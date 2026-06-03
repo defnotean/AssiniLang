@@ -1,6 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
-import { createEmptyState, JsonStore, type AppState, type Note } from "@assini/db";
+import { JsonStore, noteStatusSchema, type AppState, type Note } from "@assini/db";
 import { runEvaluationForState } from "@assini/eval";
 
 type ServerOptions = {
@@ -11,6 +11,33 @@ type ServerOptions = {
 type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
   reviewerComment?: string;
 };
+
+function parseReviewBody(input: unknown): ReviewBody | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const body = input as Record<string, unknown>;
+  const review: ReviewBody = {};
+
+  if ("status" in body) {
+    const status = noteStatusSchema.safeParse(body.status);
+    if (!status.success) return undefined;
+    review.status = status.data;
+  }
+
+  if ("explanation" in body) {
+    if (typeof body.explanation !== "string" || body.explanation.trim().length === 0) return undefined;
+    review.explanation = body.explanation;
+  }
+
+  if ("reviewerComment" in body) {
+    if (typeof body.reviewerComment !== "string" || body.reviewerComment.trim().length === 0) return undefined;
+    review.reviewerComment = body.reviewerComment;
+  }
+
+  return review;
+}
 
 export function createServer(options: ServerOptions = {}) {
   const app = Fastify({ logger: false });
@@ -60,14 +87,18 @@ export function createServer(options: ServerOptions = {}) {
     return state.evaluationRuns;
   });
 
-  app.post("/evaluations/run", async () => {
+  app.post("/evaluations/run", async (_, reply) => {
     const current = await readState();
-    const base = current.languages.length > 0 ? current : createEmptyState();
-    const runs = runEvaluationForState(base);
+    if (current.languages.length === 0) {
+      reply.code(400);
+      return { error: "No languages available to evaluate" };
+    }
+
+    const runs = runEvaluationForState(current);
 
     await writeState({
-      ...base,
-      evaluationRuns: [...base.evaluationRuns, ...runs]
+      ...current,
+      evaluationRuns: [...current.evaluationRuns, ...runs]
     });
 
     return runs;
@@ -75,7 +106,12 @@ export function createServer(options: ServerOptions = {}) {
 
   app.patch("/notes/:noteId/review", async (request, reply) => {
     const { noteId } = request.params as { noteId: string };
-    const body = (request.body ?? {}) as ReviewBody;
+    const body = parseReviewBody(request.body ?? {});
+    if (!body) {
+      reply.code(400);
+      return { error: "Invalid review body" };
+    }
+
     const state = await readState();
     const existing = state.notes.find((note) => note.id === noteId);
 

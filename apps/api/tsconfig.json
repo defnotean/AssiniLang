@@ -10,5 +10,6 @@
     { "path": "../../packages/synthetic-langs" },
     { "path": "../../packages/eval" }
   ],
-  "include": ["src"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -1,8 +1,34 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
+import { createEmptyState, JsonStore, type AppState, type EvaluationRun } from "@assini/db";
 import { buildSeedState } from "@assini/synthetic-langs";
+import { resolveRuntimeDbPath } from "./runtimePath";
 import { createServer } from "./server";
 
 describe("api server", () => {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const existingRun: EvaluationRun = {
+    id: "existing-run",
+    languageId: "archived-language",
+    createdAt: "2026-06-03T00:00:00.000Z",
+    systemVersion: "test-system",
+    fixtureVersion: "test-fixture",
+    scores: { retained: 1 },
+    failures: [],
+    summary: "Existing evaluation run."
+  };
+
+  it("resolves the runtime database path from the repository root with an env override", () => {
+    const indexUrl = pathToFileURL(join(repoRoot, "apps", "api", "src", "index.ts")).href;
+    const overridePath = join(repoRoot, "tmp", "override-db.json");
+
+    expect(resolveRuntimeDbPath({ env: {}, moduleUrl: indexUrl })).toBe(join(repoRoot, "data", "local-db.json"));
+    expect(resolveRuntimeDbPath({ env: { ASSINI_DB_PATH: overridePath }, moduleUrl: indexUrl })).toBe(overridePath);
+  });
+
   it("returns health, notes, and exercises", async () => {
     const app = createServer({ initialState: buildSeedState() });
 
@@ -43,6 +69,40 @@ describe("api server", () => {
     expect(evaluations.json()).toHaveLength(4);
   });
 
+  it("returns a client error for evaluations without languages and preserves prior runs", async () => {
+    const initialState: AppState = {
+      ...createEmptyState(),
+      evaluationRuns: [existingRun]
+    };
+    const app = createServer({ initialState });
+
+    const response = await app.inject({ method: "POST", url: "/evaluations/run" });
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "No languages available to evaluate" });
+
+    const evaluations = await app.inject({ method: "GET", url: "/evaluations" });
+    expect(evaluations.statusCode).toBe(200);
+    expect(evaluations.json()).toEqual([existingRun]);
+  });
+
+  it("reads and writes evaluation state through a provided JsonStore", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(buildSeedState());
+    const app = createServer({ store });
+
+    const languages = await app.inject({ method: "GET", url: "/languages" });
+    expect(languages.statusCode).toBe(200);
+    expect(languages.json()).toHaveLength(4);
+
+    const response = await app.inject({ method: "POST", url: "/evaluations/run" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toHaveLength(4);
+
+    const persisted = await store.read();
+    expect(persisted.evaluationRuns).toHaveLength(4);
+  });
+
   it("updates note review details", async () => {
     const app = createServer({ initialState: buildSeedState() });
 
@@ -67,6 +127,27 @@ describe("api server", () => {
       action: "reviewed",
       summary: "Please add a counterexample check."
     });
+  });
+
+  it("returns 400 for an invalid review body and does not update the note", async () => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/notes/avn-rule-verb-chain-note/review",
+      payload: {
+        status: "bogus",
+        reviewerComment: "This should not be persisted."
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Invalid review body" });
+
+    const notes = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const note = notes.json().find((item: { id: string }) => item.id === "avn-rule-verb-chain-note");
+    expect(note.status).toBe("draft");
+    expect(note.reviewer.comments).not.toContain("This should not be persisted.");
   });
 
   it("returns 404 when reviewing a missing note", async () => {
