@@ -6,12 +6,13 @@ export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
 export function createEmptyState(): AppState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     languages: [],
     corpus: [],
     noteAnswerKeys: [],
     notes: [],
     exercises: [],
+    exerciseSubmissions: [],
     evaluationRuns: []
   };
 }

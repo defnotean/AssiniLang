@@ -86,6 +86,17 @@ export const exerciseSchema = z.object({
   gradingExplanation: z.string().min(1)
 });
 
+export const exerciseSubmissionSchema = z.object({
+  id: z.string().min(1),
+  exerciseId: z.string().min(1),
+  languageId: z.string().min(1),
+  answer: z.string().min(1),
+  accepted: z.boolean(),
+  explanation: z.string().min(1),
+  submittedAt: z.string().min(1),
+  learnerId: z.string().min(1)
+});
+
 export const evaluationFailureSchema = z.object({
   category: z.string().min(1),
   languageId: z.string().min(1),
@@ -105,12 +116,13 @@ export const evaluationRunSchema = z.object({
 });
 
 export const appStateSchema = z.object({
-  schemaVersion: z.literal(2),
+  schemaVersion: z.literal(3),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
   noteAnswerKeys: z.array(noteSchema),
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
   evaluationRuns: z.array(evaluationRunSchema)
 });
 
@@ -119,6 +131,7 @@ export type CorpusPassage = z.infer<typeof corpusPassageSchema>;
 export type Morpheme = z.infer<typeof morphemeSchema>;
 export type Note = z.infer<typeof noteSchema>;
 export type Exercise = z.infer<typeof exerciseSchema>;
+export type ExerciseSubmission = z.infer<typeof exerciseSubmissionSchema>;
 export type EvaluationFailure = z.infer<typeof evaluationFailureSchema>;
 export type EvaluationRun = z.infer<typeof evaluationRunSchema>;
 export type AppState = z.infer<typeof appStateSchema>;
@@ -127,6 +140,16 @@ const legacyAppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  evaluationRuns: z.array(evaluationRunSchema)
+});
+
+const legacyAppStateV2Schema = z.object({
+  schemaVersion: z.literal(2),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  noteAnswerKeys: z.array(noteSchema),
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
   evaluationRuns: z.array(evaluationRunSchema)
@@ -165,8 +188,18 @@ export function parseAppState(input: unknown): AppState {
   if (legacy.success) {
     return appStateSchema.parse({
       ...legacy.data,
-      schemaVersion: 2,
-      noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey)
+      schemaVersion: 3,
+      noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey),
+      exerciseSubmissions: []
+    });
+  }
+
+  const legacyV2 = legacyAppStateV2Schema.safeParse(input);
+  if (legacyV2.success) {
+    return appStateSchema.parse({
+      ...legacyV2.data,
+      schemaVersion: 3,
+      exerciseSubmissions: []
     });
   }
 

@@ -1,10 +1,12 @@
-import type { CorpusPassage, EvaluationRun, Exercise, Language, Note } from "@assini/db";
+import type { CorpusPassage, EvaluationRun, Exercise, ExerciseSubmission, Language, Note } from "@assini/db";
+
+export type PublicExercise = Omit<Exercise, "expectedAnswers">;
 
 export type DashboardData = {
   languages: Language[];
   corpus: CorpusPassage[];
   notes: Note[];
-  exercises: Exercise[];
+  exercises: PublicExercise[];
   evaluations: EvaluationRun[];
 };
 
@@ -24,7 +26,7 @@ export async function fetchDashboardData(languageId = "avenik"): Promise<Dashboa
     getJson<Language[]>("/languages"),
     getJson<CorpusPassage[]>(`/languages/${encodedLanguageId}/corpus`),
     getJson<Note[]>(`/languages/${encodedLanguageId}/notes`),
-    getJson<Exercise[]>(`/languages/${encodedLanguageId}/exercises`),
+    getJson<PublicExercise[]>(`/languages/${encodedLanguageId}/exercises`),
     getJson<EvaluationRun[]>("/evaluations")
   ]);
 
@@ -56,4 +58,18 @@ export async function reviewNote(
   }
 
   return response.json() as Promise<Note>;
+}
+
+export async function submitExerciseAnswer(exerciseId: string, answer: string): Promise<ExerciseSubmission> {
+  const response = await fetch(`/api/exercises/${encodeURIComponent(exerciseId)}/submissions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answer })
+  });
+
+  if (!response.ok) {
+    throw new Error("Exercise submission failed");
+  }
+
+  return response.json() as Promise<ExerciseSubmission>;
 }

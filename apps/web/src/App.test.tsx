@@ -6,7 +6,8 @@ import { App } from "./App";
 const apiMock = vi.hoisted(() => ({
   fetchDashboardData: vi.fn(),
   runEvaluation: vi.fn(),
-  reviewNote: vi.fn()
+  reviewNote: vi.fn(),
+  submitExerciseAnswer: vi.fn()
 }));
 
 vi.mock("./api", () => apiMock);
@@ -60,7 +61,17 @@ function createDashboardData() {
         editHistory: []
       }
     ],
-    exercises: [],
+    exercises: [
+      {
+        id: "avn-ex001",
+        languageId: "avenik",
+        type: "translate_to_target",
+        prompt: "Translate: I walk by the river.",
+        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+        allowedRuleIds: ["avn-rule-verb-chain"],
+        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+      }
+    ],
     evaluations: []
   };
 }
@@ -173,5 +184,24 @@ describe("App", () => {
 
     review.resolve({});
     await waitFor(() => expect(solariButton).toBeEnabled());
+  });
+
+  it("submits learner exercise answers through the API", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.submitExerciseAnswer.mockResolvedValue({
+      accepted: true,
+      explanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+    });
+
+    render(<App />);
+
+    const answerBox = await screen.findByLabelText("Exercise answer");
+    fireEvent.change(answerBox, { target: { value: "mira talo-mi-na" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grade" }));
+
+    await waitFor(() => expect(apiMock.submitExerciseAnswer).toHaveBeenCalledWith("avn-ex001", "mira talo-mi-na"));
+    expect(
+      await screen.findByText("Use mira for river, talo for walk, -mi for present, and -na for first person singular.")
+    ).toBeInTheDocument();
   });
 });

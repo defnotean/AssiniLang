@@ -27,7 +27,7 @@ describe("JsonStore", () => {
       const raw = JSON.parse(await readFile(dbPath, "utf8"));
 
       expect(loaded.languages[0]?.id).toBe("test-lang");
-      expect(raw.schemaVersion).toBe(2);
+      expect(raw.schemaVersion).toBe(3);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -64,15 +64,35 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(2);
+      expect(loaded.schemaVersion).toBe(3);
       expect(loaded.notes).toHaveLength(1);
       expect(loaded.noteAnswerKeys).toHaveLength(1);
+      expect(loaded.exerciseSubmissions).toEqual([]);
       expect(loaded.noteAnswerKeys[0]).toMatchObject({
         id: "legacy-note",
         topic: "legacy/topic",
         explanation: "Legacy answer key text.",
         status: "approved"
       });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates v2 state with answer keys to empty exercise submissions", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const v2State = createEmptyState();
+      const { exerciseSubmissions: _removed, ...v2WithoutSubmissions } = v2State;
+      await writeFile(dbPath, `${JSON.stringify({ ...v2WithoutSubmissions, schemaVersion: 2 })}\n`, "utf8");
+
+      const loaded = await store.read();
+
+      expect(loaded.schemaVersion).toBe(3);
+      expect(loaded.exerciseSubmissions).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

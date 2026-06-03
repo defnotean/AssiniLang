@@ -49,6 +49,7 @@ describe("api server", () => {
     const exercises = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
     expect(exercises.statusCode).toBe(200);
     expect(exercises.json()[0].languageId).toBe("avenik");
+    expect(exercises.json()[0]).not.toHaveProperty("expectedAnswers");
   });
 
   it("returns languages and corpus", async () => {
@@ -116,6 +117,67 @@ describe("api server", () => {
 
     const persisted = await store.read();
     expect(persisted.evaluationRuns).toHaveLength(4);
+  });
+
+  it("grades and persists correct exercise submissions server-side", async () => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/exercises/avn-ex001/submissions",
+      payload: { answer: "mira talo-mi-na" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      exerciseId: "avn-ex001",
+      languageId: "avenik",
+      answer: "mira talo-mi-na",
+      accepted: true,
+      explanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+    });
+
+    const submissions = await app.inject({ method: "GET", url: "/exercises/avn-ex001/submissions" });
+    expect(submissions.statusCode).toBe(200);
+    expect(submissions.json()).toHaveLength(1);
+    expect(submissions.json()[0]).toMatchObject({
+      exerciseId: "avn-ex001",
+      accepted: true
+    });
+  });
+
+  it("grades incorrect exercise submissions without exposing answer keys", async () => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/exercises/avn-ex001/submissions",
+      payload: { answer: "talo mira" }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      exerciseId: "avn-ex001",
+      accepted: false,
+      explanation: "Answer did not match the synthetic exercise key."
+    });
+    expect(JSON.stringify(response.json())).not.toContain("mira talo-mi-na");
+  });
+
+  it.each([
+    ["missing exercise", "/exercises/missing-exercise/submissions", { answer: "mira talo-mi-na" }, 404],
+    ["empty answer", "/exercises/avn-ex001/submissions", { answer: " " }, 400],
+    ["missing payload", "/exercises/avn-ex001/submissions", undefined, 400]
+  ])("returns a client error for %s submissions", async (_, url, payload, statusCode) => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    const response = await app.inject({
+      method: "POST",
+      url,
+      ...(payload === undefined ? {} : { payload })
+    });
+
+    expect(response.statusCode).toBe(statusCode);
   });
 
   it("updates note review details", async () => {

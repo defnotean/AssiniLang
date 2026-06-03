@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchDashboardData, reviewNote } from "./api";
+import { fetchDashboardData, reviewNote, submitExerciseAnswer } from "./api";
 
 describe("fetchDashboardData", () => {
   afterEach(() => {
@@ -41,6 +41,23 @@ describe("fetchDashboardData", () => {
         status: "approved",
         reviewerComment: "Approved in local prototype."
       })
+    });
+  });
+
+  it("posts encoded exercise submissions", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ accepted: true })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await submitExerciseAnswer("exercise/1", "mira talo-mi-na");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/exercises/exercise%2F1/submissions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer: "mira talo-mi-na" })
     });
   });
 });

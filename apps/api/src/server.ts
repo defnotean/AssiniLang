@@ -1,7 +1,14 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
-import { JsonStore, noteStatusSchema, type AppState, type Note } from "@assini/db";
-import { runEvaluationForState } from "@assini/eval";
+import {
+  JsonStore,
+  noteStatusSchema,
+  type AppState,
+  type Exercise,
+  type ExerciseSubmission,
+  type Note
+} from "@assini/db";
+import { gradeExerciseAnswer, runEvaluationForState } from "@assini/eval";
 
 type ServerOptions = {
   store?: JsonStore;
@@ -11,6 +18,31 @@ type ServerOptions = {
 type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
   reviewerComment?: string;
 };
+
+type PublicExercise = Omit<Exercise, "expectedAnswers">;
+
+type ExerciseSubmissionBody = {
+  answer: string;
+};
+
+function toPublicExercise(exercise: Exercise): PublicExercise {
+  const { expectedAnswers: _expectedAnswers, ...publicExercise } = exercise;
+  return publicExercise;
+}
+
+function parseExerciseSubmissionBody(input: unknown): ExerciseSubmissionBody | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const body = input as Record<string, unknown>;
+  if (typeof body.answer !== "string") {
+    return undefined;
+  }
+
+  const answer = body.answer.trim();
+  return answer.length > 0 ? { answer } : undefined;
+}
 
 function parseReviewBody(input: unknown): ReviewBody | undefined {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
@@ -95,7 +127,57 @@ export function createServer(options: ServerOptions = {}) {
       reply.code(404);
       return { error: `Language not found: ${languageId}` };
     }
-    return state.exercises.filter((exercise) => exercise.languageId === languageId);
+    return state.exercises.filter((exercise) => exercise.languageId === languageId).map(toPublicExercise);
+  });
+
+  app.get("/exercises/:exerciseId/submissions", async (request, reply) => {
+    const { exerciseId } = request.params as { exerciseId: string };
+    const state = await readState();
+    const exercise = state.exercises.find((item) => item.id === exerciseId);
+
+    if (!exercise) {
+      reply.code(404);
+      return { error: `Exercise not found: ${exerciseId}` };
+    }
+
+    return state.exerciseSubmissions.filter((submission) => submission.exerciseId === exerciseId);
+  });
+
+  app.post("/exercises/:exerciseId/submissions", async (request, reply) => {
+    const { exerciseId } = request.params as { exerciseId: string };
+    const state = await readState();
+    const exercise = state.exercises.find((item) => item.id === exerciseId);
+
+    if (!exercise) {
+      reply.code(404);
+      return { error: `Exercise not found: ${exerciseId}` };
+    }
+
+    const body = parseExerciseSubmissionBody(request.body ?? {});
+    if (!body) {
+      reply.code(400);
+      return { error: "Invalid exercise submission body" };
+    }
+
+    const graded = gradeExerciseAnswer(exercise, body.answer);
+    const submittedAt = new Date().toISOString();
+    const submission: ExerciseSubmission = {
+      id: `submission-${exercise.id}-${state.exerciseSubmissions.length + 1}-${submittedAt}`,
+      exerciseId: exercise.id,
+      languageId: exercise.languageId,
+      answer: body.answer,
+      accepted: graded.accepted,
+      explanation: graded.accepted ? graded.explanation : "Answer did not match the synthetic exercise key.",
+      submittedAt,
+      learnerId: "local-learner"
+    };
+
+    await writeState({
+      ...state,
+      exerciseSubmissions: [...state.exerciseSubmissions, submission]
+    });
+
+    return submission;
   });
 
   app.get("/evaluations", async () => {

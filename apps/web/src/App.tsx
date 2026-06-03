@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Note } from "@assini/db";
 import type { DashboardData } from "./api";
-import { fetchDashboardData, reviewNote, runEvaluation } from "./api";
+import { fetchDashboardData, reviewNote, runEvaluation, submitExerciseAnswer } from "./api";
 import "./styles.css";
 
 type LoadState =
@@ -13,16 +13,13 @@ function formatScore(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-function normalizeAnswer(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 export function App() {
   const [selectedLanguageId, setSelectedLanguageId] = useState("avenik");
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
   const [answer, setAnswer] = useState("");
   const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -53,7 +50,7 @@ export function App() {
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId);
   const latestEvaluations = useMemo(() => data?.evaluations.slice(-4).reverse() ?? [], [data]);
   const firstExercise = data?.exercises[0];
-  const isWorkflowBusy = isEvaluating || reviewingNoteId !== null;
+  const isWorkflowBusy = isEvaluating || reviewingNoteId !== null || isGrading;
 
   async function handleRunEvaluation() {
     setIsEvaluating(true);
@@ -89,20 +86,24 @@ export function App() {
     }
   }
 
-  function handleGradeExercise() {
-    if (!firstExercise) {
+  async function handleGradeExercise() {
+    const submittedAnswer = answer.trim();
+    if (!firstExercise || submittedAnswer.length === 0) {
       return;
     }
 
-    const accepted = firstExercise.expectedAnswers.some(
-      (expected) => normalizeAnswer(expected) === normalizeAnswer(answer)
-    );
+    setIsGrading(true);
+    setExerciseResult(null);
 
-    setExerciseResult(
-      accepted
-        ? firstExercise.gradingExplanation
-        : `Try again. Expected: ${firstExercise.expectedAnswers.join(" | ")}`
-    );
+    try {
+      const submission = await submitExerciseAnswer(firstExercise.id, submittedAnswer);
+      setExerciseResult(submission.explanation);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Exercise submission failed";
+      setExerciseResult(message);
+    } finally {
+      setIsGrading(false);
+    }
   }
 
   return (
@@ -260,8 +261,8 @@ export function App() {
                       aria-label="Exercise answer"
                     />
                   </label>
-                  <button type="button" onClick={handleGradeExercise}>
-                    Grade
+                  <button type="button" onClick={handleGradeExercise} disabled={isGrading || answer.trim().length === 0}>
+                    {isGrading ? "Grading..." : "Grade"}
                   </button>
                   {exerciseResult && <p className="exercise-result">{exerciseResult}</p>}
                 </article>
