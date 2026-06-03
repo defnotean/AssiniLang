@@ -1,12 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { appStateSchema, type AppState, type Note } from "./schema";
+import { appStateSchema, parseAppState, type AppState, type Note } from "./schema";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
 export function createEmptyState(): AppState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     languages: [],
     corpus: [],
     noteAnswerKeys: [],
@@ -22,7 +22,7 @@ export class JsonStore {
   async read(): Promise<AppState> {
     try {
       const raw = await readFile(this.dbPath, "utf8");
-      return appStateSchema.parse(JSON.parse(raw));
+      return parseAppState(JSON.parse(raw));
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return createEmptyState();

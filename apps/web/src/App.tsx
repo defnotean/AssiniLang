@@ -53,6 +53,7 @@ export function App() {
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId);
   const latestEvaluations = useMemo(() => data?.evaluations.slice(-4).reverse() ?? [], [data]);
   const firstExercise = data?.exercises[0];
+  const isWorkflowBusy = isEvaluating || reviewingNoteId !== null;
 
   async function handleRunEvaluation() {
     setIsEvaluating(true);
@@ -111,7 +112,7 @@ export function App() {
           <p className="eyebrow">Synthetic fixtures only</p>
           <h1>Synthetic Language Evaluation</h1>
         </div>
-        <button type="button" onClick={handleRunEvaluation} disabled={isEvaluating || loadState.status === "loading"}>
+        <button type="button" onClick={handleRunEvaluation} disabled={isWorkflowBusy || loadState.status === "loading"}>
           {isEvaluating ? "Running..." : "Run Evaluation"}
         </button>
       </header>
@@ -136,7 +137,7 @@ export function App() {
                 key={language.id}
                 className={language.id === selectedLanguageId ? "selected" : ""}
                 aria-pressed={language.id === selectedLanguageId}
-                disabled={isEvaluating}
+                disabled={isWorkflowBusy}
                 onClick={() => setSelectedLanguageId(language.id)}
               >
                 <span>{language.name}</span>
@@ -198,7 +199,7 @@ export function App() {
                       <button
                         type="button"
                         aria-label={`Approve ${note.topic}`}
-                        disabled={reviewingNoteId === note.id}
+                        disabled={reviewingNoteId !== null}
                         onClick={() => handleReviewNote(note, "approved")}
                       >
                         Approve
@@ -207,7 +208,7 @@ export function App() {
                         type="button"
                         className="secondary"
                         aria-label={`Contest ${note.topic}`}
-                        disabled={reviewingNoteId === note.id}
+                        disabled={reviewingNoteId !== null}
                         onClick={() => handleReviewNote(note, "contested")}
                       >
                         Contest

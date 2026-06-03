@@ -105,7 +105,7 @@ export const evaluationRunSchema = z.object({
 });
 
 export const appStateSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
   noteAnswerKeys: z.array(noteSchema),
@@ -122,3 +122,53 @@ export type Exercise = z.infer<typeof exerciseSchema>;
 export type EvaluationFailure = z.infer<typeof evaluationFailureSchema>;
 export type EvaluationRun = z.infer<typeof evaluationRunSchema>;
 export type AppState = z.infer<typeof appStateSchema>;
+
+const legacyAppStateV1Schema = z.object({
+  schemaVersion: z.literal(1),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  evaluationRuns: z.array(evaluationRunSchema)
+});
+
+function migrateLegacyNoteToAnswerKey(note: Note): Note {
+  return {
+    ...note,
+    examples: note.examples.map((example) => ({ ...example })),
+    evidencePassageIds: [...note.evidencePassageIds],
+    status: "approved",
+    reviewer: {
+      lastReviewedBy: "legacy-v1-migration",
+      lastReviewedAt: null,
+      comments: [...note.reviewer.comments, "Migrated from v1 store without explicit note answer keys."]
+    },
+    editHistory: [
+      ...note.editHistory.map((entry) => ({ ...entry })),
+      {
+        at: new Date(0).toISOString(),
+        by: "legacy-v1-migration",
+        action: "migrated",
+        summary: "Promoted legacy note content into immutable answer-key state."
+      }
+    ]
+  };
+}
+
+export function parseAppState(input: unknown): AppState {
+  const current = appStateSchema.safeParse(input);
+  if (current.success) {
+    return current.data;
+  }
+
+  const legacy = legacyAppStateV1Schema.safeParse(input);
+  if (legacy.success) {
+    return appStateSchema.parse({
+      ...legacy.data,
+      schemaVersion: 2,
+      noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey)
+    });
+  }
+
+  return appStateSchema.parse(input);
+}

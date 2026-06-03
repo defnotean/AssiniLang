@@ -154,4 +154,24 @@ describe("App", () => {
     );
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
   });
+
+  it("disables language switching while a note review refresh is in flight", async () => {
+    const review = createDeferred<unknown>();
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.reviewNote.mockReturnValue(review.promise);
+
+    render(<App />);
+
+    const solariButton = await screen.findByRole("button", { name: /Solari/ });
+    fireEvent.click(screen.getByRole("button", { name: "Approve verb chains" }));
+
+    await waitFor(() => expect(solariButton).toBeDisabled());
+
+    fireEvent.click(solariButton);
+
+    expect(apiMock.fetchDashboardData).not.toHaveBeenCalledWith("solari");
+
+    review.resolve({});
+    await waitFor(() => expect(solariButton).toBeEnabled());
+  });
 });
