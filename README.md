@@ -15,13 +15,15 @@ npm run dev
 
 Open the web app at `http://localhost:5173`. The API runs at `http://localhost:4321`.
 
+`npm run seed`, `npm run eval`, `npm run dev`, and therefore `npm run demo` become available once the scaffold packages and apps are implemented.
+
 ## One-Command Demo
 
 ```powershell
 npm run demo
 ```
 
-The demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
+Once the scaffold packages and apps are implemented, the demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
 
 ## Project Shape
 
