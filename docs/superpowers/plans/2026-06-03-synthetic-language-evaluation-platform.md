@@ -84,6 +84,7 @@ Create `package.json`:
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.8",
     "concurrently": "^9.1.0",
     "jsdom": "^25.0.1",
     "tsx": "^4.19.2",
@@ -108,7 +109,7 @@ Create `tsconfig.base.json`:
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022"],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -180,13 +181,15 @@ npm run dev
 
 Open the web app at `http://localhost:5173`. The API runs at `http://localhost:4321`.
 
+`npm run seed`, `npm run eval`, `npm run dev`, and therefore `npm run demo` become available once the scaffold packages and apps are implemented.
+
 ## One-Command Demo
 
 ```powershell
 npm run demo
 ```
 
-The demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
+Once the scaffold packages and apps are implemented, the demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
 
 ## Project Shape
 
@@ -2011,6 +2014,7 @@ Create `apps/web/tsconfig.json`:
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "rootDir": ".",
     "outDir": "dist"
   },
