@@ -45,24 +45,30 @@ function answerUsesAllowedVocabulary(answer: string, allowedForms: string[]): bo
     .every((token) => tokenUsesAllowedVocabulary(token, allowedForms));
 }
 
-function segmentPromptTarget(prompt: string): string | undefined {
-  const match = prompt.match(/^Segment:\s*(.+)$/i);
-  return match?.[1]?.trim();
-}
-
-function segmentAnswerMatchesPrompt(answer: string, prompt: string): boolean {
-  const target = segmentPromptTarget(prompt);
-  if (!target) return false;
-
-  const pieces = answer
+function segmentPieces(answer: string): string[] {
+  return answer
     .replace(/\|/g, " ")
     .split(/\s+/)
+    .map((piece) => normalize(piece))
     .filter(Boolean);
-  if (pieces.length === 0) return false;
+}
 
-  const exactSurface = pieces.join("");
-  const boundarylessSurface = pieces.map((piece) => piece.replace(/^-|-$/g, "")).join("");
-  return exactSurface === target || boundarylessSurface === target;
+function sameSegmentSequence(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((piece, index) => piece === right[index]);
+}
+
+function segmentAnswerMatchesExpectedBoundaries(answer: string, exercise: Exercise): boolean {
+  const allowedPieces = new Set(exercise.allowedVocabulary.map((piece) => normalize(piece)));
+  const submittedPieces = segmentPieces(answer);
+  if (submittedPieces.length === 0 || submittedPieces.some((piece) => !allowedPieces.has(piece))) {
+    return false;
+  }
+
+  const expectedSequences = exercise.expectedAnswers
+    .map(segmentPieces)
+    .filter((sequence) => sequence.length > 0 && sequence.every((piece) => allowedPieces.has(piece)));
+
+  return expectedSequences.some((sequence) => sameSegmentSequence(submittedPieces, sequence));
 }
 
 function targetAnswerExistsInCorpus(languageId: string, state: AppState, answer: string): boolean {
@@ -82,7 +88,7 @@ function answerPassesGenerationPolicy(languageId: string, state: AppState, exerc
   }
 
   if (exercise.type === "segment") {
-    return segmentAnswerMatchesPrompt(answer, exercise.prompt);
+    return segmentAnswerMatchesExpectedBoundaries(answer, exercise);
   }
 
   if (exercise.type === "choose_particle") {

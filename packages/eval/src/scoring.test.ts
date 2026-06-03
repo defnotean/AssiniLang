@@ -113,4 +113,24 @@ describe("evaluation scoring", () => {
       ])
     );
   });
+
+  it("rejects segment answers that collapse required morpheme boundaries", () => {
+    const state = buildSeedState();
+    const exercise = state.exercises.find((item) => item.id === "avn-ex002");
+    if (!exercise) throw new Error("Missing avn-ex002");
+
+    exercise.expectedAnswers = [...exercise.expectedAnswers, "nemi-lo -ki"];
+
+    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+
+    expect(result.scores.generationPolicy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "generationPolicy",
+          itemId: "avn-ex002"
+        })
+      ])
+    );
+  });
 });
