@@ -19,24 +19,28 @@ function parseReviewBody(input: unknown): ReviewBody | undefined {
 
   const body = input as Record<string, unknown>;
   const review: ReviewBody = {};
+  let hasReviewField = false;
 
   if ("status" in body) {
+    hasReviewField = true;
     const status = noteStatusSchema.safeParse(body.status);
     if (!status.success) return undefined;
     review.status = status.data;
   }
 
   if ("explanation" in body) {
+    hasReviewField = true;
     if (typeof body.explanation !== "string" || body.explanation.trim().length === 0) return undefined;
     review.explanation = body.explanation;
   }
 
   if ("reviewerComment" in body) {
+    hasReviewField = true;
     if (typeof body.reviewerComment !== "string" || body.reviewerComment.trim().length === 0) return undefined;
     review.reviewerComment = body.reviewerComment;
   }
 
-  return review;
+  return hasReviewField ? review : undefined;
 }
 
 export function createServer(options: ServerOptions = {}) {

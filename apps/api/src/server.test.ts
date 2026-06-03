@@ -10,6 +10,7 @@ import { createServer } from "./server";
 
 describe("api server", () => {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const reviewedNoteId = "avn-rule-verb-chain-note";
   const existingRun: EvaluationRun = {
     id: "existing-run",
     languageId: "archived-language",
@@ -20,6 +21,11 @@ describe("api server", () => {
     failures: [],
     summary: "Existing evaluation run."
   };
+
+  async function fetchReviewedNote(app: ReturnType<typeof createServer>) {
+    const notes = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    return notes.json().find((item: { id: string }) => item.id === reviewedNoteId);
+  }
 
   it("resolves the runtime database path from the repository root with an env override", () => {
     const indexUrl = pathToFileURL(join(repoRoot, "apps", "api", "src", "index.ts")).href;
@@ -108,7 +114,7 @@ describe("api server", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/notes/avn-rule-verb-chain-note/review",
+      url: `/notes/${reviewedNoteId}/review`,
       payload: {
         status: "contested",
         explanation: "Needs one more example before approval.",
@@ -134,7 +140,7 @@ describe("api server", () => {
 
     const response = await app.inject({
       method: "PATCH",
-      url: "/notes/avn-rule-verb-chain-note/review",
+      url: `/notes/${reviewedNoteId}/review`,
       payload: {
         status: "bogus",
         reviewerComment: "This should not be persisted."
@@ -144,10 +150,34 @@ describe("api server", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Invalid review body" });
 
-    const notes = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
-    const note = notes.json().find((item: { id: string }) => item.id === "avn-rule-verb-chain-note");
+    const note = await fetchReviewedNote(app);
     expect(note.status).toBe("draft");
     expect(note.reviewer.comments).not.toContain("This should not be persisted.");
+  });
+
+  it.each([
+    ["empty object", { payload: {} }],
+    ["unknown-only object", { payload: { foo: "bar" } }],
+    ["null payload", { payload: null }],
+    ["missing payload", {}]
+  ])("returns 400 for a %s review body and does not update the note", async (_, injectOptions) => {
+    const app = createServer({ initialState: buildSeedState() });
+    const before = await fetchReviewedNote(app);
+
+    const response = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      ...injectOptions
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Invalid review body" });
+
+    const after = await fetchReviewedNote(app);
+    expect(after.status).toBe(before.status);
+    expect(after.explanation).toBe(before.explanation);
+    expect(after.reviewer).toEqual(before.reviewer);
+    expect(after.editHistory).toEqual(before.editHistory);
   });
 
   it("returns 404 when reviewing a missing note", async () => {
