@@ -1,4 +1,4 @@
-import type { AppState, EvaluationFailure, Exercise, Note } from "@assini/db";
+import type { AppState, CorpusAnswerKey, EvaluationFailure, Exercise, Morpheme, Note } from "@assini/db";
 
 type LanguageScoreResult = {
   scores: Record<string, number>;
@@ -21,6 +21,10 @@ function answerKeyTopicMap(languageId: string, state: AppState): Map<string, Not
   );
 }
 
+function corpusAnswerKeysForLanguage(languageId: string, state: AppState): CorpusAnswerKey[] {
+  return (state.corpusAnswerKeys ?? []).filter((answerKey) => answerKey.languageId === languageId);
+}
+
 function tokenUsesAllowedVocabulary(token: string, allowedForms: string[]): boolean {
   if (allowedForms.includes(token)) return true;
   if (!token.includes("-")) return false;
@@ -35,6 +39,108 @@ function tokenUsesAllowedVocabulary(token: string, allowedForms: string[]): bool
   }
 
   return true;
+}
+
+function canonicalMorpheme(morpheme: Morpheme): Morpheme {
+  return {
+    surface: normalize(morpheme.surface),
+    lemma: normalize(morpheme.lemma),
+    gloss: normalize(morpheme.gloss),
+    features: morpheme.features.map(normalize).sort()
+  };
+}
+
+function sameMorphemeSequence(left: Morpheme[], right: Morpheme[]): boolean {
+  if (left.length !== right.length) return false;
+
+  return left.every((morpheme, index) => {
+    const rightMorpheme = right[index];
+    if (!rightMorpheme) return false;
+
+    return JSON.stringify(canonicalMorpheme(morpheme)) === JSON.stringify(canonicalMorpheme(rightMorpheme));
+  });
+}
+
+function translationMatchesAnswerKey(actual: { textTarget: string; textTranslation: string }, expected: CorpusAnswerKey): boolean {
+  return normalize(actual.textTarget) === normalize(expected.textTarget)
+    && normalize(actual.textTranslation) === normalize(expected.textTranslation);
+}
+
+function scoreCorpusAnswerKeys(
+  languageId: string,
+  state: AppState,
+  failures: EvaluationFailure[]
+): { segmentationPass: number; translationPass: number; total: number } {
+  const languageCorpus = state.corpus.filter((passage) => passage.languageId === languageId);
+  const corpusById = new Map(languageCorpus.map((passage) => [passage.id, passage]));
+  const answerKeys = corpusAnswerKeysForLanguage(languageId, state);
+  const answerKeyPassageIds = new Set(answerKeys.map((answerKey) => answerKey.passageId));
+  const unkeyedCorpus = languageCorpus.filter((passage) => !answerKeyPassageIds.has(passage.id));
+
+  let segmentationPass = 0;
+  let translationPass = 0;
+
+  for (const expected of answerKeys) {
+    const actual = corpusById.get(expected.passageId);
+    if (!actual) {
+      failures.push({
+        category: "translationAccuracy",
+        languageId,
+        itemId: expected.passageId,
+        message: `Missing corpus passage for answer key ${expected.passageId}.`
+      });
+      failures.push({
+        category: "segmentationAccuracy",
+        languageId,
+        itemId: expected.passageId,
+        message: `Missing corpus passage for answer key ${expected.passageId}.`
+      });
+      continue;
+    }
+
+    if (translationMatchesAnswerKey(actual, expected)) {
+      translationPass += 1;
+    } else {
+      failures.push({
+        category: "translationAccuracy",
+        languageId,
+        itemId: expected.passageId,
+        message: `Translation mismatch for corpus passage ${expected.passageId}.`
+      });
+    }
+
+    if (sameMorphemeSequence(actual.morphologicalSegmentation, expected.morphologicalSegmentation)) {
+      segmentationPass += 1;
+    } else {
+      failures.push({
+        category: "segmentationAccuracy",
+        languageId,
+        itemId: expected.passageId,
+        message: `Segmentation mismatch for corpus passage ${expected.passageId}.`
+      });
+    }
+  }
+
+  for (const passage of unkeyedCorpus) {
+    failures.push({
+      category: "translationAccuracy",
+      languageId,
+      itemId: passage.id,
+      message: `Missing corpus answer key for passage ${passage.id}.`
+    });
+    failures.push({
+      category: "segmentationAccuracy",
+      languageId,
+      itemId: passage.id,
+      message: `Missing corpus answer key for passage ${passage.id}.`
+    });
+  }
+
+  return {
+    segmentationPass,
+    translationPass,
+    total: answerKeys.length + unkeyedCorpus.length
+  };
 }
 
 function answerUsesAllowedVocabulary(answer: string, allowedForms: string[]): boolean {
@@ -204,9 +310,7 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     }
   }
 
-  const languageCorpus = state.corpus.filter((passage) => passage.languageId === languageId);
-  const segmentationPass = languageCorpus.filter((passage) => passage.morphologicalSegmentation.length > 0).length;
-  const translationPass = languageCorpus.filter((passage) => passage.textTranslation.length > 0 && passage.textTarget.length > 0).length;
+  const corpusScores = scoreCorpusAnswerKeys(languageId, state, failures);
 
   const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
   let exercisePass = 0;
@@ -255,8 +359,8 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
       noteCoverage: scoreRatio(coveragePass, expectedByTopic.size),
       noteAccuracy: scoreRatio(contentPass, expectedByTopic.size),
       evidenceAccuracy: scoreRatio(evidencePass, expectedByTopic.size),
-      segmentationAccuracy: scoreRatio(segmentationPass, languageCorpus.length),
-      translationAccuracy: scoreRatio(translationPass, languageCorpus.length),
+      segmentationAccuracy: scoreRatio(corpusScores.segmentationPass, corpusScores.total),
+      translationAccuracy: scoreRatio(corpusScores.translationPass, corpusScores.total),
       exerciseGrading: scoreRatio(exercisePass, languageExercises.length),
       generationPolicy: scoreRatio(generationPolicyPass, generationCheckedExercises.length)
     },

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseAppState } from "@assini/db";
 import { buildSeedState, syntheticLanguageFixtures } from "./loader";
 
 describe("synthetic language fixtures", () => {
@@ -14,6 +15,64 @@ describe("synthetic language fixtures", () => {
     const state = buildSeedState();
     expect(state.corpus.length).toBeGreaterThanOrEqual(20);
     expect(state.corpus.every((passage) => passage.consentStatus.use === "synthetic-testing-only")).toBe(true);
+  });
+
+  it("seeds corpus answer keys from the existing fixture corpus", () => {
+    const state = buildSeedState();
+    const answerKeys = (state as unknown as {
+      corpusAnswerKeys?: Array<{
+        passageId: string;
+        languageId: string;
+        textTarget: string;
+        textTranslation: string;
+      }>;
+    }).corpusAnswerKeys;
+    const passage = state.corpus.find((item) => item.id === "avn-c001");
+    if (!passage) throw new Error("Missing avn-c001");
+
+    const answerKey = answerKeys?.find((item) => item.passageId === passage.id);
+
+    expect(answerKeys).toHaveLength(state.corpus.length);
+    expect(answerKey).toMatchObject({
+      passageId: "avn-c001",
+      languageId: "avenik",
+      textTarget: "mira talo-mi-na",
+      textTranslation: "I walk by the river."
+    });
+
+    passage.textTranslation = "Mutable corpus edit.";
+
+    expect(answerKey?.textTranslation).toBe("I walk by the river.");
+  });
+
+  it.each([1, 2, 3] as const)("migrates legacy v%s corpus data into corpus answer keys", (schemaVersion) => {
+    const seededState = buildSeedState();
+    const legacyState = { ...seededState, schemaVersion } as Record<string, unknown>;
+    delete legacyState.corpusAnswerKeys;
+
+    if (schemaVersion === 1) {
+      delete legacyState.noteAnswerKeys;
+      delete legacyState.exerciseSubmissions;
+    }
+
+    if (schemaVersion === 2) {
+      delete legacyState.exerciseSubmissions;
+    }
+
+    const loaded = parseAppState(legacyState) as typeof seededState & {
+      corpusAnswerKeys?: Array<{
+        passageId: string;
+        textTarget: string;
+        textTranslation: string;
+      }>;
+    };
+
+    expect(loaded.schemaVersion).toBe(3);
+    expect(loaded.corpusAnswerKeys).toHaveLength(seededState.corpus.length);
+    expect(loaded.corpusAnswerKeys?.find((item) => item.passageId === "ket-c002")).toMatchObject({
+      textTarget: "ka-se-lom-ra",
+      textTranslation: "They told the story yesterday."
+    });
   });
 
   it("connects notes and exercises to existing languages", () => {

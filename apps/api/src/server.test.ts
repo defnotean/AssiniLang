@@ -146,6 +146,52 @@ describe("api server", () => {
     });
   });
 
+  it("preserves concurrent exercise submissions through a provided JsonStore", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-submissions-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(buildSeedState());
+    const app = createServer({ store });
+
+    const responses = await Promise.all(
+      Array.from({ length: 20 }, async (_, index) =>
+        app.inject({
+          method: "POST",
+          url: "/exercises/avn-ex001/submissions",
+          payload: { answer: index % 2 === 0 ? "mira talo-mi-na" : "talo mira" }
+        })
+      )
+    );
+
+    expect(responses.every((response) => response.statusCode === 200)).toBe(true);
+
+    const persisted = await store.read();
+    const submissions = persisted.exerciseSubmissions.filter((submission) => submission.exerciseId === "avn-ex001");
+
+    expect(submissions).toHaveLength(20);
+    expect(new Set(submissions.map((submission) => submission.id)).size).toBe(20);
+  });
+
+  it("returns sanitized exercise submission history without learner answers", async () => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    await app.inject({
+      method: "POST",
+      url: "/exercises/avn-ex001/submissions",
+      payload: { answer: "mira talo-mi-na" }
+    });
+
+    const submissions = await app.inject({ method: "GET", url: "/exercises/avn-ex001/submissions" });
+
+    expect(submissions.statusCode).toBe(200);
+    expect(submissions.json()[0]).toMatchObject({
+      exerciseId: "avn-ex001",
+      accepted: true,
+      explanation: "Accepted synthetic exercise submission."
+    });
+    expect(submissions.json()[0]).not.toHaveProperty("answer");
+    expect(JSON.stringify(submissions.json())).not.toContain("mira talo-mi-na");
+  });
+
   it("grades incorrect exercise submissions without exposing answer keys", async () => {
     const app = createServer({ initialState: buildSeedState() });
 

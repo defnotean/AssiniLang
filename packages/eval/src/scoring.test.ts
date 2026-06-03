@@ -26,6 +26,50 @@ describe("evaluation scoring", () => {
     expect(result.failures).toHaveLength(0);
   });
 
+  it("scores corpus translations against answer-key text", () => {
+    const state = buildSeedState();
+    const passage = state.corpus.find((item) => item.id === "avn-c001");
+    if (!passage) throw new Error("Missing avn-c001");
+
+    passage.textTranslation = "A fluent but wrong translation.";
+
+    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+
+    expect(result.scores.translationAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "translationAccuracy",
+          itemId: "avn-c001"
+        })
+      ])
+    );
+  });
+
+  it("scores corpus segmentations against answer-key morphemes", () => {
+    const state = buildSeedState();
+    const passage = state.corpus.find((item) => item.id === "avn-c002");
+    if (!passage) throw new Error("Missing avn-c002");
+
+    passage.morphologicalSegmentation = [
+      { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+      { surface: "nemi-lo", lemma: "nemi", gloss: "teach.past", features: ["verb"] },
+      { surface: "-ki", lemma: "-ki", gloss: "3sg", features: ["person"] }
+    ];
+
+    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+
+    expect(result.scores.segmentationAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "segmentationAccuracy",
+          itemId: "avn-c002"
+        })
+      ])
+    );
+  });
+
   it("scores drafted notes against immutable answer keys instead of mutable reviewed notes", () => {
     const state = buildSeedState();
     const reviewedNote = state.notes.find((note) => note.id === "avn-rule-verb-chain-note");

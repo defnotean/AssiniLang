@@ -1,5 +1,6 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { appStateSchema, parseAppState, type AppState, type Note } from "./schema";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
@@ -18,6 +19,8 @@ export function createEmptyState(): AppState {
 }
 
 export class JsonStore {
+  private updateQueue: Promise<void> = Promise.resolve();
+
   constructor(private readonly dbPath = DEFAULT_DB_PATH) {}
 
   async read(): Promise<AppState> {
@@ -34,15 +37,31 @@ export class JsonStore {
 
   async write(state: AppState): Promise<void> {
     const parsed = appStateSchema.parse(state);
-    await mkdir(dirname(this.dbPath), { recursive: true });
-    await writeFile(this.dbPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+    const dbDir = dirname(this.dbPath);
+    const tempPath = join(dbDir, `.${basename(this.dbPath)}.${randomUUID()}.tmp`);
+
+    await mkdir(dbDir, { recursive: true });
+    try {
+      await writeFile(tempPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
+      await rename(tempPath, this.dbPath);
+    } catch (error) {
+      await unlink(tempPath).catch(() => undefined);
+      throw error;
+    }
   }
 
   async update(updater: (state: AppState) => AppState): Promise<AppState> {
-    const current = await this.read();
-    const next = updater(current);
-    await this.write(next);
-    return next;
+    const operation = this.updateQueue.then(async () => {
+      const current = await this.read();
+      const next = updater(current);
+      await this.write(next);
+      return next;
+    });
+    this.updateQueue = operation.then(
+      () => undefined,
+      () => undefined
+    );
+    return operation;
   }
 
   async updateNote(noteId: string, patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>): Promise<Note> {

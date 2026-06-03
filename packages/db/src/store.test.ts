@@ -113,4 +113,42 @@ describe("JsonStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("serializes concurrent updates through the latest persisted state", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      await store.write(createEmptyState());
+
+      await Promise.all(
+        Array.from({ length: 20 }, async (_, index) =>
+          store.update((state) => ({
+            ...state,
+            languages: [
+              ...state.languages,
+              {
+                id: `lang-${index}`,
+                name: `Lang ${index}`,
+                typology: "isolating",
+                description: "Synthetic concurrent update language.",
+                orthography: "Latin",
+                status: "synthetic",
+                fixtureSource: "concurrency-test"
+              }
+            ]
+          }))
+        )
+      );
+
+      const loaded = await store.read();
+
+      expect(loaded.languages.map((language) => language.id).sort()).toEqual(
+        Array.from({ length: 20 }, (_, index) => `lang-${index}`).sort()
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

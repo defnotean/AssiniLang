@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
@@ -53,12 +53,50 @@ function createDashboardData() {
         confidence: "high",
         status: "draft",
         reviewer: {
+          lastReviewedBy: "mentor-reviewer",
+          lastReviewedAt: "2026-06-02T15:30:00.000Z",
+          comments: ["Check suffix boundaries before approval."]
+        },
+        dialectScope: "synthetic baseline",
+        editHistory: [
+          {
+            at: "2026-06-01T12:00:00.000Z",
+            by: "draft-agent",
+            action: "drafted",
+            summary: "Generated from the Avenik grammar fixture."
+          }
+        ]
+      },
+      {
+        id: "avn-rule-case-note",
+        languageId: "avenik",
+        topic: "case particles",
+        explanation: "Avenik marks oblique roles with postposed particles.",
+        examples: [
+          {
+            passageId: "avn-c004",
+            target: "sela mora-ke",
+            translation: "The child is near the house."
+          }
+        ],
+        evidencePassageIds: ["avn-c004", "avn-c005"],
+        evidenceCount: 2,
+        confidence: "medium",
+        status: "under_review",
+        reviewer: {
           lastReviewedBy: null,
           lastReviewedAt: null,
           comments: []
         },
         dialectScope: "synthetic baseline",
-        editHistory: []
+        editHistory: [
+          {
+            at: "2026-06-01T13:00:00.000Z",
+            by: "draft-agent",
+            action: "revised",
+            summary: "Added a second evidence passage."
+          }
+        ]
       }
     ],
     exercises: [
@@ -102,8 +140,9 @@ describe("App", () => {
     expect(await screen.findByText("Note Review Queue")).toBeInTheDocument();
     expect(await screen.findByText("Evaluation Dashboard")).toBeInTheDocument();
     expect(await screen.findByText("Learner Exercise Preview")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Avenik/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /Solari/ })).toHaveAttribute("aria-pressed", "false");
+    const languageSelector = screen.getByRole("region", { name: "Language selector" });
+    expect(within(languageSelector).getByRole("button", { name: /Avenik/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(languageSelector).getByRole("button", { name: /Solari/ })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("announces loading state through a live status region", async () => {
@@ -148,22 +187,71 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Run Evaluation" })).toBeEnabled());
   });
 
-  it("submits note review actions and refreshes the selected language", async () => {
+  const reviewActionCases = [
+    {
+      action: "approval",
+      buttonName: "Approve verb chains",
+      reviewerComment: "Approved in local prototype.",
+      status: "approved"
+    },
+    {
+      action: "contest",
+      buttonName: "Contest verb chains",
+      reviewerComment: "Contested in local prototype.",
+      status: "contested"
+    }
+  ] as const;
+
+  it.each(reviewActionCases)("submits note $action actions and refreshes the selected language", async (reviewCase) => {
     const data = createDashboardData();
     apiMock.fetchDashboardData.mockResolvedValue(data);
-    apiMock.reviewNote.mockResolvedValue({ ...data.notes[0], status: "approved" });
+    apiMock.reviewNote.mockResolvedValue({ ...data.notes[0], status: reviewCase.status });
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Approve verb chains" }));
+    fireEvent.click(await screen.findByRole("button", { name: reviewCase.buttonName }));
 
     await waitFor(() =>
       expect(apiMock.reviewNote).toHaveBeenCalledWith("avn-rule-verb-chain-note", {
-        status: "approved",
-        reviewerComment: "Approved in local prototype."
+        status: reviewCase.status,
+        reviewerComment: reviewCase.reviewerComment
       })
     );
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
+  });
+
+  it("shows selected note examples, evidence, reviewer info, comments, and edit history", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+
+    render(<App />);
+
+    const detail = await screen.findByRole("article", { name: "Selected note detail" });
+    expect(await screen.findByRole("heading", { name: "verb chains" })).toBeInTheDocument();
+    expect(within(detail).getByText("mira talo-mi-na")).toBeInTheDocument();
+    expect(within(detail).getByText("I walk by the river.")).toBeInTheDocument();
+    expect(within(detail).getByText("1 evidence link")).toBeInTheDocument();
+    expect(within(detail).getByText("avn-c001")).toBeInTheDocument();
+    expect(within(detail).getByText("mentor-reviewer")).toBeInTheDocument();
+    expect(within(detail).getByText("2026-06-02T15:30:00.000Z")).toBeInTheDocument();
+    expect(within(detail).getByText("Check suffix boundaries before approval.")).toBeInTheDocument();
+    expect(within(detail).getByText("draft-agent")).toBeInTheDocument();
+    expect(within(detail).getByText("Generated from the Avenik grammar fixture.")).toBeInTheDocument();
+  });
+
+  it("switches the note detail panel when another note is selected", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /case particles/ }));
+
+    const detail = screen.getByRole("article", { name: "Selected note detail" });
+    expect(within(detail).getByRole("heading", { name: "case particles" })).toBeInTheDocument();
+    expect(within(detail).getByText("sela mora-ke")).toBeInTheDocument();
+    expect(within(detail).getByText("2 evidence links")).toBeInTheDocument();
+    expect(within(detail).getByText("avn-c004")).toBeInTheDocument();
+    expect(within(detail).getByText("avn-c005")).toBeInTheDocument();
+    expect(within(detail).getByText("Added a second evidence passage.")).toBeInTheDocument();
   });
 
   it("disables language switching while a note review refresh is in flight", async () => {

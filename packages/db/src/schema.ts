@@ -44,6 +44,14 @@ export const corpusPassageSchema = z.object({
   })
 });
 
+export const corpusAnswerKeySchema = z.object({
+  passageId: z.string().min(1),
+  languageId: z.string().min(1),
+  textTarget: z.string().min(1),
+  textTranslation: z.string().min(1),
+  morphologicalSegmentation: z.array(morphemeSchema)
+});
+
 export const noteStatusSchema = z.enum(["draft", "under_review", "approved", "contested", "rejected"]);
 export const confidenceSchema = z.enum(["low", "medium", "high"]);
 
@@ -119,6 +127,7 @@ export const appStateSchema = z.object({
   schemaVersion: z.literal(3),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
   noteAnswerKeys: z.array(noteSchema),
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
@@ -128,6 +137,7 @@ export const appStateSchema = z.object({
 
 export type Language = z.infer<typeof languageSchema>;
 export type CorpusPassage = z.infer<typeof corpusPassageSchema>;
+export type CorpusAnswerKey = z.infer<typeof corpusAnswerKeySchema>;
 export type Morpheme = z.infer<typeof morphemeSchema>;
 export type Note = z.infer<typeof noteSchema>;
 export type Exercise = z.infer<typeof exerciseSchema>;
@@ -178,30 +188,61 @@ function migrateLegacyNoteToAnswerKey(note: Note): Note {
   };
 }
 
+function cloneMorpheme(morpheme: Morpheme): Morpheme {
+  return {
+    ...morpheme,
+    features: [...morpheme.features]
+  };
+}
+
+function cloneCorpusAnswerKey(answerKey: CorpusAnswerKey): CorpusAnswerKey {
+  return {
+    ...answerKey,
+    morphologicalSegmentation: answerKey.morphologicalSegmentation.map(cloneMorpheme)
+  };
+}
+
+export function corpusPassageToAnswerKey(passage: CorpusPassage): CorpusAnswerKey {
+  return {
+    passageId: passage.id,
+    languageId: passage.languageId,
+    textTarget: passage.textTarget,
+    textTranslation: passage.textTranslation,
+    morphologicalSegmentation: passage.morphologicalSegmentation.map(cloneMorpheme)
+  };
+}
+
+function ensureCorpusAnswerKeys(state: AppState): AppState {
+  return {
+    ...state,
+    corpusAnswerKeys: state.corpusAnswerKeys?.map(cloneCorpusAnswerKey) ?? state.corpus.map(corpusPassageToAnswerKey)
+  };
+}
+
 export function parseAppState(input: unknown): AppState {
   const current = appStateSchema.safeParse(input);
   if (current.success) {
-    return current.data;
+    return ensureCorpusAnswerKeys(current.data);
   }
 
   const legacy = legacyAppStateV1Schema.safeParse(input);
   if (legacy.success) {
-    return appStateSchema.parse({
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacy.data,
       schemaVersion: 3,
       noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey),
       exerciseSubmissions: []
-    });
+    }));
   }
 
   const legacyV2 = legacyAppStateV2Schema.safeParse(input);
   if (legacyV2.success) {
-    return appStateSchema.parse({
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV2.data,
       schemaVersion: 3,
       exerciseSubmissions: []
-    });
+    }));
   }
 
-  return appStateSchema.parse(input);
+  return ensureCorpusAnswerKeys(appStateSchema.parse(input));
 }

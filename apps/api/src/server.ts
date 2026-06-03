@@ -21,6 +21,8 @@ type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
 
 type PublicExercise = Omit<Exercise, "expectedAnswers">;
 
+type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer">;
+
 type ExerciseSubmissionBody = {
   answer: string;
 };
@@ -28,6 +30,14 @@ type ExerciseSubmissionBody = {
 function toPublicExercise(exercise: Exercise): PublicExercise {
   const { expectedAnswers: _expectedAnswers, ...publicExercise } = exercise;
   return publicExercise;
+}
+
+function toPublicExerciseSubmission(submission: ExerciseSubmission): PublicExerciseSubmission {
+  const { answer: _answer, ...publicSubmission } = submission;
+  return {
+    ...publicSubmission,
+    explanation: submission.accepted ? "Accepted synthetic exercise submission." : submission.explanation
+  };
 }
 
 function parseExerciseSubmissionBody(input: unknown): ExerciseSubmissionBody | undefined {
@@ -79,16 +89,40 @@ export function createServer(options: ServerOptions = {}) {
   const app = Fastify({ logger: false });
   const store = options.store ?? new JsonStore();
   let memoryState = options.initialState;
+  const usesMemoryState = options.initialState !== undefined;
+  let memoryUpdateQueue: Promise<void> = Promise.resolve();
 
-  const readState = async () => memoryState ?? store.read();
-
-  const writeState = async (state: AppState) => {
-    if (memoryState) {
-      memoryState = state;
-      return;
+  const readState = async (): Promise<AppState> => {
+    if (!usesMemoryState) {
+      return store.read();
     }
 
-    await store.write(state);
+    if (!memoryState) {
+      throw new Error("Memory state is not initialized");
+    }
+
+    return memoryState;
+  };
+
+  const updateState = async (updater: (state: AppState) => AppState): Promise<AppState> => {
+    if (!usesMemoryState) {
+      return store.update(updater);
+    }
+
+    const operation = memoryUpdateQueue.then(async () => {
+      if (!memoryState) {
+        throw new Error("Memory state is not initialized");
+      }
+
+      const next = updater(memoryState);
+      memoryState = next;
+      return next;
+    });
+    memoryUpdateQueue = operation.then(
+      () => undefined,
+      () => undefined
+    );
+    return operation;
   };
 
   app.register(cors, { origin: true });
@@ -140,42 +174,53 @@ export function createServer(options: ServerOptions = {}) {
       return { error: `Exercise not found: ${exerciseId}` };
     }
 
-    return state.exerciseSubmissions.filter((submission) => submission.exerciseId === exerciseId);
+    return state.exerciseSubmissions
+      .filter((submission) => submission.exerciseId === exerciseId)
+      .map(toPublicExerciseSubmission);
   });
 
   app.post("/exercises/:exerciseId/submissions", async (request, reply) => {
     const { exerciseId } = request.params as { exerciseId: string };
-    const state = await readState();
-    const exercise = state.exercises.find((item) => item.id === exerciseId);
-
-    if (!exercise) {
-      reply.code(404);
-      return { error: `Exercise not found: ${exerciseId}` };
-    }
-
     const body = parseExerciseSubmissionBody(request.body ?? {});
     if (!body) {
       reply.code(400);
       return { error: "Invalid exercise submission body" };
     }
 
-    const graded = gradeExerciseAnswer(exercise, body.answer);
-    const submittedAt = new Date().toISOString();
-    const submission: ExerciseSubmission = {
-      id: `submission-${exercise.id}-${state.exerciseSubmissions.length + 1}-${submittedAt}`,
-      exerciseId: exercise.id,
-      languageId: exercise.languageId,
-      answer: body.answer,
-      accepted: graded.accepted,
-      explanation: graded.accepted ? graded.explanation : "Answer did not match the synthetic exercise key.",
-      submittedAt,
-      learnerId: "local-learner"
-    };
+    let exerciseMissing = false;
+    let submission: ExerciseSubmission | undefined;
 
-    await writeState({
-      ...state,
-      exerciseSubmissions: [...state.exerciseSubmissions, submission]
+    await updateState((state) => {
+      const exercise = state.exercises.find((item) => item.id === exerciseId);
+
+      if (!exercise) {
+        exerciseMissing = true;
+        return state;
+      }
+
+      const graded = gradeExerciseAnswer(exercise, body.answer);
+      const submittedAt = new Date().toISOString();
+      submission = {
+        id: `submission-${exercise.id}-${state.exerciseSubmissions.length + 1}-${submittedAt}`,
+        exerciseId: exercise.id,
+        languageId: exercise.languageId,
+        answer: body.answer,
+        accepted: graded.accepted,
+        explanation: graded.accepted ? graded.explanation : "Answer did not match the synthetic exercise key.",
+        submittedAt,
+        learnerId: "local-learner"
+      };
+
+      return {
+        ...state,
+        exerciseSubmissions: [...state.exerciseSubmissions, submission]
+      };
     });
+
+    if (exerciseMissing) {
+      reply.code(404);
+      return { error: `Exercise not found: ${exerciseId}` };
+    }
 
     return submission;
   });
@@ -186,18 +231,26 @@ export function createServer(options: ServerOptions = {}) {
   });
 
   app.post("/evaluations/run", async (_, reply) => {
-    const current = await readState();
-    if (current.languages.length === 0) {
+    let noLanguages = false;
+    let runs: ReturnType<typeof runEvaluationForState> | undefined;
+
+    await updateState((current) => {
+      if (current.languages.length === 0) {
+        noLanguages = true;
+        return current;
+      }
+
+      runs = runEvaluationForState(current);
+      return {
+        ...current,
+        evaluationRuns: [...current.evaluationRuns, ...runs]
+      };
+    });
+
+    if (noLanguages) {
       reply.code(400);
       return { error: "No languages available to evaluate" };
     }
-
-    const runs = runEvaluationForState(current);
-
-    await writeState({
-      ...current,
-      evaluationRuns: [...current.evaluationRuns, ...runs]
-    });
 
     return runs;
   });
@@ -210,40 +263,49 @@ export function createServer(options: ServerOptions = {}) {
       return { error: "Invalid review body" };
     }
 
-    const state = await readState();
-    const existing = state.notes.find((note) => note.id === noteId);
+    let noteMissing = false;
+    let nextNote: Note | undefined;
 
-    if (!existing) {
+    await updateState((state) => {
+      const existing = state.notes.find((note) => note.id === noteId);
+
+      if (!existing) {
+        noteMissing = true;
+        return state;
+      }
+
+      const reviewedAt = new Date().toISOString();
+      const nextStatus = body.status ?? existing.status;
+      nextNote = {
+        ...existing,
+        status: nextStatus,
+        explanation: body.explanation ?? existing.explanation,
+        reviewer: {
+          lastReviewedBy: "local-reviewer",
+          lastReviewedAt: reviewedAt,
+          comments: body.reviewerComment ? [...existing.reviewer.comments, body.reviewerComment] : existing.reviewer.comments
+        },
+        editHistory: [
+          ...existing.editHistory,
+          {
+            at: reviewedAt,
+            by: "local-reviewer",
+            action: "reviewed",
+            summary: body.reviewerComment ?? `Status set to ${nextStatus}`
+          }
+        ]
+      };
+
+      return {
+        ...state,
+        notes: state.notes.map((note) => (note.id === noteId ? nextNote as Note : note))
+      };
+    });
+
+    if (noteMissing) {
       reply.code(404);
       return { error: `Note not found: ${noteId}` };
     }
-
-    const reviewedAt = new Date().toISOString();
-    const nextStatus = body.status ?? existing.status;
-    const nextNote: Note = {
-      ...existing,
-      status: nextStatus,
-      explanation: body.explanation ?? existing.explanation,
-      reviewer: {
-        lastReviewedBy: "local-reviewer",
-        lastReviewedAt: reviewedAt,
-        comments: body.reviewerComment ? [...existing.reviewer.comments, body.reviewerComment] : existing.reviewer.comments
-      },
-      editHistory: [
-        ...existing.editHistory,
-        {
-          at: reviewedAt,
-          by: "local-reviewer",
-          action: "reviewed",
-          summary: body.reviewerComment ?? `Status set to ${nextStatus}`
-        }
-      ]
-    };
-
-    await writeState({
-      ...state,
-      notes: state.notes.map((note) => (note.id === noteId ? nextNote : note))
-    });
 
     return nextNote;
   });

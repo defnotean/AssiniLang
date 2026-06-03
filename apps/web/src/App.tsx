@@ -13,6 +13,10 @@ function formatScore(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
+function formatEvidenceLabel(count: number): string {
+  return `${count} evidence ${count === 1 ? "link" : "links"}`;
+}
+
 export function App() {
   const [selectedLanguageId, setSelectedLanguageId] = useState("avenik");
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
@@ -21,6 +25,7 @@ export function App() {
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -49,6 +54,13 @@ export function App() {
   const data = loadState.status === "ready" ? loadState.data : null;
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId);
   const latestEvaluations = useMemo(() => data?.evaluations.slice(-4).reverse() ?? [], [data]);
+  const selectedNote = useMemo(() => {
+    if (!data || data.notes.length === 0) {
+      return null;
+    }
+
+    return data.notes.find((note) => note.id === selectedNoteId) ?? data.notes[0];
+  }, [data, selectedNoteId]);
   const firstExercise = data?.exercises[0];
   const isWorkflowBusy = isEvaluating || reviewingNoteId !== null || isGrading;
 
@@ -180,44 +192,146 @@ export function App() {
               </div>
             </section>
 
-            <section>
+            <section className="review-workspace-section">
               <div className="section-heading">
                 <h2>Note Review Queue</h2>
                 <span>{data.notes.length} notes</span>
               </div>
-              <div className="item-list">
-                {data.notes.length === 0 && <p className="empty-state">No notes awaiting review.</p>}
-                {data.notes.map((note) => (
-                  <article key={note.id} className="record">
-                    <h3>{note.topic}</h3>
-                    <p>{note.explanation}</p>
-                    <div className="pill-row">
-                      <span className="pill">{note.status}</span>
-                      <span className="pill">{note.confidence} confidence</span>
-                      <span className="pill">{note.evidenceCount} evidence links</span>
+              {data.notes.length === 0 && <p className="empty-state">No notes awaiting review.</p>}
+              {selectedNote && (
+                <div className="review-workspace">
+                  <div className="note-queue-list" aria-label="Review queue">
+                    {data.notes.map((note) => (
+                      <button
+                        type="button"
+                        key={note.id}
+                        className={`note-queue-item${note.id === selectedNote.id ? " selected" : ""}`}
+                        aria-label={`Select note ${note.topic}`}
+                        aria-pressed={note.id === selectedNote.id}
+                        disabled={isWorkflowBusy}
+                        onClick={() => setSelectedNoteId(note.id)}
+                      >
+                        <span className="note-queue-topic">{note.topic}</span>
+                        <span className="note-queue-summary">{note.explanation}</span>
+                        <span className="pill-row">
+                          <span className="pill">{note.status}</span>
+                          <span className="pill">{note.confidence} confidence</span>
+                          <span className="pill">{formatEvidenceLabel(note.evidenceCount)}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <article className="record note-detail" aria-label="Selected note detail">
+                    <div className="record-topline">
+                      <div>
+                        <span className="detail-label">Selected note</span>
+                        <h3>{selectedNote.topic}</h3>
+                      </div>
+                      <div className="pill-row">
+                        <span className="pill">{selectedNote.status}</span>
+                        <span className="pill">{selectedNote.confidence} confidence</span>
+                      </div>
                     </div>
+                    <p>{selectedNote.explanation}</p>
+
+                    <dl className="detail-grid">
+                      <div>
+                        <dt>Evidence</dt>
+                        <dd>{formatEvidenceLabel(selectedNote.evidenceCount)}</dd>
+                      </div>
+                      <div>
+                        <dt>Dialect scope</dt>
+                        <dd>{selectedNote.dialectScope}</dd>
+                      </div>
+                      <div>
+                        <dt>Last reviewed by</dt>
+                        <dd>{selectedNote.reviewer.lastReviewedBy ?? "Unreviewed"}</dd>
+                      </div>
+                      <div>
+                        <dt>Last reviewed at</dt>
+                        <dd>{selectedNote.reviewer.lastReviewedAt ?? "Unreviewed"}</dd>
+                      </div>
+                    </dl>
+
+                    <div className="detail-block">
+                      <h4>Evidence IDs</h4>
+                      <div className="pill-row">
+                        {selectedNote.evidencePassageIds.map((passageId) => (
+                          <span key={passageId} className="pill">
+                            {passageId}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="detail-block">
+                      <h4>Examples</h4>
+                      <div className="detail-list">
+                        {selectedNote.examples.map((example) => (
+                          <div key={example.passageId} className="detail-row">
+                            <code>{example.target}</code>
+                            <span>{example.translation}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="detail-block">
+                      <h4>Reviewer comments</h4>
+                      {selectedNote.reviewer.comments.length === 0 ? (
+                        <p className="inline-empty">No reviewer comments.</p>
+                      ) : (
+                        <div className="detail-list">
+                          {selectedNote.reviewer.comments.map((comment) => (
+                            <p key={comment} className="detail-row">
+                              {comment}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="detail-block">
+                      <h4>Edit history</h4>
+                      {selectedNote.editHistory.length === 0 ? (
+                        <p className="inline-empty">No edit history.</p>
+                      ) : (
+                        <div className="detail-list">
+                          {selectedNote.editHistory.map((entry) => (
+                            <div key={`${entry.at}-${entry.action}-${entry.summary}`} className="detail-row">
+                              <strong>{entry.action}</strong>
+                              <span>{entry.summary}</span>
+                              <span className="muted">{entry.by}</span>
+                              <span className="muted">{entry.at}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     <div className="review-actions">
                       <button
                         type="button"
-                        aria-label={`Approve ${note.topic}`}
+                        aria-label={`Approve ${selectedNote.topic}`}
                         disabled={reviewingNoteId !== null}
-                        onClick={() => handleReviewNote(note, "approved")}
+                        onClick={() => handleReviewNote(selectedNote, "approved")}
                       >
                         Approve
                       </button>
                       <button
                         type="button"
                         className="secondary"
-                        aria-label={`Contest ${note.topic}`}
+                        aria-label={`Contest ${selectedNote.topic}`}
                         disabled={reviewingNoteId !== null}
-                        onClick={() => handleReviewNote(note, "contested")}
+                        onClick={() => handleReviewNote(selectedNote, "contested")}
                       >
                         Contest
                       </button>
                     </div>
                   </article>
-                ))}
-              </div>
+                </div>
+              )}
             </section>
 
             <section>
