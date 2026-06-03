@@ -45,6 +45,71 @@ function answerUsesAllowedVocabulary(answer: string, allowedForms: string[]): bo
     .every((token) => tokenUsesAllowedVocabulary(token, allowedForms));
 }
 
+function segmentPromptTarget(prompt: string): string | undefined {
+  const match = prompt.match(/^Segment:\s*(.+)$/i);
+  return match?.[1]?.trim();
+}
+
+function segmentAnswerMatchesPrompt(answer: string, prompt: string): boolean {
+  const target = segmentPromptTarget(prompt);
+  if (!target) return false;
+
+  const pieces = answer
+    .replace(/\|/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  if (pieces.length === 0) return false;
+
+  const exactSurface = pieces.join("");
+  const boundarylessSurface = pieces.map((piece) => piece.replace(/^-|-$/g, "")).join("");
+  return exactSurface === target || boundarylessSurface === target;
+}
+
+function targetAnswerExistsInCorpus(languageId: string, state: AppState, answer: string): boolean {
+  const normalizedAnswer = normalize(answer);
+  return state.corpus.some(
+    (passage) => passage.languageId === languageId && normalize(passage.textTarget) === normalizedAnswer
+  );
+}
+
+function answerPassesGenerationPolicy(languageId: string, state: AppState, exercise: Exercise, answer: string): boolean {
+  if (!answerUsesAllowedVocabulary(answer, exercise.allowedVocabulary)) {
+    return false;
+  }
+
+  if (exercise.type === "translate_to_target") {
+    return targetAnswerExistsInCorpus(languageId, state, answer);
+  }
+
+  if (exercise.type === "segment") {
+    return segmentAnswerMatchesPrompt(answer, exercise.prompt);
+  }
+
+  if (exercise.type === "choose_particle") {
+    return exercise.allowedVocabulary.some((form) => normalize(form) === normalize(answer));
+  }
+
+  return true;
+}
+
+function deterministicNegativeProbeAnswers(exercise: Exercise): string[] {
+  const probes = new Set<string>();
+
+  for (const expected of exercise.expectedAnswers) {
+    const normalizedExpected = normalize(expected.replace(/\|/g, " "));
+    if (!normalizedExpected) continue;
+
+    probes.add(`${normalizedExpected} __invalid__`);
+
+    const parts = normalizedExpected.split(/\s+/).filter(Boolean);
+    if (parts.length > 1) {
+      probes.add([...parts.slice(1), parts[0]].join(" "));
+    }
+  }
+
+  return [...probes];
+}
+
 export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accepted: boolean; explanation: string } {
   const normalizedAnswer = normalize(answer);
   const accepted = exercise.expectedAnswers.some((expected) => normalize(expected) === normalizedAnswer);
@@ -68,6 +133,8 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     const drafted = draftedByTopic.get(topic);
     if (!drafted) {
       failures.push({ category: "noteCoverage", languageId, itemId: expected.id, message: `Missing note topic ${topic}` });
+      failures.push({ category: "noteAccuracy", languageId, itemId: expected.id, message: `Missing note content for ${topic}` });
+      failures.push({ category: "evidenceAccuracy", languageId, itemId: expected.id, message: `Missing note evidence for ${topic}` });
       continue;
     }
 
@@ -93,9 +160,26 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   const translationPass = languageCorpus.filter((passage) => passage.textTranslation.length > 0 && passage.textTarget.length > 0).length;
 
   const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
-  const exercisePass = languageExercises.filter((exercise) =>
-    exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted)
-  ).length;
+  let exercisePass = 0;
+  for (const exercise of languageExercises) {
+    const acceptsExpectedAnswers = exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted);
+    const rejectsNegativeProbes = deterministicNegativeProbeAnswers(exercise).every(
+      (answer) => !gradeExerciseAnswer(exercise, answer).accepted
+    );
+
+    if (acceptsExpectedAnswers && rejectsNegativeProbes) {
+      exercisePass += 1;
+    } else {
+      failures.push({
+        category: "exerciseGrading",
+        languageId,
+        itemId: exercise.id,
+        message: rejectsNegativeProbes
+          ? "Expected answer was rejected by the grader."
+          : "Deterministic invalid answer was accepted by the grader."
+      });
+    }
+  }
 
   const generationCheckedExercises = languageExercises.filter((exercise) =>
     exercise.type === "translate_to_target" || exercise.type === "segment" || exercise.type === "choose_particle"
@@ -103,7 +187,7 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   let generationPolicyPass = 0;
   for (const exercise of generationCheckedExercises) {
     const passesPolicy = exercise.expectedAnswers.every((answer) =>
-      answerUsesAllowedVocabulary(answer, exercise.allowedVocabulary)
+      answerPassesGenerationPolicy(languageId, state, exercise, answer)
     );
     if (passesPolicy) {
       generationPolicyPass += 1;
