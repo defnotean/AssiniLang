@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "rootDir": ".",
+    "outDir": "dist"
+  },
+  "references": [{ "path": "../../packages/db" }],
+  "include": ["src", "vite.config.ts"]
+}
