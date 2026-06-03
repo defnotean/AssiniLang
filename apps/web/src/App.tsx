@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Note } from "@assini/db";
-import type { DashboardData } from "./api";
-import { fetchDashboardData, reviewNote, runEvaluation, submitExerciseAnswer } from "./api";
+import type { DashboardData, PublicExerciseSubmission } from "./api";
+import {
+  fetchDashboardData,
+  fetchExerciseSubmissions,
+  reviewNote,
+  runEvaluation,
+  submitExerciseAnswer
+} from "./api";
 import "./styles.css";
 
 type LoadState =
@@ -17,6 +23,10 @@ function formatEvidenceLabel(count: number): string {
   return `${count} evidence ${count === 1 ? "link" : "links"}`;
 }
 
+function formatSubmissionStatus(submission: PublicExerciseSubmission): string {
+  return submission.accepted ? "Accepted" : "Needs review";
+}
+
 export function App() {
   const [selectedLanguageId, setSelectedLanguageId] = useState("avenik");
   const [loadState, setLoadState] = useState<LoadState>({ status: "loading" });
@@ -24,8 +34,11 @@ export function App() {
   const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isGrading, setIsGrading] = useState(false);
+  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
+  const [submissionHistory, setSubmissionHistory] = useState<PublicExerciseSubmission[]>([]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -33,6 +46,8 @@ export function App() {
     setLoadState({ status: "loading" });
     setExerciseResult(null);
     setAnswer("");
+    setSelectedExerciseId(null);
+    setSubmissionHistory([]);
 
     fetchDashboardData(selectedLanguageId)
       .then((data) => {
@@ -61,8 +76,47 @@ export function App() {
 
     return data.notes.find((note) => note.id === selectedNoteId) ?? data.notes[0];
   }, [data, selectedNoteId]);
-  const firstExercise = data?.exercises[0];
+  const selectedExercise = useMemo(() => {
+    if (!data || data.exercises.length === 0) {
+      return null;
+    }
+
+    return data.exercises.find((exercise) => exercise.id === selectedExerciseId) ?? data.exercises[0];
+  }, [data, selectedExerciseId]);
   const isWorkflowBusy = isEvaluating || reviewingNoteId !== null || isGrading;
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!selectedExercise) {
+      setSubmissionHistory([]);
+      return () => {
+        isCurrent = false;
+      };
+    }
+
+    setIsLoadingSubmissions(true);
+    fetchExerciseSubmissions(selectedExercise.id)
+      .then((history) => {
+        if (isCurrent) {
+          setSubmissionHistory(history);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setSubmissionHistory([]);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setIsLoadingSubmissions(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [selectedExercise]);
 
   async function handleRunEvaluation() {
     setIsEvaluating(true);
@@ -100,7 +154,7 @@ export function App() {
 
   async function handleGradeExercise() {
     const submittedAnswer = answer.trim();
-    if (!firstExercise || submittedAnswer.length === 0) {
+    if (!selectedExercise || submittedAnswer.length === 0) {
       return;
     }
 
@@ -108,8 +162,9 @@ export function App() {
     setExerciseResult(null);
 
     try {
-      const submission = await submitExerciseAnswer(firstExercise.id, submittedAnswer);
+      const submission = await submitExerciseAnswer(selectedExercise.id, submittedAnswer);
       setExerciseResult(submission.explanation);
+      setSubmissionHistory(await fetchExerciseSubmissions(selectedExercise.id));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Exercise submission failed";
       setExerciseResult(message);
@@ -363,10 +418,41 @@ export function App() {
                 <h2>Learner Exercise Preview</h2>
                 <span>{data.exercises.length} exercises</span>
               </div>
-              {firstExercise ? (
-                <article className="record exercise-card">
-                  <span className="pill">{firstExercise.type}</span>
-                  <h3>{firstExercise.prompt}</h3>
+              {selectedExercise ? (
+                <div className="exercise-workspace">
+                  <div className="exercise-selector" aria-label="Exercise selector">
+                    {data.exercises.map((exercise) => (
+                      <button
+                        type="button"
+                        key={exercise.id}
+                        className={`exercise-selector-item${exercise.id === selectedExercise.id ? " selected" : ""}`}
+                        aria-pressed={exercise.id === selectedExercise.id}
+                        disabled={isWorkflowBusy}
+                        onClick={() => {
+                          setSelectedExerciseId(exercise.id);
+                          setAnswer("");
+                          setExerciseResult(null);
+                        }}
+                      >
+                        <span>{exercise.prompt}</span>
+                        <small>{exercise.type}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <article className="record exercise-card">
+                    <span className="pill">{selectedExercise.type}</span>
+                    <h3>{selectedExercise.prompt}</h3>
+                    <div className="detail-grid exercise-context">
+                      <div>
+                        <dt>Vocabulary</dt>
+                        <dd>{selectedExercise.allowedVocabulary.join(" ")}</dd>
+                      </div>
+                      <div>
+                        <dt>Rules</dt>
+                        <dd>{selectedExercise.allowedRuleIds.join(" ")}</dd>
+                      </div>
+                    </div>
                   <label>
                     <span>Answer</span>
                     <input
@@ -379,7 +465,26 @@ export function App() {
                     {isGrading ? "Grading..." : "Grade"}
                   </button>
                   {exerciseResult && <p className="exercise-result">{exerciseResult}</p>}
-                </article>
+                    <section className="submission-history" aria-label="Exercise submission history">
+                      <h4>Submission History</h4>
+                      {isLoadingSubmissions ? (
+                        <p className="inline-empty">Loading submissions.</p>
+                      ) : submissionHistory.length === 0 ? (
+                        <p className="inline-empty">No submissions yet.</p>
+                      ) : (
+                        <div className="detail-list">
+                          {submissionHistory.map((submission) => (
+                            <div key={submission.id} className="detail-row">
+                              <strong>{formatSubmissionStatus(submission)}</strong>
+                              <span>{submission.explanation}</span>
+                              <span className="muted">{submission.submittedAt}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+                  </article>
+                </div>
               ) : (
                 <p className="empty-state">No exercise available.</p>
               )}

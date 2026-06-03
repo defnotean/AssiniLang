@@ -1,10 +1,11 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 const apiMock = vi.hoisted(() => ({
   fetchDashboardData: vi.fn(),
+  fetchExerciseSubmissions: vi.fn(),
   runEvaluation: vi.fn(),
   reviewNote: vi.fn(),
   submitExerciseAnswer: vi.fn()
@@ -108,6 +109,15 @@ function createDashboardData() {
         allowedVocabulary: ["mira", "talo", "-mi", "-na"],
         allowedRuleIds: ["avn-rule-verb-chain"],
         gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+      },
+      {
+        id: "avn-ex002",
+        languageId: "avenik",
+        type: "segment",
+        prompt: "Segment: nemi-lo-ki",
+        allowedVocabulary: ["nemi", "-lo", "-ki"],
+        allowedRuleIds: ["avn-rule-verb-chain"],
+        gradingExplanation: "Split the verb stem from past tense and third-person singular suffixes."
       }
     ],
     evaluations: []
@@ -126,6 +136,10 @@ function createDeferred<T>() {
 }
 
 describe("App", () => {
+  beforeEach(() => {
+    apiMock.fetchExerciseSubmissions.mockResolvedValue([]);
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
   });
@@ -291,5 +305,60 @@ describe("App", () => {
     expect(
       await screen.findByText("Use mira for river, talo for walk, -mi for present, and -na for first person singular.")
     ).toBeInTheDocument();
+  });
+
+  it("shows sanitized exercise submission history and refreshes it after grading", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.fetchExerciseSubmissions
+      .mockResolvedValueOnce([
+        {
+          id: "submission-1",
+          exerciseId: "avn-ex001",
+          languageId: "avenik",
+          accepted: false,
+          explanation: "Answer did not match the synthetic exercise key.",
+          submittedAt: "2026-06-03T15:00:00.000Z",
+          learnerId: "local-learner"
+        }
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "submission-2",
+          exerciseId: "avn-ex001",
+          languageId: "avenik",
+          accepted: true,
+          explanation: "Accepted synthetic exercise submission.",
+          submittedAt: "2026-06-03T15:01:00.000Z",
+          learnerId: "local-learner"
+        }
+      ]);
+    apiMock.submitExerciseAnswer.mockResolvedValue({
+      accepted: true,
+      explanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+    });
+
+    render(<App />);
+
+    const history = await screen.findByRole("region", { name: "Exercise submission history" });
+    expect(await within(history).findByText("Answer did not match the synthetic exercise key.")).toBeInTheDocument();
+    expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
+
+    fireEvent.change(await screen.findByLabelText("Exercise answer"), { target: { value: "mira talo-mi-na" } });
+    fireEvent.click(screen.getByRole("button", { name: "Grade" }));
+
+    await waitFor(() => expect(apiMock.fetchExerciseSubmissions).toHaveBeenLastCalledWith("avn-ex001"));
+    expect(await within(history).findByText("Accepted synthetic exercise submission.")).toBeInTheDocument();
+    expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
+  });
+
+  it("switches learner exercise selection and loads that exercise history", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Segment: nemi-lo-ki/ }));
+
+    expect(await screen.findByRole("heading", { name: "Segment: nemi-lo-ki" })).toBeInTheDocument();
+    await waitFor(() => expect(apiMock.fetchExerciseSubmissions).toHaveBeenLastCalledWith("avn-ex002"));
   });
 });

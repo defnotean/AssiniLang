@@ -353,9 +353,55 @@ button.secondary {
   padding: 14px;
 }
 
+.exercise-workspace {
+  display: grid;
+  gap: 10px;
+}
+
+.exercise-selector {
+  display: grid;
+  gap: 8px;
+}
+
+.exercise-selector-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  background: #fff;
+  color: #182126;
+  border-color: #d8ded4;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.exercise-selector-item.selected {
+  border-color: #2f5d62;
+  box-shadow: inset 0 0 0 2px #2f5d62;
+}
+
+.exercise-selector-item span {
+  font-weight: 800;
+}
+
+.exercise-selector-item small {
+  color: #54615f;
+}
+
+.exercise-card {
+  display: grid;
+  gap: 12px;
+}
+
+.exercise-card h3,
 .exercise-card label,
-.exercise-card label span {
+.exercise-card label span,
+.exercise-result {
   display: block;
+  margin-bottom: 0;
+}
+
+.exercise-context {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .exercise-card label span {
@@ -365,11 +411,18 @@ button.secondary {
 }
 
 .exercise-card button {
-  margin-top: 0.7rem;
+  justify-self: start;
 }
 
 .exercise-result {
-  margin: 12px 0 0;
+  color: #3f4a4d;
+}
+
+.submission-history {
+  border-top: 1px solid #d8ded4;
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
 }
 
 @media (max-width: 760px) {
@@ -392,6 +445,7 @@ button.secondary {
   }
 
   .review-workspace,
+  .exercise-context,
   .detail-grid {
     grid-template-columns: 1fr;
   }

@@ -1,6 +1,7 @@
 import type { CorpusPassage, EvaluationRun, Exercise, ExerciseSubmission, Language, Note } from "@assini/db";
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers">;
+export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer">;
 
 export type DashboardData = {
   languages: Language[];
@@ -72,4 +73,8 @@ export async function submitExerciseAnswer(exerciseId: string, answer: string): 
   }
 
   return response.json() as Promise<ExerciseSubmission>;
+}
+
+export async function fetchExerciseSubmissions(exerciseId: string): Promise<PublicExerciseSubmission[]> {
+  return getJson<PublicExerciseSubmission[]>(`/exercises/${encodeURIComponent(exerciseId)}/submissions`);
 }
