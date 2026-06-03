@@ -71,7 +71,7 @@ Create `package.json`:
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "check": "tsc -b packages/db packages/synthetic-langs packages/eval apps/api apps/web",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "seed": "npm --workspace @assini/synthetic-langs run seed",
     "eval": "npm --workspace @assini/eval run eval",
     "dev": "concurrently -k -n api,web -c blue,green \"npm --workspace @assini/api run dev\" \"npm --workspace @assini/web run dev\"",
@@ -143,6 +143,7 @@ export default defineConfig({
     globals: true,
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts", "apps/**/*.test.tsx"],
     coverage: {
+      provider: "v8",
       reporter: ["text", "html"]
     }
   }
@@ -170,7 +171,18 @@ Synthetic language evaluation scaffold for a community-governed language AI syst
 
 This repository intentionally starts with made-up languages only. No real First Nations or Indigenous language data belongs in this milestone.
 
-## Local Setup
+## Foundation Setup
+
+```powershell
+npm install
+npm test
+```
+
+This verifies the initial workspace foundation. At this stage, Vitest exits cleanly even before test files exist.
+
+## Full Local Setup
+
+Once the scaffold packages and apps are implemented, run:
 
 ```powershell
 npm install
@@ -180,8 +192,6 @@ npm run dev
 ```
 
 Open the web app at `http://localhost:5173`. The API runs at `http://localhost:4321`.
-
-`npm run seed`, `npm run eval`, `npm run dev`, and therefore `npm run demo` become available once the scaffold packages and apps are implemented.
 
 ## One-Command Demo
 
