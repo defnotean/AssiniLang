@@ -45,14 +45,22 @@ export class JsonStore {
 
   async updateNote(noteId: string, patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>): Promise<Note> {
     let updated: Note | undefined;
-    await this.update((state) => ({
-      ...state,
-      notes: state.notes.map((note) => {
+    await this.update((state) => {
+      const notes = state.notes.map((note) => {
         if (note.id !== noteId) return note;
         updated = { ...note, ...patch };
         return updated;
-      })
-    }));
+      });
+
+      if (!updated) {
+        throw new Error(`Note not found: ${noteId}`);
+      }
+
+      return {
+        ...state,
+        notes
+      };
+    });
     if (!updated) {
       throw new Error(`Note not found: ${noteId}`);
     }

@@ -32,4 +32,20 @@ describe("JsonStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("does not write a db file when updating a missing note", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+
+      await expect(store.updateNote("missing-note", { status: "approved" })).rejects.toThrow(
+        "Note not found: missing-note"
+      );
+      await expect(readFile(dbPath, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });
