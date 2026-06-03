@@ -1,7 +1,5 @@
 # Synthetic Language Evaluation Platform Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Build a runnable local full-stack scaffold that seeds synthetic language corpora, runs answer-key evaluations, and exposes corpus, review, learner, and evaluation views in a web UI.
 
 **Architecture:** Use a TypeScript npm-workspaces monorepo with local JSON persistence. Packages define shared schemas, synthetic fixtures, and evaluation logic; a Fastify API serves that data; a Vite React app renders the prototype surfaces.
