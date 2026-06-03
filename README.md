@@ -11,9 +11,20 @@ npm install
 npm test
 ```
 
-At the Task 1 foundation stage, this installs the root workspace dependencies and verifies the empty test baseline.
+This installs the workspace dependencies and verifies the shared schemas, synthetic fixtures, evaluation harness, API, and web app tests.
 
-## After the Scaffold Is Implemented
+## Verification
+
+The baseline synthetic testbed is healthy when these commands succeed:
+
+```powershell
+npm test
+npm run check
+npm run seed
+npm run eval
+```
+
+## Run the Prototype
 
 ```powershell
 npm run seed
@@ -29,7 +40,7 @@ Open the web app at `http://localhost:5173`. The API runs at `http://localhost:4
 npm run demo
 ```
 
-Once the scaffold packages and apps are implemented, the demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
+The demo seeds synthetic fixtures, runs evaluation, and starts the API plus web app.
 
 ## Project Shape
 
