@@ -19,11 +19,12 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export async function fetchDashboardData(languageId = "avenik"): Promise<DashboardData> {
+  const encodedLanguageId = encodeURIComponent(languageId);
   const [languages, corpus, notes, exercises, evaluations] = await Promise.all([
     getJson<Language[]>("/languages"),
-    getJson<CorpusPassage[]>(`/languages/${languageId}/corpus`),
-    getJson<Note[]>(`/languages/${languageId}/notes`),
-    getJson<Exercise[]>(`/languages/${languageId}/exercises`),
+    getJson<CorpusPassage[]>(`/languages/${encodedLanguageId}/corpus`),
+    getJson<Note[]>(`/languages/${encodedLanguageId}/notes`),
+    getJson<Exercise[]>(`/languages/${encodedLanguageId}/exercises`),
     getJson<EvaluationRun[]>("/evaluations")
   ]);
 

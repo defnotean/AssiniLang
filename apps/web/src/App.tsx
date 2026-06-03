@@ -95,8 +95,16 @@ export function App() {
         </button>
       </header>
 
-      {loadState.status === "loading" && <p className="status">Loading synthetic data...</p>}
-      {loadState.status === "error" && <p className="status error">{loadState.message}</p>}
+      {loadState.status === "loading" && (
+        <p className="status" role="status" aria-live="polite">
+          Loading synthetic data...
+        </p>
+      )}
+      {loadState.status === "error" && (
+        <p className="status error" role="alert">
+          {loadState.message}
+        </p>
+      )}
 
       {data && (
         <>
@@ -106,6 +114,8 @@ export function App() {
                 type="button"
                 key={language.id}
                 className={language.id === selectedLanguageId ? "selected" : ""}
+                aria-pressed={language.id === selectedLanguageId}
+                disabled={isEvaluating}
                 onClick={() => setSelectedLanguageId(language.id)}
               >
                 <span>{language.name}</span>
