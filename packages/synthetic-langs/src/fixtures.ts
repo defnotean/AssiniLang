@@ -276,13 +276,13 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       { id: "vel-n-001", form: "loma", gloss: "berry", partOfSpeech: "noun", tags: ["food"] },
       { id: "vel-n-002", form: "vesa", gloss: "star", partOfSpeech: "noun", tags: ["sky"] },
       { id: "vel-e-001", form: "-or", gloss: "1sg present", partOfSpeech: "ending", tags: ["fusional"] },
-      { id: "vel-e-002", form: "-eth", gloss: "3sg past", partOfSpeech: "ending", tags: ["fusional"] }
+      { id: "vel-e-002", form: "-eth", gloss: "3pl past", partOfSpeech: "ending", tags: ["fusional"] }
     ],
     grammarRules: [
       {
         id: "vel-rule-fused-ending",
         topic: "morphology/verb/fused-person-tense-ending",
-        explanation: "Velari verb endings encode person and tense in a single fused ending: -or is first-person present, while -eth is third-person past.",
+        explanation: "Velari verb endings encode person and tense in a single fused ending: -or is first-person present, while -eth is third-person plural past.",
         evidencePassageIds: ["vel-c001", "vel-c002", "vel-c004"],
         confidence: "high"
       },
@@ -290,7 +290,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         id: "vel-rule-object-after-verb",
         topic: "syntax/object-after-finite-verb",
         explanation: "Velari places the object noun after the finite verb in simple clauses.",
-        evidencePassageIds: ["vel-c001", "vel-c003", "vel-c005"],
+        evidencePassageIds: ["vel-c001", "vel-c003"],
         confidence: "medium"
       }
     ],
@@ -319,10 +319,10 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         textTranslation: "They saw the star.",
         morphologicalSegmentation: [
           { surface: "mir", lemma: "mir", gloss: "see", features: ["verb-root"] },
-          { surface: "-eth", lemma: "-eth", gloss: "3sg.past", features: ["person-tense"] },
+          { surface: "-eth", lemma: "-eth", gloss: "3pl.past", features: ["person-tense"] },
           { surface: "vesa", lemma: "vesa", gloss: "star", features: ["noun"] }
         ],
-        topicTags: ["sky", "past", "third-person"],
+        topicTags: ["sky", "past", "third-person-plural"],
         consentStatus: consent
       },
       {
@@ -349,10 +349,10 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         textTranslation: "They ate berries.",
         morphologicalSegmentation: [
           { surface: "dan", lemma: "dan", gloss: "eat", features: ["verb-root"] },
-          { surface: "-eth", lemma: "-eth", gloss: "3sg.past", features: ["person-tense"] },
+          { surface: "-eth", lemma: "-eth", gloss: "3pl.past", features: ["person-tense"] },
           { surface: "loma", lemma: "loma", gloss: "berry", features: ["noun"] }
         ],
-        topicTags: ["food", "past", "third-person"],
+        topicTags: ["food", "past", "third-person-plural"],
         consentStatus: consent
       },
       {
@@ -587,7 +587,7 @@ const exerciseMap: Record<string, Exercise[]> = {
       allowedVocabulary: ["dan", "-eth", "loma"],
       allowedRuleIds: ["vel-rule-fused-ending"],
       expectedAnswers: ["They ate berries.", "They ate berries"],
-      gradingExplanation: "The ending -eth encodes third-person past."
+      gradingExplanation: "The ending -eth encodes third-person plural past."
     },
     {
       id: "vel-ex002",
