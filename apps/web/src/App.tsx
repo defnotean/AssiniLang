@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Note } from "@assini/db";
 import type { DashboardData } from "./api";
-import { fetchDashboardData, runEvaluation } from "./api";
+import { fetchDashboardData, reviewNote, runEvaluation } from "./api";
 import "./styles.css";
 
 type LoadState =
@@ -22,6 +23,7 @@ export function App() {
   const [answer, setAnswer] = useState("");
   const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
+  const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
 
   useEffect(() => {
     let isCurrent = true;
@@ -64,6 +66,25 @@ export function App() {
       setLoadState({ status: "error", message });
     } finally {
       setIsEvaluating(false);
+    }
+  }
+
+  async function handleReviewNote(note: Note, status: Extract<Note["status"], "approved" | "contested">) {
+    setReviewingNoteId(note.id);
+
+    try {
+      await reviewNote(note.id, {
+        status,
+        reviewerComment:
+          status === "approved" ? "Approved in local prototype." : "Contested in local prototype."
+      });
+      const refreshed = await fetchDashboardData(selectedLanguageId);
+      setLoadState({ status: "ready", data: refreshed });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Note review failed";
+      setLoadState({ status: "error", message });
+    } finally {
+      setReviewingNoteId(null);
     }
   }
 
@@ -172,6 +193,25 @@ export function App() {
                       <span className="pill">{note.status}</span>
                       <span className="pill">{note.confidence} confidence</span>
                       <span className="pill">{note.evidenceCount} evidence links</span>
+                    </div>
+                    <div className="review-actions">
+                      <button
+                        type="button"
+                        aria-label={`Approve ${note.topic}`}
+                        disabled={reviewingNoteId === note.id}
+                        onClick={() => handleReviewNote(note, "approved")}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary"
+                        aria-label={`Contest ${note.topic}`}
+                        disabled={reviewingNoteId === note.id}
+                        onClick={() => handleReviewNote(note, "contested")}
+                      >
+                        Contest
+                      </button>
                     </div>
                   </article>
                 ))}

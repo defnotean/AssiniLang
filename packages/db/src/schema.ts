@@ -108,6 +108,7 @@ export const appStateSchema = z.object({
   schemaVersion: z.literal(1),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
+  noteAnswerKeys: z.array(noteSchema),
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
   evaluationRuns: z.array(evaluationRunSchema)

@@ -214,6 +214,22 @@ h3 {
   white-space: nowrap;
 }
 
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.review-actions button {
+  padding: 0.5rem 0.75rem;
+}
+
+button.secondary {
+  background: #fff;
+  color: #2f5d62;
+}
+
 .empty-state {
   background: #fff;
   border: 1px dashed #cfd8cb;

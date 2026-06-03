@@ -63,6 +63,15 @@ describe("api server", () => {
     expect(corpus.json()[0].languageId).toBe("avenik");
   });
 
+  it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
+    const app = createServer({ initialState: buildSeedState() });
+
+    const response = await app.inject({ method: "GET", url: `/languages/not-a-language/${resource}` });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+  });
+
   it("runs evaluations and appends them to state", async () => {
     const app = createServer({ initialState: buildSeedState() });
 

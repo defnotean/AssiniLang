@@ -9,6 +9,7 @@ export function createEmptyState(): AppState {
     schemaVersion: 1,
     languages: [],
     corpus: [],
+    noteAnswerKeys: [],
     notes: [],
     exercises: [],
     evaluationRuns: []

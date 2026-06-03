@@ -5,7 +5,8 @@ import { App } from "./App";
 
 const apiMock = vi.hoisted(() => ({
   fetchDashboardData: vi.fn(),
-  runEvaluation: vi.fn()
+  runEvaluation: vi.fn(),
+  reviewNote: vi.fn()
 }));
 
 vi.mock("./api", () => apiMock);
@@ -33,7 +34,32 @@ function createDashboardData() {
       }
     ],
     corpus: [],
-    notes: [],
+    notes: [
+      {
+        id: "avn-rule-verb-chain-note",
+        languageId: "avenik",
+        topic: "verb chains",
+        explanation: "Avenik verbs use transparent suffix chains.",
+        examples: [
+          {
+            passageId: "avn-c001",
+            target: "mira talo-mi-na",
+            translation: "I walk by the river."
+          }
+        ],
+        evidencePassageIds: ["avn-c001"],
+        evidenceCount: 1,
+        confidence: "high",
+        status: "draft",
+        reviewer: {
+          lastReviewedBy: null,
+          lastReviewedAt: null,
+          comments: []
+        },
+        dialectScope: "synthetic baseline",
+        editHistory: []
+      }
+    ],
     exercises: [],
     evaluations: []
   };
@@ -109,5 +135,23 @@ describe("App", () => {
 
     evaluationRun.resolve([]);
     await waitFor(() => expect(screen.getByRole("button", { name: "Run Evaluation" })).toBeEnabled());
+  });
+
+  it("submits note review actions and refreshes the selected language", async () => {
+    const data = createDashboardData();
+    apiMock.fetchDashboardData.mockResolvedValue(data);
+    apiMock.reviewNote.mockResolvedValue({ ...data.notes[0], status: "approved" });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Approve verb chains" }));
+
+    await waitFor(() =>
+      expect(apiMock.reviewNote).toHaveBeenCalledWith("avn-rule-verb-chain-note", {
+        status: "approved",
+        reviewerComment: "Approved in local prototype."
+      })
+    );
+    expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
   });
 });

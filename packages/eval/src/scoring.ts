@@ -15,7 +15,7 @@ function scoreRatio(pass: number, total: number): number {
 
 function answerKeyTopicMap(languageId: string, state: AppState): Map<string, Note> {
   return new Map(
-    state.notes
+    state.noteAnswerKeys
       .filter((note) => note.languageId === languageId)
       .map((note) => [note.topic, note])
   );

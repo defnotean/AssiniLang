@@ -68,21 +68,33 @@ export function createServer(options: ServerOptions = {}) {
     return state.languages;
   });
 
-  app.get("/languages/:languageId/corpus", async (request) => {
+  app.get("/languages/:languageId/corpus", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
     return state.corpus.filter((passage) => passage.languageId === languageId);
   });
 
-  app.get("/languages/:languageId/notes", async (request) => {
+  app.get("/languages/:languageId/notes", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
     return state.notes.filter((note) => note.languageId === languageId);
   });
 
-  app.get("/languages/:languageId/exercises", async (request) => {
+  app.get("/languages/:languageId/exercises", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
     return state.exercises.filter((exercise) => exercise.languageId === languageId);
   });
 

@@ -40,3 +40,20 @@ export async function runEvaluation(): Promise<EvaluationRun[]> {
 
   return response.json() as Promise<EvaluationRun[]>;
 }
+
+export async function reviewNote(
+  noteId: string,
+  payload: Partial<Pick<Note, "status" | "explanation">> & { reviewerComment?: string }
+): Promise<Note> {
+  const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}/review`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    throw new Error("Note review failed");
+  }
+
+  return response.json() as Promise<Note>;
+}

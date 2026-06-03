@@ -26,6 +26,44 @@ describe("evaluation scoring", () => {
     expect(result.failures).toHaveLength(0);
   });
 
+  it("scores drafted notes against immutable answer keys instead of mutable reviewed notes", () => {
+    const state = buildSeedState();
+    const reviewedNote = state.notes.find((note) => note.id === "avn-rule-verb-chain-note");
+    if (!reviewedNote) throw new Error("Missing reviewed note");
+
+    reviewedNote.explanation = "Reviewed note text that should not become the gold answer.";
+
+    const result = scoreLanguageEvaluation(
+      "avenik",
+      state,
+      state.notes.filter((note) => note.languageId === "avenik")
+    );
+
+    expect(result.scores.noteAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "noteAccuracy",
+          itemId: "avn-rule-verb-chain-note"
+        })
+      ])
+    );
+  });
+
+  it("drafts baseline notes from immutable answer keys instead of reviewed notes", () => {
+    const state = buildSeedState();
+    const reviewedNote = state.notes.find((note) => note.id === "avn-rule-verb-chain-note");
+    if (!reviewedNote) throw new Error("Missing reviewed note");
+
+    const originalExplanation = reviewedNote.explanation;
+    reviewedNote.explanation = "Reviewed wording from the mutable queue.";
+
+    const drafted = draftNotesForLanguage("avenik", state);
+    const draftedNote = drafted.find((note) => note.topic === reviewedNote.topic);
+
+    expect(draftedNote?.explanation).toBe(originalExplanation);
+  });
+
   it("rejects unapproved hyphenated forms in generation-policy scoring", () => {
     const state = buildSeedState();
     const exercise = state.exercises.find((item) => item.id === "avn-ex001");

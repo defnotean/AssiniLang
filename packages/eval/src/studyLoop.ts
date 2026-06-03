@@ -1,10 +1,12 @@
 import type { AppState, Note } from "@assini/db";
 
 export function draftNotesForLanguage(languageId: string, state: AppState): Note[] {
-  const languageNotes = state.notes.filter((note) => note.languageId === languageId);
+  const languageNotes = state.noteAnswerKeys.filter((note) => note.languageId === languageId);
 
   return languageNotes.map((note) => ({
     ...note,
+    examples: note.examples.map((example) => ({ ...example })),
+    evidencePassageIds: [...note.evidencePassageIds],
     id: note.id.replace("-note", "-draft"),
     status: "draft",
     reviewer: {
@@ -13,7 +15,7 @@ export function draftNotesForLanguage(languageId: string, state: AppState): Note
       comments: ["Deterministic draft generated from synthetic fixture evidence."]
     },
     editHistory: [
-      ...note.editHistory,
+      ...note.editHistory.map((entry) => ({ ...entry })),
       {
         at: new Date(0).toISOString(),
         by: "deterministic-study-loop",
