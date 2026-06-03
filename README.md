@@ -13,7 +13,8 @@ This repository now contains a working full-stack slice:
 - A JSON-backed local database.
 - A deterministic evaluation harness with score reports.
 - A Fastify API.
-- A Vite React web prototype for corpus browsing, note review, evaluation results, and exercise grading.
+- Server-side learner exercise grading with persisted synthetic submissions.
+- A Vite React web prototype for corpus browsing, note review, evaluation results, and exercise submission.
 
 This is not a real-language deployment. It is the testbed that lets the project scale safely before any First Nations or Indigenous language material is introduced.
 
@@ -35,13 +36,15 @@ Use this repository to test system behavior, not to represent real language comm
 From the repository root:
 
 ```powershell
-npm install
-npm test
-npm run check
-npm run seed
-npm run eval
-npm run dev
+npm.cmd install
+npm.cmd test
+npm.cmd run check
+npm.cmd run seed
+npm.cmd run eval
+npm.cmd run dev
 ```
+
+On macOS, Linux, or shells where the normal npm shim is available, the same commands work with `npm`.
 
 Open the web prototype at:
 
@@ -58,7 +61,7 @@ http://localhost:4321
 ## One-Command Demo
 
 ```powershell
-npm run demo
+npm.cmd run demo
 ```
 
 This seeds the synthetic database, runs the evaluation harness, and starts both the API and web app.
@@ -67,13 +70,13 @@ This seeds the synthetic database, runs the evaluation harness, and starts both 
 
 | Command | Purpose |
 | --- | --- |
-| `npm test` | Runs all Vitest tests. |
-| `npm run check` | Runs TypeScript project checks across packages and apps. |
-| `npm run seed` | Writes synthetic fixture data to `data/local-db.json`. |
-| `npm run eval` | Runs the deterministic evaluation CLI. |
-| `npm run build` | Builds all workspaces that have a build script. |
-| `npm run dev` | Starts the API and web app together. |
-| `npm run demo` | Seeds, evaluates, and starts the local prototype. |
+| `npm.cmd test` | Runs all Vitest tests. |
+| `npm.cmd run check` | Runs TypeScript project checks across packages and apps. |
+| `npm.cmd run seed` | Writes synthetic fixture data to `data/local-db.json`. |
+| `npm.cmd run eval` | Runs the deterministic evaluation CLI. |
+| `npm.cmd run build` | Builds all workspaces that have a build script. |
+| `npm.cmd run dev` | Starts the API and web app together. |
+| `npm.cmd run demo` | Seeds, evaluates, and starts the local prototype. |
 
 ## Project Layout
 
@@ -88,7 +91,7 @@ packages/
   eval/                Deterministic study-loop simulation and scoring logic.
 
 data/
-  local-db.json        Generated local database after `npm run seed`.
+  local-db.json        Generated local database after `npm.cmd run seed`.
 
 docs/
   specs/               Design notes for the current milestone.
@@ -106,6 +109,12 @@ docs/
 The local state separates mutable review notes from immutable answer keys. Review actions update `notes`; evaluation scoring compares generated drafts against `noteAnswerKeys`.
 
 This matters because the system should not score itself against whatever a reviewer last edited.
+
+### Server-Side Exercise Submissions
+
+Learner exercise answer keys stay inside the API/data layer. The public exercise API omits `expectedAnswers`, and learner answers are submitted to the server for grading and persistence.
+
+Incorrect answers return a synthetic-safe explanation instead of revealing the answer key.
 
 ### Evaluation Harness
 
@@ -131,7 +140,9 @@ The API currently exposes:
 | `GET /languages` | List synthetic languages. |
 | `GET /languages/:languageId/corpus` | Corpus passages for one language. |
 | `GET /languages/:languageId/notes` | Review notes for one language. |
-| `GET /languages/:languageId/exercises` | Learner exercises for one language. |
+| `GET /languages/:languageId/exercises` | Learner exercises for one language without answer keys. |
+| `GET /exercises/:exerciseId/submissions` | Persisted local learner submissions for one exercise. |
+| `POST /exercises/:exerciseId/submissions` | Grade and persist a learner exercise answer. |
 | `GET /evaluations` | Previous evaluation runs. |
 | `POST /evaluations/run` | Run evaluation for all languages. |
 | `PATCH /notes/:noteId/review` | Approve, contest, or update a note review. |
@@ -146,7 +157,7 @@ The web app includes:
 - Corpus Browser.
 - Note Review Queue with Approve and Contest actions.
 - Evaluation Dashboard.
-- Learner Exercise Preview with local answer grading.
+- Learner Exercise Preview with server-side answer grading.
 - Synthetic-data warning labels.
 
 ## What Is Missing Next
@@ -238,16 +249,16 @@ Next steps:
 Use this loop for safe changes:
 
 ```powershell
-npm test
-npm run check
-npm run seed
-npm run eval
+npm.cmd test
+npm.cmd run check
+npm.cmd run seed
+npm.cmd run eval
 ```
 
 For UI work, also run:
 
 ```powershell
-npm run dev
+npm.cmd run dev
 ```
 
 Then verify the app in a browser at `http://localhost:5173`.
@@ -269,9 +280,9 @@ Each language should include:
 After adding fixtures, run:
 
 ```powershell
-npm test
-npm run seed
-npm run eval
+npm.cmd test
+npm.cmd run seed
+npm.cmd run eval
 ```
 
 ## Documentation
