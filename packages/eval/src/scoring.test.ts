@@ -133,4 +133,36 @@ describe("evaluation scoring", () => {
       ])
     );
   });
+
+  it("accepts valid segment answers for fused surface forms", () => {
+    const state = buildSeedState();
+
+    const result = scoreLanguageEvaluation("velari", state, draftNotesForLanguage("velari", state));
+
+    expect(result.scores.generationPolicy).toBe(1);
+    expect(result.failures.filter((failure) => failure.itemId === "vel-ex002")).toHaveLength(0);
+  });
+
+  it.each(["nemi -ki -lo", "nemi -lo -ki -ki"])(
+    "rejects malformed segment answer %s even when it is listed as expected",
+    (malformedAnswer) => {
+      const state = buildSeedState();
+      const exercise = state.exercises.find((item) => item.id === "avn-ex002");
+      if (!exercise) throw new Error("Missing avn-ex002");
+
+      exercise.expectedAnswers = [...exercise.expectedAnswers, malformedAnswer];
+
+      const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+
+      expect(result.scores.generationPolicy).toBeLessThan(1);
+      expect(result.failures).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            category: "generationPolicy",
+            itemId: "avn-ex002"
+          })
+        ])
+      );
+    }
+  );
 });

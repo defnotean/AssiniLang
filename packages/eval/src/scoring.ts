@@ -57,18 +57,61 @@ function sameSegmentSequence(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((piece, index) => piece === right[index]);
 }
 
+function segmentPromptTarget(prompt: string): string | undefined {
+  const match = prompt.match(/^Segment:\s*(.+)$/i);
+  return match?.[1]?.trim();
+}
+
+function boundarylessSegmentSurface(piece: string): string {
+  return piece.replace(/^-|-$/g, "");
+}
+
+function segmentMatchLengthAt(target: string, piece: string, index: number): number | undefined {
+  if (target.startsWith(piece, index)) {
+    return piece.length;
+  }
+
+  const boundarylessPiece = boundarylessSegmentSurface(piece);
+  if (boundarylessPiece && target.startsWith(boundarylessPiece, index)) {
+    return boundarylessPiece.length;
+  }
+
+  return undefined;
+}
+
+function canonicalSegmentPieces(exercise: Exercise): string[] | undefined {
+  const target = segmentPromptTarget(exercise.prompt);
+  if (!target) return undefined;
+
+  const normalizedTarget = normalize(target).replace(/\s+/g, "");
+  const formsByLength = exercise.allowedVocabulary
+    .map((piece) => normalize(piece))
+    .filter(Boolean)
+    .sort((left, right) => right.length - left.length);
+
+  const pieces: string[] = [];
+  let index = 0;
+
+  while (index < normalizedTarget.length) {
+    const next = formsByLength
+      .map((piece) => ({ piece, matchLength: segmentMatchLengthAt(normalizedTarget, piece, index) }))
+      .find((match): match is { piece: string; matchLength: number } => match.matchLength !== undefined);
+    if (!next) return undefined;
+    pieces.push(next.piece);
+    index += next.matchLength;
+  }
+
+  return pieces;
+}
+
 function segmentAnswerMatchesExpectedBoundaries(answer: string, exercise: Exercise): boolean {
-  const allowedPieces = new Set(exercise.allowedVocabulary.map((piece) => normalize(piece)));
+  const canonicalPieces = canonicalSegmentPieces(exercise);
   const submittedPieces = segmentPieces(answer);
-  if (submittedPieces.length === 0 || submittedPieces.some((piece) => !allowedPieces.has(piece))) {
+  if (!canonicalPieces || submittedPieces.length === 0) {
     return false;
   }
 
-  const expectedSequences = exercise.expectedAnswers
-    .map(segmentPieces)
-    .filter((sequence) => sequence.length > 0 && sequence.every((piece) => allowedPieces.has(piece)));
-
-  return expectedSequences.some((sequence) => sameSegmentSequence(submittedPieces, sequence));
+  return sameSegmentSequence(submittedPieces, canonicalPieces);
 }
 
 function targetAnswerExistsInCorpus(languageId: string, state: AppState, answer: string): boolean {
