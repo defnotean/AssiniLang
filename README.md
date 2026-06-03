@@ -8,6 +8,14 @@ This repository intentionally starts with made-up languages only. No real First 
 
 ```powershell
 npm install
+npm test
+```
+
+At the Task 1 foundation stage, this installs the root workspace dependencies and verifies the empty test baseline.
+
+## After the Scaffold Is Implemented
+
+```powershell
 npm run seed
 npm run eval
 npm run dev
@@ -15,9 +23,7 @@ npm run dev
 
 Open the web app at `http://localhost:5173`. The API runs at `http://localhost:4321`.
 
-`npm run seed`, `npm run eval`, `npm run dev`, and therefore `npm run demo` become available once the scaffold packages and apps are implemented.
-
-## One-Command Demo
+### One-Command Demo
 
 ```powershell
 npm run demo
