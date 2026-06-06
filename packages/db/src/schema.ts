@@ -790,6 +790,30 @@ function addNoteCollectionIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(note.topic)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} topic must not be blank: ${note.id}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
+    if (isBlankPersistedValue(note.explanation)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} explanation must not be blank: ${note.id}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
+    if (isBlankPersistedValue(note.dialectScope)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} dialect scope must not be blank: ${note.id}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
     if (note.evidenceCount !== note.evidencePassageIds.length) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

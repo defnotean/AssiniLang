@@ -616,6 +616,42 @@ describe("JsonStore", () => {
       "Note answer key references missing language: missing-language"
     ],
     [
+      "note with blank topic",
+      "notes",
+      createTestNote({ topic: "   " }),
+      "Note topic must not be blank: note-1"
+    ],
+    [
+      "note answer key with blank topic",
+      "noteAnswerKeys",
+      createTestNote({ id: "note-answer-key-1", status: "approved", topic: "   " }),
+      "Note answer key topic must not be blank: note-answer-key-1"
+    ],
+    [
+      "note with blank explanation",
+      "notes",
+      createTestNote({ explanation: "   " }),
+      "Note explanation must not be blank: note-1"
+    ],
+    [
+      "note answer key with blank explanation",
+      "noteAnswerKeys",
+      createTestNote({ id: "note-answer-key-1", status: "approved", explanation: "   " }),
+      "Note answer key explanation must not be blank: note-answer-key-1"
+    ],
+    [
+      "note with blank dialect scope",
+      "notes",
+      createTestNote({ dialectScope: "   " }),
+      "Note dialect scope must not be blank: note-1"
+    ],
+    [
+      "note answer key with blank dialect scope",
+      "noteAnswerKeys",
+      createTestNote({ id: "note-answer-key-1", status: "approved", dialectScope: "   " }),
+      "Note answer key dialect scope must not be blank: note-answer-key-1"
+    ],
+    [
       "evidence-count drift",
       "notes",
       createTestNote({ evidencePassageIds: ["passage-1"], evidenceCount: 2 }),
