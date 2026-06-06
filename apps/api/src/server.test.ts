@@ -343,6 +343,43 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it("rejects corpus imports with morphemes outside the selected language vocabulary", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/corpus",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        source: "synthetic-import",
+        sourceMetadata: {
+          author: "Local Reviewer",
+          year: 2026,
+          license: "synthetic-only",
+          consentRecord: "local synthetic import consent"
+        },
+        textTarget: "zoru talo-mi-na",
+        textTranslation: "I walk near the invented token.",
+        morphologicalSegmentation: [
+          { surface: "zoru", lemma: "zoru", gloss: "invented-token", features: ["noun"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ],
+        topicTags: ["motion"],
+        consentStatus: {
+          use: "synthetic-testing-only",
+          restrictions: []
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in Avenik vocabulary: zoru" });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
     const app = createServer({ initialState: buildSeedState() });
 

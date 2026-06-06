@@ -205,7 +205,7 @@ Scores should be machine-readable and visible in the web UI. The evaluation gate
 - Elder correction review should be role-gated, reject learners/reviewers/programmers, preserve notes during accepted/rejected transitions, and persist reviewer attribution.
 - Elder correction application should require an accepted note-linked correction, reject empty revised explanations, update the linked public note with audit history, and move the correction to `applied`.
 - Exercise authoring should be role-gated, reject unknown language/rule/vocabulary references before mutation, store answer keys server-side, return only public exercise fields, and audit creation without logging expected-answer text.
-- Corpus imports should be role-gated, reject duplicate target passages and segmentation surfaces not present in the target text before mutation, require synthetic-only consent metadata, and audit import provenance without storing private review data.
+- Corpus imports should be role-gated, reject duplicate target passages, reject segmentation surfaces not present in the target text, reject morphemes not grounded by the selected language vocabulary surface or lemma before mutation, require synthetic-only consent metadata, and audit import provenance without storing private review data.
 
 ## Testing Strategy
 

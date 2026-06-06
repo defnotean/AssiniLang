@@ -631,6 +631,24 @@ function corpusTargetContainsSurface(textTarget: string, surface: string): boole
     .some((token) => token === normalizedSurface || token.includes(normalizedSurface));
 }
 
+function corpusMorphemeGroundingError(languageId: string, body: CorpusImportBody): string | undefined {
+  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
+  if (!fixture) {
+    return `Corpus import fixture metadata not found for language: ${languageId}`;
+  }
+
+  const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form.toLowerCase()));
+  for (const morpheme of body.morphologicalSegmentation) {
+    const surface = morpheme.surface.toLowerCase();
+    const lemma = morpheme.lemma.toLowerCase();
+    if (!vocabularyForms.has(surface) && !vocabularyForms.has(lemma)) {
+      return `Corpus morpheme is not grounded in ${fixture.language.name} vocabulary: ${morpheme.surface}`;
+    }
+  }
+
+  return undefined;
+}
+
 function corpusImportValidationError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
   const normalizedTarget = normalizeAuthoredAnswer(body.textTarget).toLowerCase();
   const duplicate = state.corpus.some((passage) => (
@@ -646,6 +664,11 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
     if (!corpusTargetContainsSurface(body.textTarget, morpheme.surface)) {
       return `Corpus segmentation surface is not present in target text: ${morpheme.surface}`;
     }
+  }
+
+  const groundingError = corpusMorphemeGroundingError(languageId, body);
+  if (groundingError) {
+    return groundingError;
   }
 
   return undefined;
