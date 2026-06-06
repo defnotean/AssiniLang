@@ -456,6 +456,93 @@ function findUncoveredPersistedCorpusTargetTokens(
     .filter((token) => !hasContiguousMorphemeCoverage(token, morphemes));
 }
 
+function addCorpusTextIntegrityIssues(
+  context: z.RefinementCtx,
+  collectionPath: "corpus" | "corpusAnswerKeys",
+  passageId: string,
+  label: "Corpus" | "Corpus answer key",
+  textTarget: string,
+  textTranslation: string,
+  morphologicalSegmentation: Array<z.infer<typeof morphemeSchema>>
+) {
+  if (isBlankPersistedValue(textTarget)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} target text must not be blank for passage ${passageId}`,
+      path: [collectionPath, passageId]
+    });
+  }
+
+  if (isBlankPersistedValue(textTranslation)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} translation must not be blank for passage ${passageId}`,
+      path: [collectionPath, passageId]
+    });
+  }
+
+  for (const morpheme of morphologicalSegmentation) {
+    if (isBlankPersistedValue(morpheme.surface)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} morpheme surface must not be blank for passage ${passageId}`,
+        path: [collectionPath, passageId]
+      });
+    }
+
+    if (isBlankPersistedValue(morpheme.lemma)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} morpheme lemma must not be blank for passage ${passageId} surface ${morpheme.surface}`,
+        path: [collectionPath, passageId]
+      });
+    }
+
+    if (isBlankPersistedValue(morpheme.gloss)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} morpheme gloss must not be blank for passage ${passageId} surface ${morpheme.surface}`,
+        path: [collectionPath, passageId]
+      });
+    }
+
+    if (!corpusTargetContainsSurface(textTarget, morpheme.surface)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} segmentation surface is not present in target text for passage ${passageId}: ${morpheme.surface}`,
+        path: [collectionPath, passageId]
+      });
+    }
+
+    for (const feature of morpheme.features) {
+      if (isBlankPersistedValue(feature)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} morpheme feature must not be blank for passage ${passageId} surface ${morpheme.surface}`,
+          path: [collectionPath, passageId]
+        });
+      }
+    }
+
+    const duplicateFeature = duplicateNormalizedPersistedValue(morpheme.features);
+    if (duplicateFeature) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} morpheme feature is duplicated for passage ${passageId} surface ${morpheme.surface}: ${duplicateFeature}`,
+        path: [collectionPath, passageId]
+      });
+    }
+  }
+
+  for (const token of findUncoveredPersistedCorpusTargetTokens(textTarget, morphologicalSegmentation)) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} segmentation does not cover target token for passage ${passageId}: ${token}`,
+      path: [collectionPath, passageId]
+    });
+  }
+}
+
 function addDuplicatePersistedValueIssue<T>(
   context: z.RefinementCtx,
   path: string,
@@ -628,21 +715,15 @@ function addCorpusIntegrityIssues(
       });
     }
 
-    if (isBlankPersistedValue(passage.textTarget)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Corpus target text must not be blank for passage ${passage.id}`,
-        path: ["corpus", passage.id]
-      });
-    }
-
-    if (isBlankPersistedValue(passage.textTranslation)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Corpus translation must not be blank for passage ${passage.id}`,
-        path: ["corpus", passage.id]
-      });
-    }
+    addCorpusTextIntegrityIssues(
+      context,
+      "corpus",
+      passage.id,
+      "Corpus",
+      passage.textTarget,
+      passage.textTranslation,
+      passage.morphologicalSegmentation
+    );
 
     if (passage.topicTags.length === 0) {
       context.addIssue({
@@ -681,66 +762,6 @@ function addCorpusIntegrityIssues(
       });
     }
 
-    for (const morpheme of passage.morphologicalSegmentation) {
-      if (isBlankPersistedValue(morpheme.surface)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Corpus morpheme surface must not be blank for passage ${passage.id}`,
-          path: ["corpus", passage.id]
-        });
-      }
-
-      if (isBlankPersistedValue(morpheme.lemma)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Corpus morpheme lemma must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
-          path: ["corpus", passage.id]
-        });
-      }
-
-      if (isBlankPersistedValue(morpheme.gloss)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Corpus morpheme gloss must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
-          path: ["corpus", passage.id]
-        });
-      }
-
-      if (!corpusTargetContainsSurface(passage.textTarget, morpheme.surface)) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Corpus segmentation surface is not present in target text for passage ${passage.id}: ${morpheme.surface}`,
-          path: ["corpus", passage.id]
-        });
-      }
-
-      for (const feature of morpheme.features) {
-        if (isBlankPersistedValue(feature)) {
-          context.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: `Corpus morpheme feature must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
-            path: ["corpus", passage.id]
-          });
-        }
-      }
-
-      const duplicateFeature = duplicateNormalizedPersistedValue(morpheme.features);
-      if (duplicateFeature) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Corpus morpheme feature is duplicated for passage ${passage.id} surface ${morpheme.surface}: ${duplicateFeature}`,
-          path: ["corpus", passage.id]
-        });
-      }
-    }
-
-    for (const token of findUncoveredPersistedCorpusTargetTokens(passage.textTarget, passage.morphologicalSegmentation)) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Corpus segmentation does not cover target token for passage ${passage.id}: ${token}`,
-        path: ["corpus", passage.id]
-      });
-    }
   }
 }
 
@@ -1065,6 +1086,16 @@ function addCorpusAnswerKeyIntegrityIssues(
         path: ["corpusAnswerKeys", answerKey.passageId]
       });
     }
+
+    addCorpusTextIntegrityIssues(
+      context,
+      "corpusAnswerKeys",
+      answerKey.passageId,
+      "Corpus answer key",
+      answerKey.textTarget,
+      answerKey.textTranslation,
+      answerKey.morphologicalSegmentation
+    );
   }
 }
 

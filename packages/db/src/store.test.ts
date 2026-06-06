@@ -1072,9 +1072,155 @@ describe("JsonStore", () => {
       "passage language mismatch",
       createTestCorpusAnswerKey({ languageId: "solari" }),
       "Corpus answer key language solari does not match passage passage-1 language avenik"
+    ],
+    [
+      "blank target text",
+      createTestCorpusAnswerKey({ textTarget: "   " }),
+      "Corpus answer key target text must not be blank for passage passage-1"
+    ],
+    [
+      "blank translation",
+      createTestCorpusAnswerKey({ textTranslation: "   " }),
+      "Corpus answer key translation must not be blank for passage passage-1"
+    ],
+    [
+      "blank morpheme surface",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "   ",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key morpheme surface must not be blank for passage passage-1"
+    ],
+    [
+      "blank morpheme lemma",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "   ",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key morpheme lemma must not be blank for passage passage-1 surface mira"
+    ],
+    [
+      "blank morpheme gloss",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "   ",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key morpheme gloss must not be blank for passage passage-1 surface mira"
+    ],
+    [
+      "blank morpheme feature",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["   "]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key morpheme feature must not be blank for passage passage-1 surface mira"
+    ],
+    [
+      "duplicate morpheme feature",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun", " noun "]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key morpheme feature is duplicated for passage passage-1 surface mira: noun"
+    ],
+    [
+      "segmentation surface absent from target text",
+      createTestCorpusAnswerKey({
+        morphologicalSegmentation: [
+          {
+            surface: "ghost",
+            lemma: "ghost",
+            gloss: "ghost",
+            features: ["noun"]
+          }
+        ]
+      }),
+      "Corpus answer key segmentation surface is not present in target text for passage passage-1: ghost"
+    ],
+    [
+      "uncovered target token",
+      createTestCorpusAnswerKey({
+        textTarget: "mira lumo-ke talo-mi-na",
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus answer key segmentation does not cover target token for passage passage-1: lumo-ke"
     ]
   ])("rejects persisted corpus answer keys with %s", (_caseName, answerKey, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage()];
     state.corpus = [createTestCorpusPassage()];
     state.corpusAnswerKeys = [answerKey];
 

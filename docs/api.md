@@ -127,7 +127,7 @@ Important validation:
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.
 - Duplicate target text is rejected per language.
 
-Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep nonblank source/provenance text, target text, translations, consent restrictions, topic tags, morpheme surface/lemma/gloss text, and morpheme feature labels, keep normalized topic tags and morpheme feature labels duplicate-free, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
+Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep nonblank source/provenance text, target text, translations, consent restrictions, topic tags, morpheme surface/lemma/gloss text, and morpheme feature labels, keep normalized topic tags and morpheme feature labels duplicate-free, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, keep nonblank target text, translations, morpheme text, and feature labels, keep morpheme feature labels duplicate-free, and preserve their own segmentation coverage so manually edited local JSON cannot leave evaluation keys orphaned, malformed, or attached to the wrong language.
 
 ## Exercise Authoring
 
