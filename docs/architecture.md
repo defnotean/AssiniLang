@@ -114,11 +114,11 @@ Mutating API routes append `AuditEvent` records when they change persistent stat
 - Human-readable summary.
 - Minimal metadata.
 
-Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads. Persisted app-state reads reject audit metadata with private payload keys such as learner answers, expected answers, answer keys, grading explanations, provider prompts, hidden chain-of-thought, API keys, tokens, or secrets; they also reject secret-looking string values.
+Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads. Persisted app-state reads reject blank audit actions and summaries, audit metadata with private payload keys such as learner answers, expected answers, answer keys, grading explanations, provider prompts, hidden chain-of-thought, API keys, tokens, or secrets; they also reject secret-looking string values.
 
 Persisted audit events must keep a parseable `at` timestamp, be attributable to a known local user, and store an actor role that matches that user. Non-null audit `languageId` values must reference an existing synthetic language; `null` is reserved for global events. These checks keep restored JSON from misrepresenting when or who performed a mutation or attaching events to non-existent languages.
 
-Governance records are local synthetic policy records, not production consent infrastructure. API writes and persisted restores require a parseable `effectiveDate`; persisted records must also reference an existing synthetic language and be approved by a known Elder, lead, or admin user. This keeps local JSON restores aligned with the API mutation boundary and prevents orphaned, misdated, or misattributed policy records from appearing in exports.
+Governance records are local synthetic policy records, not production consent infrastructure. API writes and persisted restores require nonblank policy content and a parseable `effectiveDate`; persisted records must also reference an existing synthetic language and be approved by a known Elder, lead, or admin user. This keeps local JSON restores aligned with the API mutation boundary and prevents orphaned, empty, misdated, or misattributed policy records from appearing in exports.
 
 Review-disposition ledger writes are de-duplicated per note, disposition, and open status. Reopening the same unresolved disposition updates the existing work record's reason, assignee, and due date while preserving original opened attribution and writing a new audit event for the update. Persisted disposition records must reference an existing note in the same language, keep open work attached to notes currently in a disposition status, use assignable local users for assignee/opener/resolver fields, keep nonblank reason and resolution text, keep parseable `dueAt`, `openedAt`, and non-null `resolvedAt` fields, prevent resolved timestamps from predating opened timestamps, keep resolution fields empty while open, and include all resolution fields once resolved.
 
@@ -159,7 +159,7 @@ Successful imports append the passage, derive a private corpus answer key from t
 
 Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output.
 
-Persisted evaluation runs must reference an existing synthetic language, keep a parseable creation timestamp, and each failure line must use the same language ID as the run it belongs to. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
+Persisted evaluation runs must reference an existing synthetic language, keep a nonblank summary, keep a parseable creation timestamp, and each failure line must use the same language ID as the run it belongs to with a nonblank diagnostic message. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
 
 ## LLM Provider Boundary
 

@@ -1045,6 +1045,14 @@ function addGovernanceIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const record of state.governance) {
+    if (isBlankPersistedValue(record.content)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Governance record content must not be blank",
+        path: ["governance", record.id]
+      });
+    }
+
     addParseablePersistedDateIssue(context, "governance", record.id, "Governance record effectiveDate", record.effectiveDate);
 
     if (!languageIds.has(record.languageId)) {
@@ -1137,6 +1145,22 @@ function addAuditEventIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const event of state.auditEvents) {
+    if (isBlankPersistedValue(event.action)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Audit event action must not be blank",
+        path: ["auditEvents", event.id]
+      });
+    }
+
+    if (isBlankPersistedValue(event.summary)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Audit event summary must not be blank",
+        path: ["auditEvents", event.id]
+      });
+    }
+
     addParseablePersistedDateIssue(context, "auditEvents", event.id, "Audit event at", event.at);
 
     const privacyIssue = auditMetadataPrivacyIssue(event.metadata);
@@ -1292,6 +1316,14 @@ function addEvaluationRunIntegrityIssues(
   const languageIds = new Set(state.languages.map((language) => language.id));
 
   for (const run of state.evaluationRuns) {
+    if (isBlankPersistedValue(run.summary)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Evaluation run summary must not be blank",
+        path: ["evaluationRuns", run.id]
+      });
+    }
+
     addParseablePersistedDateIssue(context, "evaluationRuns", run.id, "Evaluation run createdAt", run.createdAt);
 
     if (!languageIds.has(run.languageId)) {
@@ -1303,6 +1335,14 @@ function addEvaluationRunIntegrityIssues(
     }
 
     for (const failure of run.failures) {
+      if (isBlankPersistedValue(failure.message)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Evaluation failure message must not be blank",
+          path: ["evaluationRuns", run.id]
+        });
+      }
+
       if (failure.languageId !== run.languageId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

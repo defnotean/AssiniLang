@@ -160,7 +160,7 @@ Allowed approver roles: Elder, lead, admin.
 
 Governance records are synthetic policy notes for local consent, access, and generation workflows. Writes require an existing language ID and a parseable `effectiveDate`, then append an audit event with policy type and effective date metadata.
 
-The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language, keep a parseable `effectiveDate`, and be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles or carry unusable policy timelines.
+The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language, keep nonblank policy content, keep a parseable `effectiveDate`, and be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles or carry unusable policy timelines.
 
 ## Audit Events
 
@@ -168,7 +168,7 @@ The persisted app-state schema also validates governance records during local JS
 
 Allowed reader roles: lead, admin, programmer.
 
-Audit events are written by mutation routes and derive `actorId` plus `actorRole` from the same resolved local user. During local JSON reads, persisted audit events must keep parseable timestamps and consistent actor attribution, and any non-null `languageId` must reference an existing language. `languageId: null` remains valid for global or provider-level events. Restored metadata is also rejected when it contains private payload keys or secret-looking values, while count-only metrics remain valid.
+Audit events are written by mutation routes and derive `actorId` plus `actorRole` from the same resolved local user. During local JSON reads, persisted audit events must keep nonblank action and summary text, parseable timestamps, and consistent actor attribution, and any non-null `languageId` must reference an existing language. `languageId: null` remains valid for global or provider-level events. Restored metadata is also rejected when it contains private payload keys or secret-looking values, while count-only metrics remain valid.
 
 ## Note Review
 
@@ -200,7 +200,7 @@ Language snapshots and evaluation artifacts include SHA-256 integrity manifests.
 
 `POST /evaluations/run`
 
-Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, keep a parseable `createdAt`, and every stored failure line must use the same language ID as its parent run.
+Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, keep a nonblank summary, keep a parseable `createdAt`, and every stored failure line must use the same language ID as its parent run with a nonblank diagnostic message.
 
 ## Elder Corrections
 

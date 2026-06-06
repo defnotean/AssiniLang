@@ -1306,6 +1306,11 @@ describe("JsonStore", () => {
       "unparseable effective date",
       createTestGovernanceRecord({ effectiveDate: "not-a-date" }),
       "Governance record effectiveDate must be parseable: not-a-date"
+    ],
+    [
+      "blank content",
+      createTestGovernanceRecord({ content: "   " }),
+      "Governance record content must not be blank"
     ]
   ])("rejects persisted governance records with %s", (_caseName, record, errorMessage) => {
     const state = createEmptyState();
@@ -1336,6 +1341,16 @@ describe("JsonStore", () => {
       "actor role mismatch",
       createTestAuditEvent({ actorRole: "admin" }),
       "Audit event actorRole admin does not match actor lead-1 role lead"
+    ],
+    [
+      "blank action",
+      createTestAuditEvent({ action: "   " }),
+      "Audit event action must not be blank"
+    ],
+    [
+      "blank summary",
+      createTestAuditEvent({ summary: "   " }),
+      "Audit event summary must not be blank"
     ],
     [
       "private metadata field",
@@ -1470,6 +1485,25 @@ describe("JsonStore", () => {
       "unparseable created date",
       createTestEvaluationRun({ createdAt: "not-a-date" }),
       "Evaluation run createdAt must be parseable: not-a-date"
+    ],
+    [
+      "blank summary",
+      createTestEvaluationRun({ summary: "   " }),
+      "Evaluation run summary must not be blank"
+    ],
+    [
+      "blank failure message",
+      createTestEvaluationRun({
+        failures: [
+          {
+            category: "noteAccuracy",
+            languageId: "avenik",
+            itemId: "note-1",
+            message: "   "
+          }
+        ]
+      }),
+      "Evaluation failure message must not be blank"
     ],
     [
       "failure language mismatch",
