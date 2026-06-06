@@ -560,6 +560,24 @@ function addDuplicatePersistedValueIssue<T>(
   }
 }
 
+function addBlankPersistedValueIssue<T>(
+  context: z.RefinementCtx,
+  path: string,
+  label: string,
+  items: T[],
+  valueForItem: (item: T) => string
+) {
+  for (const item of items) {
+    if (isBlankPersistedValue(valueForItem(item))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Persisted ${label} must not be blank in ${path}`,
+        path: [path]
+      });
+    }
+  }
+}
+
 function addParseablePersistedDateIssue(
   context: z.RefinementCtx,
   path: string,
@@ -2336,26 +2354,39 @@ export const appStateSchema = z.object({
 }).superRefine((state, context) => {
   addDuplicatePersistedValueIssue(context, "languages", "id", state.languages, (item) => item.id);
   addLanguageIntegrityIssues(context, state);
+  addBlankPersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
   addCorpusIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);
   addCorpusAnswerKeyIntegrityIssues(context, state);
+  addBlankPersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
   addNoteCollectionIntegrityIssues(context, state, state.noteAnswerKeys, "noteAnswerKeys", "Note answer key");
+  addBlankPersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
   addNoteCollectionIntegrityIssues(context, state, state.notes, "notes", "Note");
+  addBlankPersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);
   addExerciseIntegrityIssues(context, state);
+  addBlankPersistedValueIssue(context, "exerciseSubmissions", "id", state.exerciseSubmissions, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "exerciseSubmissions", "id", state.exerciseSubmissions, (item) => item.id);
+  addBlankPersistedValueIssue(context, "evaluationRuns", "id", state.evaluationRuns, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "evaluationRuns", "id", state.evaluationRuns, (item) => item.id);
+  addBlankPersistedValueIssue(context, "governance", "id", state.governance, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "governance", "id", state.governance, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "users", "id", state.users, (item) => item.id);
   addUserIntegrityIssues(context, state);
+  addBlankPersistedValueIssue(context, "aiSessions", "id", state.aiSessions, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "aiSessions", "id", state.aiSessions, (item) => item.id);
+  addBlankPersistedValueIssue(context, "elderCorrections", "id", state.elderCorrections, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "elderCorrections", "id", state.elderCorrections, (item) => item.id);
+  addBlankPersistedValueIssue(context, "auditEvents", "id", state.auditEvents, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "auditEvents", "id", state.auditEvents, (item) => item.id);
+  addBlankPersistedValueIssue(context, "reviewPolicies", "id", state.reviewPolicies, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewPolicies", "id", state.reviewPolicies, (item) => item.id);
+  addBlankPersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
+  addBlankPersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addExerciseSubmissionIntegrityIssues(context, state);
   addGovernanceIntegrityIssues(context, state);

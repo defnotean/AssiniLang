@@ -548,6 +548,149 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "corpus",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.corpus = [createTestCorpusPassage({ id: "   " })];
+      },
+      "Persisted id must not be blank in corpus"
+    ],
+    [
+      "note answer keys",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.noteAnswerKeys = [createTestNote({ id: "   ", status: "approved" })];
+      },
+      "Persisted id must not be blank in noteAnswerKeys"
+    ],
+    [
+      "notes",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.notes = [createTestNote({ id: "   " })];
+      },
+      "Persisted id must not be blank in notes"
+    ],
+    [
+      "exercises",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.corpus = [createTestCorpusPassage()];
+        state.exercises = [createTestExercise({ id: "   " })];
+      },
+      "Persisted id must not be blank in exercises"
+    ],
+    [
+      "exercise submissions",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.corpus = [createTestCorpusPassage()];
+        state.exercises = [createTestExercise()];
+        state.exerciseSubmissions = [createTestSubmission({ id: "   " })];
+      },
+      "Persisted id must not be blank in exerciseSubmissions"
+    ],
+    [
+      "evaluation runs",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.evaluationRuns = [createTestEvaluationRun({ id: "   " })];
+      },
+      "Persisted id must not be blank in evaluationRuns"
+    ],
+    [
+      "governance records",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.governance = [createTestGovernanceRecord({ id: "   " })];
+      },
+      "Persisted id must not be blank in governance"
+    ],
+    [
+      "AI sessions",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.notes = [createTestNote()];
+        state.corpus = [createTestCorpusPassage()];
+        state.aiSessions = [createTestAiSession({ id: "   " })];
+      },
+      "Persisted id must not be blank in aiSessions"
+    ],
+    [
+      "elder corrections",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.notes = [createTestNote()];
+        state.corpus = [createTestCorpusPassage()];
+        state.elderCorrections = [createTestElderCorrection({ id: "   " })];
+      },
+      "Persisted id must not be blank in elderCorrections"
+    ],
+    [
+      "audit events",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.auditEvents = [createTestAuditEvent({ id: "   " })];
+      },
+      "Persisted id must not be blank in auditEvents"
+    ],
+    [
+      "review policies",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.reviewPolicies = [{
+          id: "   ",
+          languageId: "avenik",
+          assignedReviewerIds: ["reviewer-1"],
+          approvalThreshold: 1,
+          requiresAssignedReviewer: true,
+          updatedAt: "2026-06-06T00:00:00.000Z",
+          updatedBy: "lead-1"
+        }];
+      },
+      "Persisted id must not be blank in reviewPolicies"
+    ],
+    [
+      "review approvals",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.notes = [createTestNote({ status: "under_review" })];
+        state.reviewApprovals = [{
+          id: "   ",
+          languageId: "avenik",
+          noteId: "note-1",
+          reviewerId: "reviewer-1",
+          approvedAt: "2026-06-06T00:01:00.000Z"
+        }];
+      },
+      "Persisted id must not be blank in reviewApprovals"
+    ],
+    [
+      "review dispositions",
+      (state: ReturnType<typeof createEmptyState>) => {
+        state.languages = [createTestLanguage()];
+        state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+        state.notes = [createTestNote({ status: "escalated" })];
+        state.reviewDispositions = [createTestDisposition({ id: "   " })];
+      },
+      "Persisted id must not be blank in reviewDispositions"
+    ]
+  ])("rejects persisted %s with a blank top-level id", (_caseName, setupState, errorMessage) => {
+    const state = createEmptyState();
+    setupState(state);
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
       "blank id",
       { id: "   " },
       "Language id must not be blank"
