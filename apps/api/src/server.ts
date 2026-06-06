@@ -723,6 +723,10 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
     return "Exercise grading explanation must be substantive.";
   }
 
+  if (body.adversarialAnswers.length < 2) {
+    return "Exercise authoring requires at least two adversarial probes.";
+  }
+
   const normalizedExpected = new Set<string>();
   for (const answer of body.expectedAnswers) {
     const normalizedAnswer = normalizeAuthoredAnswer(answer);

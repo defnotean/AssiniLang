@@ -2428,16 +2428,23 @@ function LearnerView({
   const [authoringVocabulary, setAuthoringVocabulary] = useState("");
   const [authoringRules, setAuthoringRules] = useState("");
   const [authoringAnswers, setAuthoringAnswers] = useState("");
-  const [authoringAdversarialAnswer, setAuthoringAdversarialAnswer] = useState("");
-  const [authoringAdversarialReason, setAuthoringAdversarialReason] = useState("");
+  const [authoringAdversarialAnswerOne, setAuthoringAdversarialAnswerOne] = useState("");
+  const [authoringAdversarialReasonOne, setAuthoringAdversarialReasonOne] = useState("");
+  const [authoringAdversarialAnswerTwo, setAuthoringAdversarialAnswerTwo] = useState("");
+  const [authoringAdversarialReasonTwo, setAuthoringAdversarialReasonTwo] = useState("");
   const [authoringExplanation, setAuthoringExplanation] = useState("");
   const [authoringMessage, setAuthoringMessage] = useState<string | null>(null);
   const [authoringError, setAuthoringError] = useState<string | null>(null);
   const [isCreatingExercise, setIsCreatingExercise] = useState(false);
+  const hasTwoAdversarialProbes = authoringAdversarialAnswerOne.trim().length > 0
+    && authoringAdversarialReasonOne.trim().length > 0
+    && authoringAdversarialAnswerTwo.trim().length > 0
+    && authoringAdversarialReasonTwo.trim().length > 0;
   const canCreateExercise = authoringPrompt.trim().length > 0
     && authoringVocabulary.trim().length > 0
     && authoringRules.trim().length > 0
     && authoringAnswers.trim().length > 0
+    && hasTwoAdversarialProbes
     && authoringExplanation.trim().length > 0
     && !isWorkflowBusy
     && !isCreatingExercise;
@@ -2451,9 +2458,10 @@ function LearnerView({
     event.preventDefault();
     if (!canCreateExercise) return;
 
-    const adversarialAnswers = authoringAdversarialAnswer.trim() && authoringAdversarialReason.trim()
-      ? [{ answer: authoringAdversarialAnswer.trim(), reason: authoringAdversarialReason.trim() }]
-      : [];
+    const adversarialAnswers = [
+      { answer: authoringAdversarialAnswerOne.trim(), reason: authoringAdversarialReasonOne.trim() },
+      { answer: authoringAdversarialAnswerTwo.trim(), reason: authoringAdversarialReasonTwo.trim() }
+    ];
 
     setIsCreatingExercise(true);
     setAuthoringMessage(null);
@@ -2632,23 +2640,45 @@ function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-answer">Adversarial answer</label>
+            <label htmlFor="exercise-author-adversarial-answer-one">Adversarial answer 1</label>
             <input
-              id="exercise-author-adversarial-answer"
-              value={authoringAdversarialAnswer}
+              id="exercise-author-adversarial-answer-one"
+              value={authoringAdversarialAnswerOne}
               onChange={(event) => {
-                setAuthoringAdversarialAnswer(event.target.value);
+                setAuthoringAdversarialAnswerOne(event.target.value);
                 clearAuthoringNotice();
               }}
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-reason">Adversarial reason</label>
+            <label htmlFor="exercise-author-adversarial-reason-one">Adversarial reason 1</label>
             <input
-              id="exercise-author-adversarial-reason"
-              value={authoringAdversarialReason}
+              id="exercise-author-adversarial-reason-one"
+              value={authoringAdversarialReasonOne}
               onChange={(event) => {
-                setAuthoringAdversarialReason(event.target.value);
+                setAuthoringAdversarialReasonOne(event.target.value);
+                clearAuthoringNotice();
+              }}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="exercise-author-adversarial-answer-two">Adversarial answer 2</label>
+            <input
+              id="exercise-author-adversarial-answer-two"
+              value={authoringAdversarialAnswerTwo}
+              onChange={(event) => {
+                setAuthoringAdversarialAnswerTwo(event.target.value);
+                clearAuthoringNotice();
+              }}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="exercise-author-adversarial-reason-two">Adversarial reason 2</label>
+            <input
+              id="exercise-author-adversarial-reason-two"
+              value={authoringAdversarialReasonTwo}
+              onChange={(event) => {
+                setAuthoringAdversarialReasonTwo(event.target.value);
                 clearAuthoringNotice();
               }}
             />

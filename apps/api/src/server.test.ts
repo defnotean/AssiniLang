@@ -1138,7 +1138,8 @@ describe("api server", () => {
         allowedRuleIds: ["avn-rule-verb-chain"],
         expectedAnswers: ["mira talo-mi-na"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+          { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
         ],
         gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
       }
@@ -1183,7 +1184,7 @@ describe("api server", () => {
         metadata: expect.objectContaining({
           exerciseType: "translate_to_target",
           expectedAnswerCount: 1,
-          adversarialAnswerCount: 1
+          adversarialAnswerCount: 2
         })
       })
     ]));
@@ -1217,6 +1218,34 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it("rejects exercise authoring with fewer than two adversarial probes without mutating exercises", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/exercises",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        type: "translate_to_target",
+        prompt: "Translate into Avenik: I walk by the river.",
+        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+        allowedRuleIds: ["avn-rule-verb-chain"],
+        expectedAnswers: ["mira talo-mi-na"],
+        adversarialAnswers: [
+          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+        ],
+        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Exercise authoring requires at least two adversarial probes." });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it("rejects duplicate expected exercise answers without mutating exercises", async () => {
     const app = createServer({ initialState: stateWithAuthUsers() });
     const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
@@ -1232,7 +1261,8 @@ describe("api server", () => {
         allowedRuleIds: ["avn-rule-verb-chain"],
         expectedAnswers: ["mira talo-mi-na", "  mira   talo-mi-na  "],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+          { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
         ],
         gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
       }

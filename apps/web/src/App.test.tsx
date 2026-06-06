@@ -1487,11 +1487,17 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Expected answers"), {
       target: { value: "mira talo-mi-na" }
     });
-    fireEvent.change(screen.getByLabelText("Adversarial answer"), {
+    fireEvent.change(screen.getByLabelText("Adversarial answer 1"), {
       target: { value: "talo-mi-na mira" }
     });
-    fireEvent.change(screen.getByLabelText("Adversarial reason"), {
+    fireEvent.change(screen.getByLabelText("Adversarial reason 1"), {
       target: { value: "Moves the finite verb before the locative noun." }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial answer 2"), {
+      target: { value: "mira talo-na-mi" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 2"), {
+      target: { value: "Reverses tense and person suffix order." }
     });
     fireEvent.change(screen.getByLabelText("Grading explanation"), {
       target: { value: "Use mira for river, talo for walk, -mi for present, and -na for first person singular." }
@@ -1505,7 +1511,8 @@ describe("App", () => {
       allowedRuleIds: ["avn-rule-verb-chain"],
       expectedAnswers: ["mira talo-mi-na"],
       adversarialAnswers: [
-        { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+        { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+        { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
       ],
       gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
     }));

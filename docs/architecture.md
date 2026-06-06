@@ -38,7 +38,7 @@ Each synthetic language should include:
 - Grammar rules.
 - Note answer keys.
 - Learner exercise answer keys.
-- Private adversarial exercise probes.
+- At least two private adversarial exercise probes.
 - Paradigm tables.
 - Dialect variants.
 
