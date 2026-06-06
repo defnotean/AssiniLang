@@ -137,6 +137,7 @@ When adding a workflow:
 - Add app tests for the user workflow.
 - Keep local form validation focused on obvious missing fields.
 - Treat the API as the source of truth for domain validation.
+- Extract reusable form parsing and payload-building logic into focused helper modules with direct tests.
 - Run a browser smoke check after automated tests pass.
 
 ## Generated Files

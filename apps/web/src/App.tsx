@@ -44,6 +44,12 @@ import {
   submitExerciseAnswer,
   updateReviewPolicy
 } from "./api";
+import {
+  buildCorpusImportPayload,
+  canSubmitCorpusImportDraft,
+  EMPTY_CORPUS_IMPORT_DRAFT,
+  type CorpusImportDraft
+} from "./corpusImport";
 import "./styles.css";
 
 type ViewMode = "profile" | "corpus" | "review" | "learner" | "eval" | "governance" | "model";
@@ -191,32 +197,6 @@ function parseAuthoringList(value: string): string[] {
     .split(/[,\n]/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function parseCorpusMorphemeDraft(value: string): CorpusImportPayload["morphologicalSegmentation"] {
-  return value
-    .split(/\r?\n/)
-    .map((row) => row.trim())
-    .filter(Boolean)
-    .map((row) => {
-      const [surface = "", lemma = "", gloss = "", features = ""] = row
-        .split("|")
-        .map((part) => part.trim());
-      return {
-        surface,
-        lemma,
-        gloss,
-        features: parseAuthoringList(features)
-      };
-    });
-}
-
-function hasCompleteCorpusMorphemes(morphemes: CorpusImportPayload["morphologicalSegmentation"]): boolean {
-  return morphemes.length > 0 && morphemes.every((morpheme) => (
-    morpheme.surface.length > 0
-    && morpheme.lemma.length > 0
-    && morpheme.gloss.length > 0
-  ));
 }
 
 function safeDomId(value: string): string {
@@ -1759,32 +1739,12 @@ function CorpusView({
   onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
-  const [importTarget, setImportTarget] = useState("");
-  const [importTranslation, setImportTranslation] = useState("");
-  const [importSource, setImportSource] = useState("");
-  const [importAuthor, setImportAuthor] = useState("");
-  const [importYear, setImportYear] = useState("");
-  const [importLicense, setImportLicense] = useState("");
-  const [importConsentRecord, setImportConsentRecord] = useState("");
-  const [importTags, setImportTags] = useState("");
-  const [importMorphemes, setImportMorphemes] = useState("");
-  const [importRestrictions, setImportRestrictions] = useState("");
+  const [importDraft, setImportDraft] = useState<CorpusImportDraft>(() => ({ ...EMPTY_CORPUS_IMPORT_DRAFT }));
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImportingCorpus, setIsImportingCorpus] = useState(false);
   const normalized = search.trim().toLowerCase();
-  const parsedMorphemes = useMemo(() => parseCorpusMorphemeDraft(importMorphemes), [importMorphemes]);
-  const parsedYear = Number(importYear.trim());
-  const canImportPassage = importTarget.trim().length > 0
-    && importTranslation.trim().length > 0
-    && importSource.trim().length > 0
-    && importAuthor.trim().length > 0
-    && importYear.trim().length > 0
-    && Number.isInteger(parsedYear)
-    && importLicense.trim().length > 0
-    && importConsentRecord.trim().length > 0
-    && parseAuthoringList(importTags).length > 0
-    && hasCompleteCorpusMorphemes(parsedMorphemes)
+  const canImportPassage = canSubmitCorpusImportDraft(importDraft)
     && !isWorkflowBusy
     && !isImportingCorpus;
   const filtered = useMemo(() => {
@@ -1809,11 +1769,17 @@ function CorpusView({
     setImportError(null);
   }
 
+  function updateImportDraft(field: keyof CorpusImportDraft, value: string) {
+    setImportDraft((current) => ({ ...current, [field]: value }));
+    clearImportNotice();
+  }
+
   async function handleImportCorpus(event: FormEvent) {
     event.preventDefault();
-    if (!canImportPassage) {
+    const result = buildCorpusImportPayload(importDraft);
+    if (!result.ok) {
       setImportMessage(null);
-      setImportError("Please complete target text, translation, provenance, tags, and morphemes.");
+      setImportError(result.error);
       return;
     }
 
@@ -1821,33 +1787,8 @@ function CorpusView({
     setImportMessage(null);
     setImportError(null);
     try {
-      await onImportCorpusPassage({
-        source: importSource.trim(),
-        sourceMetadata: {
-          author: importAuthor.trim(),
-          year: parsedYear,
-          license: importLicense.trim(),
-          consentRecord: importConsentRecord.trim()
-        },
-        textTarget: importTarget.trim(),
-        textTranslation: importTranslation.trim(),
-        morphologicalSegmentation: parsedMorphemes,
-        topicTags: parseAuthoringList(importTags),
-        consentStatus: {
-          use: "synthetic-testing-only",
-          restrictions: parseAuthoringList(importRestrictions)
-        }
-      });
-      setImportTarget("");
-      setImportTranslation("");
-      setImportSource("");
-      setImportAuthor("");
-      setImportYear("");
-      setImportLicense("");
-      setImportConsentRecord("");
-      setImportTags("");
-      setImportMorphemes("");
-      setImportRestrictions("");
+      await onImportCorpusPassage(result.payload);
+      setImportDraft({ ...EMPTY_CORPUS_IMPORT_DRAFT });
       setImportMessage("Corpus passage imported.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Corpus import failed";
@@ -1869,44 +1810,32 @@ function CorpusView({
             <label htmlFor="corpus-import-target">Corpus target text</label>
             <input
               id="corpus-import-target"
-              value={importTarget}
-              onChange={(event) => {
-                setImportTarget(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.target}
+              onChange={(event) => updateImportDraft("target", event.target.value)}
             />
           </div>
           <div className="form-group wide">
             <label htmlFor="corpus-import-translation">English translation</label>
             <input
               id="corpus-import-translation"
-              value={importTranslation}
-              onChange={(event) => {
-                setImportTranslation(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.translation}
+              onChange={(event) => updateImportDraft("translation", event.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="corpus-import-source">Source</label>
             <input
               id="corpus-import-source"
-              value={importSource}
-              onChange={(event) => {
-                setImportSource(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.source}
+              onChange={(event) => updateImportDraft("source", event.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="corpus-import-author">Author</label>
             <input
               id="corpus-import-author"
-              value={importAuthor}
-              onChange={(event) => {
-                setImportAuthor(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.author}
+              onChange={(event) => updateImportDraft("author", event.target.value)}
             />
           </div>
           <div className="form-group">
@@ -1915,66 +1844,48 @@ function CorpusView({
               id="corpus-import-year"
               type="number"
               inputMode="numeric"
-              value={importYear}
-              onChange={(event) => {
-                setImportYear(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.year}
+              onChange={(event) => updateImportDraft("year", event.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="corpus-import-license">License</label>
             <input
               id="corpus-import-license"
-              value={importLicense}
-              onChange={(event) => {
-                setImportLicense(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.license}
+              onChange={(event) => updateImportDraft("license", event.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="corpus-import-consent-record">Consent record</label>
             <input
               id="corpus-import-consent-record"
-              value={importConsentRecord}
-              onChange={(event) => {
-                setImportConsentRecord(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.consentRecord}
+              onChange={(event) => updateImportDraft("consentRecord", event.target.value)}
             />
           </div>
           <div className="form-group">
             <label htmlFor="corpus-import-tags">Topic tags</label>
             <input
               id="corpus-import-tags"
-              value={importTags}
-              onChange={(event) => {
-                setImportTags(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.tags}
+              onChange={(event) => updateImportDraft("tags", event.target.value)}
             />
           </div>
           <div className="form-group wide">
             <label htmlFor="corpus-import-morphemes">Morpheme segmentation</label>
             <textarea
               id="corpus-import-morphemes"
-              value={importMorphemes}
-              onChange={(event) => {
-                setImportMorphemes(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.morphemes}
+              onChange={(event) => updateImportDraft("morphemes", event.target.value)}
             />
           </div>
           <div className="form-group wide">
             <label htmlFor="corpus-import-restrictions">Access restrictions</label>
             <input
               id="corpus-import-restrictions"
-              value={importRestrictions}
-              onChange={(event) => {
-                setImportRestrictions(event.target.value);
-                clearImportNotice();
-              }}
+              value={importDraft.restrictions}
+              onChange={(event) => updateImportDraft("restrictions", event.target.value)}
             />
           </div>
         </div>
