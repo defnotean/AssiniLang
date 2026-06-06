@@ -723,6 +723,15 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
     return "Exercise grading explanation must be substantive.";
   }
 
+  const normalizedExpected = new Set<string>();
+  for (const answer of body.expectedAnswers) {
+    const normalizedAnswer = normalizeAuthoredAnswer(answer);
+    if (normalizedExpected.has(normalizedAnswer)) {
+      return `Exercise expected answer is duplicated: ${normalizedAnswer}`;
+    }
+    normalizedExpected.add(normalizedAnswer);
+  }
+
   if (body.type === "translate_to_target") {
     for (const answer of body.expectedAnswers) {
       if (!corpusTargets.has(normalizeAuthoredAnswer(answer))) {
@@ -739,7 +748,6 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
     }
   }
 
-  const normalizedExpected = new Set(body.expectedAnswers.map(normalizeAuthoredAnswer));
   const normalizedAdversarial = new Set<string>();
   for (const adversarial of body.adversarialAnswers) {
     const normalizedAnswer = normalizeAuthoredAnswer(adversarial.answer);

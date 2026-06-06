@@ -76,4 +76,18 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects duplicate expected exercise answers after normalization", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.exercisesAnswerKey[1].expectedAnswers = ["nemi|-lo|-ki", "  nemi|-lo|-ki  "];
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik exercise avn-ex002 expected answer is duplicated: nemi|-lo|-ki"
+      ])
+    );
+  });
 });

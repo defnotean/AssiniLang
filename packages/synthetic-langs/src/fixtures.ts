@@ -1409,7 +1409,7 @@ const exerciseMap: Record<string, Exercise[]> = {
       prompt: "Translate: I walk by the river.",
       allowedVocabulary: ["mira", "talo", "-mi", "-na"],
       allowedRuleIds: ["avn-rule-verb-chain"],
-      expectedAnswers: ["mira talo-mi-na", "mira talo-mi-na ", "mira talo-mi-na"],
+      expectedAnswers: ["mira talo-mi-na"],
       adversarialAnswers: [
         { answer: "talo-mi-na mira", reason: "Keeps the words but moves the verb before the locative noun." },
         { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }

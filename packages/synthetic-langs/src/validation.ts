@@ -206,6 +206,14 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
           diagnostics.push(`${languageId} exercise ${exercise.id} allows unknown vocabulary form ${form}`);
         }
       }
+      const normalizedExpectedAnswers = new Set<string>();
+      for (const answer of exercise.expectedAnswers) {
+        const normalizedAnswer = normalizedText(answer);
+        if (normalizedExpectedAnswers.has(normalizedAnswer)) {
+          diagnostics.push(`${languageId} exercise ${exercise.id} expected answer is duplicated: ${normalizedAnswer}`);
+        }
+        normalizedExpectedAnswers.add(normalizedAnswer);
+      }
       if (exercise.type === "translate_to_target") {
         for (const answer of exercise.expectedAnswers) {
           if (!corpusTargets.has(normalizedText(answer))) {
@@ -223,7 +231,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
       const normalizedAdversarialAnswers = new Set<string>();
       for (const adversarial of exercise.adversarialAnswers) {
         const normalizedAdversarialAnswer = normalizedText(adversarial.answer);
-        if (exercise.expectedAnswers.some((expected) => normalizedText(expected) === normalizedAdversarialAnswer)) {
+        if (normalizedExpectedAnswers.has(normalizedAdversarialAnswer)) {
           diagnostics.push(`${languageId} exercise ${exercise.id} adversarial answer duplicates an expected answer: ${adversarial.answer}`);
         }
         if (normalizedAdversarialAnswers.has(normalizedAdversarialAnswer)) {

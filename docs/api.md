@@ -132,7 +132,7 @@ Important validation:
 - Allowed grammar-rule IDs must exist for that language.
 - Allowed vocabulary forms must exist for that language.
 - Prompts and grading explanations must be substantive.
-- Expected answers must be present.
+- Expected answers must be present and unique after whitespace normalization.
 - Adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
 
 ## Note Review
