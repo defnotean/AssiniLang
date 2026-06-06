@@ -326,9 +326,7 @@ describe("JsonStore", () => {
       legacyState.languages.push(createTestLanguage({ id: "legacy-language", name: "Legacy Language" }));
       legacyState.corpus.push(createTestCorpusPassage({
         id: "legacy-corpus",
-        languageId: "legacy-language",
-        textTarget: "legacy target",
-        textTranslation: "Legacy translation."
+        languageId: "legacy-language"
       }));
       legacyState.notes.push({
         id: "legacy-note",
@@ -602,6 +600,74 @@ describe("JsonStore", () => {
     } else {
       state.noteAnswerKeys = [note];
     }
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing language",
+      createTestCorpusPassage({ languageId: "missing-language" }),
+      "Corpus passage references missing language: missing-language"
+    ],
+    [
+      "duplicate topic tags",
+      createTestCorpusPassage({ topicTags: ["motion", " motion "] }),
+      "Corpus topic tag is duplicated for passage passage-1: motion"
+    ],
+    [
+      "duplicate morpheme features",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun", " noun "]
+          }
+        ]
+      }),
+      "Corpus morpheme feature is duplicated for passage passage-1 surface mira: noun"
+    ],
+    [
+      "segmentation surface absent from target text",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "ghost",
+            lemma: "ghost",
+            gloss: "ghost",
+            features: ["noun"]
+          }
+        ]
+      }),
+      "Corpus segmentation surface is not present in target text for passage passage-1: ghost"
+    ],
+    [
+      "uncovered target token",
+      createTestCorpusPassage({
+        textTarget: "mira lumo-ke talo-mi-na",
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus segmentation does not cover target token for passage passage-1: lumo-ke"
+    ]
+  ])("rejects persisted corpus passages with %s", (_caseName, passage, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.corpus = [passage];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });

@@ -384,6 +384,10 @@ function normalizePersistedText(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function normalizePersistedSurfaceKey(input: string): string {
+  return normalizePersistedText(input).replace(/-/g, "");
+}
+
 function duplicateNormalizedPersistedValue(items: string[]): string | undefined {
   const seen = new Set<string>();
   for (const item of items) {
@@ -392,6 +396,45 @@ function duplicateNormalizedPersistedValue(items: string[]): string | undefined 
     seen.add(normalized);
   }
   return undefined;
+}
+
+function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
+  const normalizedSurface = normalizePersistedSurfaceKey(surface);
+  return normalizePersistedText(textTarget)
+    .split(/\s+/)
+    .some((token) => {
+      const normalizedToken = token.replace(/-/g, "");
+      return normalizedToken === normalizedSurface || normalizedToken.includes(normalizedSurface);
+    });
+}
+
+function hasContiguousMorphemeCoverage(
+  targetToken: string,
+  morphemes: Array<Pick<z.infer<typeof morphemeSchema>, "surface">>
+): boolean {
+  const targetKey = normalizePersistedSurfaceKey(targetToken);
+  const surfaceKeys = morphemes.map((morpheme) => normalizePersistedSurfaceKey(morpheme.surface));
+
+  for (let start = 0; start < surfaceKeys.length; start += 1) {
+    let candidate = "";
+    for (let end = start; end < surfaceKeys.length; end += 1) {
+      candidate += surfaceKeys[end];
+      if (candidate === targetKey) return true;
+      if (!targetKey.startsWith(candidate)) break;
+    }
+  }
+
+  return false;
+}
+
+function findUncoveredPersistedCorpusTargetTokens(
+  textTarget: string,
+  morphemes: Array<Pick<z.infer<typeof morphemeSchema>, "surface">>
+): string[] {
+  return normalizePersistedText(textTarget)
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .filter((token) => !hasContiguousMorphemeCoverage(token, morphemes));
 }
 
 function addDuplicatePersistedValueIssue<T>(
@@ -408,6 +451,62 @@ function addDuplicatePersistedValueIssue<T>(
       message: `Duplicate persisted ${label} in ${path}: ${duplicate}`,
       path: [path]
     });
+  }
+}
+
+function addCorpusIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+  }
+) {
+  const languageIds = new Set(state.languages.map((language) => language.id));
+
+  for (const passage of state.corpus) {
+    if (!languageIds.has(passage.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus passage references missing language: ${passage.languageId}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    const duplicateTopicTag = duplicateNormalizedPersistedValue(passage.topicTags);
+    if (duplicateTopicTag) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus topic tag is duplicated for passage ${passage.id}: ${duplicateTopicTag}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    for (const morpheme of passage.morphologicalSegmentation) {
+      if (!corpusTargetContainsSurface(passage.textTarget, morpheme.surface)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus segmentation surface is not present in target text for passage ${passage.id}: ${morpheme.surface}`,
+          path: ["corpus", passage.id]
+        });
+      }
+
+      const duplicateFeature = duplicateNormalizedPersistedValue(morpheme.features);
+      if (duplicateFeature) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus morpheme feature is duplicated for passage ${passage.id} surface ${morpheme.surface}: ${duplicateFeature}`,
+          path: ["corpus", passage.id]
+        });
+      }
+    }
+
+    for (const token of findUncoveredPersistedCorpusTargetTokens(passage.textTarget, passage.morphologicalSegmentation)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus segmentation does not cover target token for passage ${passage.id}: ${token}`,
+        path: ["corpus", passage.id]
+      });
+    }
   }
 }
 
@@ -1194,6 +1293,7 @@ export const appStateSchema = z.object({
 }).superRefine((state, context) => {
   addDuplicatePersistedValueIssue(context, "languages", "id", state.languages, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
+  addCorpusIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);
   addCorpusAnswerKeyIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
