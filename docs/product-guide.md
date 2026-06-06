@@ -43,7 +43,7 @@ Reviewers can also import new synthetic passages from the browser. The import fl
 - Structured morpheme segmentation.
 - Synthetic-only access restrictions.
 
-The API validates the import before saving. It rejects duplicate target passages, segmentation surfaces that are not present in the target text, morphemes that are not grounded by the selected language vocabulary surface or lemma, invalid synthetic consent metadata, and malformed payloads. Successful imports write audit metadata without storing private reviewer data.
+The API validates the import before saving. It rejects duplicate target passages, target text with symbols outside the selected language phonology inventory, segmentation surfaces that are not present in the target text, morphemes that are not grounded by the selected language vocabulary surface or lemma, invalid synthetic consent metadata, and malformed payloads. Successful imports write audit metadata without storing private reviewer data.
 
 ### Note Review Queue
 

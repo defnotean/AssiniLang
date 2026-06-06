@@ -370,10 +370,10 @@ describe("api server", () => {
           license: "synthetic-only",
           consentRecord: "local synthetic import consent"
         },
-        textTarget: "zoru talo-mi-na",
+        textTarget: "noru talo-mi-na",
         textTranslation: "I walk near the invented token.",
         morphologicalSegmentation: [
-          { surface: "zoru", lemma: "zoru", gloss: "invented-token", features: ["noun"] },
+          { surface: "noru", lemma: "noru", gloss: "invented-token", features: ["noun"] },
           { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
         ],
         topicTags: ["motion"],
@@ -385,7 +385,44 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in Avenik vocabulary: zoru" });
+    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in Avenik vocabulary: noru" });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    expect(after.json()).toEqual(before.json());
+  });
+
+  it("rejects corpus imports with target text outside the selected language phonology", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/corpus",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        source: "synthetic-import",
+        sourceMetadata: {
+          author: "Local Reviewer",
+          year: 2026,
+          license: "synthetic-only",
+          consentRecord: "local synthetic import consent"
+        },
+        textTarget: "mira-z talo-mi-na",
+        textTranslation: "I walk by the altered river.",
+        morphologicalSegmentation: [
+          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ],
+        topicTags: ["motion"],
+        consentStatus: {
+          use: "synthetic-testing-only",
+          restrictions: []
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Corpus target text uses z outside Avenik phonology inventory: mira-z talo-mi-na" });
 
     const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
     expect(after.json()).toEqual(before.json());

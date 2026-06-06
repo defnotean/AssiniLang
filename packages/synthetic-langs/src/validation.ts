@@ -17,7 +17,7 @@ function addDuplicateDiagnostics(items: string[], label: string, diagnostics: st
   }
 }
 
-function invalidOrthographySymbols(value: string, fixture: SyntheticLanguageFixture): string[] {
+export function findInvalidOrthographySymbols(value: string, fixture: SyntheticLanguageFixture): string[] {
   const allowedSymbols = [...fixture.phonology.consonants, ...fixture.phonology.vowels]
     .filter((symbol) => symbol.length > 0)
     .sort((left, right) => right.length - left.length);
@@ -51,7 +51,7 @@ function addOrthographyDiagnostics(
   label: string,
   diagnostics: string[]
 ) {
-  for (const symbol of invalidOrthographySymbols(value, fixture)) {
+  for (const symbol of findInvalidOrthographySymbols(value, fixture)) {
     diagnostics.push(`${label} uses ${symbol} outside phonology inventory`);
   }
 }

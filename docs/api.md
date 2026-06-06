@@ -64,7 +64,7 @@ Do not treat prototype auth as production security.
 
 Allowed roles: reviewer, lead, admin.
 
-The route imports one synthetic corpus passage after validating provenance, synthetic consent, segmentation, duplicate target text, and vocabulary grounding.
+The route imports one synthetic corpus passage after validating provenance, synthetic consent, segmentation, duplicate target text, target-language phonology, and vocabulary grounding.
 
 Example body:
 
@@ -112,6 +112,7 @@ Important validation:
 - `consentStatus.use` must be `synthetic-testing-only`.
 - `topicTags` must contain at least one tag.
 - Each segmentation surface must appear in the target text.
+- Target text must use symbols from the selected language phonology inventory. Whitespace and explicit morpheme hyphens are allowed.
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.
 - Duplicate target text is rejected per language.
 

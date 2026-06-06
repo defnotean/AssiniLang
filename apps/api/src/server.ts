@@ -23,7 +23,7 @@ import {
   type UserRole
 } from "@assini/db";
 import { draftNotesForLanguage, gradeExerciseAnswer, runEvaluationForState } from "@assini/eval";
-import { syntheticLanguageFixtures } from "@assini/synthetic-langs";
+import { findInvalidOrthographySymbols, syntheticLanguageFixtures } from "@assini/synthetic-langs";
 import {
   buildLlmGenerationInputFromState,
   createLlmProviderFromEnv,
@@ -649,6 +649,20 @@ function corpusMorphemeGroundingError(languageId: string, body: CorpusImportBody
   return undefined;
 }
 
+function corpusPhonologyValidationError(languageId: string, body: CorpusImportBody): string | undefined {
+  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
+  if (!fixture) {
+    return `Corpus import fixture metadata not found for language: ${languageId}`;
+  }
+
+  const invalidTargetSymbols = findInvalidOrthographySymbols(body.textTarget, fixture);
+  if (invalidTargetSymbols.length > 0) {
+    return `Corpus target text uses ${invalidTargetSymbols.join(", ")} outside ${fixture.language.name} phonology inventory: ${body.textTarget}`;
+  }
+
+  return undefined;
+}
+
 function corpusImportValidationError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
   const normalizedTarget = normalizeAuthoredAnswer(body.textTarget).toLowerCase();
   const duplicate = state.corpus.some((passage) => (
@@ -664,6 +678,11 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
     if (!corpusTargetContainsSurface(body.textTarget, morpheme.surface)) {
       return `Corpus segmentation surface is not present in target text: ${morpheme.surface}`;
     }
+  }
+
+  const phonologyError = corpusPhonologyValidationError(languageId, body);
+  if (phonologyError) {
+    return phonologyError;
   }
 
   const groundingError = corpusMorphemeGroundingError(languageId, body);
