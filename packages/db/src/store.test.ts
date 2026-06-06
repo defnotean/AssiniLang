@@ -1388,6 +1388,20 @@ describe("JsonStore", () => {
       "AI session creator is not allowed for mode programmer_debug: learner-1"
     ],
     [
+      "blank thinking summary",
+      createTestAiSession({ thinkingSummary: "   " }),
+      "AI session thinkingSummary must not be blank"
+    ],
+    [
+      "blank message content",
+      createTestAiSession({
+        messages: [
+          createTestAiMessage({ id: "ai-session-1-message-1", content: "   " })
+        ]
+      }),
+      "AI session message content must not be blank: ai-session-1-message-1"
+    ],
+    [
       "unparseable created date",
       createTestAiSession({ createdAt: "not-a-date" }),
       "AI session createdAt must be parseable: not-a-date"
@@ -1437,6 +1451,64 @@ describe("JsonStore", () => {
         ]
       }),
       "AI session message ai-session-1-message-1 cannot be after session updatedAt"
+    ],
+    [
+      "blank trace label",
+      createTestAiSession({
+        trace: [
+          {
+            id: "ai-session-1-trace-retrieval",
+            kind: "retrieval",
+            label: "   ",
+            summary: "Linked selected notes and corpus passages as observable evidence.",
+            referencedIds: ["note-1", "passage-1"],
+            warnings: []
+          }
+        ]
+      }),
+      "AI session trace label must not be blank: ai-session-1-trace-retrieval"
+    ],
+    [
+      "blank trace summary",
+      createTestAiSession({
+        trace: [
+          {
+            id: "ai-session-1-trace-retrieval",
+            kind: "retrieval",
+            label: "Evidence selection",
+            summary: "   ",
+            referencedIds: ["note-1", "passage-1"],
+            warnings: []
+          }
+        ]
+      }),
+      "AI session trace summary must not be blank: ai-session-1-trace-retrieval"
+    ],
+    [
+      "blank trace warning",
+      createTestAiSession({
+        trace: [
+          {
+            id: "ai-session-1-trace-retrieval",
+            kind: "retrieval",
+            label: "Evidence selection",
+            summary: "Linked selected notes and corpus passages as observable evidence.",
+            referencedIds: ["note-1", "passage-1"],
+            warnings: ["   "]
+          }
+        ]
+      }),
+      "AI session trace warning must not be blank: ai-session-1-trace-retrieval"
+    ],
+    [
+      "blank privacy redaction",
+      createTestAiSession({
+        privacy: {
+          redactions: ["hidden-chain-of-thought", "   "],
+          exposesHiddenChainOfThought: false
+        }
+      }),
+      "AI session privacy redaction must not be blank"
     ],
     [
       "missing context note",

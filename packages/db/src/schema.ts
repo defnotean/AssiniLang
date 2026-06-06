@@ -1217,6 +1217,24 @@ function addAiSessionIntegrityIssues(
   const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
 
   for (const session of state.aiSessions) {
+    if (isBlankPersistedValue(session.thinkingSummary)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "AI session thinkingSummary must not be blank",
+        path: ["aiSessions", session.id]
+      });
+    }
+
+    for (const redaction of session.privacy.redactions) {
+      if (isBlankPersistedValue(redaction)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "AI session privacy redaction must not be blank",
+          path: ["aiSessions", session.id]
+        });
+      }
+    }
+
     if (!languageIds.has(session.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1249,6 +1267,14 @@ function addAiSessionIntegrityIssues(
     }
 
     for (const message of session.messages) {
+      if (isBlankPersistedValue(message.content)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session message content must not be blank: ${message.id}`,
+          path: ["aiSessions", session.id]
+        });
+      }
+
       addParseablePersistedDateIssue(context, "aiSessions", session.id, "AI session message createdAt", message.createdAt);
       const messageCreatedAtTime = Date.parse(message.createdAt);
       if (!sessionTimelineIsParseable || Number.isNaN(messageCreatedAtTime)) continue;
@@ -1267,6 +1293,34 @@ function addAiSessionIntegrityIssues(
           message: `AI session message ${message.id} cannot be after session updatedAt`,
           path: ["aiSessions", session.id]
         });
+      }
+    }
+
+    for (const traceStep of session.trace) {
+      if (isBlankPersistedValue(traceStep.label)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session trace label must not be blank: ${traceStep.id}`,
+          path: ["aiSessions", session.id]
+        });
+      }
+
+      if (isBlankPersistedValue(traceStep.summary)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session trace summary must not be blank: ${traceStep.id}`,
+          path: ["aiSessions", session.id]
+        });
+      }
+
+      for (const warning of traceStep.warnings) {
+        if (isBlankPersistedValue(warning)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `AI session trace warning must not be blank: ${traceStep.id}`,
+            path: ["aiSessions", session.id]
+          });
+        }
       }
     }
 
