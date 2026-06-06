@@ -711,6 +711,76 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "missing language",
+      createTestExercise({ languageId: "missing-language" }),
+      "Exercise references missing language: missing-language"
+    ],
+    [
+      "duplicate allowed vocabulary",
+      createTestExercise({ allowedVocabulary: ["mira", "mira"] }),
+      "Exercise allowed vocabulary is duplicated: mira"
+    ],
+    [
+      "duplicate allowed rule",
+      createTestExercise({ allowedRuleIds: ["rule-1", "rule-1"] }),
+      "Exercise allowed rule is duplicated: rule-1"
+    ],
+    [
+      "duplicate expected answer",
+      createTestExercise({ expectedAnswers: ["mira talo-mi-na", " mira   talo-mi-na "] }),
+      "Exercise expected answer is duplicated: mira talo-mi-na"
+    ],
+    [
+      "too few adversarial probes",
+      createTestExercise({ adversarialAnswers: [{ answer: "talo mira", reason: "Wrong target-language order." }] }),
+      "Exercise requires at least two adversarial probes: exercise-1"
+    ],
+    [
+      "adversarial answer duplicating expected answer",
+      createTestExercise({
+        adversarialAnswers: [
+          { answer: "mira talo-mi-na", reason: "Duplicates the expected answer." },
+          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+        ]
+      }),
+      "Exercise adversarial answer duplicates an expected answer: mira talo-mi-na"
+    ],
+    [
+      "duplicate adversarial answer",
+      createTestExercise({
+        adversarialAnswers: [
+          { answer: "talo mira", reason: "Wrong target-language order." },
+          { answer: " talo   mira ", reason: "Same wrong order with extra whitespace." }
+        ]
+      }),
+      "Exercise adversarial answer is duplicated: talo mira"
+    ],
+    [
+      "translate-to-target expected answer missing from corpus",
+      createTestExercise({ expectedAnswers: ["unknown target form"] }),
+      "Translate-to-target expected answer is not present in corpus: unknown target form"
+    ],
+    [
+      "choose-particle expected answer outside allowed vocabulary",
+      createTestExercise({
+        type: "choose_particle",
+        prompt: "Choose the particle that marks present tense.",
+        allowedVocabulary: ["-mi", "-lo"],
+        expectedAnswers: ["-na"]
+      }),
+      "Choose-particle expected answer is not allowed vocabulary: -na"
+    ]
+  ])("rejects persisted exercises with %s", (_caseName, exercise, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.corpus = [createTestCorpusPassage()];
+    state.exercises = [exercise];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
       "missing exercise",
       createTestSubmission({ exerciseId: "missing-exercise" }),
       "Exercise submission references missing exercise: missing-exercise"
@@ -732,7 +802,9 @@ describe("JsonStore", () => {
     ]
   ])("rejects persisted exercise submissions with %s", (_caseName, submission, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage()];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.corpus = [createTestCorpusPassage()];
     state.exercises = [createTestExercise()];
     state.exerciseSubmissions = [submission];
 

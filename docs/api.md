@@ -140,6 +140,8 @@ Important validation:
 - At least two adversarial answers are required.
 - Adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
 
+During local JSON reads, the persisted app-state schema rechecks the exercise invariants it can prove from app state: language existence, duplicate private answer fields, minimum adversarial probes, expected/adversarial collisions, translate-to-target answers present in same-language corpus text, and choose-particle answers present in allowed vocabulary. Fixture rule/vocabulary existence remains enforced by the live authoring route and fixture validator.
+
 ## Exercise Submissions
 
 `POST /exercises/:exerciseId/submissions`

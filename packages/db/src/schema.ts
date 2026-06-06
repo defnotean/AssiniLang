@@ -380,6 +380,20 @@ function duplicatePersistedValue<T>(items: T[], valueForItem: (item: T) => strin
   return undefined;
 }
 
+function normalizePersistedText(input: string): string {
+  return input.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function duplicateNormalizedPersistedValue(items: string[]): string | undefined {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const normalized = normalizePersistedText(item);
+    if (seen.has(normalized)) return normalized;
+    seen.add(normalized);
+  }
+  return undefined;
+}
+
 function addDuplicatePersistedValueIssue<T>(
   context: z.RefinementCtx,
   path: string,
@@ -394,6 +408,117 @@ function addDuplicatePersistedValueIssue<T>(
       message: `Duplicate persisted ${label} in ${path}: ${duplicate}`,
       path: [path]
     });
+  }
+}
+
+function addExerciseIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    exercises: Array<z.infer<typeof exerciseSchema>>;
+  }
+) {
+  const languageIds = new Set(state.languages.map((language) => language.id));
+  const corpusTargetsByLanguage = new Map<string, Set<string>>();
+
+  for (const passage of state.corpus) {
+    const targets = corpusTargetsByLanguage.get(passage.languageId) ?? new Set<string>();
+    targets.add(normalizePersistedText(passage.textTarget));
+    corpusTargetsByLanguage.set(passage.languageId, targets);
+  }
+
+  for (const exercise of state.exercises) {
+    if (!languageIds.has(exercise.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise references missing language: ${exercise.languageId}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    const duplicateAllowedRule = duplicateNormalizedPersistedValue(exercise.allowedRuleIds);
+    if (duplicateAllowedRule) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise allowed rule is duplicated: ${duplicateAllowedRule}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    const duplicateAllowedVocabulary = duplicateNormalizedPersistedValue(exercise.allowedVocabulary);
+    if (duplicateAllowedVocabulary) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise allowed vocabulary is duplicated: ${duplicateAllowedVocabulary}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    const duplicateExpectedAnswer = duplicateNormalizedPersistedValue(exercise.expectedAnswers);
+    if (duplicateExpectedAnswer) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise expected answer is duplicated: ${duplicateExpectedAnswer}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    if (exercise.adversarialAnswers.length < 2) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise requires at least two adversarial probes: ${exercise.id}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    if (exercise.type === "translate_to_target") {
+      const corpusTargets = corpusTargetsByLanguage.get(exercise.languageId) ?? new Set<string>();
+      for (const answer of exercise.expectedAnswers) {
+        if (!corpusTargets.has(normalizePersistedText(answer))) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Translate-to-target expected answer is not present in corpus: ${answer}`,
+            path: ["exercises", exercise.id]
+          });
+        }
+      }
+    }
+
+    if (exercise.type === "choose_particle") {
+      const allowedVocabulary = new Set(exercise.allowedVocabulary.map(normalizePersistedText));
+      for (const answer of exercise.expectedAnswers) {
+        if (!allowedVocabulary.has(normalizePersistedText(answer))) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Choose-particle expected answer is not allowed vocabulary: ${answer}`,
+            path: ["exercises", exercise.id]
+          });
+        }
+      }
+    }
+
+    const normalizedExpected = new Set(exercise.expectedAnswers.map(normalizePersistedText));
+    const normalizedAdversarial = new Set<string>();
+    for (const adversarial of exercise.adversarialAnswers) {
+      const normalizedAnswer = normalizePersistedText(adversarial.answer);
+      if (normalizedExpected.has(normalizedAnswer)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Exercise adversarial answer duplicates an expected answer: ${adversarial.answer}`,
+          path: ["exercises", exercise.id]
+        });
+      }
+
+      if (normalizedAdversarial.has(normalizedAnswer)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Exercise adversarial answer is duplicated: ${normalizedAnswer}`,
+          path: ["exercises", exercise.id]
+        });
+      }
+      normalizedAdversarial.add(normalizedAnswer);
+    }
   }
 }
 
@@ -986,6 +1111,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);
+  addExerciseIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "exerciseSubmissions", "id", state.exerciseSubmissions, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "evaluationRuns", "id", state.evaluationRuns, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "governance", "id", state.governance, (item) => item.id);
