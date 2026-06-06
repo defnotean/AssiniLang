@@ -1532,7 +1532,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     );
   }
 
-  const { language, stats, phonology, paradigms, dialectVariants, grammarRules, vocabulary } = profileState.data;
+  const { language, stats, phonology, paradigms, dialectVariants, grammarRules, vocabulary, morphemeInventory } = profileState.data;
 
   return (
     <div className="profile-view">
@@ -1719,6 +1719,40 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
               <div className="pill-row">
                 {item.tags.map((tag) => (
                   <span className="pill" key={tag}>{tag}</span>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-card morpheme-panel" aria-label="Morpheme inventory">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Morpheme inventory</span>
+            <h2>{formatCount(morphemeInventory.length, "morpheme")}</h2>
+          </div>
+        </div>
+        <div className="morpheme-grid">
+          {morphemeInventory.map((item) => (
+            <article className="morpheme-entry" key={`${item.surface}-${item.lemma}`}>
+              <div className="morpheme-entry-topline">
+                <code>{item.surface}</code>
+                <span className="id-badge">{formatCount(item.occurrenceCount, "corpus use")}</span>
+              </div>
+              <strong>{item.lemma}</strong>
+              <span>{item.glosses.join(" / ")}</span>
+              {item.vocabulary && (
+                <small>{item.vocabulary.partOfSpeech}: {item.vocabulary.gloss}</small>
+              )}
+              <div className="pill-row">
+                {item.features.map((feature) => (
+                  <span className="pill" key={`${item.surface}-${feature}`}>{feature}</span>
+                ))}
+              </div>
+              <div className="pill-row">
+                {item.passageIds.map((passageId) => (
+                  <span className="pill" key={`${item.surface}-${passageId}`}>{passageId}</span>
                 ))}
               </div>
             </article>

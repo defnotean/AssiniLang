@@ -74,6 +74,21 @@ export type LanguageProfile = {
     partOfSpeech: string;
     tags: string[];
   }>;
+  morphemeInventory: Array<{
+    surface: string;
+    lemma: string;
+    glosses: string[];
+    features: string[];
+    occurrenceCount: number;
+    passageIds: string[];
+    vocabulary: {
+      id: string;
+      form: string;
+      gloss: string;
+      partOfSpeech: string;
+      tags: string[];
+    } | null;
+  }>;
   grammarRules: Array<{
     id: string;
     topic: string;

@@ -22,6 +22,7 @@ The profile view presents public linguistic metadata:
 - Phonology and phonotactic notes.
 - Grammar-rule inventory.
 - Public vocabulary.
+- A derived morpheme inventory with corpus-use counts, source passage IDs, glosses, features, and linked vocabulary metadata.
 - Paradigm tables.
 - Dialect variants with region labels, notes, and standard-vs-variant examples.
 - Fixture counts for corpus, notes, exercises, and profile structures.

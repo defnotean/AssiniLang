@@ -142,6 +142,17 @@ describe("api server", () => {
       gloss: "present tense",
       partOfSpeech: "suffix"
     });
+    expect(profile.json().morphemeInventory.find((item: { surface: string }) => item.surface === "mira")).toMatchObject({
+      lemma: "mira",
+      glosses: ["river"],
+      features: ["noun"],
+      occurrenceCount: expect.any(Number),
+      passageIds: expect.arrayContaining(["avn-c001"]),
+      vocabulary: expect.objectContaining({
+        form: "mira",
+        partOfSpeech: "noun"
+      })
+    });
     expect(profile.json().stats.exerciseTypes).toMatchObject({
       translate_to_target: 3,
       segment: 1,

@@ -274,6 +274,36 @@ function createLanguageProfile() {
         confidence: "high"
       }
     ],
+    morphemeInventory: [
+      {
+        surface: "mira",
+        lemma: "mira",
+        glosses: ["river"],
+        features: ["noun"],
+        occurrenceCount: 3,
+        passageIds: ["avn-c001", "avn-c004", "avn-c005"],
+        vocabulary: {
+          form: "mira",
+          gloss: "river",
+          partOfSpeech: "noun",
+          tags: ["place", "nature"]
+        }
+      },
+      {
+        surface: "talo-mi-na",
+        lemma: "talo",
+        glosses: ["walk-present-1sg"],
+        features: ["verb", "present", "1sg"],
+        occurrenceCount: 1,
+        passageIds: ["avn-c001"],
+        vocabulary: {
+          form: "talo",
+          gloss: "walk",
+          partOfSpeech: "verb",
+          tags: ["motion"]
+        }
+      }
+    ],
     stats: {
       vocabularyItems: 2,
       grammarRules: 1,
@@ -729,9 +759,10 @@ describe("App", () => {
     expect(screen.getByRole("region", { name: "Phonology profile" })).toBeInTheDocument();
     expect(screen.getByText("word-initial")).toBeInTheDocument();
     expect(screen.getByText("Consonant clusters are disallowed inside native roots.")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Paradigm tables" })).toBeInTheDocument();
+    const paradigmTables = screen.getByRole("region", { name: "Paradigm tables" });
+    expect(paradigmTables).toBeInTheDocument();
     expect(screen.getByText("Finite verb chain")).toBeInTheDocument();
-    expect(screen.getByText("talo-mi-na")).toBeInTheDocument();
+    expect(within(paradigmTables).getByText("talo-mi-na")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Dialect variants" })).toBeInTheDocument();
     expect(screen.getByText("River teaching register")).toBeInTheDocument();
     expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
@@ -739,6 +770,10 @@ describe("App", () => {
     expect(screen.getByRole("region", { name: "Vocabulary inventory" })).toBeInTheDocument();
     expect(screen.getByText("-mi")).toBeInTheDocument();
     expect(screen.getByText("present tense")).toBeInTheDocument();
+    const morphemeInventory = screen.getByRole("region", { name: "Morpheme inventory" });
+    expect(within(morphemeInventory).getAllByText("mira").length).toBeGreaterThan(0);
+    expect(within(morphemeInventory).getByText("3 corpus uses")).toBeInTheDocument();
+    expect(within(morphemeInventory).getAllByText("avn-c001").length).toBeGreaterThan(0);
   });
 
   it("runs a model provider smoke test without exposing browser-side keys", async () => {

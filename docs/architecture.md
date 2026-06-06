@@ -79,6 +79,7 @@ Keep these responsibilities there:
 - Stripping answer keys from exercises.
 - Removing internal note markers.
 - Building rich language profiles.
+- Deriving public morpheme inventories from corpus segmentation and vocabulary metadata.
 - Building sanitized language snapshots.
 - Building sanitized evaluation artifacts.
 - Computing visible integrity manifests.

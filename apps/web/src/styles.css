@@ -1241,7 +1241,8 @@ label,
   gap: 0.74rem;
 }
 
-.vocabulary-panel {
+.vocabulary-panel,
+.morpheme-panel {
   display: grid;
   grid-column: 1 / -1;
   gap: 0.74rem;
@@ -1257,7 +1258,8 @@ label,
   grid-column: 1 / -1;
 }
 
-.vocabulary-grid {
+.vocabulary-grid,
+.morpheme-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.58rem;
@@ -1376,7 +1378,8 @@ label,
   line-height: 1.4;
 }
 
-.vocabulary-entry {
+.vocabulary-entry,
+.morpheme-entry {
   display: grid;
   gap: 0.34rem;
   min-width: 0;
@@ -1386,19 +1389,31 @@ label,
   background: var(--panel-soft);
 }
 
-.vocabulary-entry code {
+.vocabulary-entry code,
+.morpheme-entry code {
   width: fit-content;
 }
 
-.vocabulary-entry strong {
+.vocabulary-entry strong,
+.morpheme-entry strong {
   overflow-wrap: anywhere;
 }
 
-.vocabulary-entry > span {
+.vocabulary-entry > span,
+.morpheme-entry > span,
+.morpheme-entry small {
   color: var(--muted);
   font-size: 0.74rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.morpheme-entry-topline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .example-row {

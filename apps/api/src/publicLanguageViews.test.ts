@@ -41,6 +41,21 @@ describe("public language views", () => {
       form: "talo-mi-na",
       morphemes: ["talo", "-mi", "-na"]
     });
+    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")).toMatchObject({
+      surface: "mira",
+      lemma: "mira",
+      glosses: ["river"],
+      features: ["noun"],
+      vocabulary: expect.objectContaining({
+        form: "mira",
+        gloss: "river",
+        partOfSpeech: "noun"
+      })
+    });
+    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.occurrenceCount).toBeGreaterThan(1);
+    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.passageIds).toEqual(
+      expect.arrayContaining(["avn-c001"])
+    );
 
     profile?.phonology.consonants.push("x-test");
     profile?.paradigms[0].rows[0].morphemes.push("-test");
@@ -74,6 +89,11 @@ describe("public language views", () => {
       }
     });
     expect(snapshot?.linguisticProfile.paradigms[0].title).toBe("Finite verb chain");
+    expect(snapshot?.linguisticProfile.morphemeInventory.find((item) => item.surface === "mira")).toMatchObject({
+      lemma: "mira",
+      occurrenceCount: expect.any(Number),
+      passageIds: expect.arrayContaining(["avn-c001"])
+    });
     expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
       name: "River teaching register"

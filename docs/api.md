@@ -27,7 +27,7 @@ Do not treat prototype auth as production security.
 | `POST /auth/prototype-session` | Open a local HTTP-only prototype session for an allowed user. |
 | `GET /users/me` | Return the current prototype user. |
 | `GET /languages` | List synthetic languages. |
-| `GET /languages/:languageId/profile` | Return public linguistic profile data for one language. |
+| `GET /languages/:languageId/profile` | Return public linguistic profile data for one language, including phonology, vocabulary, grammar, paradigms, dialect variants, and a derived morpheme inventory. |
 | `GET /languages/:languageId/corpus` | Return corpus passages for one language. |
 | `POST /languages/:languageId/corpus` | Import a validated synthetic corpus passage. |
 | `GET /languages/:languageId/notes` | Return public review notes for one language. |

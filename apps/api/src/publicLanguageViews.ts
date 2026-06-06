@@ -21,6 +21,7 @@ export type SyntheticLanguageProfile = {
   paradigms: SyntheticLanguageFixture["paradigms"];
   dialectVariants: SyntheticLanguageFixture["dialectVariants"];
   vocabulary: SyntheticLanguageFixture["vocabulary"];
+  morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
   stats: {
     vocabularyItems: number;
@@ -32,6 +33,16 @@ export type SyntheticLanguageProfile = {
     exercises: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
+};
+
+export type MorphemeInventoryItem = {
+  surface: string;
+  lemma: string;
+  glosses: string[];
+  features: string[];
+  occurrenceCount: number;
+  passageIds: string[];
+  vocabulary: SyntheticLanguageFixture["vocabulary"][number] | null;
 };
 
 export type PublicLanguageSnapshot = {
@@ -283,6 +294,76 @@ export function toPublicNotes(notes: Note[]): Note[] {
   return notes.map(toPublicNote);
 }
 
+function cloneVocabularyItem(item: SyntheticLanguageFixture["vocabulary"][number]): SyntheticLanguageFixture["vocabulary"][number] {
+  return {
+    ...item,
+    tags: [...item.tags]
+  };
+}
+
+function buildMorphemeInventory(
+  state: AppState,
+  languageId: string,
+  fixture: SyntheticLanguageFixture | undefined
+): MorphemeInventoryItem[] {
+  const vocabularyByForm = new Map(
+    fixture?.vocabulary.map((item) => [item.form.toLowerCase(), item]) ?? []
+  );
+  const inventory = new Map<string, {
+    surface: string;
+    lemma: string;
+    glosses: Set<string>;
+    features: Set<string>;
+    occurrenceCount: number;
+    passageIds: Set<string>;
+    vocabulary: SyntheticLanguageFixture["vocabulary"][number] | null;
+  }>();
+
+  for (const passage of state.corpus.filter((item) => item.languageId === languageId)) {
+    for (const morpheme of passage.morphologicalSegmentation) {
+      const key = `${morpheme.surface}\u0000${morpheme.lemma}`;
+      const existing = inventory.get(key);
+      const vocabulary = vocabularyByForm.get(morpheme.surface.toLowerCase())
+        ?? vocabularyByForm.get(morpheme.lemma.toLowerCase())
+        ?? null;
+
+      if (!existing) {
+        inventory.set(key, {
+          surface: morpheme.surface,
+          lemma: morpheme.lemma,
+          glosses: new Set([morpheme.gloss]),
+          features: new Set(morpheme.features),
+          occurrenceCount: 1,
+          passageIds: new Set([passage.id]),
+          vocabulary
+        });
+      } else {
+        existing.glosses.add(morpheme.gloss);
+        for (const feature of morpheme.features) {
+          existing.features.add(feature);
+        }
+        existing.occurrenceCount += 1;
+        existing.passageIds.add(passage.id);
+      }
+    }
+  }
+
+  return [...inventory.values()]
+    .map((item) => ({
+      surface: item.surface,
+      lemma: item.lemma,
+      glosses: [...item.glosses].sort(),
+      features: [...item.features].sort(),
+      occurrenceCount: item.occurrenceCount,
+      passageIds: [...item.passageIds].sort(),
+      vocabulary: item.vocabulary ? cloneVocabularyItem(item.vocabulary) : null
+    }))
+    .sort((left, right) => (
+      left.surface.localeCompare(right.surface)
+      || left.lemma.localeCompare(right.lemma)
+    ));
+}
+
 export function toPublicEvaluationArtifact(
   state: AppState,
   exportedAt = new Date().toISOString()
@@ -360,6 +441,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       ...item,
       tags: [...item.tags]
     })) ?? [],
+    morphemeInventory: buildMorphemeInventory(state, languageId, fixture),
     grammarRules: fixture?.grammarRules.map((rule) => ({
       ...rule,
       evidencePassageIds: [...rule.evidencePassageIds]
