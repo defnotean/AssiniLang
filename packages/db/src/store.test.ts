@@ -768,6 +768,16 @@ describe("JsonStore", () => {
       "Review approval language solari does not match note note-1 language avenik"
     ],
     [
+      "unparseable approval timestamp",
+      {
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "reviewer-1",
+        approvedAt: "not-a-date"
+      },
+      "Review approval approvedAt must be parseable: not-a-date"
+    ],
+    [
       "unknown reviewer",
       {
         languageId: "avenik",
@@ -873,6 +883,16 @@ describe("JsonStore", () => {
         requiresAssignedReviewer: false
       },
       "Review policy approvalThreshold cannot exceed assignable reviewers"
+    ],
+    [
+      "unparseable update timestamp",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedAt: "not-a-date"
+      },
+      "Review policy updatedAt must be parseable: not-a-date"
     ],
     [
       "unknown updater",

@@ -783,6 +783,8 @@ function addReviewPolicyIntegrityIssues(
   }
 
   for (const policy of state.reviewPolicies) {
+    addParseablePersistedDateIssue(context, "reviewPolicies", policy.id, "Review policy updatedAt", policy.updatedAt);
+
     if (!languageIds.has(policy.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1184,6 +1186,8 @@ function addReviewApprovalIntegrityIssues(
   const notesById = new Map(state.notes.map((note) => [note.id, note]));
 
   for (const approval of state.reviewApprovals) {
+    addParseablePersistedDateIssue(context, "reviewApprovals", approval.id, "Review approval approvedAt", approval.approvedAt);
+
     const note = notesById.get(approval.noteId);
     if (!note) {
       context.addIssue({

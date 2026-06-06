@@ -188,9 +188,9 @@ Review-policy updates require at least one assigned reviewer. Assigned reviewer 
 
 Stored approvals remain auditable after policy changes, but only reviewers eligible under the current policy count toward the active approval quorum.
 
-The persisted app-state schema enforces the same review-policy assignment, threshold, language, and updater-attribution rules, so malformed local JSON cannot create impossible approval quorums or policies detached from a real synthetic language. Restored policies are unique per language and must be updated by a known lead/admin user, except seeded policies marked with `system-seed`.
+The persisted app-state schema enforces the same review-policy assignment, threshold, language, updater-attribution, and parseable update-timestamp rules, so malformed local JSON cannot create impossible approval quorums or policies detached from a real synthetic language. Restored policies are unique per language and must be updated by a known lead/admin user, except seeded policies marked with `system-seed`.
 
-The persisted app-state schema also enforces one approval per language, note, and reviewer. Approval records must reference an existing same-language note that is still `under_review` or already `approved`, and they must use a known assignable reviewer. This keeps malformed local JSON from double-counting, misattributing, or reviving inactive quorum decisions.
+The persisted app-state schema also enforces one approval per language, note, and reviewer. Approval records must reference an existing same-language note that is still `under_review` or already `approved`, keep a parseable `approvedAt`, and use a known assignable reviewer. This keeps malformed local JSON from double-counting, misattributing, misdating, or reviving inactive quorum decisions.
 
 ## Sanitized Exports
 
