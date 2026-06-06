@@ -414,6 +414,54 @@ function addReviewPolicyIntegrityIssues(
   }
 }
 
+function addReviewApprovalIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    notes: Array<z.infer<typeof noteSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    reviewApprovals: Array<z.infer<typeof reviewApprovalSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const notesById = new Map(state.notes.map((note) => [note.id, note]));
+
+  for (const approval of state.reviewApprovals) {
+    const note = notesById.get(approval.noteId);
+    if (!note) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review approval references missing note: ${approval.noteId}`,
+        path: ["reviewApprovals", approval.id]
+      });
+    } else if (approval.languageId !== note.languageId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review approval language ${approval.languageId} does not match note ${approval.noteId} language ${note.languageId}`,
+        path: ["reviewApprovals", approval.id]
+      });
+    }
+
+    const reviewer = usersById.get(approval.reviewerId);
+    if (!reviewer) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review approval references unknown reviewer: ${approval.reviewerId}`,
+        path: ["reviewApprovals", approval.id]
+      });
+      continue;
+    }
+
+    if (!isReviewPolicyAssignableRole(reviewer.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review approval reviewer is not assignable: ${approval.reviewerId}`,
+        path: ["reviewApprovals", approval.id]
+      });
+    }
+  }
+}
+
 function duplicateReviewApprovalKey(
   approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
 ): string | undefined {
@@ -462,6 +510,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addReviewPolicyIntegrityIssues(context, state);
+  addReviewApprovalIntegrityIssues(context, state);
 
   const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
   if (duplicateApproval) {

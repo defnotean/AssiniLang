@@ -111,7 +111,7 @@ Elder correction review is a one-way transition out of `pending_review`. Accepte
 
 Review-policy records are validated both at the API mutation boundary and at the persisted app-state boundary. Assigned reviewers must be unique, known local users, and in an assignable review role; approval thresholds must fit either the assigned reviewer list or the open assignable reviewer pool.
 
-Review-approval records are unique per language, note, and reviewer. The local database schema rejects duplicate approval tuples so quorum counts cannot drift from duplicated persisted records.
+Review-approval records are unique per language, note, and reviewer. The local database schema rejects duplicate approval tuples, approvals for missing notes, approval language mismatches, unknown reviewer IDs, and approvals from users outside assignable review roles so quorum counts cannot drift from malformed persisted records.
 
 ## Corpus Import Integrity
 

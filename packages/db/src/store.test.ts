@@ -13,8 +13,31 @@ import {
   reviewApprovalSchema,
   reviewDispositionSchema,
   reviewPolicySchema,
+  type Note,
   userRoleSchema
 } from "./schema";
+
+function createTestNote(overrides: Partial<Note> = {}): Note {
+  return {
+    id: "note-1",
+    languageId: "avenik",
+    topic: "syntax/test",
+    explanation: "Synthetic note explanation.",
+    examples: [],
+    evidencePassageIds: [],
+    evidenceCount: 0,
+    confidence: "medium",
+    status: "draft",
+    reviewer: {
+      lastReviewedBy: null,
+      lastReviewedAt: null,
+      comments: []
+    },
+    dialectScope: "synthetic-default",
+    editHistory: [],
+    ...overrides
+  };
+}
 
 describe("JsonStore", () => {
   it("writes and reads a seeded state", async () => {
@@ -247,24 +270,7 @@ describe("JsonStore", () => {
 
   it("rejects duplicate persisted entity ids inside app-state collections", () => {
     const state = createEmptyState();
-    const note = {
-      id: "note-1",
-      languageId: "avenik",
-      topic: "syntax/test",
-      explanation: "Synthetic note explanation.",
-      examples: [],
-      evidencePassageIds: [],
-      evidenceCount: 0,
-      confidence: "medium" as const,
-      status: "draft" as const,
-      reviewer: {
-        lastReviewedBy: null,
-        lastReviewedAt: null,
-        comments: []
-      },
-      dialectScope: "synthetic-default",
-      editHistory: []
-    };
+    const note = createTestNote();
 
     state.notes = [
       note,
@@ -275,6 +281,56 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate persisted id in notes: note-1");
+  });
+
+  it.each([
+    [
+      "missing note",
+      {
+        languageId: "avenik",
+        noteId: "missing-note",
+        reviewerId: "reviewer-1"
+      },
+      "Review approval references missing note: missing-note"
+    ],
+    [
+      "note language mismatch",
+      {
+        languageId: "solari",
+        noteId: "note-1",
+        reviewerId: "reviewer-1"
+      },
+      "Review approval language solari does not match note note-1 language avenik"
+    ],
+    [
+      "unknown reviewer",
+      {
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "missing-reviewer"
+      },
+      "Review approval references unknown reviewer: missing-reviewer"
+    ],
+    [
+      "unassignable reviewer",
+      {
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "learner-1"
+      },
+      "Review approval reviewer is not assignable: learner-1"
+    ]
+  ])("rejects persisted review approvals with %s", (_caseName, approvalPatch, errorMessage) => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.notes = [createTestNote()];
+    state.reviewApprovals = [{
+      id: "review-approval-1",
+      approvedAt: "2026-06-06T00:01:00.000Z",
+      ...approvalPatch
+    }];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it.each([

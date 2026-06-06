@@ -156,7 +156,7 @@ Stored approvals remain auditable after policy changes, but only reviewers eligi
 
 The persisted app-state schema enforces the same review-policy assignment and threshold rules, so malformed local JSON cannot create impossible approval quorums.
 
-The persisted app-state schema also enforces one approval per language, note, and reviewer. This keeps malformed local JSON from double-counting the same reviewer in later quorum calculations.
+The persisted app-state schema also enforces one approval per language, note, and reviewer. Approval records must reference an existing note in the same language and a known assignable reviewer, which keeps malformed local JSON from double-counting or misattributing quorum decisions.
 
 ## Sanitized Exports
 
