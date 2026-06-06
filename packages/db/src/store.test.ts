@@ -1265,6 +1265,33 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      {
+        languageId: "   ",
+        noteId: "note-1",
+        reviewerId: "reviewer-1"
+      },
+      "Review approval languageId must not be blank"
+    ],
+    [
+      "blank note id",
+      {
+        languageId: "avenik",
+        noteId: "   ",
+        reviewerId: "reviewer-1"
+      },
+      "Review approval noteId must not be blank"
+    ],
+    [
+      "blank reviewer id",
+      {
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "   "
+      },
+      "Review approval reviewerId must not be blank"
+    ],
+    [
       "missing note",
       {
         languageId: "avenik",

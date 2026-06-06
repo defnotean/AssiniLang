@@ -1743,6 +1743,30 @@ function addReviewApprovalIntegrityIssues(
   for (const approval of state.reviewApprovals) {
     addParseablePersistedDateIssue(context, "reviewApprovals", approval.id, "Review approval approvedAt", approval.approvedAt);
 
+    if (isBlankPersistedValue(approval.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review approval languageId must not be blank",
+        path: ["reviewApprovals", approval.id]
+      });
+    }
+
+    if (isBlankPersistedValue(approval.noteId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review approval noteId must not be blank",
+        path: ["reviewApprovals", approval.id]
+      });
+    }
+
+    if (isBlankPersistedValue(approval.reviewerId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review approval reviewerId must not be blank",
+        path: ["reviewApprovals", approval.id]
+      });
+    }
+
     const note = notesById.get(approval.noteId);
     if (!note) {
       context.addIssue({
