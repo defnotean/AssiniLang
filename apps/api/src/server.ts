@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
+  AI_SESSION_MODE_ROLES,
   ELDER_CORRECTION_MUTATION_ROLES,
   EXERCISE_SUBMISSION_ACTOR_ROLES,
   GOVERNANCE_APPROVER_ROLES,
@@ -157,12 +158,6 @@ const EXERCISE_TYPES: readonly Exercise["type"][] = [
   "choose_particle"
 ];
 const SECRET_ENV_NAMES = ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"] as const;
-
-const MODE_ROLES: Record<AiSessionMode, readonly UserRole[]> = {
-  learner_practice: ["learner", "elder", "reviewer", "lead", "admin"],
-  elder_review: ["elder", "lead", "admin"],
-  programmer_debug: ["programmer", "admin"]
-};
 
 type AuditEventDraft = {
   actor: User;
@@ -2364,7 +2359,7 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, MODE_ROLES[body.mode]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, AI_SESSION_MODE_ROLES[body.mode]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
 

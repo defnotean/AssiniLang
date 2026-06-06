@@ -14,6 +14,7 @@ import {
   reviewDispositionSchema,
   reviewPolicySchema,
   type AuditEvent,
+  type AiSession,
   type CorpusPassage,
   type ElderCorrection,
   type Exercise,
@@ -175,6 +176,56 @@ function createTestAuditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
     languageId: "avenik",
     summary: "Created synthetic governance record.",
     metadata: { policyType: "generation" },
+    ...overrides
+  };
+}
+
+function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
+  return {
+    id: "ai-session-1",
+    languageId: "avenik",
+    mode: "programmer_debug",
+    status: "active",
+    createdBy: "programmer-1",
+    createdAt: "2026-06-06T00:00:00.000Z",
+    updatedAt: "2026-06-06T00:00:00.000Z",
+    contextNoteIds: ["note-1"],
+    contextPassageIds: ["passage-1"],
+    messages: [
+      {
+        id: "ai-session-1-message-1",
+        role: "user",
+        content: "Trace the synthetic note safely.",
+        createdAt: "2026-06-06T00:00:00.000Z",
+        createdBy: "programmer-1"
+      },
+      {
+        id: "ai-session-1-message-2",
+        role: "assistant",
+        content: "Safe synthetic response.",
+        createdAt: "2026-06-06T00:00:00.000Z",
+        createdBy: "synthetic-ai"
+      }
+    ],
+    thinkingSummary: "Safe reasoning summary: observable trace for synthetic context.",
+    trace: [
+      {
+        id: "ai-session-1-trace-retrieval",
+        kind: "retrieval",
+        label: "Evidence selection",
+        summary: "Linked selected notes and corpus passages as observable evidence.",
+        referencedIds: ["note-1", "passage-1"],
+        warnings: []
+      }
+    ],
+    neuralMap: {
+      nodes: [],
+      edges: []
+    },
+    privacy: {
+      redactions: ["hidden-chain-of-thought", "answer-keys"],
+      exposesHiddenChainOfThought: false
+    },
     ...overrides
   };
 }
@@ -650,6 +701,59 @@ describe("JsonStore", () => {
     state.languages = [createTestLanguage()];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
     state.auditEvents = [event];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing language",
+      createTestAiSession({ languageId: "missing-language" }),
+      "AI session references missing language: missing-language"
+    ],
+    [
+      "unknown creator",
+      createTestAiSession({ createdBy: "missing-user" }),
+      "AI session creator is not allowed for mode programmer_debug: missing-user"
+    ],
+    [
+      "creator role not allowed for mode",
+      createTestAiSession({ createdBy: "learner-1" }),
+      "AI session creator is not allowed for mode programmer_debug: learner-1"
+    ],
+    [
+      "missing context note",
+      createTestAiSession({ contextNoteIds: ["missing-note"] }),
+      "AI session references missing context note: missing-note"
+    ],
+    [
+      "context note language mismatch",
+      createTestAiSession({ contextNoteIds: ["other-note"] }),
+      "AI session context note other-note language solari does not match session language avenik"
+    ],
+    [
+      "missing context passage",
+      createTestAiSession({ contextPassageIds: ["missing-passage"] }),
+      "AI session references missing context passage: missing-passage"
+    ],
+    [
+      "context passage language mismatch",
+      createTestAiSession({ contextPassageIds: ["other-passage"] }),
+      "AI session context passage other-passage language solari does not match session language avenik"
+    ]
+  ])("rejects persisted AI sessions with %s", (_caseName, session, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage(), createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })];
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.notes = [
+      createTestNote(),
+      createTestNote({ id: "other-note", languageId: "solari" })
+    ];
+    state.corpus = [
+      createTestCorpusPassage(),
+      createTestCorpusPassage({ id: "other-passage", languageId: "solari" })
+    ];
+    state.aiSessions = [session];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });

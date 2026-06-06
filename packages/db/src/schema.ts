@@ -211,6 +211,20 @@ export const auditEventSchema = z.object({
 
 export const aiSessionModeSchema = z.enum(["learner_practice", "elder_review", "programmer_debug"]);
 export const aiSessionStatusSchema = z.enum(["active", "completed", "failed"]);
+export const AI_SESSION_MODE_ROLES = {
+  learner_practice: ["learner", "elder", "reviewer", "lead", "admin"],
+  elder_review: ["elder", "lead", "admin"],
+  programmer_debug: ["programmer", "admin"]
+} satisfies Record<z.infer<typeof aiSessionModeSchema>, readonly z.infer<typeof userRoleSchema>[]>;
+
+export function isAiSessionCreatorRole(
+  mode: z.infer<typeof aiSessionModeSchema>,
+  role: z.infer<typeof userRoleSchema>
+): boolean {
+  const allowedRoles: readonly z.infer<typeof userRoleSchema>[] = AI_SESSION_MODE_ROLES[mode];
+  return allowedRoles.includes(role);
+}
+
 export const aiMessageRoleSchema = z.enum(["system", "user", "assistant", "tool"]);
 export const aiTraceStepKindSchema = z.enum(["input", "retrieval", "policy_check", "generation", "correction", "output"]);
 export const neuralMapNodeTypeSchema = z.enum([
@@ -547,6 +561,76 @@ function addAuditEventIntegrityIssues(
   }
 }
 
+function addAiSessionIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    notes: Array<z.infer<typeof noteSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    aiSessions: Array<z.infer<typeof aiSessionSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const languageIds = new Set(state.languages.map((language) => language.id));
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const notesById = new Map(state.notes.map((note) => [note.id, note]));
+  const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
+
+  for (const session of state.aiSessions) {
+    if (!languageIds.has(session.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `AI session references missing language: ${session.languageId}`,
+        path: ["aiSessions", session.id]
+      });
+    }
+
+    const creator = usersById.get(session.createdBy);
+    if (!creator || !isAiSessionCreatorRole(session.mode, creator.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `AI session creator is not allowed for mode ${session.mode}: ${session.createdBy}`,
+        path: ["aiSessions", session.id]
+      });
+    }
+
+    for (const noteId of session.contextNoteIds) {
+      const note = notesById.get(noteId);
+      if (!note) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session references missing context note: ${noteId}`,
+          path: ["aiSessions", session.id]
+        });
+      } else if (note.languageId !== session.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session context note ${noteId} language ${note.languageId} does not match session language ${session.languageId}`,
+          path: ["aiSessions", session.id]
+        });
+      }
+    }
+
+    for (const passageId of session.contextPassageIds) {
+      const passage = passagesById.get(passageId);
+      if (!passage) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session references missing context passage: ${passageId}`,
+          path: ["aiSessions", session.id]
+        });
+      } else if (passage.languageId !== session.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session context passage ${passageId} language ${passage.languageId} does not match session language ${session.languageId}`,
+          path: ["aiSessions", session.id]
+        });
+      }
+    }
+  }
+}
+
 function addReviewApprovalIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -827,6 +911,7 @@ export const appStateSchema = z.object({
   addExerciseSubmissionIntegrityIssues(context, state);
   addGovernanceIntegrityIssues(context, state);
   addAuditEventIntegrityIssues(context, state);
+  addAiSessionIntegrityIssues(context, state);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);

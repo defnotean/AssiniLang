@@ -164,3 +164,5 @@ Useful environment variables:
 - `ASSINI_LLM_TIMEOUT_MS`: positive integer timeout.
 
 Provider errors are sanitized before returning to clients or storing observable session records.
+
+Persisted AI sessions must reference an existing synthetic language, be created by a known local user whose role is allowed for the session mode, and use same-language note and corpus context IDs. This keeps restored observability records aligned with the live AI-session route and prevents malformed JSON from leaking impossible context graphs into model setup and neural-map views.

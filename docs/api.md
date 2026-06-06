@@ -219,3 +219,9 @@ The persisted app-state schema enforces the same ledger invariants during local 
 `GET /llm/status` returns provider readiness without exposing API keys.
 
 AI session routes use public synthetic context and store sanitized observability records. Failed provider calls preserve safe diagnostics without exposing provider secrets.
+
+`POST /ai/sessions`
+
+Mode-specific roles are enforced for session creation: learner practice accepts learner, Elder, reviewer, lead, and admin users; elder review accepts Elder, lead, and admin users; programmer debug accepts programmer and admin users.
+
+Persisted AI sessions are validated during local JSON reads. Each session must reference an existing language, use a creator whose local role is allowed for the session mode, and keep all context note and corpus passage IDs within the same language.
