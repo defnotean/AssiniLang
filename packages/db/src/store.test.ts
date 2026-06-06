@@ -730,8 +730,9 @@ describe("JsonStore", () => {
     ]
   ])("rejects persisted review approvals with %s", (_caseName, approvalPatch, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage()];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
-    state.notes = [createTestNote()];
+    state.notes = [createTestNote({ status: "under_review" })];
     state.reviewApprovals = [{
       id: "review-approval-1",
       approvedAt: "2026-06-06T00:01:00.000Z",
@@ -740,6 +741,25 @@ describe("JsonStore", () => {
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });
+
+  it.each(["draft", "contested", "rejected", "deferred", "escalated"] as const)(
+    "rejects persisted review approvals for %s notes",
+    (status) => {
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+      state.notes = [createTestNote({ status })];
+      state.reviewApprovals = [{
+        id: `review-approval-${status}`,
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "reviewer-1",
+        approvedAt: "2026-06-06T00:01:00.000Z"
+      }];
+
+      expect(() => parseAppState(state)).toThrow(`Review approval note note-1 must be under_review or approved, found ${status}`);
+    }
+  );
 
   it.each([
     [

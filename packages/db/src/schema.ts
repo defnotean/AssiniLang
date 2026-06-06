@@ -1131,6 +1131,12 @@ function addReviewApprovalIntegrityIssues(
         message: `Review approval language ${approval.languageId} does not match note ${approval.noteId} language ${note.languageId}`,
         path: ["reviewApprovals", approval.id]
       });
+    } else if (note.status !== "under_review" && note.status !== "approved") {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review approval note ${approval.noteId} must be under_review or approved, found ${note.status}`,
+        path: ["reviewApprovals", approval.id]
+      });
     }
 
     const reviewer = usersById.get(approval.reviewerId);
