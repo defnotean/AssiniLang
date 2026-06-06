@@ -151,6 +151,14 @@ export function isReviewPolicyAssignableRole(role: z.infer<typeof userRoleSchema
   return reviewPolicyAssignableRoleSet.has(role);
 }
 
+export const REVIEW_POLICY_UPDATER_ROLES = ["lead", "admin"] as const;
+const reviewPolicyUpdaterRoleSet = new Set<string>(REVIEW_POLICY_UPDATER_ROLES);
+const reviewPolicySystemUpdaterIds = new Set<string>(["system-seed"]);
+
+export function isReviewPolicyUpdaterRole(role: z.infer<typeof userRoleSchema>): boolean {
+  return reviewPolicyUpdaterRoleSet.has(role);
+}
+
 export const ELDER_CORRECTION_MUTATION_ROLES = ["elder", "lead", "admin"] as const;
 const elderCorrectionMutationRoleSet = new Set<string>(ELDER_CORRECTION_MUTATION_ROLES);
 
@@ -422,15 +430,34 @@ function addCorpusAnswerKeyIntegrityIssues(
 function addReviewPolicyIntegrityIssues(
   context: z.RefinementCtx,
   state: {
+    languages: Array<z.infer<typeof languageSchema>>;
     users: Array<z.infer<typeof userSchema>>;
     reviewPolicies: Array<z.infer<typeof reviewPolicySchema>>;
   }
 ) {
   const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const languageIds = new Set(state.languages.map((language) => language.id));
   const usersById = new Map(users.map((user) => [user.id, user]));
   const assignableReviewerCount = users.filter((user) => isReviewPolicyAssignableRole(user.role)).length;
 
   for (const policy of state.reviewPolicies) {
+    if (!languageIds.has(policy.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review policy references missing language: ${policy.languageId}`,
+        path: ["reviewPolicies", policy.id]
+      });
+    }
+
+    const updater = usersById.get(policy.updatedBy);
+    if (!reviewPolicySystemUpdaterIds.has(policy.updatedBy) && (!updater || !isReviewPolicyUpdaterRole(updater.role))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review policy updater is not allowed: ${policy.updatedBy}`,
+        path: ["reviewPolicies", policy.id]
+      });
+    }
+
     const duplicateReviewerId = duplicatePersistedValue(policy.assignedReviewerIds, (reviewerId) => reviewerId);
     if (duplicateReviewerId) {
       context.addIssue({

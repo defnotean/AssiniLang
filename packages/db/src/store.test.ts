@@ -598,6 +598,16 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "missing language",
+      {
+        languageId: "missing-language",
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true
+      },
+      "Review policy references missing language: missing-language"
+    ],
+    [
       "duplicate assigned reviewers",
       {
         assignedReviewerIds: ["reviewer-1", "reviewer-1"],
@@ -641,9 +651,30 @@ describe("JsonStore", () => {
         requiresAssignedReviewer: false
       },
       "Review policy approvalThreshold cannot exceed assignable reviewers"
+    ],
+    [
+      "unknown updater",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedBy: "missing-user"
+      },
+      "Review policy updater is not allowed: missing-user"
+    ],
+    [
+      "unallowed updater role",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedBy: "reviewer-1"
+      },
+      "Review policy updater is not allowed: reviewer-1"
     ]
   ])("rejects persisted review policies with %s", (_caseName, policyPatch, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage()];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
     state.reviewPolicies = [{
       id: "review-policy-avenik",

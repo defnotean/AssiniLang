@@ -11,6 +11,7 @@ import {
   JsonStore,
   LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
+  REVIEW_POLICY_UPDATER_ROLES,
   type AuditEvent,
   type AiMessage,
   type AiSession,
@@ -1913,7 +1914,7 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["lead", "admin"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
 
