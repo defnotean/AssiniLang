@@ -112,15 +112,15 @@ Example body:
 Important validation:
 
 - `consentStatus.use` must be `synthetic-testing-only`.
-- `topicTags` must contain at least one tag and must be unique after whitespace normalization.
+- `topicTags` must contain at least one nonblank tag and must be unique after whitespace normalization.
 - Each segmentation surface must appear in the target text.
 - Every target-text token must be covered by one or more contiguous segmentation surfaces. Hyphen boundaries are normalized for this coverage check so fusional forms can be analyzed with separate suffix surfaces.
-- Morpheme feature lists must be unique after whitespace normalization.
+- Morpheme feature lists must use nonblank values and be unique after whitespace normalization.
 - Target text must use symbols from the selected language phonology inventory. Whitespace and explicit morpheme hyphens are allowed.
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.
 - Duplicate target text is rejected per language.
 
-Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep duplicate-free topic tags and morpheme feature lists, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
+Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep nonblank duplicate-free topic tags and morpheme feature lists, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
 
 ## Exercise Authoring
 
@@ -133,14 +133,14 @@ The route stores private answer-key fields server-side and returns only the publ
 Important validation:
 
 - Language ID must exist.
-- Allowed grammar-rule IDs must exist for that language and be unique after whitespace normalization.
-- Allowed vocabulary forms must exist for that language and be unique after whitespace normalization.
+- Allowed grammar-rule IDs must exist for that language, be nonblank, and be unique after whitespace normalization.
+- Allowed vocabulary forms must exist for that language, be nonblank, and be unique after whitespace normalization.
 - Prompts and grading explanations must be substantive.
-- Expected answers must be present and unique after whitespace normalization.
+- Expected answers must be present, nonblank, and unique after whitespace normalization.
 - At least two adversarial answers are required.
-- Adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
+- Adversarial answers and reasons must be nonblank, and adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
 
-During local JSON reads, the persisted app-state schema rechecks the exercise invariants it can prove from app state: language existence, duplicate private answer fields, minimum adversarial probes, expected/adversarial collisions, translate-to-target answers present in same-language corpus text, and choose-particle answers present in allowed vocabulary. Fixture rule/vocabulary existence remains enforced by the live authoring route and fixture validator.
+During local JSON reads, the persisted app-state schema rechecks the exercise invariants it can prove from app state: language existence, nonblank private exercise lists, duplicate private answer fields, minimum adversarial probes, expected/adversarial collisions, translate-to-target answers present in same-language corpus text, and choose-particle answers present in allowed vocabulary. Fixture rule/vocabulary existence remains enforced by the live authoring route and fixture validator.
 
 ## Exercise Submissions
 

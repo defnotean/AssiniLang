@@ -805,6 +805,16 @@ describe("JsonStore", () => {
       "Corpus topic tag is duplicated for passage passage-1: motion"
     ],
     [
+      "missing topic tags",
+      createTestCorpusPassage({ topicTags: [] }),
+      "Corpus passage requires at least one topic tag: passage-1"
+    ],
+    [
+      "blank topic tag",
+      createTestCorpusPassage({ topicTags: ["   "] }),
+      "Corpus topic tag must not be blank for passage passage-1"
+    ],
+    [
       "duplicate morpheme features",
       createTestCorpusPassage({
         morphologicalSegmentation: [
@@ -817,6 +827,26 @@ describe("JsonStore", () => {
         ]
       }),
       "Corpus morpheme feature is duplicated for passage passage-1 surface mira: noun"
+    ],
+    [
+      "blank morpheme feature",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "river",
+            features: ["   "]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus morpheme feature must not be blank for passage passage-1 surface mira"
     ],
     [
       "segmentation surface absent from target text",
@@ -1123,14 +1153,32 @@ describe("JsonStore", () => {
       "Exercise allowed vocabulary is duplicated: mira"
     ],
     [
+      "blank allowed vocabulary",
+      createTestExercise({ allowedVocabulary: ["   "] }),
+      "Exercise allowed vocabulary must not be blank"
+    ],
+    [
       "duplicate allowed rule",
       createTestExercise({ allowedRuleIds: ["rule-1", "rule-1"] }),
       "Exercise allowed rule is duplicated: rule-1"
     ],
     [
+      "blank allowed rule",
+      createTestExercise({ allowedRuleIds: ["   "] }),
+      "Exercise allowed rule must not be blank"
+    ],
+    [
       "duplicate expected answer",
       createTestExercise({ expectedAnswers: ["mira talo-mi-na", " mira   talo-mi-na "] }),
       "Exercise expected answer is duplicated: mira talo-mi-na"
+    ],
+    [
+      "blank expected answer",
+      createTestExercise({
+        type: "translate_to_english",
+        expectedAnswers: ["   "]
+      }),
+      "Exercise expected answer must not be blank"
     ],
     [
       "too few adversarial probes",
@@ -1156,6 +1204,26 @@ describe("JsonStore", () => {
         ]
       }),
       "Exercise adversarial answer is duplicated: talo mira"
+    ],
+    [
+      "blank adversarial answer",
+      createTestExercise({
+        adversarialAnswers: [
+          { answer: "   ", reason: "Blank adversarial answers should not restore." },
+          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+        ]
+      }),
+      "Exercise adversarial answer must not be blank"
+    ],
+    [
+      "blank adversarial reason",
+      createTestExercise({
+        adversarialAnswers: [
+          { answer: "talo mira", reason: "   " },
+          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+        ]
+      }),
+      "Exercise adversarial reason must not be blank"
     ],
     [
       "translate-to-target expected answer missing from corpus",

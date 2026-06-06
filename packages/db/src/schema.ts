@@ -413,6 +413,10 @@ function duplicateNormalizedPersistedValue(items: string[]): string | undefined 
   return undefined;
 }
 
+function isBlankPersistedValue(item: string): boolean {
+  return normalizePersistedText(item).length === 0;
+}
+
 function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
   const normalizedSurface = normalizePersistedSurfaceKey(surface);
   return normalizePersistedText(textTarget)
@@ -508,6 +512,24 @@ function addCorpusIntegrityIssues(
       });
     }
 
+    if (passage.topicTags.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus passage requires at least one topic tag: ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    for (const tag of passage.topicTags) {
+      if (isBlankPersistedValue(tag)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus topic tag must not be blank for passage ${passage.id}`,
+          path: ["corpus", passage.id]
+        });
+      }
+    }
+
     const duplicateTopicTag = duplicateNormalizedPersistedValue(passage.topicTags);
     if (duplicateTopicTag) {
       context.addIssue({
@@ -524,6 +546,16 @@ function addCorpusIntegrityIssues(
           message: `Corpus segmentation surface is not present in target text for passage ${passage.id}: ${morpheme.surface}`,
           path: ["corpus", passage.id]
         });
+      }
+
+      for (const feature of morpheme.features) {
+        if (isBlankPersistedValue(feature)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Corpus morpheme feature must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
+            path: ["corpus", passage.id]
+          });
+        }
       }
 
       const duplicateFeature = duplicateNormalizedPersistedValue(morpheme.features);
@@ -709,6 +741,36 @@ function addExerciseIntegrityIssues(
       });
     }
 
+    for (const ruleId of exercise.allowedRuleIds) {
+      if (isBlankPersistedValue(ruleId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Exercise allowed rule must not be blank",
+          path: ["exercises", exercise.id]
+        });
+      }
+    }
+
+    for (const vocabulary of exercise.allowedVocabulary) {
+      if (isBlankPersistedValue(vocabulary)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Exercise allowed vocabulary must not be blank",
+          path: ["exercises", exercise.id]
+        });
+      }
+    }
+
+    for (const answer of exercise.expectedAnswers) {
+      if (isBlankPersistedValue(answer)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Exercise expected answer must not be blank",
+          path: ["exercises", exercise.id]
+        });
+      }
+    }
+
     const duplicateAllowedRule = duplicateNormalizedPersistedValue(exercise.allowedRuleIds);
     if (duplicateAllowedRule) {
       context.addIssue({
@@ -773,6 +835,22 @@ function addExerciseIntegrityIssues(
     const normalizedExpected = new Set(exercise.expectedAnswers.map(normalizePersistedText));
     const normalizedAdversarial = new Set<string>();
     for (const adversarial of exercise.adversarialAnswers) {
+      if (isBlankPersistedValue(adversarial.answer)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Exercise adversarial answer must not be blank",
+          path: ["exercises", exercise.id]
+        });
+      }
+
+      if (isBlankPersistedValue(adversarial.reason)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Exercise adversarial reason must not be blank",
+          path: ["exercises", exercise.id]
+        });
+      }
+
       const normalizedAnswer = normalizePersistedText(adversarial.answer);
       if (normalizedExpected.has(normalizedAnswer)) {
         context.addIssue({
