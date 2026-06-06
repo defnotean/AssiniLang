@@ -1797,9 +1797,19 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestAiSession({ languageId: "   " }),
+      "AI session languageId must not be blank"
+    ],
+    [
       "missing language",
       createTestAiSession({ languageId: "missing-language" }),
       "AI session references missing language: missing-language"
+    ],
+    [
+      "blank creator",
+      createTestAiSession({ createdBy: "   " }),
+      "AI session creator must not be blank"
     ],
     [
       "unknown creator",
@@ -1940,6 +1950,11 @@ describe("JsonStore", () => {
       "AI session references missing context note: missing-note"
     ],
     [
+      "blank context note",
+      createTestAiSession({ contextNoteIds: ["   "] }),
+      "AI session contextNoteId must not be blank"
+    ],
+    [
       "context note language mismatch",
       createTestAiSession({ contextNoteIds: ["other-note"] }),
       "AI session context note other-note language solari does not match session language avenik"
@@ -1948,6 +1963,11 @@ describe("JsonStore", () => {
       "missing context passage",
       createTestAiSession({ contextPassageIds: ["missing-passage"] }),
       "AI session references missing context passage: missing-passage"
+    ],
+    [
+      "blank context passage",
+      createTestAiSession({ contextPassageIds: ["   "] }),
+      "AI session contextPassageId must not be blank"
     ],
     [
       "context passage language mismatch",

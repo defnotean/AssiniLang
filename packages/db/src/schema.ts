@@ -1513,6 +1513,14 @@ function addAiSessionIntegrityIssues(
       }
     }
 
+    if (isBlankPersistedValue(session.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "AI session languageId must not be blank",
+        path: ["aiSessions", session.id]
+      });
+    }
+
     if (!languageIds.has(session.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1521,8 +1529,14 @@ function addAiSessionIntegrityIssues(
       });
     }
 
-    const creator = usersById.get(session.createdBy);
-    if (!creator || !isAiSessionCreatorRole(session.mode, creator.role)) {
+    const creator = isBlankPersistedValue(session.createdBy) ? undefined : usersById.get(session.createdBy);
+    if (isBlankPersistedValue(session.createdBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "AI session creator must not be blank",
+        path: ["aiSessions", session.id]
+      });
+    } else if (!creator || !isAiSessionCreatorRole(session.mode, creator.role)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `AI session creator is not allowed for mode ${session.mode}: ${session.createdBy}`,
@@ -1603,6 +1617,15 @@ function addAiSessionIntegrityIssues(
     }
 
     for (const noteId of session.contextNoteIds) {
+      if (isBlankPersistedValue(noteId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "AI session contextNoteId must not be blank",
+          path: ["aiSessions", session.id]
+        });
+        continue;
+      }
+
       const note = notesById.get(noteId);
       if (!note) {
         context.addIssue({
@@ -1620,6 +1643,15 @@ function addAiSessionIntegrityIssues(
     }
 
     for (const passageId of session.contextPassageIds) {
+      if (isBlankPersistedValue(passageId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "AI session contextPassageId must not be blank",
+          path: ["aiSessions", session.id]
+        });
+        continue;
+      }
+
       const passage = passagesById.get(passageId);
       if (!passage) {
         context.addIssue({
