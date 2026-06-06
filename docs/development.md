@@ -94,7 +94,7 @@ Each language should include:
 - Structured phonology and phonotactic notes that cover public vocabulary, corpus, and paradigm forms.
 - At least two paradigm tables with vocabulary-backed morphemes.
 - At least two public dialect variants with phonology, lexical, grammar, and example-phrase notes.
-- Vocabulary.
+- At least 20 public vocabulary items, including enough roots, particles, affixes, endings, or prefixes to support the language typology.
 - At least five grammar rules.
 - At least ten corpus passages.
 - Morphological segmentation.

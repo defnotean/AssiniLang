@@ -9,7 +9,7 @@ The current milestone is built around four fictional languages:
 - `Velari`: fusional endings.
 - `Ketharu`: polysynthetic-lite verb forms.
 
-Each language has public corpus passages, grammar notes, learner exercises, answer keys, vocabulary, phonology, paradigms, dialect variants, and evaluation records.
+Each language has public corpus passages, grammar notes, learner exercises, answer keys, at least 20 public vocabulary items, phonology, paradigms, dialect variants, and evaluation records.
 
 ## Web Console
 

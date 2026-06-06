@@ -82,7 +82,7 @@ Each language fixture includes:
 - `notes.answer_key.json`: expected approved grammar and vocabulary notes.
 - `exercises.answer_key.json`: expected exercise prompts, valid answers, and grading explanations.
 
-The implemented baseline should keep at least ten corpus passages, five grammar rules, five note answer keys, and five learner exercises per synthetic language. Each language should also include at least two exercise types so the grading workflow is not trained only on a single task shape.
+The implemented baseline should keep at least 20 public vocabulary items, ten corpus passages, five grammar rules, five note answer keys, and five learner exercises per synthetic language. Each language should also include at least two exercise types so the grading workflow is not trained only on a single task shape.
 
 ## Data Model
 
@@ -191,7 +191,7 @@ Scores should be machine-readable and visible in the web UI. The evaluation gate
 
 - Missing fixture files should fail fast with the exact file path.
 - Invalid fixture schema should report the language ID and field path.
-- Invalid fixture cross-references should fail before seeding with actionable diagnostics for duplicate IDs, duplicate or empty dialect variant records, missing evidence passages, duplicate corpus topic tags, duplicate morpheme feature labels, target tokens not covered by corpus segmentation, symbols outside a language phonology inventory, missing or duplicate exercise rules, unknown or duplicate allowed vocabulary, duplicate expected exercise answers, invalid particle answers, target-language answers not present in the corpus, and adversarial exercise probes that duplicate accepted answers or one another.
+- Invalid fixture cross-references and quality-floor failures should fail before seeding with actionable diagnostics for undersized phonology, missing stress or syllable-template metadata, vocabulary below 20 public items, too few corpus passages/rules/notes/exercises/paradigms/dialect variants/exercise types, duplicate IDs, duplicate or empty dialect variant records, missing evidence passages, duplicate corpus topic tags, duplicate morpheme feature labels, target tokens not covered by corpus segmentation, symbols outside a language phonology inventory, missing or duplicate exercise rules, unknown or duplicate allowed vocabulary, duplicate expected exercise answers, invalid particle answers, target-language answers not present in the corpus, and adversarial exercise probes that duplicate accepted answers or one another.
 - Evaluation failures and threshold breaches should be stored or surfaced as traceable records, not just console text.
 - UI loading states should distinguish no data, invalid data, and evaluation not yet run.
 - Synthetic fixture labels should be visible anywhere language data is displayed.
@@ -244,7 +244,7 @@ After the synthetic testbed works, scale in this order:
 
 - Repository contains the monorepo scaffold.
 - At least four synthetic languages exist with corpora and answer keys.
-- Each synthetic language has at least ten corpus passages, five grammar-derived note answer keys, and five learner exercise answer keys.
+- Each synthetic language has at least 20 public vocabulary items, ten corpus passages, five grammar-derived note answer keys, and five learner exercise answer keys.
 - Evaluation harness runs from the command line.
 - Web UI displays corpus, note review, evaluation, and learner exercise views.
 - Evaluation results are persisted locally.

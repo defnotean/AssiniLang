@@ -138,4 +138,43 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects synthetic language fixtures that fall below the richness floor", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.phonology.consonants = avenik.phonology.consonants.slice(0, 5);
+    avenik.phonology.vowels = avenik.phonology.vowels.slice(0, 2);
+    avenik.phonology.phonotactics = avenik.phonology.phonotactics.slice(0, 1);
+    avenik.phonology.syllableTemplate = "";
+    avenik.phonology.stress = "";
+    avenik.vocabulary = avenik.vocabulary.slice(0, 19);
+    avenik.corpus = avenik.corpus.slice(0, 9);
+    avenik.grammarRules = avenik.grammarRules.slice(0, 4);
+    avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, 4);
+    avenik.exercisesAnswerKey = avenik.exercisesAnswerKey.filter((exercise) => exercise.type === "translate_to_target");
+    avenik.paradigms = avenik.paradigms.slice(0, 1);
+    avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
+    avenik.dialectVariants = avenik.dialectVariants.slice(0, 1);
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik phonology needs at least 6 consonants (found 5)",
+        "avenik phonology needs at least 3 vowels (found 2)",
+        "avenik phonology needs at least 2 phonotactic notes (found 1)",
+        "avenik phonology is missing a syllable template",
+        "avenik phonology is missing a stress rule",
+        "avenik needs at least 20 vocabulary items (found 19)",
+        "avenik needs at least 10 corpus passages (found 9)",
+        "avenik needs at least 5 grammar rules (found 4)",
+        "avenik needs at least 5 note answer keys (found 4)",
+        "avenik needs at least 5 exercise answer keys (found 3)",
+        "avenik needs at least 2 exercise types (found 1)",
+        "avenik needs at least 2 paradigm tables (found 1)",
+        "avenik paradigm avn-paradigm-verb-chain needs at least 3 rows (found 2)",
+        "avenik needs at least 2 dialect variants (found 1)"
+      ])
+    );
+  });
 });

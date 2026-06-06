@@ -1,6 +1,19 @@
 import type { Exercise, Morpheme } from "@assini/db";
 import type { SyntheticLanguageFixture } from "./fixtures";
 
+const MIN_CONSONANTS = 6;
+const MIN_VOWELS = 3;
+const MIN_PHONOTACTIC_NOTES = 2;
+const MIN_VOCABULARY_ITEMS = 20;
+const MIN_CORPUS_PASSAGES = 10;
+const MIN_GRAMMAR_RULES = 5;
+const MIN_NOTE_ANSWER_KEYS = 5;
+const MIN_EXERCISE_ANSWER_KEYS = 5;
+const MIN_EXERCISE_TYPES = 2;
+const MIN_PARADIGMS = 2;
+const MIN_PARADIGM_ROWS = 3;
+const MIN_DIALECT_VARIANTS = 2;
+
 function normalizedText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
@@ -31,6 +44,18 @@ function addDuplicateNormalizedDiagnostics(items: string[], label: string, diagn
       reported.add(normalized);
     }
     seen.add(normalized);
+  }
+}
+
+function addMinimumCountDiagnostic(
+  actual: number,
+  minimum: number,
+  subject: string,
+  itemLabel: string,
+  diagnostics: string[]
+) {
+  if (actual < minimum) {
+    diagnostics.push(`${subject} needs at least ${minimum} ${itemLabel} (found ${actual})`);
   }
 }
 
@@ -99,6 +124,61 @@ function addOrthographyDiagnostics(
   }
 }
 
+function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagnostics: string[]) {
+  const languageId = fixture.language.id;
+  addMinimumCountDiagnostic(fixture.phonology.consonants.length, MIN_CONSONANTS, `${languageId} phonology`, "consonants", diagnostics);
+  addMinimumCountDiagnostic(fixture.phonology.vowels.length, MIN_VOWELS, `${languageId} phonology`, "vowels", diagnostics);
+  addMinimumCountDiagnostic(
+    fixture.phonology.phonotactics.length,
+    MIN_PHONOTACTIC_NOTES,
+    `${languageId} phonology`,
+    "phonotactic notes",
+    diagnostics
+  );
+  if (!fixture.phonology.syllableTemplate.trim()) {
+    diagnostics.push(`${languageId} phonology is missing a syllable template`);
+  }
+  if (!fixture.phonology.stress.trim()) {
+    diagnostics.push(`${languageId} phonology is missing a stress rule`);
+  }
+
+  addMinimumCountDiagnostic(fixture.vocabulary.length, MIN_VOCABULARY_ITEMS, languageId, "vocabulary items", diagnostics);
+  addMinimumCountDiagnostic(fixture.corpus.length, MIN_CORPUS_PASSAGES, languageId, "corpus passages", diagnostics);
+  addMinimumCountDiagnostic(fixture.grammarRules.length, MIN_GRAMMAR_RULES, languageId, "grammar rules", diagnostics);
+  addMinimumCountDiagnostic(fixture.notesAnswerKey.length, MIN_NOTE_ANSWER_KEYS, languageId, "note answer keys", diagnostics);
+  addMinimumCountDiagnostic(
+    fixture.exercisesAnswerKey.length,
+    MIN_EXERCISE_ANSWER_KEYS,
+    languageId,
+    "exercise answer keys",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
+    new Set<Exercise["type"]>(fixture.exercisesAnswerKey.map((exercise) => exercise.type)).size,
+    MIN_EXERCISE_TYPES,
+    languageId,
+    "exercise types",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(fixture.paradigms.length, MIN_PARADIGMS, languageId, "paradigm tables", diagnostics);
+  for (const paradigm of fixture.paradigms) {
+    addMinimumCountDiagnostic(
+      paradigm.rows.length,
+      MIN_PARADIGM_ROWS,
+      `${languageId} paradigm ${paradigm.id}`,
+      "rows",
+      diagnostics
+    );
+  }
+  addMinimumCountDiagnostic(
+    fixture.dialectVariants.length,
+    MIN_DIALECT_VARIANTS,
+    languageId,
+    "dialect variants",
+    diagnostics
+  );
+}
+
 export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFixture[]): string[] {
   const diagnostics: string[] = [];
   const languageIds = fixtures.map((fixture) => fixture.language.id);
@@ -118,6 +198,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
     const corpusTargets = new Set(fixture.corpus.map((passage) => normalizedText(passage.textTarget)));
 
+    addFixtureRichnessDiagnostics(fixture, diagnostics);
     addDuplicateDiagnostics(corpusIds, `${languageId} has duplicate corpus id`, diagnostics);
     addDuplicateDiagnostics(ruleIds, `${languageId} has duplicate grammar rule id`, diagnostics);
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);

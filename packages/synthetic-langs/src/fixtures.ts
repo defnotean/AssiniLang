@@ -503,6 +503,14 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       { id: "sol-n-002", form: "luma", gloss: "teaching board", partOfSpeech: "noun", tags: ["classroom-object"] },
       { id: "sol-n-003", form: "rei", gloss: "pattern card", partOfSpeech: "noun", tags: ["classroom-object"] },
       { id: "sol-n-004", form: "sao", gloss: "practice circle", partOfSpeech: "noun", tags: ["place"] },
+      { id: "sol-n-005", form: "toma", gloss: "marker bowl", partOfSpeech: "noun", tags: ["classroom-object"] },
+      { id: "sol-n-006", form: "palo", gloss: "practice path", partOfSpeech: "noun", tags: ["place", "learning"] },
+      { id: "sol-n-007", form: "kare", gloss: "memory bead", partOfSpeech: "noun", tags: ["classroom-object", "memory"] },
+      { id: "sol-n-008", form: "nelo", gloss: "quiet prompt", partOfSpeech: "noun", tags: ["learning", "prompt"] },
+      { id: "sol-p-003", form: "lo", gloss: "you", partOfSpeech: "pronoun", tags: ["subject"] },
+      { id: "sol-p-004", form: "ra", gloss: "we", partOfSpeech: "pronoun", tags: ["subject"] },
+      { id: "sol-v-003", form: "rame", gloss: "trace / follow", partOfSpeech: "verb", tags: ["learning", "motion"] },
+      { id: "sol-v-004", form: "seni", gloss: "remember / hold in mind", partOfSpeech: "verb", tags: ["memory"] },
       { id: "sol-c-001", form: "e", gloss: "and / linked object marker", partOfSpeech: "particle", tags: ["coordination"] },
       { id: "sol-l-001", form: "na", gloss: "locative phrase marker", partOfSpeech: "particle", tags: ["location"] },
       { id: "sol-t-001", form: "pa", gloss: "past marker", partOfSpeech: "particle", tags: ["tense"] },
@@ -835,12 +843,18 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       { id: "vel-n-002", form: "vesa", gloss: "star", partOfSpeech: "noun", tags: ["sky"] },
       { id: "vel-n-003", form: "sora", gloss: "lesson stone", partOfSpeech: "noun", tags: ["classroom-object"] },
       { id: "vel-n-004", form: "navi", gloss: "practice light", partOfSpeech: "noun", tags: ["classroom-object"] },
+      { id: "vel-n-005", form: "kera", gloss: "practice tray", partOfSpeech: "noun", tags: ["classroom-object"] },
+      { id: "vel-n-006", form: "mavi", gloss: "color shard", partOfSpeech: "noun", tags: ["classroom-object"] },
+      { id: "vel-n-007", form: "telo", gloss: "teaching line", partOfSpeech: "noun", tags: ["learning"] },
+      { id: "vel-v-005", form: "hal", gloss: "ask / prompt", partOfSpeech: "verb-root", tags: ["speech"] },
+      { id: "vel-v-006", form: "rav", gloss: "trace / follow", partOfSpeech: "verb-root", tags: ["learning", "motion"] },
       { id: "vel-e-001", form: "-or", gloss: "1sg present", partOfSpeech: "ending", tags: ["fusional"] },
       { id: "vel-e-002", form: "-eth", gloss: "3pl past", partOfSpeech: "ending", tags: ["fusional"] },
       { id: "vel-e-003", form: "-al", gloss: "1sg past", partOfSpeech: "ending", tags: ["fusional"] },
       { id: "vel-e-004", form: "-um", gloss: "3pl present", partOfSpeech: "ending", tags: ["fusional"] },
       { id: "vel-e-005", form: "-in", gloss: "1sg future", partOfSpeech: "ending", tags: ["fusional"] },
-      { id: "vel-e-006", form: "-un", gloss: "3pl future", partOfSpeech: "ending", tags: ["fusional"] }
+      { id: "vel-e-006", form: "-un", gloss: "3pl future", partOfSpeech: "ending", tags: ["fusional"] },
+      { id: "vel-e-007", form: "-en", gloss: "2sg present", partOfSpeech: "ending", tags: ["fusional"] }
     ],
     grammarRules: [
       {
@@ -1145,13 +1159,19 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       { id: "ket-ob-002", form: "se-", gloss: "story object / narrative", partOfSpeech: "object-prefix", tags: ["object"] },
       { id: "ket-ob-003", form: "pi-", gloss: "clay-tile object", partOfSpeech: "object-prefix", tags: ["object"] },
       { id: "ket-ob-004", form: "ki-", gloss: "lamp-token object", partOfSpeech: "object-prefix", tags: ["object"] },
+      { id: "ket-ob-005", form: "lu-", gloss: "path object", partOfSpeech: "object-prefix", tags: ["object", "place"] },
+      { id: "ket-ob-006", form: "ru-", gloss: "signal object", partOfSpeech: "object-prefix", tags: ["object", "signal"] },
       { id: "ket-v-001", form: "wan", gloss: "carry / bear", partOfSpeech: "verb-root", tags: ["motion"] },
       { id: "ket-v-002", form: "lom", gloss: "tell / announce", partOfSpeech: "verb-root", tags: ["speech"] },
       { id: "ket-v-003", form: "tani", gloss: "arrange / assemble", partOfSpeech: "verb-root", tags: ["workshop"] },
       { id: "ket-v-004", form: "ne", gloss: "explain / state", partOfSpeech: "verb-root", tags: ["speech"] },
+      { id: "ket-v-005", form: "homa", gloss: "show / display", partOfSpeech: "verb-root", tags: ["teaching"] },
+      { id: "ket-v-006", form: "pelo", gloss: "sort / separate", partOfSpeech: "verb-root", tags: ["workshop"] },
       { id: "ket-t-001", form: "-tu", gloss: "today", partOfSpeech: "suffix", tags: ["time"] },
       { id: "ket-t-002", form: "-ra", gloss: "yesterday", partOfSpeech: "suffix", tags: ["time"] },
-      { id: "ket-t-003", form: "-su", gloss: "display-table aspect", partOfSpeech: "suffix", tags: ["aspect"] }
+      { id: "ket-t-003", form: "-su", gloss: "display-table aspect", partOfSpeech: "suffix", tags: ["aspect"] },
+      { id: "ket-t-004", form: "-ni", gloss: "near-future teaching sequence", partOfSpeech: "suffix", tags: ["time"] },
+      { id: "ket-pr-004", form: "ha-", gloss: "learner subject prefix", partOfSpeech: "prefix", tags: ["subject"] }
     ],
     grammarRules: [
       {

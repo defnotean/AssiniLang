@@ -33,7 +33,7 @@ Each synthetic language should include:
 
 - Language metadata.
 - Structured phonology and phonotactic notes.
-- Public vocabulary.
+- Public vocabulary with at least 20 lexemes, particles, endings, prefixes, or other usable forms.
 - Corpus passages with translation and morpheme segmentation.
 - Grammar rules.
 - Note answer keys.
@@ -42,7 +42,7 @@ Each synthetic language should include:
 - Paradigm tables.
 - Dialect variants.
 
-Fixture loading validates cross-references and linguistic consistency. It rejects broken evidence IDs, duplicate IDs, empty dialect labels, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted or adversarial answers, note evidence-count drift, and note examples that no longer match their cited corpus passage.
+Fixture loading validates cross-references, linguistic consistency, and fixture depth. It rejects broken evidence IDs, duplicate IDs, empty dialect labels, undersized phonology inventories, missing stress or syllable-template metadata, lexicons below 20 public vocabulary items, corpus/rule/note/exercise/paradigm/dialect sets below the synthetic milestone floor, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted or adversarial answers, note evidence-count drift, and note examples that no longer match their cited corpus passage.
 
 Validation rules live in `packages/synthetic-langs/src/validation.ts`; seed-state cloning and answer-key materialization live in `packages/synthetic-langs/src/loader.ts`.
 The shared orthography scanner is exported so fixture validation and live API imports use the same phonology-inventory rules.
