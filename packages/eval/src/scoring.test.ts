@@ -248,6 +248,15 @@ describe("evaluation scoring", () => {
     expect(result.failures.filter((failure) => failure.itemId === "vel-ex002")).toHaveLength(0);
   });
 
+  it("accepts valid segment answers for linked predicate prefix chains", () => {
+    const state = buildSeedState();
+
+    const result = scoreLanguageEvaluation("ketharu", state, draftNotesForLanguage("ketharu", state));
+
+    expect(result.scores.generationPolicy).toBe(1);
+    expect(result.failures.filter((failure) => failure.itemId === "ket-ex006")).toHaveLength(0);
+  });
+
   it.each(["nemi -ki -lo", "nemi -lo -ki -ki"])(
     "rejects malformed segment answer %s even when it is listed as expected",
     (malformedAnswer) => {

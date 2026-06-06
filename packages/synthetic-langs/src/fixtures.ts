@@ -1644,7 +1644,7 @@ const exerciseMap: Record<string, Exercise[]> = {
       type: "segment",
       prompt: "Segment: na-mo-wan-tu",
       allowedVocabulary: ["na-", "mo-", "wan", "-tu"],
-      allowedRuleIds: ["ket-rule-slot-order"],
+      allowedRuleIds: ["ket-rule-slot-order", "ket-rule-verb-as-clause"],
       expectedAnswers: ["na-|mo-|wan|-tu", "na- mo- wan -tu"],
       adversarialAnswers: [
         { answer: "na-mo|wan|-tu", reason: "Collapses subject and object prefixes into one segment." },
@@ -1707,6 +1707,20 @@ const exerciseMap: Record<string, Exercise[]> = {
         { answer: "ka-pi-tani-tu", reason: "Uses today suffix instead of display-table aspect." }
       ],
       gradingExplanation: "Use ka- for they, pi- for clay tile, tani for arrange, and -su for the display-table aspect slot."
+    },
+    {
+      id: "ket-ex006",
+      languageId: "ketharu",
+      type: "segment",
+      prompt: "Segment: wa-se-ne-ra-tu-wa-ki-tani-ra",
+      allowedVocabulary: ["wa-", "se-", "ne", "-ra", "-tu", "ki-", "tani"],
+      allowedRuleIds: ["ket-rule-slot-order", "ket-rule-verb-as-clause", "ket-rule-linked-predicate-chain"],
+      expectedAnswers: ["wa-|se-|ne|-ra|-tu|wa-|ki-|tani|-ra", "wa- se- ne -ra -tu wa- ki- tani -ra"],
+      adversarialAnswers: [
+        { answer: "wa-|se-|ne|-ra|wa-|ki-|tani|-ra", reason: "Omits the chaining suffix that links the two predicate words." },
+        { answer: "wa-|se-|ne|-ra-tu|wa-|ki-|tani|-ra", reason: "Collapses the past suffix and chaining suffix into one segment." }
+      ],
+      gradingExplanation: "The linked form keeps the first predicate chain, the -tu chain marker, and the second predicate chain segmented in order."
     }
   ]
 };

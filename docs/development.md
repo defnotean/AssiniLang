@@ -100,6 +100,7 @@ Each language should include:
 - Morphological segmentation.
 - Five note answer keys derived from those grammar rules.
 - At least five learner exercise answer keys.
+- Every grammar rule should be covered by a note answer key and by at least one learner exercise allow-list.
 - At least two exercise types.
 - Two curated adversarial probes per exercise.
 

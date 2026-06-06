@@ -107,6 +107,24 @@ describe("synthetic fixture validation module", () => {
     );
   });
 
+  it("rejects grammar rules without note and exercise coverage", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.notesAnswerKey = avenik.notesAnswerKey.filter((note) => note.id !== "avn-rule-demo-agent-marking-note");
+    for (const exercise of avenik.exercisesAnswerKey) {
+      exercise.allowedRuleIds = exercise.allowedRuleIds.filter((ruleId) => ruleId !== "avn-rule-demo-agent-marking");
+    }
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik grammar rule avn-rule-demo-agent-marking is missing note answer-key coverage",
+        "avenik grammar rule avn-rule-demo-agent-marking is missing exercise coverage"
+      ])
+    );
+  });
+
   it("rejects duplicate vocabulary ids, forms, and tags", () => {
     const brokenFixtures = cloneFixtures();
     const avenik = brokenFixtures[0];

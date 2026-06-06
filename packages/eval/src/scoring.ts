@@ -182,6 +182,10 @@ function segmentMatchLengthAt(target: string, piece: string, index: number): num
     return boundarylessPiece.length;
   }
 
+  if (!piece.startsWith("-") && target[index] === "-" && target.startsWith(piece, index + 1)) {
+    return piece.length + 1;
+  }
+
   return undefined;
 }
 

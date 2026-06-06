@@ -26,7 +26,7 @@ describe("synthetic language fixtures", () => {
       expect(fixture.corpus, `${fixture.language.id} corpus passages`).toHaveLength(10);
       expect(fixture.grammarRules, `${fixture.language.id} grammar rules`).toHaveLength(5);
       expect(fixture.notesAnswerKey, `${fixture.language.id} note answer keys`).toHaveLength(5);
-      expect(fixture.exercisesAnswerKey, `${fixture.language.id} exercise answer keys`).toHaveLength(5);
+      expect(fixture.exercisesAnswerKey.length, `${fixture.language.id} exercise answer keys`).toBeGreaterThanOrEqual(5);
 
       const coveredExerciseTypes = new Set(fixture.exercisesAnswerKey.map((exercise) => exercise.type));
       expect(coveredExerciseTypes.size, `${fixture.language.id} exercise type variety`).toBeGreaterThanOrEqual(2);
@@ -189,14 +189,14 @@ describe("synthetic language fixtures", () => {
     const state = buildSeedState();
     const languageIds = new Set(state.languages.map((language) => language.id));
     expect(state.notes).toHaveLength(20);
-    expect(state.exercises).toHaveLength(20);
+    expect(state.exercises.length).toBeGreaterThanOrEqual(20);
     expect(state.notes.every((note) => note.status === "draft")).toBe(true);
     expect(state.notes.every((note) => languageIds.has(note.languageId))).toBe(true);
     expect(state.exercises.every((exercise) => languageIds.has(exercise.languageId))).toBe(true);
     expect(syntheticLanguageFixtures).toHaveLength(4);
 
     for (const language of state.languages) {
-      expect(state.exercises.filter((exercise) => exercise.languageId === language.id)).toHaveLength(5);
+      expect(state.exercises.filter((exercise) => exercise.languageId === language.id).length).toBeGreaterThanOrEqual(5);
     }
   });
 

@@ -179,6 +179,21 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
   );
 }
 
+function addGrammarRuleCoverageDiagnostics(fixture: SyntheticLanguageFixture, diagnostics: string[]) {
+  const languageId = fixture.language.id;
+  const noteTopics = new Set(fixture.notesAnswerKey.map((note) => normalizedText(note.topic)));
+  const exercisedRuleIds = new Set(fixture.exercisesAnswerKey.flatMap((exercise) => exercise.allowedRuleIds));
+
+  for (const rule of fixture.grammarRules) {
+    if (!noteTopics.has(normalizedText(rule.topic))) {
+      diagnostics.push(`${languageId} grammar rule ${rule.id} is missing note answer-key coverage`);
+    }
+    if (!exercisedRuleIds.has(rule.id)) {
+      diagnostics.push(`${languageId} grammar rule ${rule.id} is missing exercise coverage`);
+    }
+  }
+}
+
 export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFixture[]): string[] {
   const diagnostics: string[] = [];
   const languageIds = fixtures.map((fixture) => fixture.language.id);
@@ -201,6 +216,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const vocabularyFormsList = fixture.vocabulary.map((item) => item.form);
 
     addFixtureRichnessDiagnostics(fixture, diagnostics);
+    addGrammarRuleCoverageDiagnostics(fixture, diagnostics);
     addDuplicateDiagnostics(vocabularyIds, `${languageId} has duplicate vocabulary id`, diagnostics);
     addDuplicateNormalizedDiagnostics(vocabularyFormsList, `${languageId} vocabulary form is duplicated:`, diagnostics);
     addDuplicateDiagnostics(corpusIds, `${languageId} has duplicate corpus id`, diagnostics);
