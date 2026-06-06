@@ -987,6 +987,8 @@ function addAuditEventIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const event of state.auditEvents) {
+    addParseablePersistedDateIssue(context, "auditEvents", event.id, "Audit event at", event.at);
+
     const privacyIssue = auditMetadataPrivacyIssue(event.metadata);
     if (privacyIssue) {
       context.addIssue({

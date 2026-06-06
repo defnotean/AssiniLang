@@ -1049,6 +1049,11 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "unparseable timestamp",
+      createTestAuditEvent({ at: "not-a-date" }),
+      "Audit event at must be parseable: not-a-date"
+    ],
+    [
       "missing non-null language",
       createTestAuditEvent({ languageId: "missing-language" }),
       "Audit event references missing language: missing-language"
