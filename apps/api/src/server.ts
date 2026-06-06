@@ -2715,9 +2715,15 @@ export function createServer(options: ServerOptions = {}) {
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
 
     const { correctionId } = request.params as { correctionId: string };
-    if (!current.elderCorrections.some((correction) => correction.id === correctionId)) {
+    const existingCorrection = current.elderCorrections.find((correction) => correction.id === correctionId);
+    if (!existingCorrection) {
       reply.code(404);
       return { error: `Elder correction not found: ${correctionId}` };
+    }
+
+    if (existingCorrection.status !== "pending_review") {
+      reply.code(409);
+      return { error: `Elder correction is no longer pending review: ${correctionId}` };
     }
 
     let reviewedCorrection: ElderCorrection | undefined;

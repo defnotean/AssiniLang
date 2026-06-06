@@ -103,6 +103,8 @@ Audit metadata must not include learner answers, answer keys, provider prompts, 
 
 Review-disposition ledger writes are de-duplicated per note, disposition, and open status. Reopening the same unresolved disposition updates the existing work record's reason, assignee, and due date while preserving original opened attribution and writing a new audit event for the update.
 
+Elder correction review is a one-way transition out of `pending_review`. Accepted, rejected, and applied corrections cannot be re-reviewed, which preserves reviewer attribution and keeps later note edits auditable.
+
 ## Corpus Import Integrity
 
 Corpus imports are treated as synthetic source-data mutations. They are role-gated and validated before persistence.

@@ -2628,6 +2628,55 @@ describe("api server", () => {
     expect(after.editHistory).toEqual(before.editHistory);
   });
 
+  it("rejects review attempts for elder corrections that are no longer pending", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+
+    const created = await app.inject({
+      method: "POST",
+      url: "/elder/corrections",
+      headers: authHeaders("elder-1"),
+      payload: {
+        languageId: "avenik",
+        noteId: reviewedNoteId,
+        correction: "Mention suffix order before approval.",
+        rationale: "Elder review found the explanation underspecified.",
+        severity: "major"
+      }
+    });
+    expect(created.statusCode).toBe(201);
+
+    const accepted = await app.inject({
+      method: "PATCH",
+      url: `/elder/corrections/${encodeURIComponent(created.json().id)}/review`,
+      headers: authHeaders("lead-1"),
+      payload: { status: "accepted" }
+    });
+    expect(accepted.statusCode).toBe(200);
+
+    const rejectedAfterAcceptance = await app.inject({
+      method: "PATCH",
+      url: `/elder/corrections/${encodeURIComponent(created.json().id)}/review`,
+      headers: authHeaders("elder-1"),
+      payload: { status: "rejected" }
+    });
+
+    expect(rejectedAfterAcceptance.statusCode).toBe(409);
+    expect(rejectedAfterAcceptance.json()).toEqual({
+      error: `Elder correction is no longer pending review: ${created.json().id}`
+    });
+
+    const context = await app.inject({
+      method: "GET",
+      url: "/languages/avenik/elder-context",
+      headers: authHeaders("elder-1")
+    });
+    expect(context.json().corrections[0]).toMatchObject({
+      id: created.json().id,
+      status: "accepted",
+      reviewedBy: "lead-1"
+    });
+  });
+
   it("applies accepted note-linked elder corrections as auditable note edits", async () => {
     const app = createServer({ initialState: stateWithAuthUsers() });
     const before = await fetchReviewedNote(app);

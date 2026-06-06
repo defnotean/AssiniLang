@@ -50,7 +50,7 @@ Do not treat prototype auth as production security.
 | `GET /languages/:languageId/elder-context` | Return public context and correction ledger for elder review. |
 | `GET /elder/corrections` | Return correction records, optionally filtered by language ID. |
 | `POST /elder/corrections` | Submit a pending elder correction without mutating notes. |
-| `PATCH /elder/corrections/:correctionId/review` | Accept or reject a correction with reviewer attribution. |
+| `PATCH /elder/corrections/:correctionId/review` | Accept or reject a pending correction with reviewer attribution. |
 | `PATCH /elder/corrections/:correctionId/apply` | Apply an accepted note-linked correction through a revised explanation. |
 | `GET /llm/status` | Return sanitized LLM provider readiness. |
 | `POST /ai-sessions` | Create an AI session with public synthetic context. |
@@ -155,6 +155,12 @@ Stored approvals remain auditable after policy changes, but only reviewers eligi
 ## Sanitized Exports
 
 Language snapshots and evaluation artifacts include SHA-256 integrity manifests. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
+
+## Elder Corrections
+
+`PATCH /elder/corrections/:correctionId/review`
+
+Only pending corrections can be reviewed. Once a correction is accepted, rejected, or applied, later review attempts return `409` and preserve the existing status and attribution.
 
 ## LLM Status And Sessions
 
