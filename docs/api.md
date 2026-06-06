@@ -207,7 +207,7 @@ Language snapshots and evaluation artifacts include SHA-256 integrity manifests.
 
 `POST /evaluations/run`
 
-Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, keep a nonblank summary, keep a parseable `createdAt`, and every stored failure line must use the same language ID as its parent run with a nonblank diagnostic message.
+Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, keep nonblank system version, fixture version, score category, and summary text, keep a parseable `createdAt`, and every stored failure line must use the same language ID as its parent run with nonblank category, item ID, and diagnostic message.
 
 ## Elder Corrections
 

@@ -1631,6 +1631,22 @@ function addEvaluationRunIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(run.systemVersion)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Evaluation run systemVersion must not be blank",
+        path: ["evaluationRuns", run.id]
+      });
+    }
+
+    if (isBlankPersistedValue(run.fixtureVersion)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Evaluation run fixtureVersion must not be blank",
+        path: ["evaluationRuns", run.id]
+      });
+    }
+
     addParseablePersistedDateIssue(context, "evaluationRuns", run.id, "Evaluation run createdAt", run.createdAt);
 
     if (!languageIds.has(run.languageId)) {
@@ -1641,7 +1657,33 @@ function addEvaluationRunIntegrityIssues(
       });
     }
 
+    for (const category of Object.keys(run.scores)) {
+      if (isBlankPersistedValue(category)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Evaluation score category must not be blank",
+          path: ["evaluationRuns", run.id]
+        });
+      }
+    }
+
     for (const failure of run.failures) {
+      if (isBlankPersistedValue(failure.category)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Evaluation failure category must not be blank",
+          path: ["evaluationRuns", run.id]
+        });
+      }
+
+      if (isBlankPersistedValue(failure.itemId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Evaluation failure itemId must not be blank",
+          path: ["evaluationRuns", run.id]
+        });
+      }
+
       if (isBlankPersistedValue(failure.message)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

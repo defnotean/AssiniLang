@@ -1937,6 +1937,49 @@ describe("JsonStore", () => {
       "Evaluation run summary must not be blank"
     ],
     [
+      "blank system version",
+      createTestEvaluationRun({ systemVersion: "   " }),
+      "Evaluation run systemVersion must not be blank"
+    ],
+    [
+      "blank fixture version",
+      createTestEvaluationRun({ fixtureVersion: "   " }),
+      "Evaluation run fixtureVersion must not be blank"
+    ],
+    [
+      "blank score category",
+      createTestEvaluationRun({ scores: { "   ": 1 } }),
+      "Evaluation score category must not be blank"
+    ],
+    [
+      "blank failure category",
+      createTestEvaluationRun({
+        failures: [
+          {
+            category: "   ",
+            languageId: "avenik",
+            itemId: "note-1",
+            message: "Blank failure categories should not restore."
+          }
+        ]
+      }),
+      "Evaluation failure category must not be blank"
+    ],
+    [
+      "blank failure item id",
+      createTestEvaluationRun({
+        failures: [
+          {
+            category: "noteAccuracy",
+            languageId: "avenik",
+            itemId: "   ",
+            message: "Blank failure item IDs should not restore."
+          }
+        ]
+      }),
+      "Evaluation failure itemId must not be blank"
+    ],
+    [
       "blank failure message",
       createTestEvaluationRun({
         failures: [
