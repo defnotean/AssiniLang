@@ -114,7 +114,7 @@ Mutating API routes append `AuditEvent` records when they change persistent stat
 - Human-readable summary.
 - Minimal metadata.
 
-Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads.
+Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads. Persisted app-state reads reject audit metadata with private payload keys such as learner answers, expected answers, answer keys, grading explanations, provider prompts, hidden chain-of-thought, API keys, tokens, or secrets; they also reject secret-looking string values.
 
 Persisted audit events must be attributable to a known local user, and the stored actor role must match that user. Non-null audit `languageId` values must reference an existing synthetic language; `null` is reserved for global events. These checks keep restored JSON from misrepresenting who performed a mutation or attaching events to non-existent languages.
 

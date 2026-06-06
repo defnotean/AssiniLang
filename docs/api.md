@@ -168,7 +168,7 @@ The persisted app-state schema also validates governance records during local JS
 
 Allowed reader roles: lead, admin, programmer.
 
-Audit events are written by mutation routes and derive `actorId` plus `actorRole` from the same resolved local user. During local JSON reads, persisted audit events must keep that actor attribution consistent, and any non-null `languageId` must reference an existing language. `languageId: null` remains valid for global or provider-level events.
+Audit events are written by mutation routes and derive `actorId` plus `actorRole` from the same resolved local user. During local JSON reads, persisted audit events must keep that actor attribution consistent, and any non-null `languageId` must reference an existing language. `languageId: null` remains valid for global or provider-level events. Restored metadata is also rejected when it contains private payload keys or secret-looking values, while count-only metrics remain valid.
 
 ## Note Review
 

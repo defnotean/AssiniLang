@@ -889,6 +889,64 @@ function addGovernanceIntegrityIssues(
   }
 }
 
+const privateAuditMetadataKeys = new Set([
+  "answer",
+  "answers",
+  "learneranswer",
+  "learneranswers",
+  "expectedanswer",
+  "expectedanswers",
+  "adversarialanswer",
+  "adversarialanswers",
+  "answerkey",
+  "answerkeys",
+  "gradingexplanation",
+  "providerprompt",
+  "hiddenchainofthought",
+  "chainofthought",
+  "apikey",
+  "authorization",
+  "bearer",
+  "secret",
+  "token"
+]);
+const secretLikeAuditMetadataValuePattern = /\b(?:bearer\s+\S+|sk-[A-Za-z0-9._-]+|(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY)\s*=|api[_-]?key\s*[:=]|secret\s*[:=])/i;
+
+function normalizeAuditMetadataKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function auditMetadataPath(path: string[]): string {
+  return path.length > 0 ? path.join(".") : "metadata";
+}
+
+function auditMetadataPrivacyIssue(value: unknown, path: string[] = []): string | undefined {
+  if (typeof value === "string" && secretLikeAuditMetadataValuePattern.test(value)) {
+    return `secret-like value at ${auditMetadataPath(path)}`;
+  }
+
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const issue = auditMetadataPrivacyIssue(value[index], [...path, String(index)]);
+      if (issue) return issue;
+    }
+    return undefined;
+  }
+
+  if (value && typeof value === "object") {
+    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (privateAuditMetadataKeys.has(normalizeAuditMetadataKey(key))) {
+        return `private field: ${key}`;
+      }
+
+      const issue = auditMetadataPrivacyIssue(nestedValue, [...path, key]);
+      if (issue) return issue;
+    }
+  }
+
+  return undefined;
+}
+
 function addAuditEventIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -902,6 +960,15 @@ function addAuditEventIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const event of state.auditEvents) {
+    const privacyIssue = auditMetadataPrivacyIssue(event.metadata);
+    if (privacyIssue) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Audit event metadata contains ${privacyIssue}`,
+        path: ["auditEvents", event.id]
+      });
+    }
+
     if (event.languageId !== null && !languageIds.has(event.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

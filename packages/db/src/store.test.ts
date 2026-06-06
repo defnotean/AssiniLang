@@ -996,6 +996,16 @@ describe("JsonStore", () => {
       "actor role mismatch",
       createTestAuditEvent({ actorRole: "admin" }),
       "Audit event actorRole admin does not match actor lead-1 role lead"
+    ],
+    [
+      "private metadata field",
+      createTestAuditEvent({ metadata: { learnerAnswer: "private learner answer" } }),
+      "Audit event metadata contains private field: learnerAnswer"
+    ],
+    [
+      "secret-like metadata value",
+      createTestAuditEvent({ metadata: { diagnostic: "Bearer sk-test-secret-value" } }),
+      "Audit event metadata contains secret-like value at diagnostic"
     ]
   ])("rejects persisted audit events with %s", (_caseName, event, errorMessage) => {
     const state = createEmptyState();
