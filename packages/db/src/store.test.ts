@@ -1372,6 +1372,16 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language",
+      {
+        languageId: "   ",
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true
+      },
+      "Review policy languageId must not be blank"
+    ],
+    [
       "missing language",
       {
         languageId: "missing-language",

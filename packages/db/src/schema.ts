@@ -1170,7 +1170,13 @@ function addReviewPolicyIntegrityIssues(
   for (const policy of state.reviewPolicies) {
     addParseablePersistedDateIssue(context, "reviewPolicies", policy.id, "Review policy updatedAt", policy.updatedAt);
 
-    if (!languageIds.has(policy.languageId)) {
+    if (isBlankPersistedValue(policy.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review policy languageId must not be blank",
+        path: ["reviewPolicies", policy.id]
+      });
+    } else if (!languageIds.has(policy.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Review policy references missing language: ${policy.languageId}`,
