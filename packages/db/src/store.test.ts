@@ -244,6 +244,38 @@ describe("JsonStore", () => {
     });
   });
 
+  it("rejects duplicate persisted entity ids inside app-state collections", () => {
+    const state = createEmptyState();
+    const note = {
+      id: "note-1",
+      languageId: "avenik",
+      topic: "syntax/test",
+      explanation: "Synthetic note explanation.",
+      examples: [],
+      evidencePassageIds: [],
+      evidenceCount: 0,
+      confidence: "medium" as const,
+      status: "draft" as const,
+      reviewer: {
+        lastReviewedBy: null,
+        lastReviewedAt: null,
+        comments: []
+      },
+      dialectScope: "synthetic-default",
+      editHistory: []
+    };
+
+    state.notes = [
+      note,
+      {
+        ...note,
+        explanation: "Second synthetic note with a duplicated persistent ID."
+      }
+    ];
+
+    expect(() => parseAppState(state)).toThrow("Duplicate persisted id in notes: note-1");
+  });
+
   it("rejects duplicate review approvals for the same note and reviewer", () => {
     const state = createEmptyState();
     state.reviewApprovals = [

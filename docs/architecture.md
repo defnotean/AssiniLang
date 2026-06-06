@@ -51,6 +51,8 @@ The shared orthography scanner is exported so fixture validation and live API im
 
 The generated local database lives at `data/local-db.json`. `JsonStore` writes through a temporary file and rename so normal writes are atomic.
 
+Persisted top-level records must keep stable unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by source passage ID.
+
 If the file is manually edited or corrupted, startup/read errors include the exact database path. Regenerate the synthetic baseline with:
 
 ```powershell

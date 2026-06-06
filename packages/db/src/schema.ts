@@ -311,6 +311,33 @@ export const reviewDispositionSchema = z.object({
   resolutionSummary: z.string().min(1).nullable()
 });
 
+function duplicatePersistedValue<T>(items: T[], valueForItem: (item: T) => string): string | undefined {
+  const seen = new Set<string>();
+  for (const item of items) {
+    const value = valueForItem(item);
+    if (seen.has(value)) return value;
+    seen.add(value);
+  }
+  return undefined;
+}
+
+function addDuplicatePersistedValueIssue<T>(
+  context: z.RefinementCtx,
+  path: string,
+  label: string,
+  items: T[],
+  valueForItem: (item: T) => string
+) {
+  const duplicate = duplicatePersistedValue(items, valueForItem);
+  if (duplicate) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Duplicate persisted ${label} in ${path}: ${duplicate}`,
+      path: [path]
+    });
+  }
+}
+
 function duplicateReviewApprovalKey(
   approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
 ): string | undefined {
@@ -342,6 +369,23 @@ export const appStateSchema = z.object({
   reviewApprovals: z.array(reviewApprovalSchema).default([]),
   reviewDispositions: z.array(reviewDispositionSchema).default([])
 }).superRefine((state, context) => {
+  addDuplicatePersistedValueIssue(context, "languages", "id", state.languages, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);
+  addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "exerciseSubmissions", "id", state.exerciseSubmissions, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "evaluationRuns", "id", state.evaluationRuns, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "governance", "id", state.governance, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "users", "id", state.users, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "aiSessions", "id", state.aiSessions, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "elderCorrections", "id", state.elderCorrections, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "auditEvents", "id", state.auditEvents, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "reviewPolicies", "id", state.reviewPolicies, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
+  addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
+
   const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
   if (duplicateApproval) {
     context.addIssue({
