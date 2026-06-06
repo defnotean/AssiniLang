@@ -1325,6 +1325,14 @@ function addGovernanceIntegrityIssues(
 
     addParseablePersistedDateIssue(context, "governance", record.id, "Governance record effectiveDate", record.effectiveDate);
 
+    if (isBlankPersistedValue(record.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Governance record languageId must not be blank",
+        path: ["governance", record.id]
+      });
+    }
+
     if (!languageIds.has(record.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1333,8 +1341,14 @@ function addGovernanceIntegrityIssues(
       });
     }
 
-    const approver = usersById.get(record.approvedBy);
-    if (!approver || !isGovernanceApproverRole(approver.role)) {
+    const approver = isBlankPersistedValue(record.approvedBy) ? undefined : usersById.get(record.approvedBy);
+    if (isBlankPersistedValue(record.approvedBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Governance record approver must not be blank",
+        path: ["governance", record.id]
+      });
+    } else if (!approver || !isGovernanceApproverRole(approver.role)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Governance record approver is not allowed: ${record.approvedBy}`,

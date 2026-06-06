@@ -1707,9 +1707,19 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestGovernanceRecord({ languageId: "   " }),
+      "Governance record languageId must not be blank"
+    ],
+    [
       "missing language",
       createTestGovernanceRecord({ languageId: "missing-language" }),
       "Governance record references missing language: missing-language"
+    ],
+    [
+      "blank approver",
+      createTestGovernanceRecord({ approvedBy: "   " }),
+      "Governance record approver must not be blank"
     ],
     [
       "unknown approver",

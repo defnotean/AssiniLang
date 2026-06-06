@@ -167,7 +167,7 @@ Allowed approver roles: Elder, lead, admin.
 
 Governance records are synthetic policy notes for local consent, access, and generation workflows. Writes require an existing language ID and a parseable `effectiveDate`, then append an audit event with policy type and effective date metadata.
 
-The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language, keep nonblank policy content, keep a parseable `effectiveDate`, and be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles or carry unusable policy timelines.
+The persisted app-state schema also validates governance records during local JSON reads. Each record must keep a nonblank language ID that references an existing language, keep nonblank policy content, keep a parseable `effectiveDate`, and be attributed to a nonblank known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles or carry unusable policy timelines.
 
 ## Audit Events
 
