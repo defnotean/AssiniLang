@@ -544,6 +544,40 @@ function addLanguageIntegrityIssues(
   }
 }
 
+function addUserIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    users: Array<z.infer<typeof userSchema>>;
+  }
+) {
+  for (const user of state.users) {
+    const userPathId = isBlankPersistedValue(user.id) ? "blank-user" : user.id;
+    if (isBlankPersistedValue(user.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "User id must not be blank",
+        path: ["users", userPathId]
+      });
+    }
+
+    if (isBlankPersistedValue(user.name)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `User name must not be blank: ${userPathId}`,
+        path: ["users", userPathId]
+      });
+    }
+
+    if (user.avatarUrl !== undefined && isBlankPersistedValue(user.avatarUrl)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `User avatarUrl must not be blank: ${userPathId}`,
+        path: ["users", userPathId]
+      });
+    }
+  }
+}
+
 function addCorpusIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -1845,6 +1879,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "evaluationRuns", "id", state.evaluationRuns, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "governance", "id", state.governance, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "users", "id", state.users, (item) => item.id);
+  addUserIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "aiSessions", "id", state.aiSessions, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "elderCorrections", "id", state.elderCorrections, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "auditEvents", "id", state.auditEvents, (item) => item.id);

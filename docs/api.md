@@ -8,7 +8,7 @@ The current auth system is a local prototype. It exists to exercise role-aware w
 
 Some routes can be called anonymously because they expose synthetic public data. Mutating and sensitive read routes require one of the configured local prototype users. The web app opens an HTTP-only prototype session before calling role-gated routes.
 
-Seeded local databases persist the same prototype users used by the API fallback: learner, Elder, reviewer, lead, programmer, and admin. The fallback remains for older local databases that were generated before users were written into `data/local-db.json`.
+Seeded local databases persist the same prototype users used by the API fallback: learner, Elder, reviewer, lead, programmer, and admin. The fallback remains for older local databases that were generated before users were written into `data/local-db.json`. During local JSON reads, restored users must keep nonblank IDs and names, and optional avatar URLs must be nonblank when present.
 
 Do not treat prototype auth as production security.
 

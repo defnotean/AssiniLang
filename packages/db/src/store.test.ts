@@ -581,6 +581,29 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank id",
+      { id: "   " },
+      "User id must not be blank"
+    ],
+    [
+      "blank name",
+      { name: "   " },
+      "User name must not be blank: learner-1"
+    ],
+    [
+      "blank avatar",
+      { avatarUrl: "   " },
+      "User avatarUrl must not be blank: learner-1"
+    ]
+  ])("rejects persisted users with %s", (_caseName, userPatch, errorMessage) => {
+    const state = createEmptyState();
+    state.users = [{ ...LOCAL_PROTOTYPE_USERS[0], ...userPatch }];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
       "note with missing language",
       "notes",
       createTestNote({ languageId: "missing-language" }),
