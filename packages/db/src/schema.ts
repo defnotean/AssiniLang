@@ -506,6 +506,47 @@ function addGovernanceIntegrityIssues(
   }
 }
 
+function addAuditEventIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    auditEvents: Array<z.infer<typeof auditEventSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const languageIds = new Set(state.languages.map((language) => language.id));
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  for (const event of state.auditEvents) {
+    if (event.languageId !== null && !languageIds.has(event.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Audit event references missing language: ${event.languageId}`,
+        path: ["auditEvents", event.id]
+      });
+    }
+
+    const actor = usersById.get(event.actorId);
+    if (!actor) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Audit event references unknown actor: ${event.actorId}`,
+        path: ["auditEvents", event.id]
+      });
+      continue;
+    }
+
+    if (event.actorRole !== actor.role) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Audit event actorRole ${event.actorRole} does not match actor ${event.actorId} role ${actor.role}`,
+        path: ["auditEvents", event.id]
+      });
+    }
+  }
+}
+
 function addReviewApprovalIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -785,6 +826,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addExerciseSubmissionIntegrityIssues(context, state);
   addGovernanceIntegrityIssues(context, state);
+  addAuditEventIntegrityIssues(context, state);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);

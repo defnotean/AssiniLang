@@ -13,6 +13,7 @@ import {
   reviewApprovalSchema,
   reviewDispositionSchema,
   reviewPolicySchema,
+  type AuditEvent,
   type CorpusPassage,
   type ElderCorrection,
   type Exercise,
@@ -158,6 +159,22 @@ function createTestGovernanceRecord(overrides: Partial<GovernanceRecord> = {}): 
     content: "Synthetic generation policy for local testing.",
     effectiveDate: "2026-06-06",
     approvedBy: "lead-1",
+    ...overrides
+  };
+}
+
+function createTestAuditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
+  return {
+    id: "audit-test-1",
+    at: "2026-06-06T00:00:00.000Z",
+    actorId: "lead-1",
+    actorRole: "lead",
+    action: "governance_record.created",
+    entityType: "governance_record",
+    entityId: "governance-1",
+    languageId: "avenik",
+    summary: "Created synthetic governance record.",
+    metadata: { policyType: "generation" },
     ...overrides
   };
 }
@@ -608,6 +625,31 @@ describe("JsonStore", () => {
     state.languages = [createTestLanguage()];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
     state.governance = [record];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing non-null language",
+      createTestAuditEvent({ languageId: "missing-language" }),
+      "Audit event references missing language: missing-language"
+    ],
+    [
+      "unknown actor",
+      createTestAuditEvent({ actorId: "missing-user" }),
+      "Audit event references unknown actor: missing-user"
+    ],
+    [
+      "actor role mismatch",
+      createTestAuditEvent({ actorRole: "admin" }),
+      "Audit event actorRole admin does not match actor lead-1 role lead"
+    ]
+  ])("rejects persisted audit events with %s", (_caseName, event, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.auditEvents = [event];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });

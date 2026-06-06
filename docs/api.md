@@ -160,6 +160,14 @@ Governance records are synthetic policy notes for local consent, access, and gen
 
 The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language and must be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles.
 
+## Audit Events
+
+`GET /audit/events`
+
+Allowed reader roles: lead, admin, programmer.
+
+Audit events are written by mutation routes and derive `actorId` plus `actorRole` from the same resolved local user. During local JSON reads, persisted audit events must keep that actor attribution consistent, and any non-null `languageId` must reference an existing language. `languageId: null` remains valid for global or provider-level events.
+
 ## Note Review
 
 `PATCH /notes/:noteId/review`
