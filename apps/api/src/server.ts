@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
   JsonStore,
+  LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
   type AuditEvent,
   type AiMessage,
@@ -144,14 +145,6 @@ const PROTOTYPE_AUTH_ROLES: readonly UserRole[] = ["learner", "elder", "programm
 const REVIEW_POLICY_ASSIGNABLE_ROLES: readonly UserRole[] = ["reviewer", "elder", "lead", "admin"];
 const REVIEW_DISPOSITION_STATUSES: readonly ReviewDispositionStatus[] = ["contested", "rejected", "deferred", "escalated"];
 const DEFAULT_RATE_LIMIT: RateLimitOptions = { max: 120, windowMs: 60_000 };
-const DEFAULT_LOCAL_USERS: User[] = [
-  { id: "learner-1", name: "Local Learner", role: "learner" },
-  { id: "elder-1", name: "Local Elder", role: "elder" },
-  { id: "programmer-1", name: "Local Programmer", role: "programmer" },
-  { id: "reviewer-1", name: "Local Reviewer", role: "reviewer" },
-  { id: "lead-1", name: "Local Lead", role: "lead" },
-  { id: "admin-1", name: "Local Admin", role: "admin" }
-];
 const RATE_LIMITED_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
 const AI_SESSION_MODES: AiSessionMode[] = ["learner_practice", "elder_review", "programmer_debug"];
 const EXERCISE_TYPES: readonly Exercise["type"][] = [
@@ -957,7 +950,7 @@ function getBearerToken(request: FastifyRequest): string | undefined {
 }
 
 function usersForState(state: AppState): User[] {
-  return state.users.length > 0 ? state.users : DEFAULT_LOCAL_USERS;
+  return state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
 }
 
 function actorById(state: AppState, userId: string | undefined): User | undefined {

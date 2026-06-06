@@ -58,6 +58,23 @@ describe("synthetic language fixtures", () => {
     }
   });
 
+  it("seeds local prototype users referenced by review policies", () => {
+    const state = buildSeedState();
+    const usersById = new Map(state.users.map((user) => [user.id, user]));
+
+    expect(state.users.map((user) => user.id).sort()).toEqual([
+      "admin-1",
+      "elder-1",
+      "lead-1",
+      "learner-1",
+      "programmer-1",
+      "reviewer-1"
+    ]);
+    expect(usersById.get("reviewer-1")?.role).toBe("reviewer");
+    expect(usersById.get("elder-1")?.role).toBe("elder");
+    expect(state.reviewPolicies.flatMap((policy) => policy.assignedReviewerIds).every((userId) => usersById.has(userId))).toBe(true);
+  });
+
   it("provides structured phonology and paradigm metadata for every synthetic language", () => {
     for (const fixture of syntheticLanguageFixtures) {
       expect(fixture.phonology.consonants.length, `${fixture.language.id} consonant inventory`).toBeGreaterThanOrEqual(6);

@@ -419,6 +419,15 @@ export type EvaluationFailure = z.infer<typeof evaluationFailureSchema>;
 export type EvaluationRun = z.infer<typeof evaluationRunSchema>;
 export type AppState = z.infer<typeof appStateSchema>;
 
+export const LOCAL_PROTOTYPE_USERS: User[] = [
+  { id: "learner-1", name: "Local Learner", role: "learner" },
+  { id: "elder-1", name: "Local Elder", role: "elder" },
+  { id: "programmer-1", name: "Local Programmer", role: "programmer" },
+  { id: "reviewer-1", name: "Local Reviewer", role: "reviewer" },
+  { id: "lead-1", name: "Local Lead", role: "lead" },
+  { id: "admin-1", name: "Local Admin", role: "admin" }
+];
+
 const legacyAppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
   languages: z.array(languageSchema),

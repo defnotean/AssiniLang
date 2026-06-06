@@ -2,6 +2,7 @@ import {
   appStateSchema,
   corpusPassageToAnswerKey,
   createEmptyState,
+  LOCAL_PROTOTYPE_USERS,
   type AppState,
   type CorpusPassage,
   type Exercise,
@@ -66,6 +67,7 @@ export function buildSeedState(fixtures: SyntheticLanguageFixture[] = syntheticL
 
   const state = createEmptyState();
   state.corpusAnswerKeys = [];
+  state.users.push(...LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user })));
   for (const fixture of fixtures) {
     const corpus = fixture.corpus.map(cloneCorpusPassage);
     const reviewPolicy: ReviewPolicy = {
