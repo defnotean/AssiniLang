@@ -53,7 +53,7 @@ The review queue shows generated draft notes beside their status, confidence, ev
 - Contest, reject, defer, or escalate notes with required comments.
 - Edit a note explanation through server-side substantive-explanation validation.
 
-Per-language review policies can require assigned reviewers and approval thresholds. When a threshold is greater than one, a note remains `under_review` until enough assigned reviewers approve it.
+Per-language review policies can require assigned reviewers and approval thresholds. When a threshold is greater than one, a note remains `under_review` until enough approvals are recorded. Assigned-reviewer policies bound the threshold to assigned reviewers; open-reviewer policies bound it to the current assignable reviewer pool.
 
 ### Learning Lab
 

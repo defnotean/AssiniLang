@@ -146,6 +146,8 @@ Reviewers can update note status and explanations. Contested, rejected, deferred
 
 Approval can be controlled by per-language review policies. If a policy requires multiple approvals, the note remains `under_review` until the threshold is met.
 
+Review-policy updates require at least one assigned reviewer. Assigned reviewer IDs must be unique and must reference users with assignable review roles. When `requiresAssignedReviewer` is true, `approvalThreshold` cannot exceed assigned reviewers. When it is false, `approvalThreshold` cannot exceed the current assignable reviewer pool.
+
 ## Sanitized Exports
 
 Language snapshots and evaluation artifacts include SHA-256 integrity manifests. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.

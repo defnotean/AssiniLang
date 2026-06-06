@@ -840,6 +840,36 @@ describe("api server", () => {
     ]));
   });
 
+  it("rejects review policies with impossible open reviewer quorum thresholds without mutation", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({
+      method: "GET",
+      url: "/languages/avenik/review-policy",
+      headers: authHeaders("lead-1")
+    });
+
+    const response = await app.inject({
+      method: "PUT",
+      url: "/languages/avenik/review-policy",
+      headers: authHeaders("lead-1"),
+      payload: {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 5,
+        requiresAssignedReviewer: false
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Review policy approvalThreshold cannot exceed assignable reviewers" });
+
+    const after = await app.inject({
+      method: "GET",
+      url: "/languages/avenik/review-policy",
+      headers: authHeaders("lead-1")
+    });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it("clears pending approval quorum when a note is deferred", async () => {
     const app = createServer({ initialState: stateWithAuthUsers() });
 

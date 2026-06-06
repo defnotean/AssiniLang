@@ -605,6 +605,15 @@ function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): s
     return "Review policy approvalThreshold cannot exceed assigned reviewers";
   }
 
+  if (!body.requiresAssignedReviewer) {
+    const assignableReviewerCount = [...assignableUsers.values()]
+      .filter((user) => REVIEW_POLICY_ASSIGNABLE_ROLES.includes(user.role))
+      .length;
+    if (body.approvalThreshold > assignableReviewerCount) {
+      return "Review policy approvalThreshold cannot exceed assignable reviewers";
+    }
+  }
+
   return undefined;
 }
 
