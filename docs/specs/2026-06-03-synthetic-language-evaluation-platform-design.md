@@ -149,7 +149,7 @@ Shows public phonology, dialect variants, paradigm tables, grammar rules, vocabu
 
 ### Corpus Browser
 
-Shows synthetic corpus passages for a selected language. Each passage displays target text, translation, segmentation, tags, and provenance metadata.
+Shows synthetic corpus passages for a selected language. Each passage displays target text, translation, segmentation, tags, and provenance metadata. Authorized reviewers can import new synthetic passages through the browser with source metadata, synthetic consent status, topic tags, and structured morpheme segmentation that is validated by the API before persistence.
 
 ### Note Review Queue
 

@@ -222,6 +222,7 @@ export type ElderCorrectionApplyResult = {
 
 export type GovernancePayload = Pick<GovernanceRecord, "languageId" | "policyType" | "content" | "effectiveDate">;
 export type ReviewPolicyPayload = Pick<ReviewPolicy, "assignedReviewerIds" | "approvalThreshold" | "requiresAssignedReviewer">;
+export type CorpusImportPayload = Omit<CorpusPassage, "id" | "languageId">;
 export type ExerciseAuthoringPayload = Pick<
   Exercise,
   "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
@@ -501,6 +502,21 @@ export async function createExercise(
   await assertOk(response, "Exercise authoring failed");
 
   return response.json() as Promise<PublicExercise>;
+}
+
+export async function importCorpusPassage(
+  languageId: string,
+  payload: CorpusImportPayload
+): Promise<CorpusPassage> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/corpus`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Corpus import failed");
+
+  return response.json() as Promise<CorpusPassage>;
 }
 
 export async function fetchElderContext(languageId: string): Promise<ElderContext> {

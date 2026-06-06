@@ -11,6 +11,7 @@ import {
   fetchReviewDispositions,
   generateDraftNotes,
   createExercise,
+  importCorpusPassage,
   createGovernanceRecord,
   updateReviewPolicy,
   resolveReviewDisposition,
@@ -127,6 +128,46 @@ describe("fetchDashboardData", () => {
 
     expectPrototypeSession(fetchMock, "reviewer-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/exercises", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify(payload)
+    });
+  });
+
+  it("opens a reviewer prototype session before importing encoded corpus passages", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ id: "imported-corpus-avenik-2" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      source: "synthetic-field-lab",
+      sourceMetadata: {
+        author: "reviewer-1",
+        year: 2026,
+        license: "synthetic-only",
+        consentRecord: "local-review"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river near the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "river", gloss: "river", features: ["noun"] },
+        { surface: "lumo-ke", lemma: "practice mat", gloss: "mat-near", features: ["locative"] },
+        { surface: "talo-mi-na", lemma: "walk", gloss: "walk-present-1sg", features: ["present", "1sg"] }
+      ],
+      topicTags: ["movement", "locative"],
+      consentStatus: {
+        use: "synthetic-testing-only" as const,
+        restrictions: ["synthetic-only"]
+      }
+    };
+
+    await importCorpusPassage("avenik/test language", payload);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/corpus", {
       method: "POST",
       ...jsonRequest,
       body: JSON.stringify(payload)

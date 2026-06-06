@@ -234,7 +234,7 @@ The web app includes:
 
 - Language selector.
 - Language Profile with phonology, dialect variant, paradigm, grammar-rule, and vocabulary inventories.
-- Corpus Browser.
+- Corpus Browser with reviewer corpus-import controls for provenance, consent, topic tags, and morpheme segmentation.
 - Note Review Queue with server-validated explanation editing plus approve, contest, reject, defer, and escalate actions.
 - Evaluation Dashboard with latest score cards, regression trend cards, and downloadable sanitized evaluation artifacts.
 - Learner Exercise Preview with server-side answer grading and compact exercise authoring controls.
@@ -274,7 +274,6 @@ The fixture data is currently written in TypeScript.
 
 Next steps:
 
-- Add web controls for corpus import.
 - Expand the note editor beyond review-queue explanation edits.
 - Expand web exercise authoring beyond compact single-probe controls.
 - Expand validation before saving beyond note explanation edits.

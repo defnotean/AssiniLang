@@ -21,6 +21,7 @@ const apiMock = vi.hoisted(() => ({
   fetchReviewDispositions: vi.fn(),
   fetchReviewPolicy: vi.fn(),
   generateDraftNotes: vi.fn(),
+  importCorpusPassage: vi.fn(),
   resolveReviewDisposition: vi.fn(),
   reviewElderCorrection: vi.fn(),
   runEvaluation: vi.fn(),
@@ -563,6 +564,108 @@ describe("App", () => {
     expect(screen.getByText("river")).toBeInTheDocument();
     expect(screen.getByText("talo")).toBeInTheDocument();
     expect(screen.getByText("walk")).toBeInTheDocument();
+  });
+
+  it("imports corpus passages from the Corpus Browser and refreshes the source list", async () => {
+    const initialData = createDashboardData();
+    const createdPassage = {
+      id: "imported-corpus-avenik-2",
+      languageId: "avenik",
+      source: "synthetic-field-lab",
+      sourceMetadata: {
+        author: "reviewer-1",
+        year: 2026,
+        license: "synthetic-only",
+        consentRecord: "local-review"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river near the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "river", gloss: "river", features: ["noun"] },
+        { surface: "lumo-ke", lemma: "practice mat", gloss: "mat-near", features: ["locative"] },
+        { surface: "talo-mi-na", lemma: "walk", gloss: "walk-present-1sg", features: ["present", "1sg"] }
+      ],
+      topicTags: ["movement", "locative"],
+      consentStatus: {
+        use: "synthetic-testing-only" as const,
+        restrictions: ["synthetic-only"]
+      }
+    };
+
+    apiMock.fetchDashboardData
+      .mockResolvedValueOnce(initialData)
+      .mockResolvedValueOnce({
+        ...initialData,
+        corpus: [...initialData.corpus, createdPassage]
+      });
+    apiMock.importCorpusPassage.mockResolvedValue(createdPassage);
+
+    render(<App />);
+    await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+
+    fireEvent.change(screen.getByLabelText("Corpus target text"), {
+      target: { value: "mira lumo-ke talo-mi-na" }
+    });
+    fireEvent.change(screen.getByLabelText("English translation"), {
+      target: { value: "I walk by the river near the practice mat." }
+    });
+    fireEvent.change(screen.getByLabelText("Source"), {
+      target: { value: "synthetic-field-lab" }
+    });
+    fireEvent.change(screen.getByLabelText("Author"), {
+      target: { value: "reviewer-1" }
+    });
+    fireEvent.change(screen.getByLabelText("Year"), {
+      target: { value: "2026" }
+    });
+    fireEvent.change(screen.getByLabelText("License"), {
+      target: { value: "synthetic-only" }
+    });
+    fireEvent.change(screen.getByLabelText("Consent record"), {
+      target: { value: "local-review" }
+    });
+    fireEvent.change(screen.getByLabelText("Topic tags"), {
+      target: { value: "movement, locative" }
+    });
+    fireEvent.change(screen.getByLabelText("Morpheme segmentation"), {
+      target: {
+        value: [
+          "mira | river | river | noun",
+          "lumo-ke | practice mat | mat-near | locative",
+          "talo-mi-na | walk | walk-present-1sg | present, 1sg"
+        ].join("\n")
+      }
+    });
+    fireEvent.change(screen.getByLabelText("Access restrictions"), {
+      target: { value: "synthetic-only" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import passage" }));
+
+    await waitFor(() => expect(apiMock.importCorpusPassage).toHaveBeenCalledWith("avenik", {
+      source: "synthetic-field-lab",
+      sourceMetadata: {
+        author: "reviewer-1",
+        year: 2026,
+        license: "synthetic-only",
+        consentRecord: "local-review"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river near the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "river", gloss: "river", features: ["noun"] },
+        { surface: "lumo-ke", lemma: "practice mat", gloss: "mat-near", features: ["locative"] },
+        { surface: "talo-mi-na", lemma: "walk", gloss: "walk-present-1sg", features: ["present", "1sg"] }
+      ],
+      topicTags: ["movement", "locative"],
+      consentStatus: {
+        use: "synthetic-testing-only",
+        restrictions: ["synthetic-only"]
+      }
+    }));
+    expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
+    expect(await screen.findByText("Corpus passage imported.")).toBeInTheDocument();
+    expect(await screen.findByText("mira lumo-ke talo-mi-na")).toBeInTheDocument();
+    expect(screen.getByText("2 of 2 passages")).toBeInTheDocument();
   });
 
   it("announces loading state through a live status region", async () => {

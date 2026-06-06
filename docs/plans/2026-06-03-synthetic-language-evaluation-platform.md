@@ -2523,7 +2523,7 @@ Open `http://127.0.0.1:5173` and verify:
 
 - The page title reads `Synthetic Language Evaluation`.
 - Four language buttons are visible.
-- Corpus Browser shows target text, translations, and segmentation.
+- Corpus Browser shows target text, translations, segmentation, and a validated synthetic passage import flow.
 - Note Review Queue shows notes with status and confidence.
 - Evaluation Dashboard updates after pressing `Run Evaluation`.
 - Learner Exercise Preview grades a correct answer.

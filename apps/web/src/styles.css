@@ -804,6 +804,32 @@ label,
   flex-direction: column;
 }
 
+.corpus-import-form {
+  flex: 0 0 auto;
+  margin-bottom: 0.86rem;
+}
+
+.corpus-import-form h3 {
+  margin: 0.14rem 0 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.corpus-import-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.64rem;
+}
+
+.corpus-import-grid .wide {
+  grid-column: span 2;
+}
+
+.corpus-import-form textarea {
+  min-height: 4.4rem;
+}
+
 .corpus-list {
   display: flex;
   flex-direction: column;
@@ -2056,6 +2082,10 @@ label,
     grid-template-columns: 1fr;
   }
 
+  .corpus-import-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .view-container {
     min-height: 36rem;
     overflow: visible;
@@ -2094,8 +2124,13 @@ label,
 
   .stat-strip,
   .eval-language-grid,
-  .detail-grid {
+  .detail-grid,
+  .corpus-import-grid {
     grid-template-columns: 1fr;
+  }
+
+  .corpus-import-grid .wide {
+    grid-column: auto;
   }
 
   .toolbar-row,
