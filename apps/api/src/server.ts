@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
   AI_SESSION_MODE_ROLES,
+  corpusPassageToAnswerKey,
   ELDER_CORRECTION_MUTATION_ROLES,
   EXERCISE_SUBMISSION_ACTOR_ROLES,
   GOVERNANCE_APPROVER_ROLES,
@@ -1522,7 +1523,8 @@ export function createServer(options: ServerOptions = {}) {
 
       return appendAuditEvent({
         ...state,
-        corpus: [...state.corpus, passage]
+        corpus: [...state.corpus, passage],
+        corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
       }, {
         actor,
         at: importedAt,

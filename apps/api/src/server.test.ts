@@ -248,7 +248,10 @@ describe("api server", () => {
   });
 
   it("imports validated corpus passages with provenance and audit metadata", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(stateWithAuthUsers());
+    const app = createServer({ store });
 
     const response = await app.inject({
       method: "POST",
@@ -294,6 +297,21 @@ describe("api server", () => {
       expect.objectContaining({
         id: response.json().id,
         textTarget: "mira lumo-ke talo-mi-na"
+      })
+    ]));
+
+    const persisted = await store.read();
+    expect(persisted.corpusAnswerKeys).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        passageId: response.json().id,
+        languageId: "avenik",
+        textTarget: "mira lumo-ke talo-mi-na",
+        textTranslation: "I walk by the river at the practice mat.",
+        morphologicalSegmentation: [
+          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
+          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ]
       })
     ]));
 

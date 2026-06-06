@@ -51,7 +51,7 @@ The shared orthography scanner is exported so fixture validation and live API im
 
 The generated local database lives at `data/local-db.json`. `JsonStore` writes through a temporary file and rename so normal writes are atomic.
 
-Persisted top-level records must keep stable unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by source passage ID.
+Persisted top-level records must keep stable unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by source passage ID and must point at an existing same-language corpus passage.
 
 Seeded local databases include the six prototype users used by the web console and review policies: learner, Elder, reviewer, lead, programmer, and admin. The API still falls back to the same shared prototype-user list when reading older local databases with an empty `users` array.
 
@@ -75,6 +75,8 @@ The state separates mutable review records from immutable answer keys:
 - `corpusAnswerKeys` preserve expected corpus segmentation for evaluation.
 
 This matters because the system must not evaluate itself against whatever a reviewer last edited.
+
+Seeded fixtures derive corpus answer keys from each seeded corpus passage. Live corpus imports do the same after validation, storing the imported passage publicly while adding a private answer key for evaluation. Persisted app-state reads reject corpus answer keys that reference missing passages or carry a different language ID than the passage they key.
 
 Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
 
@@ -135,7 +137,7 @@ The API rejects imports when:
 - A morpheme is not grounded by the selected language vocabulary surface or lemma.
 - Synthetic consent metadata is missing or not `synthetic-testing-only`.
 
-Successful imports append the passage and write an audit event with source, morpheme count, tag count, consent-use label, and restriction count.
+Successful imports append the passage, derive a private corpus answer key from the validated text/translation/segmentation, and write an audit event with source, morpheme count, tag count, consent-use label, and restriction count.
 
 ## Evaluation Harness
 

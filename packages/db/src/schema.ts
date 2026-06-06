@@ -389,6 +389,36 @@ function addDuplicatePersistedValueIssue<T>(
   }
 }
 
+function addCorpusAnswerKeyIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    corpusAnswerKeys?: Array<z.infer<typeof corpusAnswerKeySchema>>;
+  }
+) {
+  const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
+
+  for (const answerKey of state.corpusAnswerKeys ?? []) {
+    const passage = passagesById.get(answerKey.passageId);
+    if (!passage) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus answer key references missing passage: ${answerKey.passageId}`,
+        path: ["corpusAnswerKeys", answerKey.passageId]
+      });
+      continue;
+    }
+
+    if (answerKey.languageId !== passage.languageId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus answer key language ${answerKey.languageId} does not match passage ${answerKey.passageId} language ${passage.languageId}`,
+        path: ["corpusAnswerKeys", answerKey.passageId]
+      });
+    }
+  }
+}
+
 function addReviewPolicyIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -925,6 +955,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "languages", "id", state.languages, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);
+  addCorpusAnswerKeyIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);

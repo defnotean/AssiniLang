@@ -15,6 +15,7 @@ import {
   reviewPolicySchema,
   type AuditEvent,
   type AiSession,
+  type CorpusAnswerKey,
   type CorpusPassage,
   type ElderCorrection,
   type EvaluationRun,
@@ -94,6 +95,21 @@ function createTestCorpusPassage(overrides: Partial<CorpusPassage> = {}): Corpus
       use: "synthetic-testing-only",
       restrictions: ["unit-test"]
     },
+    ...overrides
+  };
+}
+
+function createTestCorpusAnswerKey(overrides: Partial<CorpusAnswerKey> = {}): CorpusAnswerKey {
+  const passage = createTestCorpusPassage();
+  return {
+    passageId: passage.id,
+    languageId: passage.languageId,
+    textTarget: passage.textTarget,
+    textTranslation: passage.textTranslation,
+    morphologicalSegmentation: passage.morphologicalSegmentation.map((morpheme) => ({
+      ...morpheme,
+      features: [...morpheme.features]
+    })),
     ...overrides
   };
 }
@@ -509,6 +525,25 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate persisted id in notes: note-1");
+  });
+
+  it.each([
+    [
+      "missing passage",
+      createTestCorpusAnswerKey({ passageId: "missing-passage" }),
+      "Corpus answer key references missing passage: missing-passage"
+    ],
+    [
+      "passage language mismatch",
+      createTestCorpusAnswerKey({ languageId: "solari" }),
+      "Corpus answer key language solari does not match passage passage-1 language avenik"
+    ]
+  ])("rejects persisted corpus answer keys with %s", (_caseName, answerKey, errorMessage) => {
+    const state = createEmptyState();
+    state.corpus = [createTestCorpusPassage()];
+    state.corpusAnswerKeys = [answerKey];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it.each([

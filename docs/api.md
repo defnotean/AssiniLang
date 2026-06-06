@@ -66,7 +66,7 @@ Do not treat prototype auth as production security.
 
 Allowed roles: reviewer, lead, admin.
 
-The route imports one synthetic corpus passage after validating provenance, synthetic consent, segmentation, duplicate target text, target-language phonology, and vocabulary grounding.
+The route imports one synthetic corpus passage after validating provenance, synthetic consent, segmentation, duplicate target text, target-language phonology, and vocabulary grounding. The response returns only the public corpus passage, but the server also stores a private corpus answer key derived from the validated target text, translation, and segmentation.
 
 Example body:
 
@@ -120,7 +120,7 @@ Important validation:
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.
 - Duplicate target text is rejected per language.
 
-Successful imports create a `corpus.imported` audit event.
+Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
 
 ## Exercise Authoring
 
