@@ -1373,6 +1373,15 @@ describe("JsonStore", () => {
       "Review policy references unknown reviewer: missing-reviewer"
     ],
     [
+      "blank assigned reviewer",
+      {
+        assignedReviewerIds: ["reviewer-1", "   "],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      },
+      "Review policy assigned reviewer must not be blank"
+    ],
+    [
       "unassignable learner reviewer",
       {
         assignedReviewerIds: ["reviewer-1", "learner-1"],
@@ -1408,6 +1417,16 @@ describe("JsonStore", () => {
         updatedAt: "not-a-date"
       },
       "Review policy updatedAt must be parseable: not-a-date"
+    ],
+    [
+      "blank updater",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedBy: "   "
+      },
+      "Review policy updatedBy must not be blank"
     ],
     [
       "unknown updater",

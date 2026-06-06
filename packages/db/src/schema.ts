@@ -1171,6 +1171,14 @@ function addReviewPolicyIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(policy.updatedBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review policy updatedBy must not be blank",
+        path: ["reviewPolicies", policy.id]
+      });
+    }
+
     const updater = usersById.get(policy.updatedBy);
     if (!reviewPolicySystemUpdaterIds.has(policy.updatedBy) && (!updater || !isReviewPolicyUpdaterRole(updater.role))) {
       context.addIssue({
@@ -1191,6 +1199,15 @@ function addReviewPolicyIntegrityIssues(
     }
 
     for (const reviewerId of policy.assignedReviewerIds) {
+      if (isBlankPersistedValue(reviewerId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Review policy assigned reviewer must not be blank",
+          path: ["reviewPolicies", policy.id]
+        });
+        continue;
+      }
+
       const reviewer = usersById.get(reviewerId);
       if (!reviewer) {
         context.addIssue({
