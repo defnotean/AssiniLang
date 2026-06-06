@@ -1615,6 +1615,30 @@ function addElderCorrectionIntegrityIssues(
   };
 
   for (const correction of state.elderCorrections) {
+    if (isBlankPersistedValue(correction.correction)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Elder correction text must not be blank",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
+    if (isBlankPersistedValue(correction.rationale)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Elder correction rationale must not be blank",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
+    if (correction.contextText !== undefined && isBlankPersistedValue(correction.contextText)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Elder correction contextText must not be blank",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
     if (!languageIds.has(correction.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

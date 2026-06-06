@@ -1768,6 +1768,21 @@ describe("JsonStore", () => {
       "Elder correction language solari does not match passage passage-1 language avenik"
     ],
     [
+      "blank correction",
+      createTestElderCorrection({ correction: "   " }),
+      "Elder correction text must not be blank"
+    ],
+    [
+      "blank rationale",
+      createTestElderCorrection({ rationale: "   " }),
+      "Elder correction rationale must not be blank"
+    ],
+    [
+      "blank custom context",
+      createTestElderCorrection({ noteId: undefined, contextText: "   " }),
+      "Elder correction contextText must not be blank"
+    ],
+    [
       "unknown proposer",
       createTestElderCorrection({ proposedBy: "missing-user" }),
       "Elder correction proposer is not allowed: missing-user"
