@@ -1004,6 +1004,22 @@ function addExerciseSubmissionIntegrityIssues(
   const exercisesById = new Map(state.exercises.map((exercise) => [exercise.id, exercise]));
 
   for (const submission of state.exerciseSubmissions) {
+    if (isBlankPersistedValue(submission.answer)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exercise submission answer must not be blank",
+        path: ["exerciseSubmissions", submission.id]
+      });
+    }
+
+    if (isBlankPersistedValue(submission.explanation)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exercise submission explanation must not be blank",
+        path: ["exerciseSubmissions", submission.id]
+      });
+    }
+
     addParseablePersistedDateIssue(context, "exerciseSubmissions", submission.id, "Exercise submission submittedAt", submission.submittedAt);
 
     const exercise = exercisesById.get(submission.exerciseId);

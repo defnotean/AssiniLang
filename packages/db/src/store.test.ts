@@ -1266,6 +1266,16 @@ describe("JsonStore", () => {
       "Exercise submission submittedAt must be parseable: not-a-date"
     ],
     [
+      "blank answer",
+      createTestSubmission({ answer: "   " }),
+      "Exercise submission answer must not be blank"
+    ],
+    [
+      "blank explanation",
+      createTestSubmission({ explanation: "   " }),
+      "Exercise submission explanation must not be blank"
+    ],
+    [
       "unknown learner actor",
       createTestSubmission({ learnerId: "missing-user" }),
       "Exercise submission learner is not allowed: missing-user"

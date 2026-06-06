@@ -84,7 +84,7 @@ Persisted notes and note answer keys must reference existing synthetic languages
 
 Persisted exercises must reference an existing synthetic language, keep nonblank duplicate-free allowed rule IDs, allowed vocabulary, expected answers, and adversarial probes after whitespace normalization, require nonblank adversarial reasons, retain at least two adversarial probes, avoid adversarial answers that duplicate expected answers, keep translate-to-target expected answers present in same-language corpus text, and keep choose-particle expected answers inside the exercise's allowed vocabulary. Fixture-level rule and vocabulary existence checks stay in `packages/synthetic-langs` and the live API authoring route because the DB package deliberately has no dependency on fixture metadata.
 
-Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, keep a parseable submission timestamp, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
+Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, keep nonblank private answer and grading-explanation text, keep a parseable submission timestamp, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
 
 ## Public Projection Layer
 
