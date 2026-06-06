@@ -107,6 +107,26 @@ describe("synthetic fixture validation module", () => {
     );
   });
 
+  it("rejects duplicate vocabulary ids, forms, and tags", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.vocabulary.push({
+      ...avenik.vocabulary[0],
+      form: "  talo  ",
+      tags: ["motion", "verb", "motion"]
+    });
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik has duplicate vocabulary id avn-v-001",
+        "avenik vocabulary form is duplicated: talo",
+        "avenik vocabulary item avn-v-001 tag is duplicated: motion"
+      ])
+    );
+  });
+
   it("rejects duplicate corpus topic tags and morpheme features after normalization", () => {
     const brokenFixtures = cloneFixtures();
     const avenik = brokenFixtures[0];

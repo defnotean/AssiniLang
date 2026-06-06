@@ -197,8 +197,12 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const exerciseIds = fixture.exercisesAnswerKey.map((exercise) => exercise.id);
     const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
     const corpusTargets = new Set(fixture.corpus.map((passage) => normalizedText(passage.textTarget)));
+    const vocabularyIds = fixture.vocabulary.map((item) => item.id);
+    const vocabularyFormsList = fixture.vocabulary.map((item) => item.form);
 
     addFixtureRichnessDiagnostics(fixture, diagnostics);
+    addDuplicateDiagnostics(vocabularyIds, `${languageId} has duplicate vocabulary id`, diagnostics);
+    addDuplicateNormalizedDiagnostics(vocabularyFormsList, `${languageId} vocabulary form is duplicated:`, diagnostics);
     addDuplicateDiagnostics(corpusIds, `${languageId} has duplicate corpus id`, diagnostics);
     addDuplicateDiagnostics(ruleIds, `${languageId} has duplicate grammar rule id`, diagnostics);
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);
@@ -211,6 +215,11 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
         vocabularyItem.form,
         fixture,
         `${languageId} vocabulary form ${vocabularyItem.form}`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        vocabularyItem.tags,
+        `${languageId} vocabulary item ${vocabularyItem.id} tag is duplicated:`,
         diagnostics
       );
     }
