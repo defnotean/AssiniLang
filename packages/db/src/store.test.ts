@@ -17,10 +17,25 @@ import {
   type ElderCorrection,
   type Exercise,
   type ExerciseSubmission,
+  type GovernanceRecord,
+  type Language,
   type Note,
   type ReviewDisposition,
   userRoleSchema
 } from "./schema";
+
+function createTestLanguage(overrides: Partial<Language> = {}): Language {
+  return {
+    id: "avenik",
+    name: "Avenik",
+    typology: "agglutinative",
+    description: "Synthetic test language.",
+    orthography: "Latin synthetic orthography",
+    status: "synthetic",
+    fixtureSource: "unit-test",
+    ...overrides
+  };
+}
 
 function createTestNote(overrides: Partial<Note> = {}): Note {
   return {
@@ -131,6 +146,18 @@ function createTestSubmission(overrides: Partial<ExerciseSubmission> = {}): Exer
     explanation: "Accepted answer matches the synthetic exercise key.",
     submittedAt: "2026-06-06T00:00:00.000Z",
     learnerId: "learner-1",
+    ...overrides
+  };
+}
+
+function createTestGovernanceRecord(overrides: Partial<GovernanceRecord> = {}): GovernanceRecord {
+  return {
+    id: "governance-1",
+    languageId: "avenik",
+    policyType: "generation",
+    content: "Synthetic generation policy for local testing.",
+    effectiveDate: "2026-06-06",
+    approvedBy: "lead-1",
     ...overrides
   };
 }
@@ -556,6 +583,31 @@ describe("JsonStore", () => {
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
     state.exercises = [createTestExercise()];
     state.exerciseSubmissions = [submission];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing language",
+      createTestGovernanceRecord({ languageId: "missing-language" }),
+      "Governance record references missing language: missing-language"
+    ],
+    [
+      "unknown approver",
+      createTestGovernanceRecord({ approvedBy: "missing-user" }),
+      "Governance record approver is not allowed: missing-user"
+    ],
+    [
+      "unallowed approver role",
+      createTestGovernanceRecord({ approvedBy: "reviewer-1" }),
+      "Governance record approver is not allowed: reviewer-1"
+    ]
+  ])("rejects persisted governance records with %s", (_caseName, record, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.governance = [record];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });

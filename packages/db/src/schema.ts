@@ -165,6 +165,13 @@ export function isExerciseSubmissionActorRole(role: z.infer<typeof userRoleSchem
   return exerciseSubmissionActorRoleSet.has(role);
 }
 
+export const GOVERNANCE_APPROVER_ROLES = ["elder", "lead", "admin"] as const;
+const governanceApproverRoleSet = new Set<string>(GOVERNANCE_APPROVER_ROLES);
+
+export function isGovernanceApproverRole(role: z.infer<typeof userRoleSchema>): boolean {
+  return governanceApproverRoleSet.has(role);
+}
+
 export const LOCAL_PROTOTYPE_USERS = z.array(userSchema).parse([
   { id: "learner-1", name: "Local Learner", role: "learner" },
   { id: "elder-1", name: "Local Elder", role: "elder" },
@@ -467,6 +474,38 @@ function addExerciseSubmissionIntegrityIssues(
   }
 }
 
+function addGovernanceIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    governance: Array<z.infer<typeof governanceRecordSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const languageIds = new Set(state.languages.map((language) => language.id));
+  const usersById = new Map(users.map((user) => [user.id, user]));
+
+  for (const record of state.governance) {
+    if (!languageIds.has(record.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Governance record references missing language: ${record.languageId}`,
+        path: ["governance", record.id]
+      });
+    }
+
+    const approver = usersById.get(record.approvedBy);
+    if (!approver || !isGovernanceApproverRole(approver.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Governance record approver is not allowed: ${record.approvedBy}`,
+        path: ["governance", record.id]
+      });
+    }
+  }
+}
+
 function addReviewApprovalIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -745,6 +784,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addExerciseSubmissionIntegrityIssues(context, state);
+  addGovernanceIntegrityIssues(context, state);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);
