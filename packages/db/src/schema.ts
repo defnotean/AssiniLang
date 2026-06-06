@@ -462,6 +462,89 @@ function addReviewApprovalIntegrityIssues(
   }
 }
 
+function addReviewDispositionIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    notes: Array<z.infer<typeof noteSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    reviewDispositions: Array<z.infer<typeof reviewDispositionSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const notesById = new Map(state.notes.map((note) => [note.id, note]));
+  const openDispositionKeys = new Set<string>();
+
+  const addAssignableUserIssue = (
+    userId: string,
+    label: "assignee" | "opener" | "resolver",
+    dispositionId: string
+  ) => {
+    const user = usersById.get(userId);
+    if (!user || !isReviewPolicyAssignableRole(user.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review disposition ${label} is not assignable: ${userId}`,
+        path: ["reviewDispositions", dispositionId]
+      });
+    }
+  };
+
+  for (const disposition of state.reviewDispositions) {
+    const note = notesById.get(disposition.noteId);
+    if (!note) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review disposition references missing note: ${disposition.noteId}`,
+        path: ["reviewDispositions", disposition.id]
+      });
+    } else if (disposition.languageId !== note.languageId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review disposition language ${disposition.languageId} does not match note ${disposition.noteId} language ${note.languageId}`,
+        path: ["reviewDispositions", disposition.id]
+      });
+    }
+
+    addAssignableUserIssue(disposition.assignedTo, "assignee", disposition.id);
+    addAssignableUserIssue(disposition.openedBy, "opener", disposition.id);
+
+    if (disposition.status === "open") {
+      const openKey = `${disposition.languageId}/${disposition.noteId}/${disposition.disposition}`;
+      if (openDispositionKeys.has(openKey)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Duplicate open review disposition for language/note/disposition: ${openKey}`,
+          path: ["reviewDispositions", disposition.id]
+        });
+      }
+      openDispositionKeys.add(openKey);
+
+      if (disposition.resolvedAt !== null || disposition.resolvedBy !== null || disposition.resolutionSummary !== null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Open review disposition cannot have resolution fields",
+          path: ["reviewDispositions", disposition.id]
+        });
+      }
+    }
+
+    if (disposition.status === "resolved") {
+      if (disposition.resolvedAt === null || disposition.resolvedBy === null || disposition.resolutionSummary === null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Resolved review disposition requires resolvedAt, resolvedBy, and resolutionSummary",
+          path: ["reviewDispositions", disposition.id]
+        });
+      }
+
+      if (disposition.resolvedBy !== null) {
+        addAssignableUserIssue(disposition.resolvedBy, "resolver", disposition.id);
+      }
+    }
+  }
+}
+
 function duplicateReviewApprovalKey(
   approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
 ): string | undefined {
@@ -511,6 +594,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
+  addReviewDispositionIntegrityIssues(context, state);
 
   const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
   if (duplicateApproval) {

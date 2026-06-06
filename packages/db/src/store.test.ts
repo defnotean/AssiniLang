@@ -14,6 +14,7 @@ import {
   reviewDispositionSchema,
   reviewPolicySchema,
   type Note,
+  type ReviewDisposition,
   userRoleSchema
 } from "./schema";
 
@@ -35,6 +36,25 @@ function createTestNote(overrides: Partial<Note> = {}): Note {
     },
     dialectScope: "synthetic-default",
     editHistory: [],
+    ...overrides
+  };
+}
+
+function createTestDisposition(overrides: Partial<ReviewDisposition> = {}): ReviewDisposition {
+  return {
+    id: "review-disposition-1",
+    languageId: "avenik",
+    noteId: "note-1",
+    disposition: "escalated",
+    status: "open",
+    reason: "Escalate for lead review.",
+    assignedTo: "lead-1",
+    dueAt: "2026-06-20",
+    openedAt: "2026-06-06T00:00:00.000Z",
+    openedBy: "reviewer-1",
+    resolvedAt: null,
+    resolvedBy: null,
+    resolutionSummary: null,
     ...overrides
   };
 }
@@ -419,6 +439,82 @@ describe("JsonStore", () => {
     expect(["draft", "under_review", "approved", "contested", "rejected", "deferred", "escalated"].map((status) => (
       noteStatusSchema.parse(status)
     ))).toEqual(["draft", "under_review", "approved", "contested", "rejected", "deferred", "escalated"]);
+  });
+
+  it.each([
+    [
+      "missing note",
+      createTestDisposition({ noteId: "missing-note" }),
+      "Review disposition references missing note: missing-note"
+    ],
+    [
+      "note language mismatch",
+      createTestDisposition({ languageId: "solari" }),
+      "Review disposition language solari does not match note note-1 language avenik"
+    ],
+    [
+      "unknown assignee",
+      createTestDisposition({ assignedTo: "missing-user" }),
+      "Review disposition assignee is not assignable: missing-user"
+    ],
+    [
+      "unassignable assignee",
+      createTestDisposition({ assignedTo: "learner-1" }),
+      "Review disposition assignee is not assignable: learner-1"
+    ],
+    [
+      "unknown opener",
+      createTestDisposition({ openedBy: "missing-opener" }),
+      "Review disposition opener is not assignable: missing-opener"
+    ],
+    [
+      "open resolution fields",
+      createTestDisposition({
+        resolvedAt: "2026-06-06T01:00:00.000Z",
+        resolvedBy: "lead-1",
+        resolutionSummary: "Resolved too early."
+      }),
+      "Open review disposition cannot have resolution fields"
+    ],
+    [
+      "resolved missing resolution fields",
+      createTestDisposition({
+        status: "resolved",
+        resolvedAt: null,
+        resolvedBy: null,
+        resolutionSummary: null
+      }),
+      "Resolved review disposition requires resolvedAt, resolvedBy, and resolutionSummary"
+    ],
+    [
+      "unknown resolver",
+      createTestDisposition({
+        status: "resolved",
+        resolvedAt: "2026-06-06T01:00:00.000Z",
+        resolvedBy: "missing-resolver",
+        resolutionSummary: "Resolved after follow-up."
+      }),
+      "Review disposition resolver is not assignable: missing-resolver"
+    ]
+  ])("rejects persisted review dispositions with %s", (_caseName, disposition, errorMessage) => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.notes = [createTestNote()];
+    state.reviewDispositions = [disposition];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it("rejects duplicate open review disposition work for the same note and disposition", () => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.notes = [createTestNote()];
+    state.reviewDispositions = [
+      createTestDisposition({ id: "review-disposition-1" }),
+      createTestDisposition({ id: "review-disposition-2", reason: "Duplicate open escalation." })
+    ];
+
+    expect(() => parseAppState(state)).toThrow("Duplicate open review disposition for language/note/disposition: avenik/note-1/escalated");
   });
 
   it("validates review disposition work records", () => {

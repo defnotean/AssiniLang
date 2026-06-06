@@ -148,6 +148,8 @@ Reviewers can update note status and explanations. Contested, rejected, deferred
 
 If the same note already has an open work record for the requested disposition, the route updates that record's reason, assignee, and due date instead of creating a duplicate open disposition. The original opened attribution stays on the record, and a separate audit event records the update.
 
+Persisted review-disposition records must reference an existing same-language note, use assignable local users for assignee/opener/resolver fields, and keep open versus resolved fields internally consistent.
+
 Approval can be controlled by per-language review policies. If a policy requires multiple approvals, the note remains `under_review` until the threshold is met.
 
 Review-policy updates require at least one assigned reviewer. Assigned reviewer IDs must be unique and must reference users with assignable review roles. When `requiresAssignedReviewer` is true, `approvalThreshold` cannot exceed assigned reviewers. When it is false, `approvalThreshold` cannot exceed the current assignable reviewer pool.
