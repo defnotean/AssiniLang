@@ -596,6 +596,54 @@ function addCorpusIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(passage.source)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus source must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    if (isBlankPersistedValue(passage.sourceMetadata.author)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus source author must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    if (isBlankPersistedValue(passage.sourceMetadata.license)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus source license must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    if (isBlankPersistedValue(passage.sourceMetadata.consentRecord)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus source consent record must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    if (isBlankPersistedValue(passage.textTarget)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus target text must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
+    if (isBlankPersistedValue(passage.textTranslation)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus translation must not be blank for passage ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    }
+
     if (passage.topicTags.length === 0) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -609,6 +657,16 @@ function addCorpusIntegrityIssues(
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Corpus topic tag must not be blank for passage ${passage.id}`,
+          path: ["corpus", passage.id]
+        });
+      }
+    }
+
+    for (const restriction of passage.consentStatus.restrictions) {
+      if (isBlankPersistedValue(restriction)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus consent restriction must not be blank for passage ${passage.id}`,
           path: ["corpus", passage.id]
         });
       }

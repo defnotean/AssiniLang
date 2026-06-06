@@ -856,6 +856,61 @@ describe("JsonStore", () => {
       "Corpus passage references missing language: missing-language"
     ],
     [
+      "blank source",
+      createTestCorpusPassage({ source: "   " }),
+      "Corpus source must not be blank for passage passage-1"
+    ],
+    [
+      "blank source author",
+      createTestCorpusPassage({
+        sourceMetadata: {
+          ...createTestCorpusPassage().sourceMetadata,
+          author: "   "
+        }
+      }),
+      "Corpus source author must not be blank for passage passage-1"
+    ],
+    [
+      "blank source license",
+      createTestCorpusPassage({
+        sourceMetadata: {
+          ...createTestCorpusPassage().sourceMetadata,
+          license: "   "
+        }
+      }),
+      "Corpus source license must not be blank for passage passage-1"
+    ],
+    [
+      "blank source consent record",
+      createTestCorpusPassage({
+        sourceMetadata: {
+          ...createTestCorpusPassage().sourceMetadata,
+          consentRecord: "   "
+        }
+      }),
+      "Corpus source consent record must not be blank for passage passage-1"
+    ],
+    [
+      "blank target text",
+      createTestCorpusPassage({ textTarget: "   " }),
+      "Corpus target text must not be blank for passage passage-1"
+    ],
+    [
+      "blank translation",
+      createTestCorpusPassage({ textTranslation: "   " }),
+      "Corpus translation must not be blank for passage passage-1"
+    ],
+    [
+      "blank consent restriction",
+      createTestCorpusPassage({
+        consentStatus: {
+          use: "synthetic-testing-only",
+          restrictions: ["   "]
+        }
+      }),
+      "Corpus consent restriction must not be blank for passage passage-1"
+    ],
+    [
       "duplicate topic tags",
       createTestCorpusPassage({ topicTags: ["motion", " motion "] }),
       "Corpus topic tag is duplicated for passage passage-1: motion"
