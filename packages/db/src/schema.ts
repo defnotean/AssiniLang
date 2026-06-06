@@ -1406,6 +1406,14 @@ function addAuditEventIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(event.entityId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Audit event entityId must not be blank",
+        path: ["auditEvents", event.id]
+      });
+    }
+
     if (isBlankPersistedValue(event.summary)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

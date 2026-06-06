@@ -1721,6 +1721,11 @@ describe("JsonStore", () => {
       "Audit event action must not be blank"
     ],
     [
+      "blank entity id",
+      createTestAuditEvent({ entityId: "   " }),
+      "Audit event entityId must not be blank"
+    ],
+    [
       "blank summary",
       createTestAuditEvent({ summary: "   " }),
       "Audit event summary must not be blank"
