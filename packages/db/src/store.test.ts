@@ -681,6 +681,33 @@ describe("JsonStore", () => {
       "Note editHistory action is not allowed: made_up_action"
     ],
     [
+      "note with blank reviewer comment",
+      "notes",
+      createTestNote({
+        reviewer: {
+          lastReviewedBy: "reviewer-1",
+          lastReviewedAt: "2026-06-06T00:00:00.000Z",
+          comments: ["   "]
+        }
+      }),
+      "Note reviewer comment must not be blank"
+    ],
+    [
+      "note with blank edit-history summary",
+      "notes",
+      createTestNote({
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "reviewer-1",
+            action: "reviewed",
+            summary: "   "
+          }
+        ]
+      }),
+      "Note editHistory summary must not be blank"
+    ],
+    [
       "note answer key with unsupported edit-history action",
       "noteAnswerKeys",
       createTestNote({
@@ -696,6 +723,23 @@ describe("JsonStore", () => {
         ]
       }),
       "Note answer key editHistory action is not allowed: seeded"
+    ],
+    [
+      "note answer key with blank edit-history summary",
+      "noteAnswerKeys",
+      createTestNote({
+        id: "note-answer-key-1",
+        status: "approved",
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "synthetic-generator",
+            action: "created",
+            summary: "   "
+          }
+        ]
+      }),
+      "Note answer key editHistory summary must not be blank"
     ],
     [
       "missing evidence passage",

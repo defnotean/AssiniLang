@@ -588,12 +588,30 @@ function addNoteCollectionIntegrityIssues(
       });
     }
 
+    for (const comment of note.reviewer.comments) {
+      if (comment.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} reviewer comment must not be blank`,
+          path: [collectionPath, note.id]
+        });
+      }
+    }
+
     for (const entry of note.editHistory) {
       addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} editHistory at`, entry.at);
       if (!isAllowedPersistedNoteActor(usersById, entry.by)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `${label} editHistory by is not allowed: ${entry.by}`,
+          path: [collectionPath, note.id]
+        });
+      }
+
+      if (entry.summary.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} editHistory summary must not be blank`,
           path: [collectionPath, note.id]
         });
       }
