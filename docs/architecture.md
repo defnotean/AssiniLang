@@ -71,9 +71,12 @@ The state separates mutable review records from immutable answer keys:
 - `noteAnswerKeys` are immutable evaluation references.
 - `exercises` are stored with private expected answers and adversarial probes.
 - Public exercise responses omit answer keys and grading explanations.
+- `exerciseSubmissions` keep learner answers and actor IDs server-side; public submission views redact both fields.
 - `corpusAnswerKeys` preserve expected corpus segmentation for evaluation.
 
 This matters because the system must not evaluate itself against whatever a reviewer last edited.
+
+Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
 
 ## Public Projection Layer
 

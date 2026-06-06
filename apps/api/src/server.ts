@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
   ELDER_CORRECTION_MUTATION_ROLES,
+  EXERCISE_SUBMISSION_ACTOR_ROLES,
   isReviewPolicyAssignableRole,
   JsonStore,
   LOCAL_PROTOTYPE_USERS,
@@ -1705,7 +1706,7 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["learner", "reviewer", "lead", "admin"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, EXERCISE_SUBMISSION_ACTOR_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
 

@@ -15,6 +15,8 @@ import {
   reviewPolicySchema,
   type CorpusPassage,
   type ElderCorrection,
+  type Exercise,
+  type ExerciseSubmission,
   type Note,
   type ReviewDisposition,
   userRoleSchema
@@ -91,6 +93,44 @@ function createTestElderCorrection(overrides: Partial<ElderCorrection> = {}): El
     proposedAt: "2026-06-06T00:00:00.000Z",
     reviewedBy: null,
     reviewedAt: null,
+    ...overrides
+  };
+}
+
+function createTestExercise(overrides: Partial<Exercise> = {}): Exercise {
+  return {
+    id: "exercise-1",
+    languageId: "avenik",
+    type: "translate_to_target",
+    prompt: "Translate: I walk by the river.",
+    allowedVocabulary: ["mira", "talo"],
+    allowedRuleIds: ["rule-1"],
+    expectedAnswers: ["mira talo-mi-na"],
+    adversarialAnswers: [
+      {
+        answer: "talo mira",
+        reason: "Wrong target-language order."
+      },
+      {
+        answer: "mira talo",
+        reason: "Missing required synthetic suffixes."
+      }
+    ],
+    gradingExplanation: "Accepted answer matches the synthetic exercise key.",
+    ...overrides
+  };
+}
+
+function createTestSubmission(overrides: Partial<ExerciseSubmission> = {}): ExerciseSubmission {
+  return {
+    id: "submission-1",
+    exerciseId: "exercise-1",
+    languageId: "avenik",
+    answer: "mira talo-mi-na",
+    accepted: true,
+    explanation: "Accepted answer matches the synthetic exercise key.",
+    submittedAt: "2026-06-06T00:00:00.000Z",
+    learnerId: "learner-1",
     ...overrides
   };
 }
@@ -488,6 +528,36 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate review approval for language/note/reviewer: avenik/note-1/reviewer-1");
+  });
+
+  it.each([
+    [
+      "missing exercise",
+      createTestSubmission({ exerciseId: "missing-exercise" }),
+      "Exercise submission references missing exercise: missing-exercise"
+    ],
+    [
+      "exercise language mismatch",
+      createTestSubmission({ languageId: "solari" }),
+      "Exercise submission language solari does not match exercise exercise-1 language avenik"
+    ],
+    [
+      "unknown learner actor",
+      createTestSubmission({ learnerId: "missing-user" }),
+      "Exercise submission learner is not allowed: missing-user"
+    ],
+    [
+      "unallowed learner actor role",
+      createTestSubmission({ learnerId: "elder-1" }),
+      "Exercise submission learner is not allowed: elder-1"
+    ]
+  ])("rejects persisted exercise submissions with %s", (_caseName, submission, errorMessage) => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.exercises = [createTestExercise()];
+    state.exerciseSubmissions = [submission];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it("validates richer note review lifecycle statuses", () => {

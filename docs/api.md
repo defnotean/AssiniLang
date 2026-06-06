@@ -140,6 +140,16 @@ Important validation:
 - At least two adversarial answers are required.
 - Adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
 
+## Exercise Submissions
+
+`POST /exercises/:exerciseId/submissions`
+
+Allowed submitter roles: learner, reviewer, lead, admin.
+
+Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID.
+
+The persisted app-state schema validates restored submission records before the API serves them. Each submission must reference an existing exercise, keep the same `languageId` as that exercise, and use a known local actor whose role is allowed to submit learner-exercise answers.
+
 ## Note Review
 
 `PATCH /notes/:noteId/review`

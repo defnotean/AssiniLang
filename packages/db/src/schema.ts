@@ -158,6 +158,13 @@ export function isElderCorrectionMutationRole(role: z.infer<typeof userRoleSchem
   return elderCorrectionMutationRoleSet.has(role);
 }
 
+export const EXERCISE_SUBMISSION_ACTOR_ROLES = ["learner", "reviewer", "lead", "admin"] as const;
+const exerciseSubmissionActorRoleSet = new Set<string>(EXERCISE_SUBMISSION_ACTOR_ROLES);
+
+export function isExerciseSubmissionActorRole(role: z.infer<typeof userRoleSchema>): boolean {
+  return exerciseSubmissionActorRoleSet.has(role);
+}
+
 export const LOCAL_PROTOTYPE_USERS = z.array(userSchema).parse([
   { id: "learner-1", name: "Local Learner", role: "learner" },
   { id: "elder-1", name: "Local Elder", role: "elder" },
@@ -416,6 +423,45 @@ function addReviewPolicyIntegrityIssues(
         code: z.ZodIssueCode.custom,
         message: "Review policy approvalThreshold cannot exceed assignable reviewers",
         path: ["reviewPolicies", policy.id]
+      });
+    }
+  }
+}
+
+function addExerciseSubmissionIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    exercises: Array<z.infer<typeof exerciseSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    exerciseSubmissions: Array<z.infer<typeof exerciseSubmissionSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const exercisesById = new Map(state.exercises.map((exercise) => [exercise.id, exercise]));
+
+  for (const submission of state.exerciseSubmissions) {
+    const exercise = exercisesById.get(submission.exerciseId);
+    if (!exercise) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise submission references missing exercise: ${submission.exerciseId}`,
+        path: ["exerciseSubmissions", submission.id]
+      });
+    } else if (submission.languageId !== exercise.languageId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise submission language ${submission.languageId} does not match exercise ${submission.exerciseId} language ${exercise.languageId}`,
+        path: ["exerciseSubmissions", submission.id]
+      });
+    }
+
+    const learner = usersById.get(submission.learnerId);
+    if (!learner || !isExerciseSubmissionActorRole(learner.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise submission learner is not allowed: ${submission.learnerId}`,
+        path: ["exerciseSubmissions", submission.id]
       });
     }
   }
@@ -698,6 +744,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewPolicies", "id", state.reviewPolicies, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
+  addExerciseSubmissionIntegrityIssues(context, state);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);
