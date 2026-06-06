@@ -90,4 +90,20 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects duplicate exercise authoring allow-list entries", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.exercisesAnswerKey[0].allowedVocabulary = ["mira", "talo", "mira", "-mi", "-na"];
+    avenik.exercisesAnswerKey[0].allowedRuleIds = ["avn-rule-verb-chain", "avn-rule-verb-chain"];
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik exercise avn-ex001 allowed vocabulary is duplicated: mira",
+        "avenik exercise avn-ex001 allowed rule is duplicated: avn-rule-verb-chain"
+      ])
+    );
+  });
 });

@@ -62,8 +62,8 @@ The Learning Lab previews public learner exercises and submits answers to the AP
 Reviewers can author compact synthetic exercises from the web UI. Exercise authoring is validated server-side against:
 
 - Known language IDs.
-- Known grammar-rule IDs.
-- Known vocabulary forms.
+- Known grammar-rule IDs, with duplicates rejected after whitespace normalization.
+- Known vocabulary forms, with duplicates rejected after whitespace normalization.
 - Non-empty expected answers that are unique after whitespace normalization.
 - At least two private adversarial answer probes that do not duplicate expected answers or one another after whitespace normalization.
 - Substantive grading explanations.

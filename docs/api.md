@@ -129,8 +129,8 @@ The route stores private answer-key fields server-side and returns only the publ
 Important validation:
 
 - Language ID must exist.
-- Allowed grammar-rule IDs must exist for that language.
-- Allowed vocabulary forms must exist for that language.
+- Allowed grammar-rule IDs must exist for that language and be unique after whitespace normalization.
+- Allowed vocabulary forms must exist for that language and be unique after whitespace normalization.
 - Prompts and grading explanations must be substantive.
 - Expected answers must be present and unique after whitespace normalization.
 - At least two adversarial answers are required.

@@ -623,6 +623,18 @@ function normalizeAuthoredAnswer(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
+function firstDuplicateNormalizedValue(values: string[]): string | undefined {
+  const seen = new Set<string>();
+  for (const value of values) {
+    const normalizedValue = normalizeAuthoredAnswer(value);
+    if (seen.has(normalizedValue)) {
+      return normalizedValue;
+    }
+    seen.add(normalizedValue);
+  }
+  return undefined;
+}
+
 function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
   const normalizedSurface = normalizeAuthoredAnswer(surface).toLowerCase();
   return normalizeAuthoredAnswer(textTarget)
@@ -713,6 +725,16 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
     if (!vocabularyForms.has(form)) {
       return `Exercise references unknown vocabulary form: ${form}`;
     }
+  }
+
+  const duplicateAllowedRule = firstDuplicateNormalizedValue(body.allowedRuleIds);
+  if (duplicateAllowedRule) {
+    return `Exercise allowed rule is duplicated: ${duplicateAllowedRule}`;
+  }
+
+  const duplicateAllowedVocabulary = firstDuplicateNormalizedValue(body.allowedVocabulary);
+  if (duplicateAllowedVocabulary) {
+    return `Exercise allowed vocabulary is duplicated: ${duplicateAllowedVocabulary}`;
   }
 
   if (body.prompt.length < 12) {

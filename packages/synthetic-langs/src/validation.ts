@@ -17,6 +17,19 @@ function addDuplicateDiagnostics(items: string[], label: string, diagnostics: st
   }
 }
 
+function addDuplicateNormalizedDiagnostics(items: string[], label: string, diagnostics: string[]) {
+  const seen = new Set<string>();
+  const reported = new Set<string>();
+  for (const item of items) {
+    const normalized = normalizedText(item);
+    if (seen.has(normalized) && !reported.has(normalized)) {
+      diagnostics.push(`${label} ${normalized}`);
+      reported.add(normalized);
+    }
+    seen.add(normalized);
+  }
+}
+
 export function findInvalidOrthographySymbols(value: string, fixture: SyntheticLanguageFixture): string[] {
   const allowedSymbols = [...fixture.phonology.consonants, ...fixture.phonology.vowels]
     .filter((symbol) => symbol.length > 0)
@@ -196,6 +209,16 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
       if (exercise.languageId !== languageId) {
         diagnostics.push(`${languageId} exercise ${exercise.id} has mismatched languageId ${exercise.languageId}`);
       }
+      addDuplicateNormalizedDiagnostics(
+        exercise.allowedRuleIds,
+        `${languageId} exercise ${exercise.id} allowed rule is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        exercise.allowedVocabulary,
+        `${languageId} exercise ${exercise.id} allowed vocabulary is duplicated:`,
+        diagnostics
+      );
       for (const ruleId of exercise.allowedRuleIds) {
         if (!ruleIdSet.has(ruleId)) {
           diagnostics.push(`${languageId} exercise ${exercise.id} references missing rule ${ruleId}`);
