@@ -13,6 +13,8 @@ import {
   reviewApprovalSchema,
   reviewDispositionSchema,
   reviewPolicySchema,
+  type CorpusPassage,
+  type ElderCorrection,
   type Note,
   type ReviewDisposition,
   userRoleSchema
@@ -36,6 +38,59 @@ function createTestNote(overrides: Partial<Note> = {}): Note {
     },
     dialectScope: "synthetic-default",
     editHistory: [],
+    ...overrides
+  };
+}
+
+function createTestCorpusPassage(overrides: Partial<CorpusPassage> = {}): CorpusPassage {
+  return {
+    id: "passage-1",
+    languageId: "avenik",
+    source: "synthetic-test",
+    sourceMetadata: {
+      author: "Synthetic Tester",
+      year: 2026,
+      license: "synthetic-only",
+      consentRecord: "synthetic-test-consent"
+    },
+    textTarget: "mira talo-mi-na",
+    textTranslation: "I walk by the river.",
+    morphologicalSegmentation: [
+      {
+        surface: "mira",
+        lemma: "mira",
+        gloss: "river",
+        features: ["noun"]
+      },
+      {
+        surface: "talo-mi-na",
+        lemma: "talo",
+        gloss: "walk.present.1sg",
+        features: ["verb", "present", "1sg"]
+      }
+    ],
+    topicTags: ["motion"],
+    consentStatus: {
+      use: "synthetic-testing-only",
+      restrictions: ["unit-test"]
+    },
+    ...overrides
+  };
+}
+
+function createTestElderCorrection(overrides: Partial<ElderCorrection> = {}): ElderCorrection {
+  return {
+    id: "elder-correction-1",
+    languageId: "avenik",
+    noteId: "note-1",
+    correction: "Clarify that tense appears before person in the synthetic suffix chain.",
+    rationale: "Elder review should preserve suffix-order teaching notes.",
+    severity: "major",
+    status: "pending_review",
+    proposedBy: "elder-1",
+    proposedAt: "2026-06-06T00:00:00.000Z",
+    reviewedBy: null,
+    reviewedAt: null,
     ...overrides
   };
 }
@@ -515,6 +570,80 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate open review disposition for language/note/disposition: avenik/note-1/escalated");
+  });
+
+  it.each([
+    [
+      "missing note target",
+      createTestElderCorrection({ noteId: "missing-note" }),
+      "Elder correction references missing note: missing-note"
+    ],
+    [
+      "note language mismatch",
+      createTestElderCorrection({ languageId: "solari" }),
+      "Elder correction language solari does not match note note-1 language avenik"
+    ],
+    [
+      "missing passage target",
+      createTestElderCorrection({ noteId: undefined, passageId: "missing-passage" }),
+      "Elder correction references missing passage: missing-passage"
+    ],
+    [
+      "passage language mismatch",
+      createTestElderCorrection({ languageId: "solari", noteId: undefined, passageId: "passage-1" }),
+      "Elder correction language solari does not match passage passage-1 language avenik"
+    ],
+    [
+      "unknown proposer",
+      createTestElderCorrection({ proposedBy: "missing-user" }),
+      "Elder correction proposer is not allowed: missing-user"
+    ],
+    [
+      "learner proposer",
+      createTestElderCorrection({ proposedBy: "learner-1" }),
+      "Elder correction proposer is not allowed: learner-1"
+    ],
+    [
+      "pending review attribution",
+      createTestElderCorrection({
+        reviewedBy: "lead-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }),
+      "Pending elder correction cannot have review attribution"
+    ],
+    [
+      "accepted missing review attribution",
+      createTestElderCorrection({ status: "accepted" }),
+      "Reviewed elder correction requires reviewedBy and reviewedAt"
+    ],
+    [
+      "unallowed reviewer",
+      createTestElderCorrection({
+        status: "accepted",
+        reviewedBy: "learner-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }),
+      "Elder correction reviewer is not allowed: learner-1"
+    ],
+    [
+      "applied custom-context correction",
+      createTestElderCorrection({
+        noteId: undefined,
+        contextText: "Custom context without a note target.",
+        status: "applied",
+        reviewedBy: "lead-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }),
+      "Applied elder correction must reference a note"
+    ]
+  ])("rejects persisted elder corrections with %s", (_caseName, correction, errorMessage) => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.notes = [createTestNote()];
+    state.corpus = [createTestCorpusPassage()];
+    state.elderCorrections = [correction];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it("validates review disposition work records", () => {

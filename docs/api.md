@@ -166,9 +166,25 @@ Language snapshots and evaluation artifacts include SHA-256 integrity manifests.
 
 ## Elder Corrections
 
+`POST /elder/corrections`
+
+Allowed submitter roles: Elder, lead, admin.
+
+Corrections can target a note, a corpus passage, or custom context text. Note and passage targets must belong to the correction language. Submitting a correction records it as `pending_review` and does not mutate note content.
+
 `PATCH /elder/corrections/:correctionId/review`
 
+Allowed reviewer roles: Elder, lead, admin.
+
 Only pending corrections can be reviewed. Once a correction is accepted, rejected, or applied, later review attempts return `409` and preserve the existing status and attribution.
+
+`PATCH /elder/corrections/:correctionId/apply`
+
+Allowed applier roles: Elder, lead, admin.
+
+Only accepted note-linked corrections can be applied. Applying a correction requires a revised note explanation, moves the correction to `applied`, sets the linked note back to `under_review`, appends a note edit-history entry, and writes audit events for both the correction and the note.
+
+The persisted app-state schema enforces the same ledger invariants during local JSON reads: correction note and passage IDs must resolve within the same language, proposer and reviewer IDs must be known Elder/lead/admin users, pending corrections cannot carry review attribution, reviewed corrections must include `reviewedBy` and `reviewedAt`, and applied corrections must reference a note.
 
 ## LLM Status And Sessions
 

@@ -151,6 +151,13 @@ export function isReviewPolicyAssignableRole(role: z.infer<typeof userRoleSchema
   return reviewPolicyAssignableRoleSet.has(role);
 }
 
+export const ELDER_CORRECTION_MUTATION_ROLES = ["elder", "lead", "admin"] as const;
+const elderCorrectionMutationRoleSet = new Set<string>(ELDER_CORRECTION_MUTATION_ROLES);
+
+export function isElderCorrectionMutationRole(role: z.infer<typeof userRoleSchema>): boolean {
+  return elderCorrectionMutationRoleSet.has(role);
+}
+
 export const LOCAL_PROTOTYPE_USERS = z.array(userSchema).parse([
   { id: "learner-1", name: "Local Learner", role: "learner" },
   { id: "elder-1", name: "Local Elder", role: "elder" },
@@ -545,6 +552,105 @@ function addReviewDispositionIntegrityIssues(
   }
 }
 
+function addElderCorrectionIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    notes: Array<z.infer<typeof noteSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
+    elderCorrections: Array<z.infer<typeof elderCorrectionSchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const notesById = new Map(state.notes.map((note) => [note.id, note]));
+  const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
+
+  const addAllowedActorIssue = (
+    userId: string,
+    label: "proposer" | "reviewer",
+    correctionId: string
+  ) => {
+    const user = usersById.get(userId);
+    if (!user || !isElderCorrectionMutationRole(user.role)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Elder correction ${label} is not allowed: ${userId}`,
+        path: ["elderCorrections", correctionId]
+      });
+    }
+  };
+
+  for (const correction of state.elderCorrections) {
+    if (correction.noteId !== undefined) {
+      const note = notesById.get(correction.noteId);
+      if (!note) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Elder correction references missing note: ${correction.noteId}`,
+          path: ["elderCorrections", correction.id]
+        });
+      } else if (correction.languageId !== note.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Elder correction language ${correction.languageId} does not match note ${correction.noteId} language ${note.languageId}`,
+          path: ["elderCorrections", correction.id]
+        });
+      }
+    }
+
+    if (correction.passageId !== undefined) {
+      const passage = passagesById.get(correction.passageId);
+      if (!passage) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Elder correction references missing passage: ${correction.passageId}`,
+          path: ["elderCorrections", correction.id]
+        });
+      } else if (correction.languageId !== passage.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Elder correction language ${correction.languageId} does not match passage ${correction.passageId} language ${passage.languageId}`,
+          path: ["elderCorrections", correction.id]
+        });
+      }
+    }
+
+    addAllowedActorIssue(correction.proposedBy, "proposer", correction.id);
+
+    if (correction.status === "pending_review") {
+      if (correction.reviewedBy !== null || correction.reviewedAt !== null) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Pending elder correction cannot have review attribution",
+          path: ["elderCorrections", correction.id]
+        });
+      }
+      continue;
+    }
+
+    if (correction.reviewedBy === null || correction.reviewedAt === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Reviewed elder correction requires reviewedBy and reviewedAt",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
+    if (correction.reviewedBy !== null) {
+      addAllowedActorIssue(correction.reviewedBy, "reviewer", correction.id);
+    }
+
+    if (correction.status === "applied" && correction.noteId === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Applied elder correction must reference a note",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+  }
+}
+
 function duplicateReviewApprovalKey(
   approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
 ): string | undefined {
@@ -595,6 +701,7 @@ export const appStateSchema = z.object({
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);
+  addElderCorrectionIntegrityIssues(context, state);
 
   const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
   if (duplicateApproval) {
