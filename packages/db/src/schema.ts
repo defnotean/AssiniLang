@@ -1346,6 +1346,7 @@ function addElderCorrectionIntegrityIssues(
     }
 
     addAllowedActorIssue(correction.proposedBy, "proposer", correction.id);
+    addParseablePersistedDateIssue(context, "elderCorrections", correction.id, "Elder correction proposedAt", correction.proposedAt);
 
     if (correction.status === "pending_review") {
       if (correction.reviewedBy !== null || correction.reviewedAt !== null) {
@@ -1368,6 +1369,21 @@ function addElderCorrectionIntegrityIssues(
 
     if (correction.reviewedBy !== null) {
       addAllowedActorIssue(correction.reviewedBy, "reviewer", correction.id);
+    }
+
+    addParseablePersistedDateIssue(context, "elderCorrections", correction.id, "Elder correction reviewedAt", correction.reviewedAt);
+
+    if (
+      correction.reviewedAt !== null
+      && !Number.isNaN(Date.parse(correction.proposedAt))
+      && !Number.isNaN(Date.parse(correction.reviewedAt))
+      && Date.parse(correction.reviewedAt) < Date.parse(correction.proposedAt)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Elder correction reviewedAt cannot be before proposedAt",
+        path: ["elderCorrections", correction.id]
+      });
     }
 
     if (correction.status === "applied" && correction.noteId === undefined) {

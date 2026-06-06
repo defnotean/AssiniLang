@@ -1303,6 +1303,11 @@ describe("JsonStore", () => {
       "Elder correction proposer is not allowed: learner-1"
     ],
     [
+      "unparseable proposed date",
+      createTestElderCorrection({ proposedAt: "not-a-date" }),
+      "Elder correction proposedAt must be parseable: not-a-date"
+    ],
+    [
       "pending review attribution",
       createTestElderCorrection({
         reviewedBy: "lead-1",
@@ -1314,6 +1319,25 @@ describe("JsonStore", () => {
       "accepted missing review attribution",
       createTestElderCorrection({ status: "accepted" }),
       "Reviewed elder correction requires reviewedBy and reviewedAt"
+    ],
+    [
+      "unparseable reviewed date",
+      createTestElderCorrection({
+        status: "accepted",
+        reviewedBy: "lead-1",
+        reviewedAt: "not-a-date"
+      }),
+      "Elder correction reviewedAt must be parseable: not-a-date"
+    ],
+    [
+      "review before proposal",
+      createTestElderCorrection({
+        status: "accepted",
+        proposedAt: "2026-06-06T02:00:00.000Z",
+        reviewedBy: "lead-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }),
+      "Elder correction reviewedAt cannot be before proposedAt"
     ],
     [
       "unallowed reviewer",
