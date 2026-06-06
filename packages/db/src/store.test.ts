@@ -566,6 +566,50 @@ describe("JsonStore", () => {
       "Note evidenceCount 2 does not match evidencePassageIds length 1: note-1"
     ],
     [
+      "note with unparseable reviewer timestamp",
+      "notes",
+      createTestNote({
+        reviewer: {
+          lastReviewedBy: "reviewer-1",
+          lastReviewedAt: "not-a-date",
+          comments: []
+        }
+      }),
+      "Note reviewer lastReviewedAt must be parseable: not-a-date"
+    ],
+    [
+      "note with unparseable edit-history timestamp",
+      "notes",
+      createTestNote({
+        editHistory: [
+          {
+            at: "not-a-date",
+            by: "reviewer-1",
+            action: "reviewed",
+            summary: "Malformed timestamp should not restore."
+          }
+        ]
+      }),
+      "Note editHistory at must be parseable: not-a-date"
+    ],
+    [
+      "note answer key with unparseable edit-history timestamp",
+      "noteAnswerKeys",
+      createTestNote({
+        id: "note-answer-key-1",
+        status: "approved",
+        editHistory: [
+          {
+            at: "not-a-date",
+            by: "legacy-fixture",
+            action: "seeded",
+            summary: "Malformed answer-key timestamp should not restore."
+          }
+        ]
+      }),
+      "Note answer key editHistory at must be parseable: not-a-date"
+    ],
+    [
       "missing evidence passage",
       "notes",
       createTestNote({ evidencePassageIds: ["missing-passage"], evidenceCount: 1 }),
@@ -603,7 +647,7 @@ describe("JsonStore", () => {
     ]
   ])("rejects persisted %s", (_caseName, collection, note, errorMessage) => {
     const state = createEmptyState();
-    state.languages = [createTestLanguage()];
+    state.languages = [createTestLanguage(), createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })];
     state.corpus = [
       createTestCorpusPassage(),
       createTestCorpusPassage({ id: "other-passage", languageId: "solari" })

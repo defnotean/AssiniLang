@@ -557,6 +557,11 @@ function addNoteCollectionIntegrityIssues(
       });
     }
 
+    addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} reviewer lastReviewedAt`, note.reviewer.lastReviewedAt);
+    for (const entry of note.editHistory) {
+      addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} editHistory at`, entry.at);
+    }
+
     for (const passageId of note.evidencePassageIds) {
       const passage = passagesById.get(passageId);
       if (!passage) {
