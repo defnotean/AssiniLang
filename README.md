@@ -72,6 +72,7 @@ Start here:
 
 - [Documentation Hub](docs/README.md)
 - [Product Guide](docs/product-guide.md)
+- [UI Design Guide](docs/ui-design.md)
 - [Architecture And Data](docs/architecture.md)
 - [API Reference](docs/api.md)
 - [Development Guide](docs/development.md)

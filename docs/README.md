@@ -5,10 +5,11 @@ This folder is the detailed handbook for AssiniLang. The root README stays short
 ## Reading Path
 
 1. [Product Guide](product-guide.md): what the prototype does and how each workspace is meant to be used.
-2. [Architecture And Data](architecture.md): how the apps, packages, fixtures, persistence, validation, and redaction layers fit together.
-3. [API Reference](api.md): route behavior, auth expectations, mutation rules, and important payload shapes.
-4. [Development Guide](development.md): setup, commands, testing, browser verification, and adding synthetic languages.
-5. [Roadmap](roadmap.md): what must happen before real language material can be used.
+2. [UI Design Guide](ui-design.md): how the `AssiniLang.html` design handoff maps to the real React app.
+3. [Architecture And Data](architecture.md): how the apps, packages, fixtures, persistence, validation, and redaction layers fit together.
+4. [API Reference](api.md): route behavior, auth expectations, mutation rules, and important payload shapes.
+5. [Development Guide](development.md): setup, commands, testing, browser verification, and adding synthetic languages.
+6. [Roadmap](roadmap.md): what must happen before real language material can be used.
 
 ## Historical Design Docs
 
