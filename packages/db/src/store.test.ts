@@ -1752,9 +1752,19 @@ describe("JsonStore", () => {
       "Audit event references missing language: missing-language"
     ],
     [
+      "blank non-null language",
+      createTestAuditEvent({ languageId: "   " }),
+      "Audit event languageId must not be blank"
+    ],
+    [
       "unknown actor",
       createTestAuditEvent({ actorId: "missing-user" }),
       "Audit event references unknown actor: missing-user"
+    ],
+    [
+      "blank actor",
+      createTestAuditEvent({ actorId: "   " }),
+      "Audit event actorId must not be blank"
     ],
     [
       "actor role mismatch",

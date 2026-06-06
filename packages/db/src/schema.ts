@@ -1450,6 +1450,14 @@ function addAuditEventIntegrityIssues(
       });
     }
 
+    if (event.languageId !== null && isBlankPersistedValue(event.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Audit event languageId must not be blank",
+        path: ["auditEvents", event.id]
+      });
+    }
+
     if (event.languageId !== null && !languageIds.has(event.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -1458,7 +1466,16 @@ function addAuditEventIntegrityIssues(
       });
     }
 
-    const actor = usersById.get(event.actorId);
+    const actor = isBlankPersistedValue(event.actorId) ? undefined : usersById.get(event.actorId);
+    if (isBlankPersistedValue(event.actorId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Audit event actorId must not be blank",
+        path: ["auditEvents", event.id]
+      });
+      continue;
+    }
+
     if (!actor) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
