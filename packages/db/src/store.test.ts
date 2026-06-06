@@ -601,13 +601,69 @@ describe("JsonStore", () => {
         editHistory: [
           {
             at: "not-a-date",
-            by: "legacy-fixture",
+            by: "legacy-v1-migration",
             action: "seeded",
             summary: "Malformed answer-key timestamp should not restore."
           }
         ]
       }),
       "Note answer key editHistory at must be parseable: not-a-date"
+    ],
+    [
+      "note with unknown reviewer actor",
+      "notes",
+      createTestNote({
+        reviewer: {
+          lastReviewedBy: "missing-reviewer",
+          lastReviewedAt: "2026-06-06T00:00:00.000Z",
+          comments: ["Unknown reviewers should not restore."]
+        }
+      }),
+      "Note reviewer lastReviewedBy is not allowed: missing-reviewer"
+    ],
+    [
+      "note with unassignable reviewer actor",
+      "notes",
+      createTestNote({
+        reviewer: {
+          lastReviewedBy: "learner-1",
+          lastReviewedAt: "2026-06-06T00:00:00.000Z",
+          comments: ["Learners cannot be note reviewers."]
+        }
+      }),
+      "Note reviewer lastReviewedBy is not allowed: learner-1"
+    ],
+    [
+      "note with unknown edit-history actor",
+      "notes",
+      createTestNote({
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "missing-writer",
+            action: "reviewed",
+            summary: "Unknown edit-history writers should not restore."
+          }
+        ]
+      }),
+      "Note editHistory by is not allowed: missing-writer"
+    ],
+    [
+      "note answer key with unknown edit-history actor",
+      "noteAnswerKeys",
+      createTestNote({
+        id: "note-answer-key-1",
+        status: "approved",
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "missing-system-writer",
+            action: "seeded",
+            summary: "Unknown answer-key writers should not restore."
+          }
+        ]
+      }),
+      "Note answer key editHistory by is not allowed: missing-system-writer"
     ],
     [
       "missing evidence passage",

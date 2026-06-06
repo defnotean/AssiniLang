@@ -155,6 +155,12 @@ export function isReviewPolicyAssignableRole(role: z.infer<typeof userRoleSchema
 export const REVIEW_POLICY_UPDATER_ROLES = ["lead", "admin"] as const;
 const reviewPolicyUpdaterRoleSet = new Set<string>(REVIEW_POLICY_UPDATER_ROLES);
 const reviewPolicySystemUpdaterIds = new Set<string>(["system-seed"]);
+const noteSystemActorIds = new Set<string>([
+  "deterministic-study-loop",
+  "legacy-v1-migration",
+  "synthetic-generator",
+  "synthetic-reviewer"
+]);
 
 export function isReviewPolicyUpdaterRole(role: z.infer<typeof userRoleSchema>): boolean {
   return reviewPolicyUpdaterRoleSet.has(role);
@@ -471,6 +477,11 @@ function addParseablePersistedDateIssue(
   }
 }
 
+function isAllowedPersistedNoteActor(usersById: Map<string, z.infer<typeof userSchema>>, actorId: string): boolean {
+  const actor = usersById.get(actorId);
+  return noteSystemActorIds.has(actorId) || (actor !== undefined && isReviewPolicyAssignableRole(actor.role));
+}
+
 function addCorpusIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -532,11 +543,14 @@ function addNoteCollectionIntegrityIssues(
   state: {
     languages: Array<z.infer<typeof languageSchema>>;
     corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    users: Array<z.infer<typeof userSchema>>;
   },
   notes: Array<z.infer<typeof noteSchema>>,
   collectionPath: "notes" | "noteAnswerKeys",
   label: "Note" | "Note answer key"
 ) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
   const languageIds = new Set(state.languages.map((language) => language.id));
   const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
 
@@ -558,8 +572,23 @@ function addNoteCollectionIntegrityIssues(
     }
 
     addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} reviewer lastReviewedAt`, note.reviewer.lastReviewedAt);
+    if (note.reviewer.lastReviewedBy !== null && !isAllowedPersistedNoteActor(usersById, note.reviewer.lastReviewedBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} reviewer lastReviewedBy is not allowed: ${note.reviewer.lastReviewedBy}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
     for (const entry of note.editHistory) {
       addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} editHistory at`, entry.at);
+      if (!isAllowedPersistedNoteActor(usersById, entry.by)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} editHistory by is not allowed: ${entry.by}`,
+          path: [collectionPath, note.id]
+        });
+      }
     }
 
     for (const passageId of note.evidencePassageIds) {
