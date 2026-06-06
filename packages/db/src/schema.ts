@@ -1346,6 +1346,14 @@ function addReviewDispositionIntegrityIssues(
     addParseablePersistedDateIssue(context, "reviewDispositions", disposition.id, "Review disposition openedAt", disposition.openedAt);
     addParseablePersistedDateIssue(context, "reviewDispositions", disposition.id, "Review disposition resolvedAt", disposition.resolvedAt);
 
+    if (disposition.reason.trim().length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review disposition reason must not be blank",
+        path: ["reviewDispositions", disposition.id]
+      });
+    }
+
     addAssignableUserIssue(disposition.assignedTo, "assignee", disposition.id);
     addAssignableUserIssue(disposition.openedBy, "opener", disposition.id);
 
@@ -1374,6 +1382,24 @@ function addReviewDispositionIntegrityIssues(
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Resolved review disposition requires resolvedAt, resolvedBy, and resolutionSummary",
+          path: ["reviewDispositions", disposition.id]
+        });
+      }
+
+      if (disposition.resolutionSummary !== null && disposition.resolutionSummary.trim().length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Review disposition resolutionSummary must not be blank",
+          path: ["reviewDispositions", disposition.id]
+        });
+      }
+
+      const openedAtTime = Date.parse(disposition.openedAt);
+      const resolvedAtTime = disposition.resolvedAt === null ? NaN : Date.parse(disposition.resolvedAt);
+      if (!Number.isNaN(openedAtTime) && !Number.isNaN(resolvedAtTime) && resolvedAtTime < openedAtTime) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Review disposition resolvedAt cannot be before openedAt",
           path: ["reviewDispositions", disposition.id]
         });
       }

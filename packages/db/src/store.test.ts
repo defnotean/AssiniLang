@@ -1468,6 +1468,11 @@ describe("JsonStore", () => {
       "Review disposition openedAt must be parseable: not-a-date"
     ],
     [
+      "blank reason",
+      createTestDisposition({ reason: "   " }),
+      "Review disposition reason must not be blank"
+    ],
+    [
       "open resolution fields",
       createTestDisposition({
         resolvedAt: "2026-06-06T01:00:00.000Z",
@@ -1495,6 +1500,27 @@ describe("JsonStore", () => {
         resolutionSummary: "Resolved after follow-up."
       }),
       "Review disposition resolvedAt must be parseable: not-a-date"
+    ],
+    [
+      "resolved before opened",
+      createTestDisposition({
+        status: "resolved",
+        openedAt: "2026-06-06T02:00:00.000Z",
+        resolvedAt: "2026-06-06T01:00:00.000Z",
+        resolvedBy: "lead-1",
+        resolutionSummary: "Resolved before it opened."
+      }),
+      "Review disposition resolvedAt cannot be before openedAt"
+    ],
+    [
+      "blank resolution summary",
+      createTestDisposition({
+        status: "resolved",
+        resolvedAt: "2026-06-06T01:00:00.000Z",
+        resolvedBy: "lead-1",
+        resolutionSummary: "   "
+      }),
+      "Review disposition resolutionSummary must not be blank"
     ],
     [
       "unknown resolver",
