@@ -856,6 +856,8 @@ function addExerciseSubmissionIntegrityIssues(
   const exercisesById = new Map(state.exercises.map((exercise) => [exercise.id, exercise]));
 
   for (const submission of state.exerciseSubmissions) {
+    addParseablePersistedDateIssue(context, "exerciseSubmissions", submission.id, "Exercise submission submittedAt", submission.submittedAt);
+
     const exercise = exercisesById.get(submission.exerciseId);
     if (!exercise) {
       context.addIssue({
@@ -1142,6 +1144,8 @@ function addEvaluationRunIntegrityIssues(
   const languageIds = new Set(state.languages.map((language) => language.id));
 
   for (const run of state.evaluationRuns) {
+    addParseablePersistedDateIssue(context, "evaluationRuns", run.id, "Evaluation run createdAt", run.createdAt);
+
     if (!languageIds.has(run.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,

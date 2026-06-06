@@ -150,7 +150,7 @@ Allowed submitter roles: learner, reviewer, lead, admin.
 
 Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID.
 
-The persisted app-state schema validates restored submission records before the API serves them. Each submission must reference an existing exercise, keep the same `languageId` as that exercise, and use a known local actor whose role is allowed to submit learner-exercise answers.
+The persisted app-state schema validates restored submission records before the API serves them. Each submission must reference an existing exercise, keep the same `languageId` as that exercise, keep a parseable `submittedAt`, and use a known local actor whose role is allowed to submit learner-exercise answers.
 
 ## Governance Records
 
@@ -200,7 +200,7 @@ Language snapshots and evaluation artifacts include SHA-256 integrity manifests.
 
 `POST /evaluations/run`
 
-Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, and every stored failure line must use the same language ID as its parent run.
+Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, keep a parseable `createdAt`, and every stored failure line must use the same language ID as its parent run.
 
 ## Elder Corrections
 

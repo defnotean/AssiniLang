@@ -84,7 +84,7 @@ Persisted notes and note answer keys must reference existing synthetic languages
 
 Persisted exercises must reference an existing synthetic language, keep duplicate-free allowed rule IDs, allowed vocabulary, expected answers, and adversarial probes after whitespace normalization, retain at least two adversarial probes, avoid adversarial answers that duplicate expected answers, keep translate-to-target expected answers present in same-language corpus text, and keep choose-particle expected answers inside the exercise's allowed vocabulary. Fixture-level rule and vocabulary existence checks stay in `packages/synthetic-langs` and the live API authoring route because the DB package deliberately has no dependency on fixture metadata.
 
-Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
+Persisted exercise submissions must reference an existing exercise, match that exercise's language ID, keep a parseable submission timestamp, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
 
 ## Public Projection Layer
 
@@ -159,7 +159,7 @@ Successful imports append the passage, derive a private corpus answer key from t
 
 Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output.
 
-Persisted evaluation runs must reference an existing synthetic language, and each failure line must use the same language ID as the run it belongs to. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
+Persisted evaluation runs must reference an existing synthetic language, keep a parseable creation timestamp, and each failure line must use the same language ID as the run it belongs to. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
 
 ## LLM Provider Boundary
 

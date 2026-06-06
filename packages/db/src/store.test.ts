@@ -997,6 +997,11 @@ describe("JsonStore", () => {
       "Exercise submission language solari does not match exercise exercise-1 language avenik"
     ],
     [
+      "unparseable submitted date",
+      createTestSubmission({ submittedAt: "not-a-date" }),
+      "Exercise submission submittedAt must be parseable: not-a-date"
+    ],
+    [
       "unknown learner actor",
       createTestSubmission({ learnerId: "missing-user" }),
       "Exercise submission learner is not allowed: missing-user"
@@ -1196,6 +1201,11 @@ describe("JsonStore", () => {
       "missing language",
       createTestEvaluationRun({ languageId: "missing-language" }),
       "Evaluation run references missing language: missing-language"
+    ],
+    [
+      "unparseable created date",
+      createTestEvaluationRun({ createdAt: "not-a-date" }),
+      "Evaluation run createdAt must be parseable: not-a-date"
     ],
     [
       "failure language mismatch",
