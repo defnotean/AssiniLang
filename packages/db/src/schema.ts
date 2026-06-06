@@ -146,6 +146,7 @@ export const userSchema = z.object({
 
 export const REVIEW_POLICY_ASSIGNABLE_ROLES = ["reviewer", "elder", "lead", "admin"] as const;
 const reviewPolicyAssignableRoleSet = new Set<string>(REVIEW_POLICY_ASSIGNABLE_ROLES);
+const reviewDispositionNoteStatusSet = new Set<string>(["contested", "rejected", "deferred", "escalated"]);
 
 export function isReviewPolicyAssignableRole(role: z.infer<typeof userRoleSchema>): boolean {
   return reviewPolicyAssignableRoleSet.has(role);
@@ -1199,6 +1200,12 @@ function addReviewDispositionIntegrityIssues(
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Review disposition language ${disposition.languageId} does not match note ${disposition.noteId} language ${note.languageId}`,
+        path: ["reviewDispositions", disposition.id]
+      });
+    } else if (disposition.status === "open" && !reviewDispositionNoteStatusSet.has(note.status)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Open review disposition note ${disposition.noteId} must have a disposition status, found ${note.status}`,
         path: ["reviewDispositions", disposition.id]
       });
     }

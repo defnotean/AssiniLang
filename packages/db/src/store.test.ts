@@ -1215,6 +1215,19 @@ describe("JsonStore", () => {
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
+  it.each(["draft", "under_review", "approved"] as const)(
+    "rejects open review dispositions for %s notes",
+    (status) => {
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+      state.notes = [createTestNote({ status })];
+      state.reviewDispositions = [createTestDisposition()];
+
+      expect(() => parseAppState(state)).toThrow(`Open review disposition note note-1 must have a disposition status, found ${status}`);
+    }
+  );
+
   it("rejects duplicate open review disposition work for the same note and disposition", () => {
     const state = createEmptyState();
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
