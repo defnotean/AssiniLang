@@ -57,6 +57,8 @@ Per-language review policies can require assigned reviewers and approval thresho
 
 If assignments change mid-review, earlier approvals stay in the audit trail but no longer satisfy quorum unless the reviewer is still eligible under the current policy.
 
+Repeated contested, rejected, deferred, or escalated decisions for the same note and disposition update the existing open work item instead of creating duplicate open ledger entries.
+
 ### Learning Lab
 
 The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.

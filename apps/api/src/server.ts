@@ -2101,6 +2101,7 @@ export function createServer(options: ServerOptions = {}) {
       let approvalThreshold: number | undefined;
       const disposition = isReviewDispositionStatus(requestedStatus) ? requestedStatus : undefined;
       let reviewDisposition: ReviewDisposition | undefined;
+      let reviewDispositionCreated = false;
 
       if (requestedStatus === "approved" && policy) {
         if (policy.requiresAssignedReviewer && !policy.assignedReviewerIds.includes(actor.id)) {
@@ -2138,21 +2139,36 @@ export function createServer(options: ServerOptions = {}) {
           approval.languageId !== existing.languageId || approval.noteId !== noteId
         ));
 
-        reviewDisposition = {
-          id: `review-disposition-${existing.languageId}-${noteId}-${state.reviewDispositions.length + 1}-${reviewedAt}`,
-          languageId: existing.languageId,
-          noteId,
-          disposition,
-          status: "open",
-          reason: body.reviewerComment as string,
-          assignedTo: body.dispositionAssigneeId ?? actor.id,
-          dueAt: body.dispositionDueAt ?? null,
-          openedAt: reviewedAt,
-          openedBy: actor.id,
-          resolvedAt: null,
-          resolvedBy: null,
-          resolutionSummary: null
-        };
+        const existingOpenDisposition = state.reviewDispositions.find((item) => (
+          item.languageId === existing.languageId
+          && item.noteId === noteId
+          && item.disposition === disposition
+          && item.status === "open"
+        ));
+
+        reviewDisposition = existingOpenDisposition
+          ? {
+              ...existingOpenDisposition,
+              reason: body.reviewerComment as string,
+              assignedTo: body.dispositionAssigneeId ?? actor.id,
+              dueAt: body.dispositionDueAt ?? null
+            }
+          : {
+              id: `review-disposition-${existing.languageId}-${noteId}-${state.reviewDispositions.length + 1}-${reviewedAt}`,
+              languageId: existing.languageId,
+              noteId,
+              disposition,
+              status: "open",
+              reason: body.reviewerComment as string,
+              assignedTo: body.dispositionAssigneeId ?? actor.id,
+              dueAt: body.dispositionDueAt ?? null,
+              openedAt: reviewedAt,
+              openedBy: actor.id,
+              resolvedAt: null,
+              resolvedBy: null,
+              resolutionSummary: null
+            };
+        reviewDispositionCreated = !existingOpenDisposition;
       }
 
       nextNote = {
@@ -2179,8 +2195,10 @@ export function createServer(options: ServerOptions = {}) {
         ...state,
         notes: state.notes.map((note) => (note.id === noteId ? nextNote as Note : note)),
         reviewApprovals,
-        reviewDispositions: reviewDisposition
+        reviewDispositions: reviewDisposition && reviewDispositionCreated
           ? [...state.reviewDispositions, reviewDisposition]
+          : reviewDisposition
+            ? state.reviewDispositions.map((item) => (item.id === reviewDisposition?.id ? reviewDisposition : item))
           : state.reviewDispositions
       };
 
@@ -2203,15 +2221,15 @@ export function createServer(options: ServerOptions = {}) {
             : {})
         }
       };
-      const dispositionCreatedDraft: AuditEventDraft[] = reviewDisposition
+      const dispositionAuditDraft: AuditEventDraft[] = reviewDisposition
         ? [{
             actor,
             at: reviewedAt,
-            action: "review_disposition.created",
+            action: reviewDispositionCreated ? "review_disposition.created" : "review_disposition.updated",
             entityType: "review_disposition",
             entityId: reviewDisposition.id,
             languageId: existing.languageId,
-            summary: `Opened ${reviewDisposition.disposition} review disposition for ${noteId}.`,
+            summary: `${reviewDispositionCreated ? "Opened" : "Updated"} ${reviewDisposition.disposition} review disposition for ${noteId}.`,
             metadata: {
               noteId,
               disposition: reviewDisposition.disposition,
@@ -2221,7 +2239,7 @@ export function createServer(options: ServerOptions = {}) {
           }]
         : [];
 
-      return appendAuditEvents(nextState, [noteReviewedDraft, ...dispositionCreatedDraft]);
+      return appendAuditEvents(nextState, [noteReviewedDraft, ...dispositionAuditDraft]);
     });
 
     if (noteMissing) {

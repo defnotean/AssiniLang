@@ -101,6 +101,8 @@ Mutating API routes append `AuditEvent` records when they change persistent stat
 
 Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads.
 
+Review-disposition ledger writes are de-duplicated per note, disposition, and open status. Reopening the same unresolved disposition updates the existing work record's reason, assignee, and due date while preserving original opened attribution and writing a new audit event for the update.
+
 ## Corpus Import Integrity
 
 Corpus imports are treated as synthetic source-data mutations. They are role-gated and validated before persistence.

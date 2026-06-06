@@ -2001,6 +2001,81 @@ describe("api server", () => {
     ]));
   });
 
+  it("updates an existing open review disposition instead of creating duplicate open work", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+
+    const firstDeferral = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        status: "deferred",
+        reviewerComment: "Pause until the next review workshop.",
+        dispositionAssigneeId: "elder-1",
+        dispositionDueAt: "2026-06-20"
+      }
+    });
+    expect(firstDeferral.statusCode).toBe(200);
+
+    const opened = await app.inject({
+      method: "GET",
+      url: "/languages/avenik/review-dispositions",
+      headers: authHeaders("lead-1")
+    });
+    expect(opened.statusCode).toBe(200);
+    expect(opened.json()).toHaveLength(1);
+    const dispositionId = opened.json()[0].id as string;
+
+    const updatedDeferral = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      headers: authHeaders("lead-1"),
+      payload: {
+        status: "deferred",
+        reviewerComment: "Still paused; assign the follow-up to the lead.",
+        dispositionAssigneeId: "lead-1",
+        dispositionDueAt: "2026-06-27"
+      }
+    });
+    expect(updatedDeferral.statusCode).toBe(200);
+
+    const dispositions = await app.inject({
+      method: "GET",
+      url: "/languages/avenik/review-dispositions",
+      headers: authHeaders("lead-1")
+    });
+    expect(dispositions.statusCode).toBe(200);
+    expect(dispositions.json()).toHaveLength(1);
+    expect(dispositions.json()[0]).toMatchObject({
+      id: dispositionId,
+      status: "open",
+      reason: "Still paused; assign the follow-up to the lead.",
+      assignedTo: "lead-1",
+      dueAt: "2026-06-27",
+      openedBy: "reviewer-1"
+    });
+
+    const audit = await app.inject({
+      method: "GET",
+      url: "/audit/events?languageId=avenik",
+      headers: authHeaders("lead-1")
+    });
+    expect(audit.json().filter((event: { action: string }) => event.action === "review_disposition.created")).toHaveLength(1);
+    expect(audit.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        action: "review_disposition.updated",
+        entityType: "review_disposition",
+        entityId: dispositionId,
+        metadata: expect.objectContaining({
+          noteId: reviewedNoteId,
+          disposition: "deferred",
+          assignedTo: "lead-1",
+          dueAt: "2026-06-27"
+        })
+      })
+    ]));
+  });
+
   it.each([
     ["contested missing reviewerComment", { status: "contested" }],
     ["contested blank reviewerComment", { status: "contested", reviewerComment: "   " }],
