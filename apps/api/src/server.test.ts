@@ -1049,6 +1049,7 @@ describe("api server", () => {
   it.each([
     ["missing content", { languageId: "avenik", policyType: "consent", effectiveDate: "2026-06-05" }, "Invalid governance body"],
     ["invalid policy type", { languageId: "avenik", policyType: "retention", content: "Policy.", effectiveDate: "2026-06-05" }, "Invalid governance body"],
+    ["unparseable effective date", { languageId: "avenik", policyType: "consent", content: "Policy.", effectiveDate: "not-a-date" }, "Invalid governance body"],
     ["unknown language", { languageId: "not-a-language", policyType: "consent", content: "Policy.", effectiveDate: "2026-06-05" }, "Language not found: not-a-language"]
   ])("rejects %s governance writes without mutating records", async (_, payload, error) => {
     const app = createServer({ initialState: stateWithAuthUsers() });

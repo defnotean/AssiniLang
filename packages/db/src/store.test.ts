@@ -1019,6 +1019,11 @@ describe("JsonStore", () => {
       "unallowed approver role",
       createTestGovernanceRecord({ approvedBy: "reviewer-1" }),
       "Governance record approver is not allowed: reviewer-1"
+    ],
+    [
+      "unparseable effective date",
+      createTestGovernanceRecord({ effectiveDate: "not-a-date" }),
+      "Governance record effectiveDate must be parseable: not-a-date"
     ]
   ])("rejects persisted governance records with %s", (_caseName, record, errorMessage) => {
     const state = createEmptyState();

@@ -158,9 +158,9 @@ The persisted app-state schema validates restored submission records before the 
 
 Allowed approver roles: Elder, lead, admin.
 
-Governance records are synthetic policy notes for local consent, access, and generation workflows. Writes require an existing language ID and append an audit event with policy type and effective date metadata.
+Governance records are synthetic policy notes for local consent, access, and generation workflows. Writes require an existing language ID and a parseable `effectiveDate`, then append an audit event with policy type and effective date metadata.
 
-The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language and must be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles.
+The persisted app-state schema also validates governance records during local JSON reads. Each record must reference an existing language, keep a parseable `effectiveDate`, and be attributed to a known local Elder, lead, or admin, so malformed restored state cannot invent policy records outside the local governance roles or carry unusable policy timelines.
 
 ## Audit Events
 

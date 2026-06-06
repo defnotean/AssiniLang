@@ -545,7 +545,7 @@ function parseGovernanceBody(input: unknown): GovernanceBody | undefined {
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const effectiveDate = typeof body.effectiveDate === "string" ? body.effectiveDate.trim() : "";
 
-  if (!languageId || !policyType || !content || !effectiveDate) {
+  if (!languageId || !policyType || !content || !effectiveDate || Number.isNaN(Date.parse(effectiveDate))) {
     return undefined;
   }
 

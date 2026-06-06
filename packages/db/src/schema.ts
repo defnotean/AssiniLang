@@ -879,6 +879,14 @@ function addGovernanceIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const record of state.governance) {
+    if (Number.isNaN(Date.parse(record.effectiveDate))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Governance record effectiveDate must be parseable: ${record.effectiveDate}`,
+        path: ["governance", record.id]
+      });
+    }
+
     if (!languageIds.has(record.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
