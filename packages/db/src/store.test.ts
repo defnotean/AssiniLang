@@ -2074,6 +2074,16 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestDisposition({ languageId: "   " }),
+      "Review disposition languageId must not be blank"
+    ],
+    [
+      "blank note id",
+      createTestDisposition({ noteId: "   " }),
+      "Review disposition noteId must not be blank"
+    ],
+    [
       "missing note",
       createTestDisposition({ noteId: "missing-note" }),
       "Review disposition references missing note: missing-note"
@@ -2089,6 +2099,11 @@ describe("JsonStore", () => {
       "Review disposition assignee is not assignable: missing-user"
     ],
     [
+      "blank assignee",
+      createTestDisposition({ assignedTo: "   " }),
+      "Review disposition assignee must not be blank"
+    ],
+    [
       "unassignable assignee",
       createTestDisposition({ assignedTo: "learner-1" }),
       "Review disposition assignee is not assignable: learner-1"
@@ -2097,6 +2112,11 @@ describe("JsonStore", () => {
       "unknown opener",
       createTestDisposition({ openedBy: "missing-opener" }),
       "Review disposition opener is not assignable: missing-opener"
+    ],
+    [
+      "blank opener",
+      createTestDisposition({ openedBy: "   " }),
+      "Review disposition opener must not be blank"
     ],
     [
       "unparseable due date",
@@ -2162,6 +2182,16 @@ describe("JsonStore", () => {
         resolutionSummary: "   "
       }),
       "Review disposition resolutionSummary must not be blank"
+    ],
+    [
+      "blank resolver",
+      createTestDisposition({
+        status: "resolved",
+        resolvedAt: "2026-06-06T01:00:00.000Z",
+        resolvedBy: "   ",
+        resolutionSummary: "Resolved after follow-up."
+      }),
+      "Review disposition resolver must not be blank"
     ],
     [
       "unknown resolver",

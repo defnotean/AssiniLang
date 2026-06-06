@@ -1826,6 +1826,15 @@ function addReviewDispositionIntegrityIssues(
     label: "assignee" | "opener" | "resolver",
     dispositionId: string
   ) => {
+    if (isBlankPersistedValue(userId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Review disposition ${label} must not be blank`,
+        path: ["reviewDispositions", dispositionId]
+      });
+      return;
+    }
+
     const user = usersById.get(userId);
     if (!user || !isReviewPolicyAssignableRole(user.role)) {
       context.addIssue({
@@ -1837,6 +1846,22 @@ function addReviewDispositionIntegrityIssues(
   };
 
   for (const disposition of state.reviewDispositions) {
+    if (isBlankPersistedValue(disposition.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review disposition languageId must not be blank",
+        path: ["reviewDispositions", disposition.id]
+      });
+    }
+
+    if (isBlankPersistedValue(disposition.noteId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review disposition noteId must not be blank",
+        path: ["reviewDispositions", disposition.id]
+      });
+    }
+
     const note = notesById.get(disposition.noteId);
     if (!note) {
       context.addIssue({

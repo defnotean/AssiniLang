@@ -187,7 +187,7 @@ During local JSON reads, restored notes and note answer keys must reference exis
 
 If the same note already has an open work record for the requested disposition, the route updates that record's reason, assignee, and due date instead of creating a duplicate open disposition. The original opened attribution stays on the record, and a separate audit event records the update.
 
-Persisted review-disposition records must reference an existing same-language note, use assignable local users for assignee/opener/resolver fields, keep nonblank reason and resolution text, keep parseable timeline fields (`dueAt`, `openedAt`, and `resolvedAt` when present), prevent resolved timestamps from predating opened timestamps, and keep open versus resolved fields internally consistent. Open disposition work must be attached to a note currently in a disposition status: `contested`, `rejected`, `deferred`, or `escalated`.
+Persisted review-disposition records must keep nonblank language and note IDs, reference an existing same-language note, use nonblank assignable local users for assignee/opener/resolver fields, keep nonblank reason and resolution text, keep parseable timeline fields (`dueAt`, `openedAt`, and `resolvedAt` when present), prevent resolved timestamps from predating opened timestamps, and keep open versus resolved fields internally consistent. Open disposition work must be attached to a note currently in a disposition status: `contested`, `rejected`, `deferred`, or `escalated`.
 
 Approval can be controlled by per-language review policies. If a policy requires multiple approvals, the note remains `under_review` until the threshold is met.
 
