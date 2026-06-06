@@ -1217,6 +1217,35 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it("rejects duplicate adversarial exercise probes without mutating exercises", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/exercises",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        type: "translate_to_target",
+        prompt: "Translate into Avenik: I walk by the river.",
+        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+        allowedRuleIds: ["avn-rule-verb-chain"],
+        expectedAnswers: ["mira talo-mi-na"],
+        adversarialAnswers: [
+          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+          { answer: "  talo-mi-na   mira  ", reason: "Repeats the same word order probe with extra whitespace." }
+        ],
+        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Exercise adversarial answer is duplicated: talo-mi-na mira" });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it("grades and persists correct exercise submissions server-side", async () => {
     const app = createServer({ initialState: buildSeedState() });
 

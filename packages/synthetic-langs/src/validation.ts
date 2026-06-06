@@ -220,10 +220,16 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
           }
         }
       }
+      const normalizedAdversarialAnswers = new Set<string>();
       for (const adversarial of exercise.adversarialAnswers) {
-        if (exercise.expectedAnswers.some((expected) => normalizedText(expected) === normalizedText(adversarial.answer))) {
+        const normalizedAdversarialAnswer = normalizedText(adversarial.answer);
+        if (exercise.expectedAnswers.some((expected) => normalizedText(expected) === normalizedAdversarialAnswer)) {
           diagnostics.push(`${languageId} exercise ${exercise.id} adversarial answer duplicates an expected answer: ${adversarial.answer}`);
         }
+        if (normalizedAdversarialAnswers.has(normalizedAdversarialAnswer)) {
+          diagnostics.push(`${languageId} exercise ${exercise.id} adversarial answer is duplicated: ${normalizedAdversarialAnswer}`);
+        }
+        normalizedAdversarialAnswers.add(normalizedAdversarialAnswer);
       }
     }
   }

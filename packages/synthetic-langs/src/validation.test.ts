@@ -59,4 +59,21 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects duplicate adversarial exercise probes after normalization", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.exercisesAnswerKey[0].adversarialAnswers = [
+      { answer: "talo-mi-na mira", reason: "Keeps the words but moves the verb first." },
+      { answer: "  talo-mi-na   mira  ", reason: "Repeats the same probe with extra whitespace." }
+    ];
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik exercise avn-ex001 adversarial answer is duplicated: talo-mi-na mira"
+      ])
+    );
+  });
 });

@@ -65,7 +65,7 @@ Reviewers can author compact synthetic exercises from the web UI. Exercise autho
 - Known grammar-rule IDs.
 - Known vocabulary forms.
 - Non-empty expected answers.
-- Private adversarial answer probes.
+- Private adversarial answer probes that do not duplicate expected answers or one another after whitespace normalization.
 - Substantive grading explanations.
 
 ### Evaluation Dashboard

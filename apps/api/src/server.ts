@@ -740,10 +740,16 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
   }
 
   const normalizedExpected = new Set(body.expectedAnswers.map(normalizeAuthoredAnswer));
+  const normalizedAdversarial = new Set<string>();
   for (const adversarial of body.adversarialAnswers) {
-    if (normalizedExpected.has(normalizeAuthoredAnswer(adversarial.answer))) {
+    const normalizedAnswer = normalizeAuthoredAnswer(adversarial.answer);
+    if (normalizedExpected.has(normalizedAnswer)) {
       return `Exercise adversarial answer duplicates an expected answer: ${adversarial.answer}`;
     }
+    if (normalizedAdversarial.has(normalizedAnswer)) {
+      return `Exercise adversarial answer is duplicated: ${normalizedAnswer}`;
+    }
+    normalizedAdversarial.add(normalizedAnswer);
   }
 
   return undefined;

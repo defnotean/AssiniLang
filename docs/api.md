@@ -133,7 +133,7 @@ Important validation:
 - Allowed vocabulary forms must exist for that language.
 - Prompts and grading explanations must be substantive.
 - Expected answers must be present.
-- Adversarial answers must not duplicate accepted answers.
+- Adversarial answers must not duplicate accepted answers or another adversarial probe after whitespace normalization.
 
 ## Note Review
 
