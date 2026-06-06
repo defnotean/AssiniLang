@@ -782,7 +782,13 @@ function addNoteCollectionIntegrityIssues(
   const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
 
   for (const note of notes) {
-    if (!languageIds.has(note.languageId)) {
+    if (isBlankPersistedValue(note.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} languageId must not be blank: ${note.id}`,
+        path: [collectionPath, note.id]
+      });
+    } else if (!languageIds.has(note.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `${label} references missing language: ${note.languageId}`,
@@ -823,7 +829,13 @@ function addNoteCollectionIntegrityIssues(
     }
 
     addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} reviewer lastReviewedAt`, note.reviewer.lastReviewedAt);
-    if (note.reviewer.lastReviewedBy !== null && !isAllowedPersistedNoteActor(usersById, note.reviewer.lastReviewedBy)) {
+    if (note.reviewer.lastReviewedBy !== null && isBlankPersistedValue(note.reviewer.lastReviewedBy)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} reviewer lastReviewedBy must not be blank`,
+        path: [collectionPath, note.id]
+      });
+    } else if (note.reviewer.lastReviewedBy !== null && !isAllowedPersistedNoteActor(usersById, note.reviewer.lastReviewedBy)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `${label} reviewer lastReviewedBy is not allowed: ${note.reviewer.lastReviewedBy}`,
@@ -843,7 +855,13 @@ function addNoteCollectionIntegrityIssues(
 
     for (const entry of note.editHistory) {
       addParseablePersistedDateIssue(context, collectionPath, note.id, `${label} editHistory at`, entry.at);
-      if (!isAllowedPersistedNoteActor(usersById, entry.by)) {
+      if (isBlankPersistedValue(entry.by)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} editHistory by must not be blank`,
+          path: [collectionPath, note.id]
+        });
+      } else if (!isAllowedPersistedNoteActor(usersById, entry.by)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `${label} editHistory by is not allowed: ${entry.by}`,
@@ -869,6 +887,15 @@ function addNoteCollectionIntegrityIssues(
     }
 
     for (const passageId of note.evidencePassageIds) {
+      if (isBlankPersistedValue(passageId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} evidencePassageId must not be blank`,
+          path: [collectionPath, note.id]
+        });
+        continue;
+      }
+
       const passage = passagesById.get(passageId);
       if (!passage) {
         context.addIssue({
@@ -889,6 +916,15 @@ function addNoteCollectionIntegrityIssues(
     }
 
     for (const example of note.examples) {
+      if (isBlankPersistedValue(example.passageId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} example passageId must not be blank`,
+          path: [collectionPath, note.id]
+        });
+        continue;
+      }
+
       const passage = passagesById.get(example.passageId);
       if (!passage) {
         context.addIssue({

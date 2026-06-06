@@ -604,10 +604,22 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "note with blank language",
+      "notes",
+      createTestNote({ languageId: "   " }),
+      "Note languageId must not be blank: note-1"
+    ],
+    [
       "note with missing language",
       "notes",
       createTestNote({ languageId: "missing-language" }),
       "Note references missing language: missing-language"
+    ],
+    [
+      "note answer key with blank language",
+      "noteAnswerKeys",
+      createTestNote({ id: "note-answer-key-1", languageId: "   ", status: "approved" }),
+      "Note answer key languageId must not be blank: note-answer-key-1"
     ],
     [
       "note answer key with missing language",
@@ -714,6 +726,18 @@ describe("JsonStore", () => {
       "Note reviewer lastReviewedBy is not allowed: missing-reviewer"
     ],
     [
+      "note with blank reviewer actor",
+      "notes",
+      createTestNote({
+        reviewer: {
+          lastReviewedBy: "   ",
+          lastReviewedAt: "2026-06-06T00:00:00.000Z",
+          comments: ["Blank reviewers should not restore."]
+        }
+      }),
+      "Note reviewer lastReviewedBy must not be blank"
+    ],
+    [
       "note with unassignable reviewer actor",
       "notes",
       createTestNote({
@@ -739,6 +763,21 @@ describe("JsonStore", () => {
         ]
       }),
       "Note editHistory by is not allowed: missing-writer"
+    ],
+    [
+      "note with blank edit-history actor",
+      "notes",
+      createTestNote({
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "   ",
+            action: "reviewed",
+            summary: "Blank edit-history writers should not restore."
+          }
+        ]
+      }),
+      "Note editHistory by must not be blank"
     ],
     [
       "note answer key with unknown edit-history actor",
@@ -840,6 +879,12 @@ describe("JsonStore", () => {
       "Note references missing evidence passage: missing-passage"
     ],
     [
+      "blank evidence passage",
+      "notes",
+      createTestNote({ evidencePassageIds: ["   "], evidenceCount: 1 }),
+      "Note evidencePassageId must not be blank"
+    ],
+    [
       "evidence passage language mismatch",
       "notes",
       createTestNote({ evidencePassageIds: ["other-passage"], evidenceCount: 1 }),
@@ -852,6 +897,14 @@ describe("JsonStore", () => {
         examples: [{ passageId: "missing-passage", target: "missing target", translation: "Missing translation." }]
       }),
       "Note references missing example passage: missing-passage"
+    ],
+    [
+      "blank example passage",
+      "notes",
+      createTestNote({
+        examples: [{ passageId: "   ", target: "missing target", translation: "Missing translation." }]
+      }),
+      "Note example passageId must not be blank"
     ],
     [
       "example target mismatch",
