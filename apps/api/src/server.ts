@@ -661,6 +661,22 @@ function corpusMorphemeGroundingError(languageId: string, body: CorpusImportBody
   return undefined;
 }
 
+function corpusListValidationError(body: CorpusImportBody): string | undefined {
+  const duplicateTopicTag = firstDuplicateNormalizedValue(body.topicTags);
+  if (duplicateTopicTag) {
+    return `Corpus topic tag is duplicated: ${duplicateTopicTag}`;
+  }
+
+  for (const morpheme of body.morphologicalSegmentation) {
+    const duplicateFeature = firstDuplicateNormalizedValue(morpheme.features);
+    if (duplicateFeature) {
+      return `Corpus morpheme feature is duplicated for ${morpheme.surface}: ${duplicateFeature}`;
+    }
+  }
+
+  return undefined;
+}
+
 function corpusPhonologyValidationError(languageId: string, body: CorpusImportBody): string | undefined {
   const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
   if (!fixture) {
@@ -690,6 +706,11 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
     if (!corpusTargetContainsSurface(body.textTarget, morpheme.surface)) {
       return `Corpus segmentation surface is not present in target text: ${morpheme.surface}`;
     }
+  }
+
+  const listError = corpusListValidationError(body);
+  if (listError) {
+    return listError;
   }
 
   const phonologyError = corpusPhonologyValidationError(languageId, body);

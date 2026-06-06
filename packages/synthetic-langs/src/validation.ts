@@ -114,10 +114,20 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
         `${languageId} corpus passage ${passage.id} textTarget`,
         diagnostics
       );
+      addDuplicateNormalizedDiagnostics(
+        passage.topicTags,
+        `${languageId} corpus passage ${passage.id} topic tag is duplicated:`,
+        diagnostics
+      );
       for (const morpheme of passage.morphologicalSegmentation) {
         if (!vocabularyForms.has(morpheme.surface) && !vocabularyForms.has(morpheme.lemma)) {
           diagnostics.push(`${languageId} corpus passage ${passage.id} has ungrounded morpheme ${morpheme.surface}/${morpheme.lemma}`);
         }
+        addDuplicateNormalizedDiagnostics(
+          morpheme.features,
+          `${languageId} corpus passage ${passage.id} morpheme ${morpheme.surface} feature is duplicated:`,
+          diagnostics
+        );
       }
     }
 

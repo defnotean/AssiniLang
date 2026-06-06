@@ -106,4 +106,20 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects duplicate corpus topic tags and morpheme features after normalization", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.corpus[0].topicTags = ["motion", "present", "motion"];
+    avenik.corpus[0].morphologicalSegmentation[0].features = ["noun", "noun"];
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik corpus passage avn-c001 topic tag is duplicated: motion",
+        "avenik corpus passage avn-c001 morpheme mira feature is duplicated: noun"
+      ])
+    );
+  });
 });

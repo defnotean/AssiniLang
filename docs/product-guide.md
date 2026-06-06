@@ -39,11 +39,11 @@ Reviewers can also import new synthetic passages from the browser. The import fl
 - English translation.
 - Source label.
 - Author, year, license, and consent record.
-- Topic tags.
-- Structured morpheme segmentation.
+- Unique topic tags.
+- Structured morpheme segmentation with unique feature labels per morpheme.
 - Synthetic-only access restrictions.
 
-The API validates the import before saving. It rejects duplicate target passages, target text with symbols outside the selected language phonology inventory, segmentation surfaces that are not present in the target text, morphemes that are not grounded by the selected language vocabulary surface or lemma, invalid synthetic consent metadata, and malformed payloads. Successful imports write audit metadata without storing private reviewer data.
+The API validates the import before saving. It rejects duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, target text with symbols outside the selected language phonology inventory, segmentation surfaces that are not present in the target text, morphemes that are not grounded by the selected language vocabulary surface or lemma, invalid synthetic consent metadata, and malformed payloads. Successful imports write audit metadata without storing private reviewer data.
 
 ### Note Review Queue
 

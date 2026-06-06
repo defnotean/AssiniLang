@@ -428,6 +428,64 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it.each([
+    [
+      "topic tags",
+      {
+        topicTags: ["motion", "place", "motion"],
+        morphologicalSegmentation: [
+          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
+          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ]
+      },
+      "Corpus topic tag is duplicated: motion"
+    ],
+    [
+      "morpheme features",
+      {
+        topicTags: ["motion", "place"],
+        morphologicalSegmentation: [
+          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun", "noun"] },
+          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ]
+      },
+      "Corpus morpheme feature is duplicated for mira: noun"
+    ]
+  ])("rejects corpus imports with duplicate %s without mutating corpus", async (_, overrides, error) => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/corpus",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        source: "synthetic-import",
+        sourceMetadata: {
+          author: "Local Reviewer",
+          year: 2026,
+          license: "synthetic-only",
+          consentRecord: "local synthetic import consent"
+        },
+        textTarget: "mira lumo-ke talo-mi-na",
+        textTranslation: "I walk by the river at the practice mat.",
+        ...overrides,
+        consentStatus: {
+          use: "synthetic-testing-only",
+          restrictions: []
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
     const app = createServer({ initialState: buildSeedState() });
 
