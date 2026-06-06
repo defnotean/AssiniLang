@@ -105,6 +105,8 @@ Review-disposition ledger writes are de-duplicated per note, disposition, and op
 
 Elder correction review is a one-way transition out of `pending_review`. Accepted, rejected, and applied corrections cannot be re-reviewed, which preserves reviewer attribution and keeps later note edits auditable.
 
+Review-approval records are unique per language, note, and reviewer. The local database schema rejects duplicate approval tuples so quorum counts cannot drift from duplicated persisted records.
+
 ## Corpus Import Integrity
 
 Corpus imports are treated as synthetic source-data mutations. They are role-gated and validated before persistence.

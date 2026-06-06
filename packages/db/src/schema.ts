@@ -311,6 +311,18 @@ export const reviewDispositionSchema = z.object({
   resolutionSummary: z.string().min(1).nullable()
 });
 
+function duplicateReviewApprovalKey(
+  approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
+): string | undefined {
+  const seen = new Set<string>();
+  for (const approval of approvals) {
+    const key = `${approval.languageId}/${approval.noteId}/${approval.reviewerId}`;
+    if (seen.has(key)) return key;
+    seen.add(key);
+  }
+  return undefined;
+}
+
 export const appStateSchema = z.object({
   schemaVersion: z.literal(7),
   languages: z.array(languageSchema),
@@ -329,6 +341,15 @@ export const appStateSchema = z.object({
   reviewPolicies: z.array(reviewPolicySchema).default([]),
   reviewApprovals: z.array(reviewApprovalSchema).default([]),
   reviewDispositions: z.array(reviewDispositionSchema).default([])
+}).superRefine((state, context) => {
+  const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
+  if (duplicateApproval) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Duplicate review approval for language/note/reviewer: ${duplicateApproval}`,
+      path: ["reviewApprovals"]
+    });
+  }
 });
 
 export type UserRole = z.infer<typeof userRoleSchema>;

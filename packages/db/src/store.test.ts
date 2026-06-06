@@ -244,6 +244,28 @@ describe("JsonStore", () => {
     });
   });
 
+  it("rejects duplicate review approvals for the same note and reviewer", () => {
+    const state = createEmptyState();
+    state.reviewApprovals = [
+      {
+        id: "review-approval-1",
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "reviewer-1",
+        approvedAt: "2026-06-06T00:01:00.000Z"
+      },
+      {
+        id: "review-approval-2",
+        languageId: "avenik",
+        noteId: "note-1",
+        reviewerId: "reviewer-1",
+        approvedAt: "2026-06-06T00:02:00.000Z"
+      }
+    ];
+
+    expect(() => parseAppState(state)).toThrow("Duplicate review approval for language/note/reviewer: avenik/note-1/reviewer-1");
+  });
+
   it("validates richer note review lifecycle statuses", () => {
     expect(["draft", "under_review", "approved", "contested", "rejected", "deferred", "escalated"].map((status) => (
       noteStatusSchema.parse(status)
