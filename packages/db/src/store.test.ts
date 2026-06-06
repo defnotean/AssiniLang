@@ -7,6 +7,7 @@ import {
   aiSessionSchema,
   auditEventSchema,
   elderCorrectionSchema,
+  LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
   parseAppState,
   reviewApprovalSchema,
@@ -274,6 +275,66 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate persisted id in notes: note-1");
+  });
+
+  it.each([
+    [
+      "duplicate assigned reviewers",
+      {
+        assignedReviewerIds: ["reviewer-1", "reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true
+      },
+      "Review policy assignedReviewerIds must be unique"
+    ],
+    [
+      "unknown assigned reviewer",
+      {
+        assignedReviewerIds: ["reviewer-1", "missing-reviewer"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      },
+      "Review policy references unknown reviewer: missing-reviewer"
+    ],
+    [
+      "unassignable learner reviewer",
+      {
+        assignedReviewerIds: ["reviewer-1", "learner-1"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      },
+      "Review policy reviewer is not assignable: learner-1"
+    ],
+    [
+      "assigned-reviewer threshold overflow",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      },
+      "Review policy approvalThreshold cannot exceed assigned reviewers"
+    ],
+    [
+      "open-reviewer threshold overflow",
+      {
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 5,
+        requiresAssignedReviewer: false
+      },
+      "Review policy approvalThreshold cannot exceed assignable reviewers"
+    ]
+  ])("rejects persisted review policies with %s", (_caseName, policyPatch, errorMessage) => {
+    const state = createEmptyState();
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.reviewPolicies = [{
+      id: "review-policy-avenik",
+      languageId: "avenik",
+      updatedAt: "2026-06-06T00:00:00.000Z",
+      updatedBy: "lead-1",
+      ...policyPatch
+    }];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it("rejects duplicate review approvals for the same note and reviewer", () => {

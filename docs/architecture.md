@@ -109,6 +109,8 @@ Review-disposition ledger writes are de-duplicated per note, disposition, and op
 
 Elder correction review is a one-way transition out of `pending_review`. Accepted, rejected, and applied corrections cannot be re-reviewed, which preserves reviewer attribution and keeps later note edits auditable.
 
+Review-policy records are validated both at the API mutation boundary and at the persisted app-state boundary. Assigned reviewers must be unique, known local users, and in an assignable review role; approval thresholds must fit either the assigned reviewer list or the open assignable reviewer pool.
+
 Review-approval records are unique per language, note, and reviewer. The local database schema rejects duplicate approval tuples so quorum counts cannot drift from duplicated persisted records.
 
 ## Corpus Import Integrity

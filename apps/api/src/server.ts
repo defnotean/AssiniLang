@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
+  isReviewPolicyAssignableRole,
   JsonStore,
   LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
@@ -142,7 +143,6 @@ const TEST_ONLY_AUTH_TOKEN = "test";
 const PROTOTYPE_SESSION_COOKIE = "assini_prototype_session";
 const PROTOTYPE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
 const PROTOTYPE_AUTH_ROLES: readonly UserRole[] = ["learner", "elder", "programmer", "reviewer", "lead"];
-const REVIEW_POLICY_ASSIGNABLE_ROLES: readonly UserRole[] = ["reviewer", "elder", "lead", "admin"];
 const REVIEW_DISPOSITION_STATUSES: readonly ReviewDispositionStatus[] = ["contested", "rejected", "deferred", "escalated"];
 const DEFAULT_RATE_LIMIT: RateLimitOptions = { max: 120, windowMs: 60_000 };
 const RATE_LIMITED_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
@@ -589,7 +589,7 @@ function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): s
       return `Review policy references unknown reviewer: ${reviewerId}`;
     }
 
-    if (!REVIEW_POLICY_ASSIGNABLE_ROLES.includes(reviewer.role)) {
+    if (!isReviewPolicyAssignableRole(reviewer.role)) {
       return `Review policy reviewer is not assignable: ${reviewerId}`;
     }
   }
@@ -600,7 +600,7 @@ function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): s
 
   if (!body.requiresAssignedReviewer) {
     const assignableReviewerCount = [...assignableUsers.values()]
-      .filter((user) => REVIEW_POLICY_ASSIGNABLE_ROLES.includes(user.role))
+      .filter((user) => isReviewPolicyAssignableRole(user.role))
       .length;
     if (body.approvalThreshold > assignableReviewerCount) {
       return "Review policy approvalThreshold cannot exceed assignable reviewers";
@@ -617,7 +617,7 @@ function reviewPolicyEligibleReviewerIds(state: AppState, policy: ReviewPolicy):
 
   return new Set(
     usersForState(state)
-      .filter((user) => REVIEW_POLICY_ASSIGNABLE_ROLES.includes(user.role))
+      .filter((user) => isReviewPolicyAssignableRole(user.role))
       .map((user) => user.id)
   );
 }
@@ -889,7 +889,7 @@ function isReviewDispositionStatus(status: Note["status"] | undefined): status i
 function reviewDispositionValidationError(state: AppState, body: ReviewBody, actor: User): string | undefined {
   const assignedTo = body.dispositionAssigneeId ?? actor.id;
   const assignee = usersForState(state).find((user) => user.id === assignedTo);
-  if (!assignee || !REVIEW_POLICY_ASSIGNABLE_ROLES.includes(assignee.role)) {
+  if (!assignee || !isReviewPolicyAssignableRole(assignee.role)) {
     return `Review disposition assignee is not assignable: ${assignedTo}`;
   }
 

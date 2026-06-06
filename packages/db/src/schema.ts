@@ -144,6 +144,22 @@ export const userSchema = z.object({
   avatarUrl: z.string().optional()
 });
 
+export const REVIEW_POLICY_ASSIGNABLE_ROLES = ["reviewer", "elder", "lead", "admin"] as const;
+const reviewPolicyAssignableRoleSet = new Set<string>(REVIEW_POLICY_ASSIGNABLE_ROLES);
+
+export function isReviewPolicyAssignableRole(role: z.infer<typeof userRoleSchema>): boolean {
+  return reviewPolicyAssignableRoleSet.has(role);
+}
+
+export const LOCAL_PROTOTYPE_USERS = z.array(userSchema).parse([
+  { id: "learner-1", name: "Local Learner", role: "learner" },
+  { id: "elder-1", name: "Local Elder", role: "elder" },
+  { id: "programmer-1", name: "Local Programmer", role: "programmer" },
+  { id: "reviewer-1", name: "Local Reviewer", role: "reviewer" },
+  { id: "lead-1", name: "Local Lead", role: "lead" },
+  { id: "admin-1", name: "Local Admin", role: "admin" }
+]);
+
 export const auditEntityTypeSchema = z.enum([
   "exercise_submission",
   "evaluation_run",
@@ -338,6 +354,66 @@ function addDuplicatePersistedValueIssue<T>(
   }
 }
 
+function addReviewPolicyIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    users: Array<z.infer<typeof userSchema>>;
+    reviewPolicies: Array<z.infer<typeof reviewPolicySchema>>;
+  }
+) {
+  const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const usersById = new Map(users.map((user) => [user.id, user]));
+  const assignableReviewerCount = users.filter((user) => isReviewPolicyAssignableRole(user.role)).length;
+
+  for (const policy of state.reviewPolicies) {
+    const duplicateReviewerId = duplicatePersistedValue(policy.assignedReviewerIds, (reviewerId) => reviewerId);
+    if (duplicateReviewerId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review policy assignedReviewerIds must be unique",
+        path: ["reviewPolicies", policy.id]
+      });
+      continue;
+    }
+
+    for (const reviewerId of policy.assignedReviewerIds) {
+      const reviewer = usersById.get(reviewerId);
+      if (!reviewer) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Review policy references unknown reviewer: ${reviewerId}`,
+          path: ["reviewPolicies", policy.id]
+        });
+        continue;
+      }
+
+      if (!isReviewPolicyAssignableRole(reviewer.role)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Review policy reviewer is not assignable: ${reviewerId}`,
+          path: ["reviewPolicies", policy.id]
+        });
+      }
+    }
+
+    if (policy.requiresAssignedReviewer && policy.approvalThreshold > policy.assignedReviewerIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review policy approvalThreshold cannot exceed assigned reviewers",
+        path: ["reviewPolicies", policy.id]
+      });
+    }
+
+    if (!policy.requiresAssignedReviewer && policy.approvalThreshold > assignableReviewerCount) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Review policy approvalThreshold cannot exceed assignable reviewers",
+        path: ["reviewPolicies", policy.id]
+      });
+    }
+  }
+}
+
 function duplicateReviewApprovalKey(
   approvals: Array<Pick<ReviewApproval, "languageId" | "noteId" | "reviewerId">>
 ): string | undefined {
@@ -385,6 +461,7 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "reviewPolicies", "id", state.reviewPolicies, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewApprovals", "id", state.reviewApprovals, (item) => item.id);
   addDuplicatePersistedValueIssue(context, "reviewDispositions", "id", state.reviewDispositions, (item) => item.id);
+  addReviewPolicyIntegrityIssues(context, state);
 
   const duplicateApproval = duplicateReviewApprovalKey(state.reviewApprovals);
   if (duplicateApproval) {
@@ -418,15 +495,6 @@ export type ExerciseSubmission = z.infer<typeof exerciseSubmissionSchema>;
 export type EvaluationFailure = z.infer<typeof evaluationFailureSchema>;
 export type EvaluationRun = z.infer<typeof evaluationRunSchema>;
 export type AppState = z.infer<typeof appStateSchema>;
-
-export const LOCAL_PROTOTYPE_USERS: User[] = [
-  { id: "learner-1", name: "Local Learner", role: "learner" },
-  { id: "elder-1", name: "Local Elder", role: "elder" },
-  { id: "programmer-1", name: "Local Programmer", role: "programmer" },
-  { id: "reviewer-1", name: "Local Reviewer", role: "reviewer" },
-  { id: "lead-1", name: "Local Lead", role: "lead" },
-  { id: "admin-1", name: "Local Admin", role: "admin" }
-];
 
 const legacyAppStateV1Schema = z.object({
   schemaVersion: z.literal(1),
