@@ -196,6 +196,29 @@ describe("evaluation scoring", () => {
     );
   });
 
+  it("scores exercise grading against curated adversarial answer probes", () => {
+    const state = buildSeedState();
+    const exercise = state.exercises.find((item) => item.id === "avn-ex001");
+    if (!exercise) throw new Error("Missing avn-ex001");
+
+    exercise.adversarialAnswers = [
+      { answer: "mira talo-mi-na", reason: "Matches an expected answer and must be detected as an unsafe probe." }
+    ];
+
+    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+
+    expect(result.scores.exerciseGrading).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "exerciseGrading",
+          itemId: "avn-ex001",
+          message: "Curated adversarial answer was accepted by the grader."
+        })
+      ])
+    );
+  });
+
   it("rejects segment answers that collapse required morpheme boundaries", () => {
     const state = buildSeedState();
     const exercise = state.exercises.find((item) => item.id === "avn-ex002");

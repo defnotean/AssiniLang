@@ -6,11 +6,14 @@ import {
   type CorpusPassage,
   type Exercise,
   type Morpheme,
-  type Note
+  type Note,
+  type ReviewPolicy
 } from "@assini/db";
-import { syntheticLanguageFixtures } from "./fixtures";
+import { syntheticLanguageFixtures, type SyntheticLanguageFixture } from "./fixtures";
+import { validateSyntheticLanguageFixtures } from "./validation";
 
 export { syntheticLanguageFixtures };
+export { validateSyntheticLanguageFixtures } from "./validation";
 
 function cloneNote(note: Note): Note {
   return {
@@ -50,15 +53,30 @@ function cloneExercise(exercise: Exercise): Exercise {
     ...exercise,
     allowedVocabulary: [...exercise.allowedVocabulary],
     allowedRuleIds: [...exercise.allowedRuleIds],
-    expectedAnswers: [...exercise.expectedAnswers]
+    expectedAnswers: [...exercise.expectedAnswers],
+    adversarialAnswers: exercise.adversarialAnswers.map((adversarial) => ({ ...adversarial }))
   };
 }
 
-export function buildSeedState(): AppState {
+export function buildSeedState(fixtures: SyntheticLanguageFixture[] = syntheticLanguageFixtures): AppState {
+  const diagnostics = validateSyntheticLanguageFixtures(fixtures);
+  if (diagnostics.length > 0) {
+    throw new Error(["Synthetic fixture validation failed:", ...diagnostics].join("\n"));
+  }
+
   const state = createEmptyState();
   state.corpusAnswerKeys = [];
-  for (const fixture of syntheticLanguageFixtures) {
+  for (const fixture of fixtures) {
     const corpus = fixture.corpus.map(cloneCorpusPassage);
+    const reviewPolicy: ReviewPolicy = {
+      id: `review-policy-${fixture.language.id}`,
+      languageId: fixture.language.id,
+      assignedReviewerIds: ["reviewer-1", "elder-1"],
+      approvalThreshold: 2,
+      requiresAssignedReviewer: true,
+      updatedAt: "2026-06-06T00:00:00.000Z",
+      updatedBy: "system-seed"
+    };
 
     state.languages.push(fixture.language);
     state.corpus.push(...corpus);
@@ -66,6 +84,7 @@ export function buildSeedState(): AppState {
     state.noteAnswerKeys.push(...fixture.notesAnswerKey.map(cloneNote));
     state.notes.push(...fixture.notesAnswerKey.map((note) => ({ ...cloneNote(note), status: "draft" as const })));
     state.exercises.push(...fixture.exercisesAnswerKey.map(cloneExercise));
+    state.reviewPolicies.push(reviewPolicy);
   }
   return appStateSchema.parse(state);
 }

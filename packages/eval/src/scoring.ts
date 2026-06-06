@@ -319,17 +319,22 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     const rejectsNegativeProbes = deterministicNegativeProbeAnswers(exercise).every(
       (answer) => !gradeExerciseAnswer(exercise, answer).accepted
     );
+    const rejectsAdversarialProbes = exercise.adversarialAnswers.every(
+      (probe) => !gradeExerciseAnswer(exercise, probe.answer).accepted
+    );
 
-    if (acceptsExpectedAnswers && rejectsNegativeProbes) {
+    if (acceptsExpectedAnswers && rejectsNegativeProbes && rejectsAdversarialProbes) {
       exercisePass += 1;
     } else {
       failures.push({
         category: "exerciseGrading",
         languageId,
         itemId: exercise.id,
-        message: rejectsNegativeProbes
+        message: !acceptsExpectedAnswers
           ? "Expected answer was rejected by the grader."
-          : "Deterministic invalid answer was accepted by the grader."
+          : rejectsNegativeProbes
+            ? "Curated adversarial answer was accepted by the grader."
+            : "Deterministic invalid answer was accepted by the grader."
       });
     }
   }

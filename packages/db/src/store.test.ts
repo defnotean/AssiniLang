@@ -3,6 +3,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createEmptyState, JsonStore } from "./store";
+import {
+  aiSessionSchema,
+  auditEventSchema,
+  elderCorrectionSchema,
+  noteStatusSchema,
+  parseAppState,
+  reviewApprovalSchema,
+  reviewDispositionSchema,
+  reviewPolicySchema,
+  userRoleSchema
+} from "./schema";
 
 describe("JsonStore", () => {
   it("writes and reads a seeded state", async () => {
@@ -27,7 +38,11 @@ describe("JsonStore", () => {
       const raw = JSON.parse(await readFile(dbPath, "utf8"));
 
       expect(loaded.languages[0]?.id).toBe("test-lang");
-      expect(raw.schemaVersion).toBe(3);
+      expect(raw.schemaVersion).toBe(7);
+      expect(loaded.auditEvents).toEqual([]);
+      expect(loaded.reviewPolicies).toEqual([]);
+      expect(loaded.reviewApprovals).toEqual([]);
+      expect(loaded.reviewDispositions).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -64,10 +79,14 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(3);
+      expect(loaded.schemaVersion).toBe(7);
       expect(loaded.notes).toHaveLength(1);
       expect(loaded.noteAnswerKeys).toHaveLength(1);
       expect(loaded.exerciseSubmissions).toEqual([]);
+      expect(loaded.auditEvents).toEqual([]);
+      expect(loaded.reviewPolicies).toEqual([]);
+      expect(loaded.reviewApprovals).toEqual([]);
+      expect(loaded.reviewDispositions).toEqual([]);
       expect(loaded.noteAnswerKeys[0]).toMatchObject({
         id: "legacy-note",
         topic: "legacy/topic",
@@ -91,11 +110,166 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(3);
+      expect(loaded.schemaVersion).toBe(7);
       expect(loaded.exerciseSubmissions).toEqual([]);
+      expect(loaded.auditEvents).toEqual([]);
+      expect(loaded.reviewPolicies).toEqual([]);
+      expect(loaded.reviewApprovals).toEqual([]);
+      expect(loaded.reviewDispositions).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it("reports the database path when local JSON is corrupted", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      await writeFile(dbPath, "{ not valid json", "utf8");
+
+      await expect(store.read()).rejects.toThrow(`Failed to read local database at ${dbPath}:`);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates v4 state into empty audit and review-policy ledgers", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const v4State = createEmptyState();
+      const { auditEvents: _removed, ...v4WithoutAuditEvents } = v4State;
+      await writeFile(dbPath, `${JSON.stringify({ ...v4WithoutAuditEvents, schemaVersion: 4 })}\n`, "utf8");
+
+      const loaded = await store.read();
+
+      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.auditEvents).toEqual([]);
+      expect(loaded.reviewPolicies).toEqual([]);
+      expect(loaded.reviewApprovals).toEqual([]);
+      expect(loaded.reviewDispositions).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates v5 state into empty review-policy ledgers", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const v5State = createEmptyState();
+      const { reviewPolicies: _policies, reviewApprovals: _approvals, ...v5WithoutReviewPolicy } = v5State;
+      await writeFile(dbPath, `${JSON.stringify({ ...v5WithoutReviewPolicy, schemaVersion: 5 })}\n`, "utf8");
+
+      const loaded = await store.read();
+
+      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.reviewPolicies).toEqual([]);
+      expect(loaded.reviewApprovals).toEqual([]);
+      expect(loaded.reviewDispositions).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates v6 state into an empty review disposition ledger", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const v6State = createEmptyState();
+      const { reviewDispositions: _dispositions, ...v6WithoutDispositionLedger } = v6State;
+      await writeFile(dbPath, `${JSON.stringify({ ...v6WithoutDispositionLedger, schemaVersion: 6 })}\n`, "utf8");
+
+      const loaded = await store.read();
+
+      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.reviewDispositions).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("validates audit event records", () => {
+    expect(auditEventSchema.parse({
+      id: "audit-test-1",
+      at: "2026-06-06T00:00:00.000Z",
+      actorId: "lead-1",
+      actorRole: "lead",
+      action: "governance_record.created",
+      entityType: "governance_record",
+      entityId: "governance-1",
+      languageId: "avenik",
+      summary: "Created synthetic governance record.",
+      metadata: { policyType: "generation" }
+    })).toMatchObject({
+      actorId: "lead-1",
+      actorRole: "lead",
+      action: "governance_record.created",
+      metadata: { policyType: "generation" }
+    });
+  });
+
+  it("validates review policy and approval records", () => {
+    expect(reviewPolicySchema.parse({
+      id: "review-policy-avenik",
+      languageId: "avenik",
+      assignedReviewerIds: ["reviewer-1", "elder-1"],
+      approvalThreshold: 2,
+      requiresAssignedReviewer: true,
+      updatedAt: "2026-06-06T00:00:00.000Z",
+      updatedBy: "lead-1"
+    })).toMatchObject({
+      languageId: "avenik",
+      approvalThreshold: 2,
+      requiresAssignedReviewer: true
+    });
+
+    expect(reviewApprovalSchema.parse({
+      id: "review-approval-1",
+      languageId: "avenik",
+      noteId: "avn-rule-verb-chain-note",
+      reviewerId: "reviewer-1",
+      approvedAt: "2026-06-06T00:01:00.000Z"
+    })).toMatchObject({
+      noteId: "avn-rule-verb-chain-note",
+      reviewerId: "reviewer-1"
+    });
+  });
+
+  it("validates richer note review lifecycle statuses", () => {
+    expect(["draft", "under_review", "approved", "contested", "rejected", "deferred", "escalated"].map((status) => (
+      noteStatusSchema.parse(status)
+    ))).toEqual(["draft", "under_review", "approved", "contested", "rejected", "deferred", "escalated"]);
+  });
+
+  it("validates review disposition work records", () => {
+    expect(reviewDispositionSchema.parse({
+      id: "review-disposition-1",
+      languageId: "avenik",
+      noteId: "avn-rule-verb-chain-note",
+      disposition: "escalated",
+      status: "open",
+      reason: "Escalate for lead review.",
+      assignedTo: "lead-1",
+      dueAt: "2026-06-20",
+      openedAt: "2026-06-06T00:00:00.000Z",
+      openedBy: "reviewer-1",
+      resolvedAt: null,
+      resolvedBy: null,
+      resolutionSummary: null
+    })).toMatchObject({
+      disposition: "escalated",
+      status: "open",
+      assignedTo: "lead-1"
+    });
   });
 
   it("does not write a db file when updating a missing note", async () => {

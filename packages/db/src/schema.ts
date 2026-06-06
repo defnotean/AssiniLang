@@ -52,7 +52,15 @@ export const corpusAnswerKeySchema = z.object({
   morphologicalSegmentation: z.array(morphemeSchema)
 });
 
-export const noteStatusSchema = z.enum(["draft", "under_review", "approved", "contested", "rejected"]);
+export const noteStatusSchema = z.enum([
+  "draft",
+  "under_review",
+  "approved",
+  "contested",
+  "rejected",
+  "deferred",
+  "escalated"
+]);
 export const confidenceSchema = z.enum(["low", "medium", "high"]);
 
 export const noteSchema = z.object({
@@ -91,6 +99,10 @@ export const exerciseSchema = z.object({
   allowedVocabulary: z.array(z.string()),
   allowedRuleIds: z.array(z.string()),
   expectedAnswers: z.array(z.string().min(1)),
+  adversarialAnswers: z.array(z.object({
+    answer: z.string().min(1),
+    reason: z.string().min(1)
+  })).default([]),
   gradingExplanation: z.string().min(1)
 });
 
@@ -123,8 +135,184 @@ export const evaluationRunSchema = z.object({
   summary: z.string().min(1)
 });
 
+export const userRoleSchema = z.enum(["admin", "elder", "programmer", "reviewer", "lead", "learner"]);
+
+export const userSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  role: userRoleSchema,
+  avatarUrl: z.string().optional()
+});
+
+export const auditEntityTypeSchema = z.enum([
+  "exercise_submission",
+  "evaluation_run",
+  "governance_record",
+  "review_policy",
+  "review_approval",
+  "review_disposition",
+  "exercise",
+  "corpus",
+  "note",
+  "ai_session",
+  "ai_message",
+  "elder_correction"
+]);
+
+export const auditEventSchema = z.object({
+  id: z.string().min(1),
+  at: z.string().min(1),
+  actorId: z.string().min(1),
+  actorRole: userRoleSchema,
+  action: z.string().min(1),
+  entityType: auditEntityTypeSchema,
+  entityId: z.string().min(1),
+  languageId: z.string().min(1).nullable(),
+  summary: z.string().min(1),
+  metadata: z.record(z.unknown()).default({})
+});
+
+export const aiSessionModeSchema = z.enum(["learner_practice", "elder_review", "programmer_debug"]);
+export const aiSessionStatusSchema = z.enum(["active", "completed", "failed"]);
+export const aiMessageRoleSchema = z.enum(["system", "user", "assistant", "tool"]);
+export const aiTraceStepKindSchema = z.enum(["input", "retrieval", "policy_check", "generation", "correction", "output"]);
+export const neuralMapNodeTypeSchema = z.enum([
+  "language",
+  "corpus",
+  "note",
+  "exercise",
+  "ai_session",
+  "elder_correction",
+  "output"
+]);
+export const neuralMapEdgeRelationSchema = z.enum([
+  "has_corpus",
+  "has_note",
+  "has_exercise",
+  "uses_context",
+  "generated",
+  "proposed_correction"
+]);
+
+export const aiMessageSchema = z.object({
+  id: z.string().min(1),
+  role: aiMessageRoleSchema,
+  content: z.string().min(1),
+  createdAt: z.string().min(1),
+  createdBy: z.string().min(1)
+});
+
+export const aiTraceStepSchema = z.object({
+  id: z.string().min(1),
+  kind: aiTraceStepKindSchema,
+  label: z.string().min(1),
+  summary: z.string().min(1),
+  referencedIds: z.array(z.string().min(1)).default([]),
+  warnings: z.array(z.string().min(1)).default([])
+});
+
+export const neuralMapNodeSchema = z.object({
+  id: z.string().min(1),
+  type: neuralMapNodeTypeSchema,
+  label: z.string().min(1),
+  metadata: z.record(z.union([z.string(), z.number(), z.boolean()])).default({})
+});
+
+export const neuralMapEdgeSchema = z.object({
+  source: z.string().min(1),
+  target: z.string().min(1),
+  relation: neuralMapEdgeRelationSchema,
+  weight: z.number().min(0).max(1).optional()
+});
+
+export const neuralMapSchema = z.object({
+  nodes: z.array(neuralMapNodeSchema).default([]),
+  edges: z.array(neuralMapEdgeSchema).default([])
+});
+
+export const aiSessionSchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  mode: aiSessionModeSchema,
+  status: aiSessionStatusSchema,
+  createdBy: z.string().min(1),
+  createdAt: z.string().min(1),
+  updatedAt: z.string().min(1),
+  contextNoteIds: z.array(z.string().min(1)).default([]),
+  contextPassageIds: z.array(z.string().min(1)).default([]),
+  messages: z.array(aiMessageSchema).default([]),
+  thinkingSummary: z.string().min(1),
+  trace: z.array(aiTraceStepSchema).default([]),
+  neuralMap: neuralMapSchema.default({ nodes: [], edges: [] }),
+  privacy: z.object({
+    redactions: z.array(z.string().min(1)).default([]),
+    exposesHiddenChainOfThought: z.literal(false)
+  })
+});
+
+export const elderCorrectionSchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  noteId: z.string().min(1).optional(),
+  passageId: z.string().min(1).optional(),
+  correction: z.string().min(1),
+  rationale: z.string().min(1),
+  severity: z.enum(["minor", "major", "safety"]).default("minor"),
+  contextText: z.string().min(1).optional(),
+  status: z.enum(["pending_review", "accepted", "rejected", "applied"]).default("pending_review"),
+  proposedBy: z.string().min(1),
+  proposedAt: z.string().min(1),
+  reviewedBy: z.string().nullable().default(null),
+  reviewedAt: z.string().nullable().default(null)
+}).refine((correction) => correction.noteId !== undefined || correction.passageId !== undefined || correction.contextText !== undefined, {
+  message: "At least one correction target or contextText is required"
+});
+
+export const governanceRecordSchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  policyType: z.enum(["consent", "access", "generation"]),
+  content: z.string().min(1),
+  effectiveDate: z.string(),
+  approvedBy: z.string()
+});
+
+export const reviewPolicySchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  assignedReviewerIds: z.array(z.string().min(1)),
+  approvalThreshold: z.number().int().min(1),
+  requiresAssignedReviewer: z.boolean().default(true),
+  updatedAt: z.string().min(1),
+  updatedBy: z.string().min(1)
+});
+
+export const reviewApprovalSchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  noteId: z.string().min(1),
+  reviewerId: z.string().min(1),
+  approvedAt: z.string().min(1)
+});
+
+export const reviewDispositionSchema = z.object({
+  id: z.string().min(1),
+  languageId: z.string().min(1),
+  noteId: z.string().min(1),
+  disposition: z.enum(["contested", "rejected", "deferred", "escalated"]),
+  status: z.enum(["open", "resolved"]),
+  reason: z.string().min(1),
+  assignedTo: z.string().min(1),
+  dueAt: z.string().min(1).nullable(),
+  openedAt: z.string().min(1),
+  openedBy: z.string().min(1),
+  resolvedAt: z.string().min(1).nullable(),
+  resolvedBy: z.string().min(1).nullable(),
+  resolutionSummary: z.string().min(1).nullable()
+});
+
 export const appStateSchema = z.object({
-  schemaVersion: z.literal(3),
+  schemaVersion: z.literal(7),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
   corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
@@ -132,9 +320,29 @@ export const appStateSchema = z.object({
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
   exerciseSubmissions: z.array(exerciseSubmissionSchema),
-  evaluationRuns: z.array(evaluationRunSchema)
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([]),
+  aiSessions: z.array(aiSessionSchema).default([]),
+  elderCorrections: z.array(elderCorrectionSchema).default([]),
+  auditEvents: z.array(auditEventSchema).default([]),
+  reviewPolicies: z.array(reviewPolicySchema).default([]),
+  reviewApprovals: z.array(reviewApprovalSchema).default([]),
+  reviewDispositions: z.array(reviewDispositionSchema).default([])
 });
 
+export type UserRole = z.infer<typeof userRoleSchema>;
+export type User = z.infer<typeof userSchema>;
+export type AuditEvent = z.infer<typeof auditEventSchema>;
+export type AiSessionMode = z.infer<typeof aiSessionModeSchema>;
+export type AiSession = z.infer<typeof aiSessionSchema>;
+export type AiMessage = z.infer<typeof aiMessageSchema>;
+export type NeuralMap = z.infer<typeof neuralMapSchema>;
+export type ElderCorrection = z.infer<typeof elderCorrectionSchema>;
+export type GovernanceRecord = z.infer<typeof governanceRecordSchema>;
+export type ReviewPolicy = z.infer<typeof reviewPolicySchema>;
+export type ReviewApproval = z.infer<typeof reviewApprovalSchema>;
+export type ReviewDisposition = z.infer<typeof reviewDispositionSchema>;
 export type Language = z.infer<typeof languageSchema>;
 export type CorpusPassage = z.infer<typeof corpusPassageSchema>;
 export type CorpusAnswerKey = z.infer<typeof corpusAnswerKeySchema>;
@@ -163,6 +371,72 @@ const legacyAppStateV2Schema = z.object({
   notes: z.array(noteSchema),
   exercises: z.array(exerciseSchema),
   evaluationRuns: z.array(evaluationRunSchema)
+});
+
+const legacyAppStateV3Schema = z.object({
+  schemaVersion: z.literal(3),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
+  noteAnswerKeys: z.array(noteSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([])
+});
+
+const legacyAppStateV4Schema = z.object({
+  schemaVersion: z.literal(4),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
+  noteAnswerKeys: z.array(noteSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([]),
+  aiSessions: z.array(aiSessionSchema).default([]),
+  elderCorrections: z.array(elderCorrectionSchema).default([])
+});
+
+const legacyAppStateV5Schema = z.object({
+  schemaVersion: z.literal(5),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
+  noteAnswerKeys: z.array(noteSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([]),
+  aiSessions: z.array(aiSessionSchema).default([]),
+  elderCorrections: z.array(elderCorrectionSchema).default([]),
+  auditEvents: z.array(auditEventSchema).default([])
+});
+
+const legacyAppStateV6Schema = z.object({
+  schemaVersion: z.literal(6),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
+  noteAnswerKeys: z.array(noteSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([]),
+  aiSessions: z.array(aiSessionSchema).default([]),
+  elderCorrections: z.array(elderCorrectionSchema).default([]),
+  auditEvents: z.array(auditEventSchema).default([]),
+  reviewPolicies: z.array(reviewPolicySchema).default([]),
+  reviewApprovals: z.array(reviewApprovalSchema).default([])
 });
 
 function migrateLegacyNoteToAnswerKey(note: Note): Note {
@@ -229,9 +503,13 @@ export function parseAppState(input: unknown): AppState {
   if (legacy.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacy.data,
-      schemaVersion: 3,
+      schemaVersion: 7,
       noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey),
-      exerciseSubmissions: []
+      exerciseSubmissions: [],
+      auditEvents: [],
+      reviewPolicies: [],
+      reviewApprovals: [],
+      reviewDispositions: []
     }));
   }
 
@@ -239,8 +517,56 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV2.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV2.data,
-      schemaVersion: 3,
-      exerciseSubmissions: []
+      schemaVersion: 7,
+      exerciseSubmissions: [],
+      auditEvents: [],
+      reviewPolicies: [],
+      reviewApprovals: [],
+      reviewDispositions: []
+    }));
+  }
+
+  const legacyV3 = legacyAppStateV3Schema.safeParse(input);
+  if (legacyV3.success) {
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
+      ...legacyV3.data,
+      schemaVersion: 7,
+      auditEvents: [],
+      reviewPolicies: [],
+      reviewApprovals: [],
+      reviewDispositions: []
+    }));
+  }
+
+  const legacyV4 = legacyAppStateV4Schema.safeParse(input);
+  if (legacyV4.success) {
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
+      ...legacyV4.data,
+      schemaVersion: 7,
+      auditEvents: [],
+      reviewPolicies: [],
+      reviewApprovals: [],
+      reviewDispositions: []
+    }));
+  }
+
+  const legacyV5 = legacyAppStateV5Schema.safeParse(input);
+  if (legacyV5.success) {
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
+      ...legacyV5.data,
+      schemaVersion: 7,
+      reviewPolicies: [],
+      reviewApprovals: [],
+      reviewDispositions: []
+    }));
+  }
+
+  const legacyV6 = legacyAppStateV6Schema.safeParse(input);
+  if (legacyV6.success) {
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
+      ...legacyV6.data,
+      schemaVersion: 7,
+      reviewDispositions: []
     }));
   }
 

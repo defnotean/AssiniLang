@@ -7,14 +7,22 @@ export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
 export function createEmptyState(): AppState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 7,
     languages: [],
     corpus: [],
     noteAnswerKeys: [],
     notes: [],
     exercises: [],
     exerciseSubmissions: [],
-    evaluationRuns: []
+    evaluationRuns: [],
+    governance: [],
+    users: [],
+    aiSessions: [],
+    elderCorrections: [],
+    auditEvents: [],
+    reviewPolicies: [],
+    reviewApprovals: [],
+    reviewDispositions: []
   };
 }
 
@@ -31,7 +39,9 @@ export class JsonStore {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return createEmptyState();
       }
-      throw error;
+
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to read local database at ${this.dbPath}: ${message}`, { cause: error });
     }
   }
 

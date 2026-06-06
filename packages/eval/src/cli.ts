@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JsonStore } from "@assini/db";
-import { runEvaluationForState } from "./runEvaluation";
+import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const evalDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");
@@ -21,4 +21,13 @@ await store.write({
 
 for (const run of runs) {
   console.log(run.summary);
+}
+
+const gate = summarizeEvaluationGate(runs);
+if (!gate.passed) {
+  console.error("Evaluation gate failed:");
+  for (const line of gate.failureLines) {
+    console.error(`- ${line}`);
+  }
+  process.exitCode = gate.exitCode;
 }

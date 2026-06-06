@@ -1346,7 +1346,7 @@ npm test -- packages/synthetic-langs/src/loader.test.ts
 npm run seed
 ```
 
-Expected: tests PASS, then seed prints four languages, twenty corpus passages, eight draft notes, and eight exercises.
+Expected: tests PASS, then seed prints four languages, forty corpus passages, twenty draft notes, and twenty exercises.
 
 - [ ] **Step 5: Commit**
 
@@ -2505,7 +2505,7 @@ npm run seed
 npm run eval
 ```
 
-Expected: seed reports four languages and twenty corpus passages; eval reports four language summaries.
+Expected: seed reports four languages and forty corpus passages; eval reports four language summaries.
 
 - [ ] **Step 4: Start the app**
 

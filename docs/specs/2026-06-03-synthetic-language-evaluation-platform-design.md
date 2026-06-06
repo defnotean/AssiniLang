@@ -82,12 +82,17 @@ Each language fixture includes:
 - `notes.answer_key.json`: expected approved grammar and vocabulary notes.
 - `exercises.answer_key.json`: expected exercise prompts, valid answers, and grading explanations.
 
+The implemented baseline should keep at least ten corpus passages, five grammar rules, five note answer keys, and five learner exercises per synthetic language. Each language should also include at least two exercise types so the grading workflow is not trained only on a single task shape.
+
 ## Data Model
 
 The first implementation should model these entities:
 
 - Language
   - ID, name, typology, description, orthography, status, fixture source.
+
+- DialectVariant
+  - ID, language ID by fixture ownership, public name, region label, phonology notes, lexical notes, grammar notes, and standard-vs-variant example phrases.
 
 - CorpusPassage
   - ID, language ID, source, source metadata, target text, translation, segmentation, tags, consent status.
@@ -96,24 +101,51 @@ The first implementation should model these entities:
   - ID, language ID, topic, explanation, examples, evidence passage IDs, confidence, status, dialect scope, reviewer metadata, edit history.
 
 - Exercise
-  - ID, language ID, type, prompt, allowed vocabulary/rules, expected answer set, grading rubric.
+  - ID, language ID, type, prompt, allowed vocabulary/rules, expected answer set, private adversarial answer probes, grading rubric.
 
 - EvaluationRun
   - ID, language ID, timestamp, system version, input fixture version, scores, failures, and summary.
+
+- GovernanceRecord
+  - ID, language ID, policy type, policy content, effective date, and approving actor.
+
+- ReviewPolicy
+  - ID, language ID, assigned reviewer IDs, approval threshold, assigned-reviewer requirement, updated timestamp, and updating actor.
+
+- ReviewApproval
+  - ID, language ID, note ID, reviewer ID, and approval timestamp.
+
+- ReviewDisposition
+  - ID, language ID, note ID, disposition status, work status, reason, assignee, due date, opener, resolution actor, resolution timestamp, and resolution summary.
+
+- AuditEvent
+  - ID, timestamp, actor ID, actor role, action, entity type, entity ID, language ID, summary, and minimal non-secret metadata.
 
 The schema should mirror the project plan where possible, even when fields contain synthetic stand-ins.
 
 ## Core Workflow
 
 1. Seed synthetic language fixtures.
-2. Load corpus, vocabulary, grammar, notes, and exercises into local storage.
+2. Load corpus, vocabulary, dialect variants, grammar, notes, and exercises into local storage.
 3. Run a deterministic study-loop simulation that creates draft notes from grammar and corpus fixtures.
 4. Compare generated draft notes against `notes.answer_key.json`.
 5. Run exercise grading tests against `exercises.answer_key.json`.
 6. Store an `EvaluationRun` with per-category scores and failure details.
 7. Display the results in the web UI.
+8. Export sanitized evaluation artifacts with latest-run scores, latest-vs-previous trend deltas, aggregate gate status, failure lines, and a SHA-256 integrity manifest.
+9. Export sanitized single-language review snapshots with public linguistic profile metadata, including dialect variants, and a SHA-256 integrity manifest for authorized reviewers without exposing answer keys or learner submissions.
+10. Submit, review, and explicitly apply elder correction records, preserving accepted/rejected audit attribution and note edit history.
+11. Enforce per-language review policies so assigned reviewer approvals must meet the configured threshold before notes move to `approved`.
+12. Open assigned, due-date-bearing review disposition records for contested, rejected, deferred, and escalated notes; resolve them back into `under_review` with an audit trail.
+13. Append role-gated audit events for persisted data mutations without storing learner answers, provider prompts, answer keys, or hidden model traces.
+14. Let authorized reviewers, leads, and admins author synthetic exercises through server-side rule, vocabulary, answer, and adversarial-probe validation while keeping answer keys private in public responses.
+15. Let authorized reviewers, leads, and admins import synthetic corpus passages through provenance, synthetic-consent, and segmentation validation with auditable import metadata.
 
 ## Web UI Surfaces
+
+### Language Profile
+
+Shows public phonology, dialect variants, paradigm tables, grammar rules, vocabulary, and fixture counts for the selected synthetic language. Dialect variants should show public region labels, phonology notes, lexical notes, grammar notes, and standard-vs-variant examples without exposing answer keys.
 
 ### Corpus Browser
 
@@ -121,15 +153,25 @@ Shows synthetic corpus passages for a selected language. Each passage displays t
 
 ### Note Review Queue
 
-Shows generated draft notes beside answer-key notes. Users can mark a note as approved, contested, rejected, or edited. This mirrors the reviewer-console concept from the project plan.
+Shows generated draft notes beside answer-key notes. Users can revise the selected note explanation after server-side substantive-explanation validation and mark a note as approved, contested, rejected, deferred, or escalated. This mirrors the reviewer-console concept from the project plan.
+
+Contested, rejected, deferred, and escalated notes must include a reviewer comment explaining the reason for the disposition. The API should reject disposition writes without a substantive comment and preserve the previous note state. Disposition writes should create trackable work records with an assignee and optional due date; the assignee, leads, and admins can resolve those records and return the note to `under_review`. The Governance UI should expose the disposition ledger with reason, assignee, due date, resolution summary entry, and resolved attribution.
 
 ### Evaluation Dashboard
 
-Shows latest evaluation scores, failures, and language-by-language comparisons. Failures should be concrete enough that a developer can trace them back to fixture data.
+Shows latest evaluation scores, latest-vs-previous regression trends, failures, and language-by-language comparisons. Failures should be concrete enough that a developer can trace them back to fixture data. The dashboard exposes a sanitized evaluation artifact download with latest runs, aggregate pass/fail metadata, trend counters, per-category score deltas, failure lines, and a visible integrity hash prefix, without answer keys, learner submissions, learner answers, AI sessions, or local users.
 
 ### Learner Exercise Preview
 
-Shows exercises generated from approved notes and lets the user submit answers. The system grades against the answer key and displays the expected explanation.
+Shows exercises generated from approved notes and lets the user submit answers. The system grades against the answer key and displays the expected explanation. The Learning Lab also exposes compact reviewer authoring controls for creating validated synthetic exercises without returning private answer-key fields to the browser.
+
+### Governance And Snapshot Export
+
+Shows local synthetic governance policy records, lets authorized prototype users add policy records, lets leads maintain assigned reviewer IDs and approval thresholds, exposes the review-disposition work ledger for resolution, exposes a filtered role-gated audit ledger for mutation traceability, and exposes a sanitized single-language JSON snapshot download for review handoff. The snapshot includes public phonology, dialect variants, paradigm tables, vocabulary, grammar rules, corpus, review notes, exercises, governance records, evaluation summaries, and a visible integrity hash prefix. The snapshot download must never include answer keys, learner submissions, learner answers, AI sessions, or local users.
+
+### Elder Workspace
+
+Shows public note/corpus context and the submitted correction ledger for one synthetic language. Elders can submit correction records tied to a note, passage, or custom context. Elders, leads, and admins can accept or reject pending corrections, and each review transition records `reviewedBy` plus `reviewedAt`. Accepted corrections linked to a note can then be applied only through an explicit revised explanation; applying a correction moves the correction to `applied`, sets the note back to `under_review`, and appends a note `applied_correction` edit-history entry.
 
 ## Evaluation Categories
 
@@ -140,28 +182,49 @@ The first harness should score:
 - Evidence accuracy: generated notes cite the correct corpus passages.
 - Segmentation accuracy: morpheme boundaries and glosses match answer keys.
 - Translation accuracy: fixture translations match expected outputs.
-- Exercise grading: correct answers accepted and incorrect answers rejected.
+- Exercise grading: correct answers accepted, deterministic invalid answers rejected, and curated adversarial answer probes rejected.
 - Generation policy: outputs only use allowed vocabulary and approved rules.
 
-Scores should be machine-readable and visible in the web UI.
+Scores should be machine-readable and visible in the web UI. The evaluation gate should fail when structured failures exist or when any category drops below its required floor. Most categories use a 96% minimum during the synthetic milestone; generation-policy checks require 100% because unapproved forms should never enter learner-facing outputs.
 
 ## Error Handling
 
 - Missing fixture files should fail fast with the exact file path.
 - Invalid fixture schema should report the language ID and field path.
-- Evaluation failures should be stored as structured records, not just console text.
+- Invalid fixture cross-references should fail before seeding with actionable diagnostics for duplicate IDs, duplicate or empty dialect variant records, missing evidence passages, symbols outside a language phonology inventory, missing exercise rules, unknown allowed vocabulary, invalid particle answers, target-language answers not present in the corpus, and adversarial exercise probes that duplicate accepted answers.
+- Evaluation failures and threshold breaches should be stored or surfaced as traceable records, not just console text.
 - UI loading states should distinguish no data, invalid data, and evaluation not yet run.
 - Synthetic fixture labels should be visible anywhere language data is displayed.
+- Governance writes should be role-gated and reject unknown language IDs without mutating stored policy records.
+- Review-policy writes should be role-gated to leads/admins, reject unknown reviewers or impossible approval thresholds, and keep notes `under_review` until enough assigned approvals exist.
+- Note explanation edits should reject underspecified text before mutating note status, reviewer metadata, or edit history.
+- Review-disposition writes should validate assignees and due dates, preserve a work ledger, restrict resolution to assignees/leads/admins, reopen linked notes for review, and audit both creation and resolution.
+- Audit-event reads should be role-gated to operational leads/admins/programmers, support language filtering, reject unknown language filters, and omit learner answers, provider prompts, answer keys, and hidden model traces.
+- Review snapshot exports should be role-gated, include public linguistic profile metadata with dialect variants and an integrity manifest with SHA-256 content hash plus redaction policy, return unknown-language errors, and omit answer keys, adversarial exercise probes, learner submissions, learner answers, AI sessions, and local user records.
+- Evaluation artifact exports should be role-gated, include latest-run aggregate metadata, latest-vs-previous trend records, failure lines, and an integrity manifest with SHA-256 content hash plus redaction policy, and omit answer keys, learner submissions, learner answers, AI sessions, and local user records.
+- Elder correction review should be role-gated, reject learners/reviewers/programmers, preserve notes during accepted/rejected transitions, and persist reviewer attribution.
+- Elder correction application should require an accepted note-linked correction, reject empty revised explanations, update the linked public note with audit history, and move the correction to `applied`.
+- Exercise authoring should be role-gated, reject unknown language/rule/vocabulary references before mutation, store answer keys server-side, return only public exercise fields, and audit creation without logging expected-answer text.
+- Corpus imports should be role-gated, reject duplicate target passages and segmentation surfaces not present in the target text before mutation, require synthetic-only consent metadata, and audit import provenance without storing private review data.
 
 ## Testing Strategy
 
 Testing should start with the fixture and evaluation core:
 
 - Unit tests for fixture schema validation.
+- Unit tests for required public dialect variant metadata and diagnostics.
+- Unit tests for required private adversarial exercise probes and diagnostics.
 - Unit tests for synthetic language rule application.
 - Unit tests for note comparison and scoring.
+- Unit tests for evaluation gate failures from explicit records and score thresholds.
 - Unit tests for exercise grading.
 - API tests for language, corpus, notes, exercises, and evaluation routes.
+- API tests for role-gated governance policy creation and invalid governance writes.
+- API tests for review-policy assignment, threshold enforcement, unassigned reviewer rejection, and audit metadata.
+- API tests for review-disposition assignment, due dates, assignee-only resolution, note reopening, and audit metadata.
+- API tests for role-gated audit-event recording and filtered reads.
+- API tests for sanitized review snapshot exports, exported linguistic metadata, integrity manifests, and forbidden export attempts.
+- API tests for sanitized evaluation artifact exports, integrity manifests, and forbidden export attempts.
 - Web smoke tests for the corpus browser, note review queue, dashboard, and learner exercise preview.
 
 The first milestone is complete only when one command can seed fixtures, run evaluations, and start the local app.
@@ -181,6 +244,7 @@ After the synthetic testbed works, scale in this order:
 
 - Repository contains the monorepo scaffold.
 - At least four synthetic languages exist with corpora and answer keys.
+- Each synthetic language has at least ten corpus passages, five grammar-derived note answer keys, and five learner exercise answer keys.
 - Evaluation harness runs from the command line.
 - Web UI displays corpus, note review, evaluation, and learner exercise views.
 - Evaluation results are persisted locally.
