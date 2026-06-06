@@ -455,6 +455,22 @@ function addDuplicatePersistedValueIssue<T>(
   }
 }
 
+function addParseablePersistedDateIssue(
+  context: z.RefinementCtx,
+  path: string,
+  recordId: string,
+  label: string,
+  value: string | null
+) {
+  if (value !== null && Number.isNaN(Date.parse(value))) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `${label} must be parseable: ${value}`,
+      path: [path, recordId]
+    });
+  }
+}
+
 function addCorpusIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -879,13 +895,7 @@ function addGovernanceIntegrityIssues(
   const usersById = new Map(users.map((user) => [user.id, user]));
 
   for (const record of state.governance) {
-    if (Number.isNaN(Date.parse(record.effectiveDate))) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Governance record effectiveDate must be parseable: ${record.effectiveDate}`,
-        path: ["governance", record.id]
-      });
-    }
+    addParseablePersistedDateIssue(context, "governance", record.id, "Governance record effectiveDate", record.effectiveDate);
 
     if (!languageIds.has(record.languageId)) {
       context.addIssue({
@@ -1217,6 +1227,10 @@ function addReviewDispositionIntegrityIssues(
         path: ["reviewDispositions", disposition.id]
       });
     }
+
+    addParseablePersistedDateIssue(context, "reviewDispositions", disposition.id, "Review disposition dueAt", disposition.dueAt);
+    addParseablePersistedDateIssue(context, "reviewDispositions", disposition.id, "Review disposition openedAt", disposition.openedAt);
+    addParseablePersistedDateIssue(context, "reviewDispositions", disposition.id, "Review disposition resolvedAt", disposition.resolvedAt);
 
     addAssignableUserIssue(disposition.assignedTo, "assignee", disposition.id);
     addAssignableUserIssue(disposition.openedBy, "opener", disposition.id);

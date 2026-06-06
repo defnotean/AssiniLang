@@ -1183,6 +1183,16 @@ describe("JsonStore", () => {
       "Review disposition opener is not assignable: missing-opener"
     ],
     [
+      "unparseable due date",
+      createTestDisposition({ dueAt: "not-a-date" }),
+      "Review disposition dueAt must be parseable: not-a-date"
+    ],
+    [
+      "unparseable opened date",
+      createTestDisposition({ openedAt: "not-a-date" }),
+      "Review disposition openedAt must be parseable: not-a-date"
+    ],
+    [
       "open resolution fields",
       createTestDisposition({
         resolvedAt: "2026-06-06T01:00:00.000Z",
@@ -1202,6 +1212,16 @@ describe("JsonStore", () => {
       "Resolved review disposition requires resolvedAt, resolvedBy, and resolutionSummary"
     ],
     [
+      "unparseable resolved date",
+      createTestDisposition({
+        status: "resolved",
+        resolvedAt: "not-a-date",
+        resolvedBy: "lead-1",
+        resolutionSummary: "Resolved after follow-up."
+      }),
+      "Review disposition resolvedAt must be parseable: not-a-date"
+    ],
+    [
       "unknown resolver",
       createTestDisposition({
         status: "resolved",
@@ -1213,8 +1233,9 @@ describe("JsonStore", () => {
     ]
   ])("rejects persisted review dispositions with %s", (_caseName, disposition, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage(), createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
-    state.notes = [createTestNote()];
+    state.notes = [createTestNote({ status: "escalated" })];
     state.reviewDispositions = [disposition];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
