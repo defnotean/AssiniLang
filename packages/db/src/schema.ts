@@ -161,6 +161,14 @@ const noteSystemActorIds = new Set<string>([
   "synthetic-generator",
   "synthetic-reviewer"
 ]);
+const noteEditHistoryActionSet = new Set<string>([
+  "applied_correction",
+  "created",
+  "disposition_resolved",
+  "drafted",
+  "migrated",
+  "reviewed"
+]);
 
 export function isReviewPolicyUpdaterRole(role: z.infer<typeof userRoleSchema>): boolean {
   return reviewPolicyUpdaterRoleSet.has(role);
@@ -586,6 +594,14 @@ function addNoteCollectionIntegrityIssues(
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `${label} editHistory by is not allowed: ${entry.by}`,
+          path: [collectionPath, note.id]
+        });
+      }
+
+      if (!noteEditHistoryActionSet.has(entry.action)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} editHistory action is not allowed: ${entry.action}`,
           path: [collectionPath, note.id]
         });
       }

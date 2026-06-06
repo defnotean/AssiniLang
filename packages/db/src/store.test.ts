@@ -602,7 +602,7 @@ describe("JsonStore", () => {
           {
             at: "not-a-date",
             by: "legacy-v1-migration",
-            action: "seeded",
+            action: "migrated",
             summary: "Malformed answer-key timestamp should not restore."
           }
         ]
@@ -664,6 +664,38 @@ describe("JsonStore", () => {
         ]
       }),
       "Note answer key editHistory by is not allowed: missing-system-writer"
+    ],
+    [
+      "note with unsupported edit-history action",
+      "notes",
+      createTestNote({
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "reviewer-1",
+            action: "made_up_action",
+            summary: "Unsupported note timeline actions should not restore."
+          }
+        ]
+      }),
+      "Note editHistory action is not allowed: made_up_action"
+    ],
+    [
+      "note answer key with unsupported edit-history action",
+      "noteAnswerKeys",
+      createTestNote({
+        id: "note-answer-key-1",
+        status: "approved",
+        editHistory: [
+          {
+            at: "2026-06-06T00:00:00.000Z",
+            by: "synthetic-generator",
+            action: "seeded",
+            summary: "Unsupported answer-key timeline actions should not restore."
+          }
+        ]
+      }),
+      "Note answer key editHistory action is not allowed: seeded"
     ],
     [
       "missing evidence passage",
