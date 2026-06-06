@@ -176,6 +176,8 @@ Audit events are written by mutation routes and derive `actorId` plus `actorRole
 
 Reviewers can update note status and explanations. Contested, rejected, deferred, and escalated notes require a reviewer comment. Those dispositions create work records that can later be resolved by the assignee, leads, or admins.
 
+During local JSON reads, restored notes and note answer keys must reference existing languages, keep `evidenceCount` aligned with `evidencePassageIds`, cite existing same-language evidence passages, and keep examples synchronized with the cited corpus target text and translation.
+
 If the same note already has an open work record for the requested disposition, the route updates that record's reason, assignee, and due date instead of creating a duplicate open disposition. The original opened attribution stays on the record, and a separate audit event records the update.
 
 Persisted review-disposition records must reference an existing same-language note, use assignable local users for assignee/opener/resolver fields, and keep open versus resolved fields internally consistent.

@@ -411,6 +411,94 @@ function addDuplicatePersistedValueIssue<T>(
   }
 }
 
+function addNoteCollectionIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+  },
+  notes: Array<z.infer<typeof noteSchema>>,
+  collectionPath: "notes" | "noteAnswerKeys",
+  label: "Note" | "Note answer key"
+) {
+  const languageIds = new Set(state.languages.map((language) => language.id));
+  const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
+
+  for (const note of notes) {
+    if (!languageIds.has(note.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} references missing language: ${note.languageId}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
+    if (note.evidenceCount !== note.evidencePassageIds.length) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `${label} evidenceCount ${note.evidenceCount} does not match evidencePassageIds length ${note.evidencePassageIds.length}: ${note.id}`,
+        path: [collectionPath, note.id]
+      });
+    }
+
+    for (const passageId of note.evidencePassageIds) {
+      const passage = passagesById.get(passageId);
+      if (!passage) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} references missing evidence passage: ${passageId}`,
+          path: [collectionPath, note.id]
+        });
+        continue;
+      }
+
+      if (passage.languageId !== note.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} evidence passage ${passageId} language ${passage.languageId} does not match note ${note.id} language ${note.languageId}`,
+          path: [collectionPath, note.id]
+        });
+      }
+    }
+
+    for (const example of note.examples) {
+      const passage = passagesById.get(example.passageId);
+      if (!passage) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} references missing example passage: ${example.passageId}`,
+          path: [collectionPath, note.id]
+        });
+        continue;
+      }
+
+      if (passage.languageId !== note.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} example passage ${example.passageId} language ${passage.languageId} does not match note ${note.id} language ${note.languageId}`,
+          path: [collectionPath, note.id]
+        });
+      }
+
+      if (example.target !== passage.textTarget) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} example ${example.passageId} target does not match cited corpus textTarget`,
+          path: [collectionPath, note.id]
+        });
+      }
+
+      if (example.translation !== passage.textTranslation) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${label} example ${example.passageId} translation does not match cited corpus textTranslation`,
+          path: [collectionPath, note.id]
+        });
+      }
+    }
+  }
+}
+
 function addExerciseIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -1109,7 +1197,9 @@ export const appStateSchema = z.object({
   addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);
   addCorpusAnswerKeyIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "noteAnswerKeys", "id", state.noteAnswerKeys, (item) => item.id);
+  addNoteCollectionIntegrityIssues(context, state, state.noteAnswerKeys, "noteAnswerKeys", "Note answer key");
   addDuplicatePersistedValueIssue(context, "notes", "id", state.notes, (item) => item.id);
+  addNoteCollectionIntegrityIssues(context, state, state.notes, "notes", "Note");
   addDuplicatePersistedValueIssue(context, "exercises", "id", state.exercises, (item) => item.id);
   addExerciseIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "exerciseSubmissions", "id", state.exerciseSubmissions, (item) => item.id);

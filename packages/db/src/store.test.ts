@@ -323,6 +323,13 @@ describe("JsonStore", () => {
     try {
       const store = new JsonStore(dbPath);
       const legacyState = createEmptyState();
+      legacyState.languages.push(createTestLanguage({ id: "legacy-language", name: "Legacy Language" }));
+      legacyState.corpus.push(createTestCorpusPassage({
+        id: "legacy-corpus",
+        languageId: "legacy-language",
+        textTarget: "legacy target",
+        textTranslation: "Legacy translation."
+      }));
       legacyState.notes.push({
         id: "legacy-note",
         languageId: "legacy-language",
@@ -515,6 +522,7 @@ describe("JsonStore", () => {
   it("rejects duplicate persisted entity ids inside app-state collections", () => {
     const state = createEmptyState();
     const note = createTestNote();
+    state.languages = [createTestLanguage()];
 
     state.notes = [
       note,
@@ -525,6 +533,77 @@ describe("JsonStore", () => {
     ];
 
     expect(() => parseAppState(state)).toThrow("Duplicate persisted id in notes: note-1");
+  });
+
+  it.each([
+    [
+      "note with missing language",
+      "notes",
+      createTestNote({ languageId: "missing-language" }),
+      "Note references missing language: missing-language"
+    ],
+    [
+      "note answer key with missing language",
+      "noteAnswerKeys",
+      createTestNote({ id: "note-answer-key-1", languageId: "missing-language", status: "approved" }),
+      "Note answer key references missing language: missing-language"
+    ],
+    [
+      "evidence-count drift",
+      "notes",
+      createTestNote({ evidencePassageIds: ["passage-1"], evidenceCount: 2 }),
+      "Note evidenceCount 2 does not match evidencePassageIds length 1: note-1"
+    ],
+    [
+      "missing evidence passage",
+      "notes",
+      createTestNote({ evidencePassageIds: ["missing-passage"], evidenceCount: 1 }),
+      "Note references missing evidence passage: missing-passage"
+    ],
+    [
+      "evidence passage language mismatch",
+      "notes",
+      createTestNote({ evidencePassageIds: ["other-passage"], evidenceCount: 1 }),
+      "Note evidence passage other-passage language solari does not match note note-1 language avenik"
+    ],
+    [
+      "missing example passage",
+      "notes",
+      createTestNote({
+        examples: [{ passageId: "missing-passage", target: "missing target", translation: "Missing translation." }]
+      }),
+      "Note references missing example passage: missing-passage"
+    ],
+    [
+      "example target mismatch",
+      "notes",
+      createTestNote({
+        examples: [{ passageId: "passage-1", target: "wrong target", translation: "I walk by the river." }]
+      }),
+      "Note example passage-1 target does not match cited corpus textTarget"
+    ],
+    [
+      "example translation mismatch",
+      "notes",
+      createTestNote({
+        examples: [{ passageId: "passage-1", target: "mira talo-mi-na", translation: "Wrong translation." }]
+      }),
+      "Note example passage-1 translation does not match cited corpus textTranslation"
+    ]
+  ])("rejects persisted %s", (_caseName, collection, note, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.corpus = [
+      createTestCorpusPassage(),
+      createTestCorpusPassage({ id: "other-passage", languageId: "solari" })
+    ];
+    if (collection === "notes") {
+      state.notes = [note];
+    } else {
+      state.noteAnswerKeys = [note];
+    }
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
   it.each([
