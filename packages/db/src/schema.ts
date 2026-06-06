@@ -952,6 +952,22 @@ function addExerciseIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(exercise.prompt)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise prompt must not be blank: ${exercise.id}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
+    if (isBlankPersistedValue(exercise.gradingExplanation)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise grading explanation must not be blank: ${exercise.id}`,
+        path: ["exercises", exercise.id]
+      });
+    }
+
     for (const ruleId of exercise.allowedRuleIds) {
       if (isBlankPersistedValue(ruleId)) {
         context.addIssue({

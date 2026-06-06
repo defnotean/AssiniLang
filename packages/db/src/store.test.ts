@@ -1501,6 +1501,16 @@ describe("JsonStore", () => {
       "Exercise references missing language: missing-language"
     ],
     [
+      "blank prompt",
+      createTestExercise({ prompt: "   " }),
+      "Exercise prompt must not be blank: exercise-1"
+    ],
+    [
+      "blank grading explanation",
+      createTestExercise({ gradingExplanation: "   " }),
+      "Exercise grading explanation must not be blank: exercise-1"
+    ],
+    [
       "duplicate allowed vocabulary",
       createTestExercise({ allowedVocabulary: ["mira", "mira"] }),
       "Exercise allowed vocabulary is duplicated: mira"
