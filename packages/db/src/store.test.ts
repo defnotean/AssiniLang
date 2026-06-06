@@ -832,6 +832,34 @@ describe("JsonStore", () => {
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });
 
+  it("rejects duplicate review policies for the same language", () => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
+    state.reviewPolicies = [
+      {
+        id: "review-policy-avenik-primary",
+        languageId: "avenik",
+        assignedReviewerIds: ["reviewer-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedAt: "2026-06-06T00:00:00.000Z",
+        updatedBy: "lead-1"
+      },
+      {
+        id: "review-policy-avenik-secondary",
+        languageId: "avenik",
+        assignedReviewerIds: ["elder-1"],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: true,
+        updatedAt: "2026-06-06T00:01:00.000Z",
+        updatedBy: "lead-1"
+      }
+    ];
+
+    expect(() => parseAppState(state)).toThrow("Duplicate review policy for language: avenik");
+  });
+
   it("rejects duplicate review approvals for the same note and reviewer", () => {
     const state = createEmptyState();
     state.reviewApprovals = [

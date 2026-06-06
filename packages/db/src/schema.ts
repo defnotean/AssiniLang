@@ -751,6 +751,14 @@ function addReviewPolicyIntegrityIssues(
   const languageIds = new Set(state.languages.map((language) => language.id));
   const usersById = new Map(users.map((user) => [user.id, user]));
   const assignableReviewerCount = users.filter((user) => isReviewPolicyAssignableRole(user.role)).length;
+  const duplicatePolicyLanguageId = duplicatePersistedValue(state.reviewPolicies, (policy) => policy.languageId);
+  if (duplicatePolicyLanguageId) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Duplicate review policy for language: ${duplicatePolicyLanguageId}`,
+      path: ["reviewPolicies"]
+    });
+  }
 
   for (const policy of state.reviewPolicies) {
     if (!languageIds.has(policy.languageId)) {
