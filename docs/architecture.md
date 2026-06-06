@@ -151,6 +151,8 @@ Successful imports append the passage and write an audit event with source, morp
 
 Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output.
 
+Persisted evaluation runs must reference an existing synthetic language, and each failure line must use the same language ID as the run it belongs to. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
+
 ## LLM Provider Boundary
 
 LLM provider configuration is server-only. The browser can view readiness status but must never receive provider API keys.

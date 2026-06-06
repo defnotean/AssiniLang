@@ -631,6 +631,36 @@ function addAiSessionIntegrityIssues(
   }
 }
 
+function addEvaluationRunIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+    evaluationRuns: Array<z.infer<typeof evaluationRunSchema>>;
+  }
+) {
+  const languageIds = new Set(state.languages.map((language) => language.id));
+
+  for (const run of state.evaluationRuns) {
+    if (!languageIds.has(run.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Evaluation run references missing language: ${run.languageId}`,
+        path: ["evaluationRuns", run.id]
+      });
+    }
+
+    for (const failure of run.failures) {
+      if (failure.languageId !== run.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Evaluation failure language ${failure.languageId} does not match run language ${run.languageId}`,
+          path: ["evaluationRuns", run.id]
+        });
+      }
+    }
+  }
+}
+
 function addReviewApprovalIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -912,6 +942,7 @@ export const appStateSchema = z.object({
   addGovernanceIntegrityIssues(context, state);
   addAuditEventIntegrityIssues(context, state);
   addAiSessionIntegrityIssues(context, state);
+  addEvaluationRunIntegrityIssues(context, state);
   addReviewPolicyIntegrityIssues(context, state);
   addReviewApprovalIntegrityIssues(context, state);
   addReviewDispositionIntegrityIssues(context, state);

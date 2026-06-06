@@ -192,6 +192,12 @@ The persisted app-state schema also enforces one approval per language, note, an
 
 Language snapshots and evaluation artifacts include SHA-256 integrity manifests. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
 
+## Evaluation Runs
+
+`POST /evaluations/run`
+
+Evaluation runs are generated for existing synthetic languages. Persisted runs are validated during local JSON reads: each run must reference an existing language, and every stored failure line must use the same language ID as its parent run.
+
 ## Elder Corrections
 
 `POST /elder/corrections`

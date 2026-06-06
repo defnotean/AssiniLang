@@ -17,6 +17,7 @@ import {
   type AiSession,
   type CorpusPassage,
   type ElderCorrection,
+  type EvaluationRun,
   type Exercise,
   type ExerciseSubmission,
   type GovernanceRecord,
@@ -226,6 +227,23 @@ function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
       redactions: ["hidden-chain-of-thought", "answer-keys"],
       exposesHiddenChainOfThought: false
     },
+    ...overrides
+  };
+}
+
+function createTestEvaluationRun(overrides: Partial<EvaluationRun> = {}): EvaluationRun {
+  return {
+    id: "evaluation-run-1",
+    languageId: "avenik",
+    createdAt: "2026-06-06T00:00:00.000Z",
+    systemVersion: "unit-test",
+    fixtureVersion: "unit-test",
+    scores: {
+      noteCoverage: 1,
+      noteAccuracy: 1
+    },
+    failures: [],
+    summary: "Synthetic evaluation run.",
     ...overrides
   };
 }
@@ -754,6 +772,34 @@ describe("JsonStore", () => {
       createTestCorpusPassage({ id: "other-passage", languageId: "solari" })
     ];
     state.aiSessions = [session];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing language",
+      createTestEvaluationRun({ languageId: "missing-language" }),
+      "Evaluation run references missing language: missing-language"
+    ],
+    [
+      "failure language mismatch",
+      createTestEvaluationRun({
+        failures: [
+          {
+            category: "noteAccuracy",
+            languageId: "solari",
+            itemId: "note-1",
+            message: "Mismatched synthetic failure line."
+          }
+        ]
+      }),
+      "Evaluation failure language solari does not match run language avenik"
+    ]
+  ])("rejects persisted evaluation runs with %s", (_caseName, run, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage(), createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })];
+    state.evaluationRuns = [run];
 
     expect(() => parseAppState(state)).toThrow(errorMessage);
   });
