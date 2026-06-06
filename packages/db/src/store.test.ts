@@ -198,6 +198,23 @@ function createTestAuditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
 }
 
 function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
+  const messages: AiSession["messages"] = [
+    {
+      id: "ai-session-1-message-1",
+      role: "user",
+      content: "Trace the synthetic note safely.",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      createdBy: "programmer-1"
+    },
+    {
+      id: "ai-session-1-message-2",
+      role: "assistant",
+      content: "Safe synthetic response.",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      createdBy: "synthetic-ai"
+    }
+  ];
+
   return {
     id: "ai-session-1",
     languageId: "avenik",
@@ -208,22 +225,7 @@ function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
     updatedAt: "2026-06-06T00:00:00.000Z",
     contextNoteIds: ["note-1"],
     contextPassageIds: ["passage-1"],
-    messages: [
-      {
-        id: "ai-session-1-message-1",
-        role: "user",
-        content: "Trace the synthetic note safely.",
-        createdAt: "2026-06-06T00:00:00.000Z",
-        createdBy: "programmer-1"
-      },
-      {
-        id: "ai-session-1-message-2",
-        role: "assistant",
-        content: "Safe synthetic response.",
-        createdAt: "2026-06-06T00:00:00.000Z",
-        createdBy: "synthetic-ai"
-      }
-    ],
+    messages,
     thinkingSummary: "Safe reasoning summary: observable trace for synthetic context.",
     trace: [
       {
@@ -243,6 +245,17 @@ function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
       redactions: ["hidden-chain-of-thought", "answer-keys"],
       exposesHiddenChainOfThought: false
     },
+    ...overrides
+  };
+}
+
+function createTestAiMessage(overrides: Partial<AiSession["messages"][number]> = {}): AiSession["messages"][number] {
+  return {
+    id: "ai-session-1-message-custom",
+    role: "user",
+    content: "Trace the synthetic note safely.",
+    createdAt: "2026-06-06T00:00:00.000Z",
+    createdBy: "programmer-1",
     ...overrides
   };
 }
@@ -1084,6 +1097,57 @@ describe("JsonStore", () => {
       "creator role not allowed for mode",
       createTestAiSession({ createdBy: "learner-1" }),
       "AI session creator is not allowed for mode programmer_debug: learner-1"
+    ],
+    [
+      "unparseable created date",
+      createTestAiSession({ createdAt: "not-a-date" }),
+      "AI session createdAt must be parseable: not-a-date"
+    ],
+    [
+      "unparseable updated date",
+      createTestAiSession({ updatedAt: "not-a-date" }),
+      "AI session updatedAt must be parseable: not-a-date"
+    ],
+    [
+      "updated before created",
+      createTestAiSession({
+        createdAt: "2026-06-06T02:00:00.000Z",
+        updatedAt: "2026-06-06T01:00:00.000Z",
+        messages: [
+          createTestAiMessage({ id: "ai-session-1-message-1", createdAt: "2026-06-06T02:00:00.000Z" })
+        ]
+      }),
+      "AI session updatedAt cannot be before createdAt"
+    ],
+    [
+      "unparseable message date",
+      createTestAiSession({
+        messages: [
+          createTestAiMessage({ id: "ai-session-1-message-1", createdAt: "not-a-date" })
+        ]
+      }),
+      "AI session message createdAt must be parseable: not-a-date"
+    ],
+    [
+      "message before session creation",
+      createTestAiSession({
+        createdAt: "2026-06-06T01:00:00.000Z",
+        updatedAt: "2026-06-06T02:00:00.000Z",
+        messages: [
+          createTestAiMessage({ id: "ai-session-1-message-1", createdAt: "2026-06-06T00:00:00.000Z" })
+        ]
+      }),
+      "AI session message ai-session-1-message-1 cannot be before session createdAt"
+    ],
+    [
+      "message after session update",
+      createTestAiSession({
+        updatedAt: "2026-06-06T01:00:00.000Z",
+        messages: [
+          createTestAiMessage({ id: "ai-session-1-message-1", createdAt: "2026-06-06T02:00:00.000Z" })
+        ]
+      }),
+      "AI session message ai-session-1-message-1 cannot be after session updatedAt"
     ],
     [
       "missing context note",

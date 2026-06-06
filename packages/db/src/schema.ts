@@ -1058,6 +1058,42 @@ function addAiSessionIntegrityIssues(
       });
     }
 
+    addParseablePersistedDateIssue(context, "aiSessions", session.id, "AI session createdAt", session.createdAt);
+    addParseablePersistedDateIssue(context, "aiSessions", session.id, "AI session updatedAt", session.updatedAt);
+    const createdAtTime = Date.parse(session.createdAt);
+    const updatedAtTime = Date.parse(session.updatedAt);
+    const sessionTimelineIsParseable = !Number.isNaN(createdAtTime) && !Number.isNaN(updatedAtTime);
+
+    if (sessionTimelineIsParseable && updatedAtTime < createdAtTime) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "AI session updatedAt cannot be before createdAt",
+        path: ["aiSessions", session.id]
+      });
+    }
+
+    for (const message of session.messages) {
+      addParseablePersistedDateIssue(context, "aiSessions", session.id, "AI session message createdAt", message.createdAt);
+      const messageCreatedAtTime = Date.parse(message.createdAt);
+      if (!sessionTimelineIsParseable || Number.isNaN(messageCreatedAtTime)) continue;
+
+      if (messageCreatedAtTime < createdAtTime) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session message ${message.id} cannot be before session createdAt`,
+          path: ["aiSessions", session.id]
+        });
+      }
+
+      if (messageCreatedAtTime > updatedAtTime) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `AI session message ${message.id} cannot be after session updatedAt`,
+          path: ["aiSessions", session.id]
+        });
+      }
+    }
+
     for (const noteId of session.contextNoteIds) {
       const note = notesById.get(noteId);
       if (!note) {
