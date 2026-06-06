@@ -944,7 +944,14 @@ function addExerciseIntegrityIssues(
   }
 
   for (const exercise of state.exercises) {
-    if (!languageIds.has(exercise.languageId)) {
+    const exerciseLanguageIdIsBlank = isBlankPersistedValue(exercise.languageId);
+    if (exerciseLanguageIdIsBlank) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Exercise languageId must not be blank: ${exercise.id}`,
+        path: ["exercises", exercise.id]
+      });
+    } else if (!languageIds.has(exercise.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Exercise references missing language: ${exercise.languageId}`,
@@ -1033,7 +1040,7 @@ function addExerciseIntegrityIssues(
       });
     }
 
-    if (exercise.type === "translate_to_target") {
+    if (exercise.type === "translate_to_target" && !exerciseLanguageIdIsBlank) {
       const corpusTargets = corpusTargetsByLanguage.get(exercise.languageId) ?? new Set<string>();
       for (const answer of exercise.expectedAnswers) {
         if (!corpusTargets.has(normalizePersistedText(answer))) {
@@ -1276,14 +1283,32 @@ function addExerciseSubmissionIntegrityIssues(
 
     addParseablePersistedDateIssue(context, "exerciseSubmissions", submission.id, "Exercise submission submittedAt", submission.submittedAt);
 
-    const exercise = exercisesById.get(submission.exerciseId);
-    if (!exercise) {
+    const submissionExerciseIdIsBlank = isBlankPersistedValue(submission.exerciseId);
+    const submissionLanguageIdIsBlank = isBlankPersistedValue(submission.languageId);
+    if (submissionExerciseIdIsBlank) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exercise submission exerciseId must not be blank",
+        path: ["exerciseSubmissions", submission.id]
+      });
+    }
+
+    if (submissionLanguageIdIsBlank) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exercise submission languageId must not be blank",
+        path: ["exerciseSubmissions", submission.id]
+      });
+    }
+
+    const exercise = submissionExerciseIdIsBlank ? undefined : exercisesById.get(submission.exerciseId);
+    if (!submissionExerciseIdIsBlank && !exercise) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Exercise submission references missing exercise: ${submission.exerciseId}`,
         path: ["exerciseSubmissions", submission.id]
       });
-    } else if (submission.languageId !== exercise.languageId) {
+    } else if (exercise && !submissionLanguageIdIsBlank && submission.languageId !== exercise.languageId) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Exercise submission language ${submission.languageId} does not match exercise ${submission.exerciseId} language ${exercise.languageId}`,
@@ -1291,8 +1316,14 @@ function addExerciseSubmissionIntegrityIssues(
       });
     }
 
-    const learner = usersById.get(submission.learnerId);
-    if (!learner || !isExerciseSubmissionActorRole(learner.role)) {
+    const learner = isBlankPersistedValue(submission.learnerId) ? undefined : usersById.get(submission.learnerId);
+    if (isBlankPersistedValue(submission.learnerId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Exercise submission learnerId must not be blank",
+        path: ["exerciseSubmissions", submission.id]
+      });
+    } else if (!learner || !isExerciseSubmissionActorRole(learner.role)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Exercise submission learner is not allowed: ${submission.learnerId}`,

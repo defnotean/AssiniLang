@@ -1542,6 +1542,11 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestExercise({ languageId: "   " }),
+      "Exercise languageId must not be blank: exercise-1"
+    ],
+    [
       "missing language",
       createTestExercise({ languageId: "missing-language" }),
       "Exercise references missing language: missing-language"
@@ -1660,9 +1665,19 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank exercise id",
+      createTestSubmission({ exerciseId: "   " }),
+      "Exercise submission exerciseId must not be blank"
+    ],
+    [
       "missing exercise",
       createTestSubmission({ exerciseId: "missing-exercise" }),
       "Exercise submission references missing exercise: missing-exercise"
+    ],
+    [
+      "blank language id",
+      createTestSubmission({ languageId: "   " }),
+      "Exercise submission languageId must not be blank"
     ],
     [
       "exercise language mismatch",
@@ -1688,6 +1703,11 @@ describe("JsonStore", () => {
       "unknown learner actor",
       createTestSubmission({ learnerId: "missing-user" }),
       "Exercise submission learner is not allowed: missing-user"
+    ],
+    [
+      "blank learner actor",
+      createTestSubmission({ learnerId: "   " }),
+      "Exercise submission learnerId must not be blank"
     ],
     [
       "unallowed learner actor role",
