@@ -494,6 +494,56 @@ function isAllowedPersistedNoteActor(usersById: Map<string, z.infer<typeof userS
   return noteSystemActorIds.has(actorId) || (actor !== undefined && isReviewPolicyAssignableRole(actor.role));
 }
 
+function addLanguageIntegrityIssues(
+  context: z.RefinementCtx,
+  state: {
+    languages: Array<z.infer<typeof languageSchema>>;
+  }
+) {
+  for (const language of state.languages) {
+    const languagePathId = isBlankPersistedValue(language.id) ? "blank-language" : language.id;
+    if (isBlankPersistedValue(language.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Language id must not be blank",
+        path: ["languages", languagePathId]
+      });
+    }
+
+    if (isBlankPersistedValue(language.name)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Language name must not be blank: ${languagePathId}`,
+        path: ["languages", languagePathId]
+      });
+    }
+
+    if (isBlankPersistedValue(language.description)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Language description must not be blank: ${languagePathId}`,
+        path: ["languages", languagePathId]
+      });
+    }
+
+    if (isBlankPersistedValue(language.orthography)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Language orthography must not be blank: ${languagePathId}`,
+        path: ["languages", languagePathId]
+      });
+    }
+
+    if (isBlankPersistedValue(language.fixtureSource)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Language fixtureSource must not be blank: ${languagePathId}`,
+        path: ["languages", languagePathId]
+      });
+    }
+  }
+}
+
 function addCorpusIntegrityIssues(
   context: z.RefinementCtx,
   state: {
@@ -1780,6 +1830,7 @@ export const appStateSchema = z.object({
   reviewDispositions: z.array(reviewDispositionSchema).default([])
 }).superRefine((state, context) => {
   addDuplicatePersistedValueIssue(context, "languages", "id", state.languages, (item) => item.id);
+  addLanguageIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "corpus", "id", state.corpus, (item) => item.id);
   addCorpusIntegrityIssues(context, state);
   addDuplicatePersistedValueIssue(context, "corpusAnswerKeys", "passageId", state.corpusAnswerKeys ?? [], (item) => item.passageId);

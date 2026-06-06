@@ -548,6 +548,39 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank id",
+      { id: "   " },
+      "Language id must not be blank"
+    ],
+    [
+      "blank name",
+      { name: "   " },
+      "Language name must not be blank: avenik"
+    ],
+    [
+      "blank description",
+      { description: "   " },
+      "Language description must not be blank: avenik"
+    ],
+    [
+      "blank orthography",
+      { orthography: "   " },
+      "Language orthography must not be blank: avenik"
+    ],
+    [
+      "blank fixture source",
+      { fixtureSource: "   " },
+      "Language fixtureSource must not be blank: avenik"
+    ]
+  ])("rejects persisted languages with %s", (_caseName, languagePatch, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage(languagePatch)];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
       "note with missing language",
       "notes",
       createTestNote({ languageId: "missing-language" }),

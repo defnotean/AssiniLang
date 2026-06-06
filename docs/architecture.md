@@ -51,7 +51,7 @@ The shared orthography scanner is exported so fixture validation and live API im
 
 The generated local database lives at `data/local-db.json`. `JsonStore` writes through a temporary file and rename so normal writes are atomic.
 
-Persisted top-level records must keep stable unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by source passage ID and must point at an existing same-language corpus passage.
+Persisted top-level records must keep stable unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by source passage ID and must point at an existing same-language corpus passage. Persisted language records must also keep nonblank IDs, public names, descriptions, orthography labels, and fixture-source labels so corrupted local JSON cannot publish empty language catalog entries.
 
 Seeded local databases include the six prototype users used by the web console and review policies: learner, Elder, reviewer, lead, programmer, and admin. The API still falls back to the same shared prototype-user list when reading older local databases with an empty `users` array.
 

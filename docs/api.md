@@ -60,6 +60,12 @@ Do not treat prototype auth as production security.
 | `GET /observability/ai-sessions` | Return sanitized AI session observability. |
 | `GET /neural-map` | Return a role-gated sanitized graph of local AI/session context. |
 
+## Language Catalog
+
+`GET /languages`
+
+Languages are seeded synthetic records. During local JSON reads, restored language records must keep nonblank IDs, public names, descriptions, orthography labels, and fixture-source labels before they can appear in public catalogs, snapshots, or profile responses.
+
 ## Corpus Import
 
 `POST /languages/:languageId/corpus`
