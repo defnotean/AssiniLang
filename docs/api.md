@@ -122,12 +122,12 @@ Important validation:
 - `topicTags` must contain at least one nonblank tag and must be unique after whitespace normalization.
 - Each segmentation surface must appear in the target text.
 - Every target-text token must be covered by one or more contiguous segmentation surfaces. Hyphen boundaries are normalized for this coverage check so fusional forms can be analyzed with separate suffix surfaces.
-- Morpheme feature lists must use nonblank values and be unique after whitespace normalization.
+- Morpheme surface, lemma, gloss, and feature labels must use nonblank values; feature labels must be unique after whitespace normalization.
 - Target text must use symbols from the selected language phonology inventory. Whitespace and explicit morpheme hyphens are allowed.
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.
 - Duplicate target text is rejected per language.
 
-Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep nonblank source/provenance text, target text, translations, consent restrictions, nonblank duplicate-free topic tags, and duplicate-free morpheme feature lists, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
+Successful imports create a `corpus.imported` audit event. The persisted app-state schema later verifies that corpus passages still reference existing languages, keep nonblank source/provenance text, target text, translations, consent restrictions, topic tags, morpheme surface/lemma/gloss text, and morpheme feature labels, keep normalized topic tags and morpheme feature labels duplicate-free, and preserve target-text segmentation coverage. It also verifies that corpus answer keys still reference existing same-language passages, so manually edited local JSON cannot leave evaluation keys orphaned or attached to the wrong language.
 
 ## Exercise Authoring
 

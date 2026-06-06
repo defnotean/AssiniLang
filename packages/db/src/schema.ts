@@ -682,6 +682,30 @@ function addCorpusIntegrityIssues(
     }
 
     for (const morpheme of passage.morphologicalSegmentation) {
+      if (isBlankPersistedValue(morpheme.surface)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus morpheme surface must not be blank for passage ${passage.id}`,
+          path: ["corpus", passage.id]
+        });
+      }
+
+      if (isBlankPersistedValue(morpheme.lemma)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus morpheme lemma must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
+          path: ["corpus", passage.id]
+        });
+      }
+
+      if (isBlankPersistedValue(morpheme.gloss)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus morpheme gloss must not be blank for passage ${passage.id} surface ${morpheme.surface}`,
+          path: ["corpus", passage.id]
+        });
+      }
+
       if (!corpusTargetContainsSurface(passage.textTarget, morpheme.surface)) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

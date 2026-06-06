@@ -926,6 +926,66 @@ describe("JsonStore", () => {
       "Corpus topic tag must not be blank for passage passage-1"
     ],
     [
+      "blank morpheme surface",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "   ",
+            lemma: "mira",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus morpheme surface must not be blank for passage passage-1"
+    ],
+    [
+      "blank morpheme lemma",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "   ",
+            gloss: "river",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus morpheme lemma must not be blank for passage passage-1 surface mira"
+    ],
+    [
+      "blank morpheme gloss",
+      createTestCorpusPassage({
+        morphologicalSegmentation: [
+          {
+            surface: "mira",
+            lemma: "mira",
+            gloss: "   ",
+            features: ["noun"]
+          },
+          {
+            surface: "talo-mi-na",
+            lemma: "talo",
+            gloss: "walk.present.1sg",
+            features: ["verb", "present", "1sg"]
+          }
+        ]
+      }),
+      "Corpus morpheme gloss must not be blank for passage passage-1 surface mira"
+    ],
+    [
       "duplicate morpheme features",
       createTestCorpusPassage({
         morphologicalSegmentation: [
