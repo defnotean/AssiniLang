@@ -2033,6 +2033,11 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestEvaluationRun({ languageId: "   " }),
+      "Evaluation run languageId must not be blank"
+    ],
+    [
       "missing language",
       createTestEvaluationRun({ languageId: "missing-language" }),
       "Evaluation run references missing language: missing-language"
@@ -2117,6 +2122,20 @@ describe("JsonStore", () => {
         ]
       }),
       "Evaluation failure language solari does not match run language avenik"
+    ],
+    [
+      "blank failure language id",
+      createTestEvaluationRun({
+        failures: [
+          {
+            category: "noteAccuracy",
+            languageId: "   ",
+            itemId: "note-1",
+            message: "Blank failure language IDs should not restore."
+          }
+        ]
+      }),
+      "Evaluation failure languageId must not be blank"
     ]
   ])("rejects persisted evaluation runs with %s", (_caseName, run, errorMessage) => {
     const state = createEmptyState();

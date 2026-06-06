@@ -1768,7 +1768,13 @@ function addEvaluationRunIntegrityIssues(
 
     addParseablePersistedDateIssue(context, "evaluationRuns", run.id, "Evaluation run createdAt", run.createdAt);
 
-    if (!languageIds.has(run.languageId)) {
+    if (isBlankPersistedValue(run.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Evaluation run languageId must not be blank",
+        path: ["evaluationRuns", run.id]
+      });
+    } else if (!languageIds.has(run.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Evaluation run references missing language: ${run.languageId}`,
@@ -1811,7 +1817,13 @@ function addEvaluationRunIntegrityIssues(
         });
       }
 
-      if (failure.languageId !== run.languageId) {
+      if (isBlankPersistedValue(failure.languageId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Evaluation failure languageId must not be blank",
+          path: ["evaluationRuns", run.id]
+        });
+      } else if (failure.languageId !== run.languageId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Evaluation failure language ${failure.languageId} does not match run language ${run.languageId}`,

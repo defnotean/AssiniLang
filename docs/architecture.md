@@ -159,7 +159,7 @@ Successful imports append the passage, derive a private corpus answer key from t
 
 Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output.
 
-Persisted evaluation runs must reference an existing synthetic language; keep nonblank system version, fixture version, score category, and summary text; keep a parseable creation timestamp; and each failure line must use the same language ID as the run it belongs to with a nonblank category, item ID, and diagnostic message. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
+Persisted evaluation runs must keep nonblank language IDs that reference an existing synthetic language; keep nonblank system version, fixture version, score category, and summary text; keep a parseable creation timestamp; and each failure line must use a nonblank language ID matching the run it belongs to with a nonblank category, item ID, and diagnostic message. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
 
 ## LLM Provider Boundary
 
