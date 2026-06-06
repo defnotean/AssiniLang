@@ -196,7 +196,7 @@ Scores should be machine-readable and visible in the web UI. The evaluation gate
 - UI loading states should distinguish no data, invalid data, and evaluation not yet run.
 - Synthetic fixture labels should be visible anywhere language data is displayed.
 - Governance writes should be role-gated and reject unknown language IDs without mutating stored policy records.
-- Review-policy writes should be role-gated to leads/admins, reject unknown reviewers or impossible approval thresholds, bound assigned-reviewer quorums to assigned reviewers, bound open-reviewer quorums to the assignable reviewer pool, and keep notes `under_review` until enough approvals exist.
+- Review-policy writes should be role-gated to leads/admins, reject unknown reviewers or impossible approval thresholds, bound assigned-reviewer quorums to assigned reviewers, bound open-reviewer quorums to the assignable reviewer pool, count only reviewers eligible under the current policy toward active quorum, and keep notes `under_review` until enough approvals exist.
 - Note explanation edits should reject underspecified text before mutating note status, reviewer metadata, or edit history.
 - Review-disposition writes should validate assignees and due dates, preserve a work ledger, restrict resolution to assignees/leads/admins, reopen linked notes for review, and audit both creation and resolution.
 - Audit-event reads should be role-gated to operational leads/admins/programmers, support language filtering, reject unknown language filters, and omit learner answers, provider prompts, answer keys, and hidden model traces.

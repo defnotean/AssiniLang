@@ -55,6 +55,8 @@ The review queue shows generated draft notes beside their status, confidence, ev
 
 Per-language review policies can require assigned reviewers and approval thresholds. When a threshold is greater than one, a note remains `under_review` until enough approvals are recorded. Assigned-reviewer policies bound the threshold to assigned reviewers; open-reviewer policies bound it to the current assignable reviewer pool.
 
+If assignments change mid-review, earlier approvals stay in the audit trail but no longer satisfy quorum unless the reviewer is still eligible under the current policy.
+
 ### Learning Lab
 
 The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.

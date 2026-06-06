@@ -617,6 +617,18 @@ function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): s
   return undefined;
 }
 
+function reviewPolicyEligibleReviewerIds(state: AppState, policy: ReviewPolicy): Set<string> {
+  if (policy.requiresAssignedReviewer) {
+    return new Set(policy.assignedReviewerIds);
+  }
+
+  return new Set(
+    usersForState(state)
+      .filter((user) => REVIEW_POLICY_ASSIGNABLE_ROLES.includes(user.role))
+      .map((user) => user.id)
+  );
+}
+
 function noteExplanationValidationError(explanation: string | undefined): string | undefined {
   if (explanation === undefined) return undefined;
 
@@ -2112,9 +2124,11 @@ export function createServer(options: ServerOptions = {}) {
           reviewApprovals = [...reviewApprovals, approval];
         }
 
+        const eligibleReviewerIds = reviewPolicyEligibleReviewerIds(state, policy);
         approvalCount = new Set(
           reviewApprovals
             .filter((approval) => approval.languageId === existing.languageId && approval.noteId === noteId)
+            .filter((approval) => eligibleReviewerIds.has(approval.reviewerId))
             .map((approval) => approval.reviewerId)
         ).size;
         approvalThreshold = policy.approvalThreshold;

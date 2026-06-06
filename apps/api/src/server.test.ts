@@ -870,6 +870,70 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it("does not count stale approvals after review policy assignments change", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+
+    const originalPolicy = await app.inject({
+      method: "PUT",
+      url: "/languages/avenik/review-policy",
+      headers: authHeaders("lead-1"),
+      payload: {
+        assignedReviewerIds: ["reviewer-1", "elder-1"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      }
+    });
+    expect(originalPolicy.statusCode).toBe(200);
+
+    const staleApproval = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        status: "approved",
+        reviewerComment: "Approval before assignment changed."
+      }
+    });
+    expect(staleApproval.statusCode).toBe(200);
+    expect(staleApproval.json().status).toBe("under_review");
+
+    const reassignedPolicy = await app.inject({
+      method: "PUT",
+      url: "/languages/avenik/review-policy",
+      headers: authHeaders("lead-1"),
+      payload: {
+        assignedReviewerIds: ["elder-1", "lead-1"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      }
+    });
+    expect(reassignedPolicy.statusCode).toBe(200);
+
+    const firstCurrentApproval = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      headers: authHeaders("elder-1"),
+      payload: {
+        status: "approved",
+        reviewerComment: "First current assigned reviewer approves."
+      }
+    });
+    expect(firstCurrentApproval.statusCode).toBe(200);
+    expect(firstCurrentApproval.json().status).toBe("under_review");
+
+    const finalCurrentApproval = await app.inject({
+      method: "PATCH",
+      url: `/notes/${reviewedNoteId}/review`,
+      headers: authHeaders("lead-1"),
+      payload: {
+        status: "approved",
+        reviewerComment: "Second current assigned reviewer approves."
+      }
+    });
+    expect(finalCurrentApproval.statusCode).toBe(200);
+    expect(finalCurrentApproval.json().status).toBe("approved");
+  });
+
   it("clears pending approval quorum when a note is deferred", async () => {
     const app = createServer({ initialState: stateWithAuthUsers() });
 
