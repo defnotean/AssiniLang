@@ -191,7 +191,7 @@ Scores should be machine-readable and visible in the web UI. The evaluation gate
 
 - Missing fixture files should fail fast with the exact file path.
 - Invalid fixture schema should report the language ID and field path.
-- Invalid fixture cross-references should fail before seeding with actionable diagnostics for duplicate IDs, duplicate or empty dialect variant records, missing evidence passages, duplicate corpus topic tags, duplicate morpheme feature labels, symbols outside a language phonology inventory, missing or duplicate exercise rules, unknown or duplicate allowed vocabulary, duplicate expected exercise answers, invalid particle answers, target-language answers not present in the corpus, and adversarial exercise probes that duplicate accepted answers or one another.
+- Invalid fixture cross-references should fail before seeding with actionable diagnostics for duplicate IDs, duplicate or empty dialect variant records, missing evidence passages, duplicate corpus topic tags, duplicate morpheme feature labels, target tokens not covered by corpus segmentation, symbols outside a language phonology inventory, missing or duplicate exercise rules, unknown or duplicate allowed vocabulary, duplicate expected exercise answers, invalid particle answers, target-language answers not present in the corpus, and adversarial exercise probes that duplicate accepted answers or one another.
 - Evaluation failures and threshold breaches should be stored or surfaced as traceable records, not just console text.
 - UI loading states should distinguish no data, invalid data, and evaluation not yet run.
 - Synthetic fixture labels should be visible anywhere language data is displayed.
@@ -205,7 +205,7 @@ Scores should be machine-readable and visible in the web UI. The evaluation gate
 - Elder correction review should be role-gated, reject learners/reviewers/programmers, preserve notes during accepted/rejected transitions, and persist reviewer attribution.
 - Elder correction application should require an accepted note-linked correction, reject empty revised explanations, update the linked public note with audit history, and move the correction to `applied`.
 - Exercise authoring should be role-gated, reject unknown language/rule/vocabulary references, duplicate allowed rules or vocabulary, fewer than two adversarial probes, duplicate expected answers, and duplicate adversarial probes before mutation, store answer keys server-side, return only public exercise fields, and audit creation without logging expected-answer text.
-- Corpus imports should be role-gated, reject duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, target text outside the selected language phonology inventory, segmentation surfaces not present in the target text, and morphemes not grounded by the selected language vocabulary surface or lemma before mutation, require synthetic-only consent metadata, and audit import provenance without storing private review data.
+- Corpus imports should be role-gated, reject duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, target text outside the selected language phonology inventory, segmentation surfaces not present in the target text, target tokens not covered by contiguous segmentation surfaces, and morphemes not grounded by the selected language vocabulary surface or lemma before mutation, require synthetic-only consent metadata, and audit import provenance without storing private review data.
 
 ## Testing Strategy
 

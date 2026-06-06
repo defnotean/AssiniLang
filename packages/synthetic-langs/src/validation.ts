@@ -1,8 +1,12 @@
-import type { Exercise } from "@assini/db";
+import type { Exercise, Morpheme } from "@assini/db";
 import type { SyntheticLanguageFixture } from "./fixtures";
 
 function normalizedText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
+}
+
+function normalizedSurfaceKey(value: string): string {
+  return normalizedText(value).toLowerCase().replace(/-/g, "");
 }
 
 function addDuplicateDiagnostics(items: string[], label: string, diagnostics: string[]) {
@@ -56,6 +60,32 @@ export function findInvalidOrthographySymbols(value: string, fixture: SyntheticL
   }
 
   return [...invalid];
+}
+
+function hasContiguousMorphemeCoverage(targetToken: string, morphemes: Array<Pick<Morpheme, "surface">>): boolean {
+  const targetKey = normalizedSurfaceKey(targetToken);
+  const surfaceKeys = morphemes.map((morpheme) => normalizedSurfaceKey(morpheme.surface));
+
+  for (let start = 0; start < surfaceKeys.length; start += 1) {
+    let candidate = "";
+    for (let end = start; end < surfaceKeys.length; end += 1) {
+      candidate += surfaceKeys[end];
+      if (candidate === targetKey) return true;
+      if (!targetKey.startsWith(candidate)) break;
+    }
+  }
+
+  return false;
+}
+
+export function findUncoveredCorpusTargetTokens(
+  textTarget: string,
+  morphologicalSegmentation: Array<Pick<Morpheme, "surface">>
+): string[] {
+  return normalizedText(textTarget)
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .filter((token) => !hasContiguousMorphemeCoverage(token, morphologicalSegmentation));
 }
 
 function addOrthographyDiagnostics(
@@ -119,6 +149,9 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
         `${languageId} corpus passage ${passage.id} topic tag is duplicated:`,
         diagnostics
       );
+      for (const token of findUncoveredCorpusTargetTokens(passage.textTarget, passage.morphologicalSegmentation)) {
+        diagnostics.push(`${languageId} corpus passage ${passage.id} segmentation does not cover target token: ${token}`);
+      }
       for (const morpheme of passage.morphologicalSegmentation) {
         if (!vocabularyForms.has(morpheme.surface) && !vocabularyForms.has(morpheme.lemma)) {
           diagnostics.push(`${languageId} corpus passage ${passage.id} has ungrounded morpheme ${morpheme.surface}/${morpheme.lemma}`);

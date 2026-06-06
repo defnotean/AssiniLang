@@ -112,6 +112,7 @@ Important validation:
 - `consentStatus.use` must be `synthetic-testing-only`.
 - `topicTags` must contain at least one tag and must be unique after whitespace normalization.
 - Each segmentation surface must appear in the target text.
+- Every target-text token must be covered by one or more contiguous segmentation surfaces. Hyphen boundaries are normalized for this coverage check so fusional forms can be analyzed with separate suffix surfaces.
 - Morpheme feature lists must be unique after whitespace normalization.
 - Target text must use symbols from the selected language phonology inventory. Whitespace and explicit morpheme hyphens are allowed.
 - Each morpheme must be grounded by the selected language vocabulary surface or lemma.

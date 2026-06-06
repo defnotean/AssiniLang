@@ -122,4 +122,20 @@ describe("synthetic fixture validation module", () => {
       ])
     );
   });
+
+  it("rejects corpus passages whose segmentation omits target tokens", () => {
+    const brokenFixtures = cloneFixtures();
+    const avenik = brokenFixtures[0];
+    if (!avenik) throw new Error("Missing Avenik fixture");
+
+    avenik.corpus[4].morphologicalSegmentation = avenik.corpus[4].morphologicalSegmentation.filter(
+      (morpheme) => morpheme.surface !== "mira"
+    );
+
+    expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
+      expect.arrayContaining([
+        "avenik corpus passage avn-c005 segmentation does not cover target token: mira"
+      ])
+    );
+  });
 });

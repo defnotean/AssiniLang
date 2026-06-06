@@ -23,7 +23,7 @@ import {
   type UserRole
 } from "@assini/db";
 import { draftNotesForLanguage, gradeExerciseAnswer, runEvaluationForState } from "@assini/eval";
-import { findInvalidOrthographySymbols, syntheticLanguageFixtures } from "@assini/synthetic-langs";
+import { findInvalidOrthographySymbols, findUncoveredCorpusTargetTokens, syntheticLanguageFixtures } from "@assini/synthetic-langs";
 import {
   buildLlmGenerationInputFromState,
   createLlmProviderFromEnv,
@@ -636,11 +636,14 @@ function firstDuplicateNormalizedValue(values: string[]): string | undefined {
 }
 
 function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
-  const normalizedSurface = normalizeAuthoredAnswer(surface).toLowerCase();
+  const normalizedSurface = normalizeAuthoredAnswer(surface).toLowerCase().replace(/-/g, "");
   return normalizeAuthoredAnswer(textTarget)
     .toLowerCase()
     .split(/\s+/)
-    .some((token) => token === normalizedSurface || token.includes(normalizedSurface));
+    .some((token) => {
+      const normalizedToken = token.replace(/-/g, "");
+      return normalizedToken === normalizedSurface || normalizedToken.includes(normalizedSurface);
+    });
 }
 
 function corpusMorphemeGroundingError(languageId: string, body: CorpusImportBody): string | undefined {
@@ -716,6 +719,11 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
   const phonologyError = corpusPhonologyValidationError(languageId, body);
   if (phonologyError) {
     return phonologyError;
+  }
+
+  const uncoveredTargetToken = findUncoveredCorpusTargetTokens(body.textTarget, body.morphologicalSegmentation)[0];
+  if (uncoveredTargetToken) {
+    return `Corpus segmentation does not cover target token: ${uncoveredTargetToken}`;
   }
 
   const groundingError = corpusMorphemeGroundingError(languageId, body);

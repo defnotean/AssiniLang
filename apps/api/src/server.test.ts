@@ -354,6 +354,43 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  it("rejects corpus imports when segmentation omits a target token", async () => {
+    const app = createServer({ initialState: stateWithAuthUsers() });
+    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages/avenik/corpus",
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        source: "synthetic-import",
+        sourceMetadata: {
+          author: "Local Reviewer",
+          year: 2026,
+          license: "synthetic-only",
+          consentRecord: "local synthetic import consent"
+        },
+        textTarget: "mira lumo-ke talo-mi-na",
+        textTranslation: "I walk by the river at the practice mat.",
+        morphologicalSegmentation: [
+          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
+          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+        ],
+        topicTags: ["motion", "place"],
+        consentStatus: {
+          use: "synthetic-testing-only",
+          restrictions: []
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({ error: "Corpus segmentation does not cover target token: lumo-ke" });
+
+    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it("rejects corpus imports with morphemes outside the selected language vocabulary", async () => {
     const app = createServer({ initialState: stateWithAuthUsers() });
     const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });

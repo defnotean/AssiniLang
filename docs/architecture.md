@@ -42,7 +42,7 @@ Each synthetic language should include:
 - Paradigm tables.
 - Dialect variants.
 
-Fixture loading validates cross-references and linguistic consistency. It rejects broken evidence IDs, duplicate IDs, empty dialect labels, mismatched language IDs, public forms outside the phonology inventory, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted or adversarial answers, note evidence-count drift, and note examples that no longer match their cited corpus passage.
+Fixture loading validates cross-references and linguistic consistency. It rejects broken evidence IDs, duplicate IDs, empty dialect labels, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted or adversarial answers, note evidence-count drift, and note examples that no longer match their cited corpus passage.
 
 Validation rules live in `packages/synthetic-langs/src/validation.ts`; seed-state cloning and answer-key materialization live in `packages/synthetic-langs/src/loader.ts`.
 The shared orthography scanner is exported so fixture validation and live API imports use the same phonology-inventory rules.
@@ -111,6 +111,7 @@ The API rejects imports when:
 - The body is malformed.
 - Target text duplicates an existing passage for the language.
 - A segmentation surface does not appear in the target text.
+- A target-text token is not covered by one or more contiguous segmentation surfaces.
 - Target text uses a symbol outside the selected language phonology inventory.
 - A morpheme is not grounded by the selected language vocabulary surface or lemma.
 - Synthetic consent metadata is missing or not `synthetic-testing-only`.
