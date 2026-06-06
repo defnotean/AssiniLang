@@ -1252,6 +1252,7 @@ function addReviewDispositionIntegrityIssues(
 function addElderCorrectionIntegrityIssues(
   context: z.RefinementCtx,
   state: {
+    languages: Array<z.infer<typeof languageSchema>>;
     notes: Array<z.infer<typeof noteSchema>>;
     corpus: Array<z.infer<typeof corpusPassageSchema>>;
     users: Array<z.infer<typeof userSchema>>;
@@ -1259,6 +1260,7 @@ function addElderCorrectionIntegrityIssues(
   }
 ) {
   const users = state.users.length > 0 ? state.users : LOCAL_PROTOTYPE_USERS;
+  const languageIds = new Set(state.languages.map((language) => language.id));
   const usersById = new Map(users.map((user) => [user.id, user]));
   const notesById = new Map(state.notes.map((note) => [note.id, note]));
   const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
@@ -1279,6 +1281,14 @@ function addElderCorrectionIntegrityIssues(
   };
 
   for (const correction of state.elderCorrections) {
+    if (!languageIds.has(correction.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Elder correction references missing language: ${correction.languageId}`,
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
     if (correction.noteId !== undefined) {
       const note = notesById.get(correction.noteId);
       if (!note) {

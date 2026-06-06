@@ -1242,6 +1242,11 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "missing language",
+      createTestElderCorrection({ languageId: "missing-language", noteId: undefined, contextText: "Custom context only." }),
+      "Elder correction references missing language: missing-language"
+    ],
+    [
       "missing note target",
       createTestElderCorrection({ noteId: "missing-note" }),
       "Elder correction references missing note: missing-note"
@@ -1306,6 +1311,7 @@ describe("JsonStore", () => {
     ]
   ])("rejects persisted elder corrections with %s", (_caseName, correction, errorMessage) => {
     const state = createEmptyState();
+    state.languages = [createTestLanguage(), createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })];
     state.users = LOCAL_PROTOTYPE_USERS.map((user) => ({ ...user }));
     state.notes = [createTestNote()];
     state.corpus = [createTestCorpusPassage()];
