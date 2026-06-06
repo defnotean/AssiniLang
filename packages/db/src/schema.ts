@@ -675,7 +675,13 @@ function addCorpusIntegrityIssues(
   const languageIds = new Set(state.languages.map((language) => language.id));
 
   for (const passage of state.corpus) {
-    if (!languageIds.has(passage.languageId)) {
+    if (isBlankPersistedValue(passage.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Corpus passage languageId must not be blank: ${passage.id}`,
+        path: ["corpus", passage.id]
+      });
+    } else if (!languageIds.has(passage.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Corpus passage references missing language: ${passage.languageId}`,
@@ -1152,6 +1158,15 @@ function addCorpusAnswerKeyIntegrityIssues(
   const passagesById = new Map(state.corpus.map((passage) => [passage.id, passage]));
 
   for (const answerKey of state.corpusAnswerKeys ?? []) {
+    if (isBlankPersistedValue(answerKey.passageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Corpus answer key passageId must not be blank",
+        path: ["corpusAnswerKeys", answerKey.passageId]
+      });
+      continue;
+    }
+
     const passage = passagesById.get(answerKey.passageId);
     if (!passage) {
       context.addIssue({
@@ -1162,7 +1177,13 @@ function addCorpusAnswerKeyIntegrityIssues(
       continue;
     }
 
-    if (answerKey.languageId !== passage.languageId) {
+    if (isBlankPersistedValue(answerKey.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Corpus answer key languageId must not be blank",
+        path: ["corpusAnswerKeys", answerKey.passageId]
+      });
+    } else if (answerKey.languageId !== passage.languageId) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Corpus answer key language ${answerKey.languageId} does not match passage ${answerKey.passageId} language ${passage.languageId}`,

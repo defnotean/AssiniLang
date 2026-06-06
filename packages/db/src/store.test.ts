@@ -940,6 +940,11 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language",
+      createTestCorpusPassage({ languageId: "   " }),
+      "Corpus passage languageId must not be blank: passage-1"
+    ],
+    [
       "missing language",
       createTestCorpusPassage({ languageId: "missing-language" }),
       "Corpus passage references missing language: missing-language"
@@ -1153,9 +1158,19 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank passage id",
+      createTestCorpusAnswerKey({ passageId: "   " }),
+      "Corpus answer key passageId must not be blank"
+    ],
+    [
       "missing passage",
       createTestCorpusAnswerKey({ passageId: "missing-passage" }),
       "Corpus answer key references missing passage: missing-passage"
+    ],
+    [
+      "blank language id",
+      createTestCorpusAnswerKey({ languageId: "   " }),
+      "Corpus answer key languageId must not be blank"
     ],
     [
       "passage language mismatch",
