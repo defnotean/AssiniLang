@@ -1973,6 +1973,15 @@ function addElderCorrectionIntegrityIssues(
     label: "proposer" | "reviewer",
     correctionId: string
   ) => {
+    if (isBlankPersistedValue(userId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Elder correction ${label} must not be blank`,
+        path: ["elderCorrections", correctionId]
+      });
+      return;
+    }
+
     const user = usersById.get(userId);
     if (!user || !isElderCorrectionMutationRole(user.role)) {
       context.addIssue({
@@ -2008,6 +2017,14 @@ function addElderCorrectionIntegrityIssues(
       });
     }
 
+    if (isBlankPersistedValue(correction.languageId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Elder correction languageId must not be blank",
+        path: ["elderCorrections", correction.id]
+      });
+    }
+
     if (!languageIds.has(correction.languageId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
@@ -2017,6 +2034,14 @@ function addElderCorrectionIntegrityIssues(
     }
 
     if (correction.noteId !== undefined) {
+      if (isBlankPersistedValue(correction.noteId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Elder correction noteId must not be blank",
+          path: ["elderCorrections", correction.id]
+        });
+      }
+
       const note = notesById.get(correction.noteId);
       if (!note) {
         context.addIssue({
@@ -2034,6 +2059,14 @@ function addElderCorrectionIntegrityIssues(
     }
 
     if (correction.passageId !== undefined) {
+      if (isBlankPersistedValue(correction.passageId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Elder correction passageId must not be blank",
+          path: ["elderCorrections", correction.id]
+        });
+      }
+
       const passage = passagesById.get(correction.passageId);
       if (!passage) {
         context.addIssue({

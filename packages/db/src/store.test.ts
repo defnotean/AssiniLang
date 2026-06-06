@@ -2240,9 +2240,19 @@ describe("JsonStore", () => {
 
   it.each([
     [
+      "blank language id",
+      createTestElderCorrection({ languageId: "   ", noteId: undefined, contextText: "Custom context only." }),
+      "Elder correction languageId must not be blank"
+    ],
+    [
       "missing language",
       createTestElderCorrection({ languageId: "missing-language", noteId: undefined, contextText: "Custom context only." }),
       "Elder correction references missing language: missing-language"
+    ],
+    [
+      "blank note target",
+      createTestElderCorrection({ noteId: "   " }),
+      "Elder correction noteId must not be blank"
     ],
     [
       "missing note target",
@@ -2258,6 +2268,11 @@ describe("JsonStore", () => {
       "missing passage target",
       createTestElderCorrection({ noteId: undefined, passageId: "missing-passage" }),
       "Elder correction references missing passage: missing-passage"
+    ],
+    [
+      "blank passage target",
+      createTestElderCorrection({ noteId: undefined, passageId: "   " }),
+      "Elder correction passageId must not be blank"
     ],
     [
       "passage language mismatch",
@@ -2283,6 +2298,11 @@ describe("JsonStore", () => {
       "unknown proposer",
       createTestElderCorrection({ proposedBy: "missing-user" }),
       "Elder correction proposer is not allowed: missing-user"
+    ],
+    [
+      "blank proposer",
+      createTestElderCorrection({ proposedBy: "   " }),
+      "Elder correction proposer must not be blank"
     ],
     [
       "learner proposer",
@@ -2325,6 +2345,15 @@ describe("JsonStore", () => {
         reviewedAt: "2026-06-06T01:00:00.000Z"
       }),
       "Elder correction reviewedAt cannot be before proposedAt"
+    ],
+    [
+      "blank reviewer",
+      createTestElderCorrection({
+        status: "accepted",
+        reviewedBy: "   ",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }),
+      "Elder correction reviewer must not be blank"
     ],
     [
       "unallowed reviewer",

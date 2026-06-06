@@ -229,7 +229,7 @@ Allowed applier roles: Elder, lead, admin.
 
 Only accepted note-linked corrections can be applied. Applying a correction requires a revised note explanation, moves the correction to `applied`, sets the linked note back to `under_review`, appends a note edit-history entry, and writes audit events for both the correction and the note.
 
-The persisted app-state schema enforces the same ledger invariants during local JSON reads: correction language IDs must resolve to an existing synthetic language, correction note and passage IDs must resolve within that same language, correction text, rationale, and custom context text must stay nonblank, proposer and reviewer IDs must be known Elder/lead/admin users, `proposedAt` and non-null `reviewedAt` values must be parseable, review timestamps cannot precede proposal timestamps, pending corrections cannot carry review attribution, reviewed corrections must include `reviewedBy` and `reviewedAt`, and applied corrections must reference a note.
+The persisted app-state schema enforces the same ledger invariants during local JSON reads: correction language IDs must be nonblank and resolve to an existing synthetic language; correction note and passage IDs, when present, must be nonblank and resolve within that same language; correction text, rationale, and custom context text must stay nonblank; proposer and reviewer IDs must be nonblank known Elder/lead/admin users; `proposedAt` and non-null `reviewedAt` values must be parseable; review timestamps cannot precede proposal timestamps; pending corrections cannot carry review attribution; reviewed corrections must include `reviewedBy` and `reviewedAt`; and applied corrections must reference a note.
 
 ## LLM Status And Sessions
 
