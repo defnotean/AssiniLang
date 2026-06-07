@@ -78,6 +78,8 @@ describe("synthetic language fixtures", () => {
       vowels: 5,
       phonotacticNotes: 3,
       vocabularyItems: 24,
+      semanticDomains: 3,
+      semanticDomainVocabulary: 3,
       corpusPassages: 12,
       grammarRules: 6,
       noteAnswerKeys: 6,
@@ -95,8 +97,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: true,
-      totalChecks: 15,
-      passedChecks: 15,
+      totalChecks: 17,
+      passedChecks: 17,
       failedChecks: 0
     });
     expect(summary.checks.map((check) => check.id)).toEqual([
@@ -104,6 +106,8 @@ describe("synthetic language fixtures", () => {
       "vowels",
       "phonotacticNotes",
       "vocabularyItems",
+      "semanticDomains",
+      "semanticDomainVocabulary",
       "corpusPassages",
       "grammarRules",
       "noteAnswerKeys",
@@ -121,6 +125,20 @@ describe("synthetic language fixtures", () => {
       label: "Exercise types",
       actual: 3,
       minimum: SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "semanticDomains",
+      label: "Semantic domains",
+      actual: 3,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.semanticDomains,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "semanticDomainVocabulary",
+      label: "Semantic domain vocabulary",
+      actual: 3,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary,
       passed: true
     });
     expect(summary.checks).toContainEqual({
@@ -158,8 +176,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: false,
-      totalChecks: 15,
-      passedChecks: 13,
+      totalChecks: 17,
+      passedChecks: 15,
       failedChecks: 2
     });
     expect(summary.checks).toContainEqual({
@@ -281,6 +299,29 @@ describe("synthetic language fixtures", () => {
           expect(event.evidencePassageIds.length, `${fixture.language.id} ${dialect.id} event evidence`).toBeGreaterThan(0);
           expect(event.evidencePassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
         }
+      }
+    }
+  });
+
+  it("provides semantic domains that anchor vocabulary to corpus evidence", () => {
+    for (const fixture of syntheticLanguageFixtures) {
+      const vocabularyIds = new Set(fixture.vocabulary.map((item) => item.id));
+      const corpusIds = new Set(fixture.corpus.map((passage) => passage.id));
+
+      expect(fixture.semanticDomains, `${fixture.language.id} semantic domains`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.semanticDomains
+      );
+      for (const domain of fixture.semanticDomains) {
+        expect(domain.id, `${fixture.language.id} semantic domain id`).toBeTruthy();
+        expect(domain.label, `${fixture.language.id} ${domain.id} label`).toBeTruthy();
+        expect(domain.description, `${fixture.language.id} ${domain.id} description`).toBeTruthy();
+        expect(domain.coreVocabularyIds.length, `${fixture.language.id} ${domain.id} vocabulary`).toBeGreaterThanOrEqual(
+          SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary
+        );
+        expect(domain.evidencePassageIds.length, `${fixture.language.id} ${domain.id} evidence`).toBeGreaterThan(0);
+        expect(domain.usageNotes.length, `${fixture.language.id} ${domain.id} usage notes`).toBeGreaterThan(0);
+        expect(domain.coreVocabularyIds.every((vocabularyId) => vocabularyIds.has(vocabularyId))).toBe(true);
+        expect(domain.evidencePassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
       }
     }
   });

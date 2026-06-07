@@ -30,6 +30,7 @@ describe("public language views", () => {
         vocabularyItems: 24,
         grammarRules: 6,
         paradigms: 2,
+        semanticDomains: 3,
         dialectVariants: 2,
         discourseExamples: 3,
         teachingSequences: 2,
@@ -46,6 +47,8 @@ describe("public language views", () => {
         { id: "vowels", label: "Vowels", actual: 5, minimum: 3, passed: true },
         { id: "phonotacticNotes", label: "Phonotactic notes", actual: 3, minimum: 2, passed: true },
         { id: "vocabularyItems", label: "Vocabulary", actual: 24, minimum: 24, passed: true },
+        { id: "semanticDomains", label: "Semantic domains", actual: 3, minimum: 3, passed: true },
+        { id: "semanticDomainVocabulary", label: "Semantic domain vocabulary", actual: 3, minimum: 3, passed: true },
         { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
         { id: "grammarRules", label: "Grammar rules", actual: 6, minimum: 6, passed: true },
         { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
@@ -79,6 +82,13 @@ describe("public language views", () => {
     expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.passageIds).toEqual(
       expect.arrayContaining(["avn-c001"])
     );
+    expect(profile?.semanticDomains[0]).toMatchObject({
+      id: "avn-domain-motion",
+      label: "Motion and route teaching",
+      coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
+      evidencePassageIds: ["avn-c001", "avn-c005"],
+      usageNotes: expect.arrayContaining(["Route nouns pair with transparent motion verbs before tense-person suffixes."])
+    });
     expect(profile?.discourseExamples[0]).toMatchObject({
       id: "avn-discourse-opening",
       functionLabel: "Opening a teaching turn",
@@ -114,6 +124,8 @@ describe("public language views", () => {
       description: "test",
       evidencePassageIds: ["test"]
     });
+    profile?.semanticDomains[0].coreVocabularyIds.push("test-vocab");
+    profile?.semanticDomains[0].usageNotes.push("test-note");
     profile?.discourseExamples[0].notes.push("test-note");
     profile?.teachingSequences[0].steps.push({ label: "test", prompt: "test" });
     profile?.vocabulary[0].tags.push("test-tag");
@@ -127,6 +139,8 @@ describe("public language views", () => {
     expect(fixture?.dialectVariants[0].history.events).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ period: "test" })])
     );
+    expect(fixture?.semanticDomains[0].coreVocabularyIds).not.toContain("test-vocab");
+    expect(fixture?.semanticDomains[0].usageNotes).not.toContain("test-note");
     expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
     expect(fixture?.teachingSequences[0].steps).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "test" })])
@@ -152,7 +166,7 @@ describe("public language views", () => {
             { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
           ])
         },
-        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
+        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, semanticDomains: 3, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
@@ -161,6 +175,10 @@ describe("public language views", () => {
       lemma: "mira",
       occurrenceCount: expect.any(Number),
       passageIds: expect.arrayContaining(["avn-c001"])
+    });
+    expect(snapshot?.linguisticProfile.semanticDomains[0]).toMatchObject({
+      id: "avn-domain-motion",
+      evidencePassageIds: ["avn-c001", "avn-c005"]
     });
     expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
@@ -289,8 +307,8 @@ describe("public language views", () => {
           languages: 4,
           passedLanguages: 4,
           failedLanguages: 0,
-          totalChecks: 60,
-          passedChecks: 60,
+          totalChecks: 68,
+          passedChecks: 68,
           failedChecks: 0,
           passed: true
         }

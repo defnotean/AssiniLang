@@ -230,6 +230,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.linguisticProfile.stats.vocabularyItems, "vocabulary item"),
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
     formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
+    formatCount(snapshot.linguisticProfile.stats.semanticDomains, "semantic domain"),
     formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
     formatCount(snapshot.linguisticProfile.stats.discourseExamples, "discourse example"),
     formatCount(snapshot.linguisticProfile.stats.teachingSequences, "teaching sequence"),
@@ -1555,6 +1556,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     stats,
     phonology,
     paradigms,
+    semanticDomains,
     dialectVariants,
     discourseExamples,
     teachingSequences,
@@ -1595,6 +1597,10 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
           <div>
             <dt>Paradigms</dt>
             <dd>{stats.paradigms}</dd>
+          </div>
+          <div>
+            <dt>Semantic domains</dt>
+            <dd>{stats.semanticDomains}</dd>
           </div>
           <div>
             <dt>Dialects</dt>
@@ -1706,6 +1712,51 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
                     <strong>{row.gloss}</strong>
                     <small>{row.morphemes.join(" + ")}</small>
                   </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-card semantic-domain-panel" aria-label="Semantic domains">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Semantic domains</span>
+            <h2>{formatCount(semanticDomains.length, "domain")}</h2>
+          </div>
+        </div>
+        <div className="semantic-domain-grid">
+          {semanticDomains.map((domain) => (
+            <article className="semantic-domain-card" key={domain.id}>
+              <div className="record-topline">
+                <div>
+                  <h3>{domain.label}</h3>
+                  <p>{domain.description}</p>
+                </div>
+                <span className="id-badge">{domain.id}</span>
+              </div>
+              <div className="domain-reference-grid">
+                <div>
+                  <strong>Vocabulary</strong>
+                  <div className="pill-row">
+                    {domain.coreVocabularyIds.map((vocabularyId) => (
+                      <span className="pill" key={`${domain.id}-${vocabularyId}`}>{vocabularyId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Evidence</strong>
+                  <div className="pill-row">
+                    {domain.evidencePassageIds.map((passageId) => (
+                      <span className="pill" key={`${domain.id}-${passageId}`}>{passageId}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="domain-note-list">
+                {domain.usageNotes.map((note) => (
+                  <p key={`${domain.id}-${note}`}>{note}</p>
                 ))}
               </div>
             </article>

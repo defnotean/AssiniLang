@@ -58,6 +58,8 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigmRows: 3,
   dialectVariants: 2,
   dialectHistoryEvents: 2,
+  semanticDomains: 3,
+  semanticDomainVocabulary: 3,
   discourseExamples: 3,
   teachingSequences: 2
 };
@@ -311,6 +313,16 @@ function createLanguageProfile() {
         ]
       }
     ],
+    semanticDomains: [
+      {
+        id: "avn-domain-motion",
+        label: "Motion and route teaching",
+        description: "Movement roots and place nouns used to teach transparent route clauses.",
+        coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
+        evidencePassageIds: ["avn-c001", "avn-c005"],
+        usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
+      }
+    ],
     discourseExamples: [
       {
         id: "avn-discourse-opening",
@@ -382,6 +394,7 @@ function createLanguageProfile() {
       vocabularyItems: 2,
       grammarRules: 1,
       paradigms: 1,
+      semanticDomains: 1,
       dialectVariants: 1,
       discourseExamples: 1,
       teachingSequences: 1,
@@ -510,8 +523,8 @@ describe("App", () => {
           languages: 2,
           passedLanguages: 2,
           failedLanguages: 0,
-          totalChecks: 30,
-          passedChecks: 30,
+          totalChecks: 34,
+          passedChecks: 34,
           failedChecks: 0,
           passed: true
         }
@@ -608,6 +621,16 @@ describe("App", () => {
             ]
           }
         ],
+        semanticDomains: [
+          {
+            id: "avn-domain-motion",
+            label: "Motion and route teaching",
+            description: "Movement roots and place nouns used to teach transparent route clauses.",
+            coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
+            evidencePassageIds: ["avn-c001", "avn-c005"],
+            usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
+          }
+        ],
         discourseExamples: [
           {
             id: "avn-discourse-opening",
@@ -653,6 +676,7 @@ describe("App", () => {
           vocabularyItems: 2,
           grammarRules: 1,
           paradigms: 1,
+          semanticDomains: 1,
           dialectVariants: 1,
           discourseExamples: 1,
           teachingSequences: 1,
@@ -915,6 +939,13 @@ describe("App", () => {
     expect(paradigmTables).toBeInTheDocument();
     expect(screen.getByText("Finite verb chain")).toBeInTheDocument();
     expect(within(paradigmTables).getByText("talo-mi-na")).toBeInTheDocument();
+    const semanticDomains = screen.getByRole("region", { name: "Semantic domains" });
+    expect(semanticDomains).toBeInTheDocument();
+    expect(within(semanticDomains).getByText("Motion and route teaching")).toBeInTheDocument();
+    expect(within(semanticDomains).getByText("Movement roots and place nouns used to teach transparent route clauses.")).toBeInTheDocument();
+    expect(within(semanticDomains).getByText("avn-n-001")).toBeInTheDocument();
+    expect(within(semanticDomains).getByText("avn-c005")).toBeInTheDocument();
+    expect(within(semanticDomains).getByText("Route nouns pair with transparent motion verbs before tense-person suffixes.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Dialect variants" })).toBeInTheDocument();
     expect(screen.getByText("River teaching register")).toBeInTheDocument();
     expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
@@ -1218,7 +1249,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 dialect variant, 1 discourse example, 1 teaching sequence, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 semantic domain, 1 dialect variant, 1 discourse example, 1 teaching sequence, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
@@ -1285,7 +1316,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 30 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 34 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

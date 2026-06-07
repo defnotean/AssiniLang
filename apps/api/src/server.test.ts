@@ -106,6 +106,7 @@ describe("api server", () => {
         notes: 6,
         exercises: 6,
         vocabularyItems: 24,
+        semanticDomains: 3,
         dialectVariants: 2
       }
     });
@@ -146,6 +147,12 @@ describe("api server", () => {
       standard: "mira talo-mi-na",
       variant: "mira talo-mi-nena",
       translation: "I walk by the river."
+    });
+    expect(profile.json().semanticDomains[0]).toMatchObject({
+      id: "avn-domain-motion",
+      label: "Motion and route teaching",
+      coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
+      evidencePassageIds: ["avn-c001", "avn-c005"]
     });
     expect(profile.json().vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
       gloss: "present tense",
@@ -1214,6 +1221,7 @@ describe("api server", () => {
         vocabularyItems: 24,
         grammarRules: 6,
         paradigms: 2,
+        semanticDomains: 3,
         dialectVariants: 2
       }
     });
@@ -1232,6 +1240,10 @@ describe("api server", () => {
           })
         ])
       }
+    });
+    expect(snapshot.linguisticProfile.semanticDomains[0]).toMatchObject({
+      id: "avn-domain-motion",
+      evidencePassageIds: ["avn-c001", "avn-c005"]
     });
     expect(snapshot.linguisticProfile.vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
       gloss: "present tense",

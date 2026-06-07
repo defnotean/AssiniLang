@@ -1433,6 +1433,65 @@ label,
   overflow-wrap: anywhere;
 }
 
+.semantic-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 0.68rem;
+}
+
+.semantic-domain-card {
+  display: grid;
+  align-content: start;
+  gap: 0.72rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.78rem;
+  background: var(--panel-soft);
+}
+
+.semantic-domain-card h3,
+.semantic-domain-card p {
+  margin: 0;
+}
+
+.semantic-domain-card h3 {
+  font-size: 0.96rem;
+}
+
+.domain-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.58rem;
+}
+
+.domain-reference-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 0.36rem;
+  min-width: 0;
+}
+
+.domain-reference-grid strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.domain-note-list {
+  display: grid;
+  gap: 0.38rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.56rem;
+}
+
+.domain-note-list p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .dialect-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -2320,6 +2379,7 @@ label,
   .eval-language-grid,
   .detail-grid,
   .corpus-import-grid,
+  .domain-reference-grid,
   .sequence-reference-grid,
   .sequence-step-list li {
     grid-template-columns: 1fr;

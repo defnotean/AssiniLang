@@ -13,6 +13,8 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   exerciseTypes: 2,
   paradigms: 2,
   paradigmRows: 3,
+  semanticDomains: 3,
+  semanticDomainVocabulary: 3,
   dialectVariants: 2,
   dialectHistoryEvents: 2,
   discourseExamples: 3,
@@ -51,6 +53,8 @@ const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, s
   exerciseTypes: "Exercise types",
   paradigms: "Paradigm tables",
   paradigmRows: "Minimum paradigm rows",
+  semanticDomains: "Semantic domains",
+  semanticDomainVocabulary: "Semantic domain vocabulary",
   dialectVariants: "Dialect variants",
   dialectHistoryEvents: "Dialect history events",
   discourseExamples: "Discourse examples",
@@ -62,6 +66,8 @@ const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
   "vowels",
   "phonotacticNotes",
   "vocabularyItems",
+  "semanticDomains",
+  "semanticDomainVocabulary",
   "corpusPassages",
   "grammarRules",
   "noteAnswerKeys",
@@ -87,6 +93,11 @@ function minimumDialectHistoryEvents(fixture: SyntheticLanguageFixture | undefin
   return Math.min(...fixture.dialectVariants.map((dialect) => dialect.history.events.length));
 }
 
+function minimumSemanticDomainVocabulary(fixture: SyntheticLanguageFixture | undefined): number {
+  if (!fixture || fixture.semanticDomains.length === 0) return 0;
+  return Math.min(...fixture.semanticDomains.map((domain) => domain.coreVocabularyIds.length));
+}
+
 export function buildSyntheticFixtureQualityActuals(
   fixture: SyntheticLanguageFixture | undefined
 ): SyntheticFixtureQualityActuals {
@@ -102,6 +113,8 @@ export function buildSyntheticFixtureQualityActuals(
     exerciseTypes: new Set<Exercise["type"]>(fixture?.exercisesAnswerKey.map((exercise) => exercise.type) ?? []).size,
     paradigms: fixture?.paradigms.length ?? 0,
     paradigmRows: minimumParadigmRows(fixture),
+    semanticDomains: fixture?.semanticDomains.length ?? 0,
+    semanticDomainVocabulary: minimumSemanticDomainVocabulary(fixture),
     dialectVariants: fixture?.dialectVariants.length ?? 0,
     dialectHistoryEvents: minimumDialectHistoryEvents(fixture),
     discourseExamples: fixture?.discourseExamples.length ?? 0,
@@ -284,6 +297,22 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     diagnostics
   );
   addMinimumCountDiagnostic(
+    fixture.semanticDomains.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.semanticDomains,
+    languageId,
+    "semantic domains",
+    diagnostics
+  );
+  for (const domain of fixture.semanticDomains) {
+    addMinimumCountDiagnostic(
+      domain.coreVocabularyIds.length,
+      SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary,
+      `${languageId} semantic domain ${domain.id}`,
+      "vocabulary items",
+      diagnostics
+    );
+  }
+  addMinimumCountDiagnostic(
     fixture.corpus.length,
     SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages,
     languageId,
@@ -394,6 +423,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const ruleIds = fixture.grammarRules.map((rule) => rule.id);
     const ruleIdSet = new Set(ruleIds);
     const paradigmIds = fixture.paradigms.map((paradigm) => paradigm.id);
+    const semanticDomainIds = fixture.semanticDomains.map((domain) => domain.id);
     const dialectVariantIds = fixture.dialectVariants.map((dialect) => dialect.id);
     const discourseExampleIds = fixture.discourseExamples.map((example) => example.id);
     const teachingSequenceIds = fixture.teachingSequences.map((sequence) => sequence.id);
@@ -403,6 +433,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
     const corpusTargets = new Set(fixture.corpus.map((passage) => normalizedText(passage.textTarget)));
     const vocabularyIds = fixture.vocabulary.map((item) => item.id);
+    const vocabularyIdSet = new Set(vocabularyIds);
     const vocabularyFormsList = fixture.vocabulary.map((item) => item.form);
 
     addFixtureRichnessDiagnostics(fixture, diagnostics);
@@ -412,6 +443,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     addDuplicateDiagnostics(corpusIds, `${languageId} has duplicate corpus id`, diagnostics);
     addDuplicateDiagnostics(ruleIds, `${languageId} has duplicate grammar rule id`, diagnostics);
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);
+    addDuplicateDiagnostics(semanticDomainIds, `${languageId} has duplicate semantic domain id`, diagnostics);
     addDuplicateDiagnostics(dialectVariantIds, `${languageId} has duplicate dialect variant id`, diagnostics);
     addDuplicateDiagnostics(discourseExampleIds, `${languageId} has duplicate discourse example id`, diagnostics);
     addDuplicateDiagnostics(teachingSequenceIds, `${languageId} has duplicate teaching sequence id`, diagnostics);
@@ -482,6 +514,50 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
           if (!vocabularyForms.has(morpheme)) {
             diagnostics.push(`${languageId} paradigm ${paradigm.id} row ${row.label} references unknown morpheme ${morpheme}`);
           }
+        }
+      }
+    }
+
+    for (const domain of fixture.semanticDomains) {
+      const domainLabel = `${languageId} semantic domain ${domain.id}`;
+      if (!domain.id.trim()) {
+        diagnostics.push(`${languageId} has a semantic domain without an id`);
+      }
+      if (!domain.label.trim()) {
+        diagnostics.push(`${domainLabel} is missing a label`);
+      }
+      if (!domain.description.trim()) {
+        diagnostics.push(`${domainLabel} is missing a description`);
+      }
+      if (domain.evidencePassageIds.length === 0) {
+        diagnostics.push(`${domainLabel} needs at least one evidence passage`);
+      }
+      if (domain.usageNotes.length === 0) {
+        diagnostics.push(`${domainLabel} needs at least one usage note`);
+      }
+      addDuplicateNormalizedDiagnostics(
+        domain.coreVocabularyIds,
+        `${domainLabel} vocabulary id is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        domain.evidencePassageIds,
+        `${domainLabel} evidence passage is duplicated:`,
+        diagnostics
+      );
+      for (const vocabularyId of domain.coreVocabularyIds) {
+        if (!vocabularyIdSet.has(vocabularyId)) {
+          diagnostics.push(`${domainLabel} references missing vocabulary id ${vocabularyId}`);
+        }
+      }
+      for (const passageId of domain.evidencePassageIds) {
+        if (!corpusIdSet.has(passageId)) {
+          diagnostics.push(`${domainLabel} references missing corpus passage ${passageId}`);
+        }
+      }
+      for (const usageNote of domain.usageNotes) {
+        if (!usageNote.trim()) {
+          diagnostics.push(`${domainLabel} has a blank usage note`);
         }
       }
     }

@@ -20,6 +20,15 @@ export type ParadigmTable = {
   }>;
 };
 
+export type SemanticDomain = {
+  id: string;
+  label: string;
+  description: string;
+  coreVocabularyIds: string[];
+  evidencePassageIds: string[];
+  usageNotes: string[];
+};
+
 export type DialectVariant = {
   id: string;
   name: string;
@@ -71,6 +80,7 @@ export type SyntheticLanguageFixture = {
   language: Language;
   phonology: PhonologyProfile;
   paradigms: ParadigmTable[];
+  semanticDomains: SemanticDomain[];
   dialectVariants: DialectVariant[];
   discourseExamples: DiscourseExample[];
   teachingSequences: TeachingSequence[];
@@ -227,6 +237,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    semanticDomains: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -591,6 +602,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    semanticDomains: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -963,6 +975,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    semanticDomains: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -1312,6 +1325,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    semanticDomains: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -1549,6 +1563,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
 
 type FixtureRichnessExpansion = {
   vocabulary: SyntheticLanguageFixture["vocabulary"];
+  semanticDomains: SyntheticLanguageFixture["semanticDomains"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   teachingSequences: SyntheticLanguageFixture["teachingSequences"];
   corpus: CorpusPassage[];
@@ -1563,6 +1578,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "avn-vocab-maku", form: "maku", gloss: "memory bead", partOfSpeech: "noun", tags: ["object", "memory"] },
       { id: "avn-vocab-seya", form: "seya", gloss: "answer card", partOfSpeech: "noun", tags: ["classroom", "answer"] },
       { id: "avn-vocab-roki", form: "roki", gloss: "review line", partOfSpeech: "noun", tags: ["review", "sequence"] }
+    ],
+    semanticDomains: [
+      {
+        id: "avn-domain-motion",
+        label: "Motion and route teaching",
+        description: "Movement roots and place nouns used to teach transparent route clauses.",
+        coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
+        evidencePassageIds: ["avn-c001", "avn-c005"],
+        usageNotes: [
+          "Route nouns pair with transparent motion verbs before tense-person suffixes.",
+          "Learners contrast locative route phrases with plain object frames."
+        ]
+      },
+      {
+        id: "avn-domain-classroom-objects",
+        label: "Classroom object handling",
+        description: "Object nouns and arrangement verbs used in workshop sorting and demonstration tasks.",
+        coreVocabularyIds: ["avn-n-005", "avn-n-006", "avn-n-007", "avn-v-003"],
+        evidencePassageIds: ["avn-c006", "avn-c010", "avn-c012"],
+        usageNotes: [
+          "Classroom objects usually take -ra when they are manipulated or arranged.",
+          "Paired reviewed objects keep case marking visible before coordination."
+        ]
+      },
+      {
+        id: "avn-domain-review-speech",
+        label: "Review speech and memory work",
+        description: "Teaching and speech roots used for correction, explanation, and memory-object review.",
+        coreVocabularyIds: ["avn-v-002", "avn-v-004", "avn-vocab-maku", "avn-vocab-roki"],
+        evidencePassageIds: ["avn-c008", "avn-c011", "avn-c012"],
+        usageNotes: [
+          "Speech verbs introduce review objects after the setting frame.",
+          "Memory nouns support repair turns without changing the verb-chain template."
+        ]
+      }
     ],
     discourseExamples: [
       {
@@ -1715,6 +1765,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "sol-vocab-tero", form: "tero", gloss: "review stone", partOfSpeech: "noun", tags: ["review", "object"] },
       { id: "sol-vocab-pume", form: "pume", gloss: "response shell", partOfSpeech: "noun", tags: ["response", "object"] }
     ],
+    semanticDomains: [
+      {
+        id: "sol-domain-participant-particles",
+        label: "Participant and particle frames",
+        description: "Pronouns, tense particles, and aspect particles that establish the clause frame.",
+        coreVocabularyIds: ["sol-p-001", "sol-p-002", "sol-t-001", "sol-a-001"],
+        evidencePassageIds: ["sol-c001", "sol-c005", "sol-c011"],
+        usageNotes: [
+          "Pronouns stay clause-initial before tense or aspect particles.",
+          "Particles carry time and ongoing action without changing verb forms."
+        ]
+      },
+      {
+        id: "sol-domain-classroom-objects",
+        label: "Classroom object coordination",
+        description: "Board, card, mat, and stone nouns used in object-linking practice.",
+        coreVocabularyIds: ["sol-n-002", "sol-n-003", "sol-vocab-lisa", "sol-vocab-tero"],
+        evidencePassageIds: ["sol-c004", "sol-c012"],
+        usageNotes: [
+          "Object nouns remain uninflected when linked by e.",
+          "Review prompts keep coordinated objects after the verb phrase."
+        ]
+      },
+      {
+        id: "sol-domain-memory-tracing",
+        label: "Memory and tracing practice",
+        description: "Memory nouns and tracing verbs used for repeated learner review.",
+        coreVocabularyIds: ["sol-v-003", "sol-v-004", "sol-n-007", "sol-vocab-moni"],
+        evidencePassageIds: ["sol-c007", "sol-c011"],
+        usageNotes: [
+          "Tracing and remembering verbs share the same particle frame as other actions.",
+          "Memory objects often combine with final place phrases."
+        ]
+      }
+    ],
     discourseExamples: [
       {
         id: "sol-discourse-opening",
@@ -1861,6 +1946,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "vel-vocab-rali", form: "rali", gloss: "review mark", partOfSpeech: "noun", tags: ["review", "object"] },
       { id: "vel-vocab-huno", form: "huno", gloss: "future cue", partOfSpeech: "noun", tags: ["time", "prompt"] }
     ],
+    semanticDomains: [
+      {
+        id: "vel-domain-fused-endings",
+        label: "Fused person-tense endings",
+        description: "Verb roots and endings that encode person, number, and tense in one form.",
+        coreVocabularyIds: ["vel-e-001", "vel-e-002", "vel-e-006", "vel-v-002"],
+        evidencePassageIds: ["vel-c001", "vel-c002", "vel-c012"],
+        usageNotes: [
+          "Learners read the fused ending before translating the following object noun.",
+          "Past plural and future plural endings are contrasted in review prompts."
+        ]
+      },
+      {
+        id: "vel-domain-object-review",
+        label: "Object review materials",
+        description: "Teaching objects and review nouns that follow completed verb forms.",
+        coreVocabularyIds: ["vel-n-003", "vel-n-004", "vel-vocab-tesa", "vel-vocab-rali"],
+        evidencePassageIds: ["vel-c003", "vel-c011", "vel-c012"],
+        usageNotes: [
+          "Objects stay after the fully inflected verb.",
+          "Review nouns make fused-ending contrasts visible without changing object order."
+        ]
+      },
+      {
+        id: "vel-domain-perception-cues",
+        label: "Perception and future cues",
+        description: "Seeing roots, sky nouns, and cue words used in prompt-following examples.",
+        coreVocabularyIds: ["vel-v-002", "vel-n-002", "vel-vocab-huno"],
+        evidencePassageIds: ["vel-c004", "vel-c010"],
+        usageNotes: [
+          "Perception roots pair with visible cue nouns in classroom examples.",
+          "Future cue nouns help distinguish future endings from present endings."
+        ]
+      }
+    ],
     discourseExamples: [
       {
         id: "vel-discourse-opening",
@@ -2000,6 +2120,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "ket-vocab-ro-prefix", form: "ro-", gloss: "review-token object prefix", partOfSpeech: "object-prefix", tags: ["object", "review"] },
       { id: "ket-vocab-hali", form: "hali", gloss: "check / compare", partOfSpeech: "verb-root", tags: ["review", "verb"] },
       { id: "ket-vocab-ko-suffix", form: "-ko", gloss: "careful review aspect", partOfSpeech: "aspect-suffix", tags: ["aspect", "review"] }
+    ],
+    semanticDomains: [
+      {
+        id: "ket-domain-predicate-slots",
+        label: "Predicate slot reading",
+        description: "Subject prefixes, object prefixes, roots, and suffixes used to teach one-word predicates.",
+        coreVocabularyIds: ["ket-pr-001", "ket-ob-001", "ket-v-001", "ket-t-001"],
+        evidencePassageIds: ["ket-c001", "ket-c004"],
+        usageNotes: [
+          "The subject prefix always precedes the object prefix.",
+          "Slot reading keeps learner attention on predicate-internal order."
+        ]
+      },
+      {
+        id: "ket-domain-display-objects",
+        label: "Display-table objects",
+        description: "Object prefixes and arrangement roots used for display-table teaching scenes.",
+        coreVocabularyIds: ["ket-ob-003", "ket-ob-004", "ket-v-003", "ket-t-003"],
+        evidencePassageIds: ["ket-c003", "ket-c005", "ket-c010"],
+        usageNotes: [
+          "Display-table examples keep object prefixes inside the predicate word.",
+          "Arrangement verbs make object-stack contrasts visible."
+        ]
+      },
+      {
+        id: "ket-domain-review-checking",
+        label: "Review checking and careful aspect",
+        description: "Review-token and learner-object forms used with careful-checking predicates.",
+        coreVocabularyIds: ["ket-vocab-ro-prefix", "ket-vocab-me-prefix", "ket-vocab-hali", "ket-vocab-ko-suffix"],
+        evidencePassageIds: ["ket-c011", "ket-c012"],
+        usageNotes: [
+          "Careful-review -ko closes a stable subject-object-root-aspect chain.",
+          "Review and learner prefixes show how object roles change without adding separate words."
+        ]
+      }
     ],
     discourseExamples: [
       {
@@ -2142,6 +2297,7 @@ for (const fixture of syntheticLanguageFixtures) {
   const expansion = fixtureRichnessExpansion[fixture.language.id];
   if (!expansion) continue;
   fixture.vocabulary.push(...expansion.vocabulary);
+  fixture.semanticDomains.push(...expansion.semanticDomains);
   fixture.discourseExamples.push(...expansion.discourseExamples);
   fixture.corpus.push(...expansion.corpus);
   fixture.grammarRules.push(...expansion.grammarRules);

@@ -20,6 +20,33 @@ describe("synthetic fixture validation module", () => {
       { answer: avenik.exercisesAnswerKey[0].expectedAnswers[0], reason: "Duplicates the expected answer." }
     ];
     (avenik as unknown as {
+      semanticDomains: Array<{
+        id: string;
+        label: string;
+        description: string;
+        coreVocabularyIds: string[];
+        evidencePassageIds: string[];
+        usageNotes: string[];
+      }>;
+    }).semanticDomains = [
+      {
+        id: "duplicate-domain",
+        label: "",
+        description: "",
+        coreVocabularyIds: ["missing-vocab"],
+        evidencePassageIds: ["missing-domain-passage"],
+        usageNotes: []
+      },
+      {
+        id: "duplicate-domain",
+        label: "Repair domain",
+        description: "Groups repair vocabulary for validation.",
+        coreVocabularyIds: ["avn-v-001", "avn-v-001"],
+        evidencePassageIds: ["avn-c001", "avn-c001"],
+        usageNotes: [""]
+      }
+    ];
+    (avenik as unknown as {
       dialectVariants: Array<{
         id: string;
         name: string;
@@ -135,6 +162,16 @@ describe("synthetic fixture validation module", () => {
         "avenik vocabulary form zalo uses z outside phonology inventory",
         "avenik paradigm avn-paradigm-verb-chain row present first singular references unknown morpheme -missing",
         "avenik exercise avn-ex001 adversarial answer duplicates an expected answer: mira talo-mi-na",
+        "avenik has duplicate semantic domain id duplicate-domain",
+        "avenik semantic domain duplicate-domain is missing a label",
+        "avenik semantic domain duplicate-domain is missing a description",
+        "avenik semantic domain duplicate-domain needs at least 3 vocabulary items (found 1)",
+        "avenik semantic domain duplicate-domain references missing vocabulary id missing-vocab",
+        "avenik semantic domain duplicate-domain references missing corpus passage missing-domain-passage",
+        "avenik semantic domain duplicate-domain needs at least one usage note",
+        "avenik semantic domain duplicate-domain vocabulary id is duplicated: avn-v-001",
+        "avenik semantic domain duplicate-domain evidence passage is duplicated: avn-c001",
+        "avenik semantic domain duplicate-domain has a blank usage note",
         "avenik has duplicate dialect variant id duplicate-dialect",
         "avenik dialect variant duplicate-dialect is missing a name",
         "avenik dialect variant duplicate-dialect is missing a region label",
@@ -300,6 +337,31 @@ describe("synthetic fixture validation module", () => {
     avenik.phonology.syllableTemplate = "";
     avenik.phonology.stress = "";
     avenik.vocabulary = avenik.vocabulary.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems - 1);
+    const existingSemanticDomains = (avenik as unknown as {
+      semanticDomains?: Array<{
+        id: string;
+        label: string;
+        description: string;
+        coreVocabularyIds: string[];
+        evidencePassageIds: string[];
+        usageNotes: string[];
+      }>;
+    }).semanticDomains ?? [
+      {
+        id: "avn-domain-motion",
+        label: "Motion and route teaching",
+        description: "Placeholder domain for richness-floor diagnostics.",
+        coreVocabularyIds: ["avn-v-001", "avn-v-002", "avn-v-003"],
+        evidencePassageIds: ["avn-c001"],
+        usageNotes: ["Placeholder note."]
+      }
+    ];
+    (avenik as unknown as { semanticDomains: typeof existingSemanticDomains }).semanticDomains = [
+      {
+        ...existingSemanticDomains[0],
+        coreVocabularyIds: ["avn-v-001", "avn-v-002"]
+      }
+    ];
     avenik.corpus = avenik.corpus.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1);
     avenik.grammarRules = avenik.grammarRules.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1);
     avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1);
@@ -322,6 +384,8 @@ describe("synthetic fixture validation module", () => {
         "avenik phonology is missing a syllable template",
         "avenik phonology is missing a stress rule",
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems} vocabulary items (found ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems - 1})`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.semanticDomains} semantic domains (found 1)`,
+        `avenik semantic domain avn-domain-motion needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary} vocabulary items (found 2)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages} corpus passages (found ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1})`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules} grammar rules (found ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1})`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys} note answer keys (found ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1})`,

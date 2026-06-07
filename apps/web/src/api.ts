@@ -46,6 +46,8 @@ export type FixtureMinimums = {
   exerciseTypes: number;
   paradigms: number;
   paradigmRows: number;
+  semanticDomains: number;
+  semanticDomainVocabulary: number;
   dialectVariants: number;
   dialectHistoryEvents: number;
   discourseExamples: number;
@@ -96,6 +98,14 @@ export type LanguageProfile = {
       gloss: string;
       morphemes: string[];
     }>;
+  }>;
+  semanticDomains: Array<{
+    id: string;
+    label: string;
+    description: string;
+    coreVocabularyIds: string[];
+    evidencePassageIds: string[];
+    usageNotes: string[];
   }>;
   dialectVariants: Array<{
     id: string;
@@ -172,6 +182,7 @@ export type LanguageProfile = {
     vocabularyItems: number;
     grammarRules: number;
     paradigms: number;
+    semanticDomains: number;
     dialectVariants: number;
     discourseExamples: number;
     teachingSequences: number;

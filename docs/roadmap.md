@@ -53,6 +53,7 @@ The current evaluator is useful but small.
 Next steps:
 
 - Add more synthetic languages.
+- Expand semantic-domain coverage into richer cultural-safety review packets before any real data is considered.
 - Continue expanding dialect histories beyond the current evidence-backed synthetic timelines.
 - Add historical trend charts.
 - Retain named evaluation baselines.

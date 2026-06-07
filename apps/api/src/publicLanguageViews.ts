@@ -26,6 +26,7 @@ export type SyntheticLanguageProfile = {
   language: AppState["languages"][number];
   phonology: SyntheticLanguageFixture["phonology"];
   paradigms: SyntheticLanguageFixture["paradigms"];
+  semanticDomains: SyntheticLanguageFixture["semanticDomains"];
   dialectVariants: SyntheticLanguageFixture["dialectVariants"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   teachingSequences: SyntheticLanguageFixture["teachingSequences"];
@@ -38,6 +39,7 @@ export type SyntheticLanguageProfile = {
     vocabularyItems: number;
     grammarRules: number;
     paradigms: number;
+    semanticDomains: number;
     dialectVariants: number;
     discourseExamples: number;
     teachingSequences: number;
@@ -464,6 +466,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
     vocabularyItems: fixture?.vocabulary.length ?? 0,
     grammarRules: fixture?.grammarRules.length ?? 0,
     paradigms: fixture?.paradigms.length ?? 0,
+    semanticDomains: fixture?.semanticDomains.length ?? 0,
     dialectVariants: fixture?.dialectVariants.length ?? 0,
     discourseExamples: fixture?.discourseExamples.length ?? 0,
     teachingSequences: fixture?.teachingSequences.length ?? 0,
@@ -491,6 +494,12 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
         ...row,
         morphemes: [...row.morphemes]
       }))
+    })) ?? [],
+    semanticDomains: fixture?.semanticDomains.map((domain) => ({
+      ...domain,
+      coreVocabularyIds: [...domain.coreVocabularyIds],
+      evidencePassageIds: [...domain.evidencePassageIds],
+      usageNotes: [...domain.usageNotes]
     })) ?? [],
     dialectVariants: fixture?.dialectVariants.map((dialect) => ({
       ...dialect,
@@ -536,6 +545,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       exerciseAnswerKeys: stats.exercises,
       exerciseTypes: Object.keys(stats.exerciseTypes).length,
       paradigms: stats.paradigms,
+      semanticDomains: stats.semanticDomains,
       dialectVariants: stats.dialectVariants,
       discourseExamples: stats.discourseExamples,
       teachingSequences: stats.teachingSequences
