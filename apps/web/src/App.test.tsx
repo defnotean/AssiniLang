@@ -57,6 +57,7 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigms: 2,
   paradigmRows: 3,
   dialectVariants: 2,
+  dialectHistoryEvents: 2,
   discourseExamples: 3,
   teachingSequences: 2
 };
@@ -286,6 +287,21 @@ function createLanguageProfile() {
         phonologyNotes: ["First-person endings may lengthen in careful teaching speech."],
         lexicalNotes: ["mira remains the preferred public form for river."],
         grammarNotes: ["Person suffixes stay transparent after tense markers."],
+        history: {
+          summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
+          events: [
+            {
+              period: "early workshop",
+              description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
+              evidencePassageIds: ["avn-c001", "avn-c005"]
+            },
+            {
+              period: "review circle",
+              description: "Learners kept the river noun stable while comparing careful and everyday suffix rhythm.",
+              evidencePassageIds: ["avn-c004"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "mira talo-mi-na",
@@ -494,8 +510,8 @@ describe("App", () => {
           languages: 2,
           passedLanguages: 2,
           failedLanguages: 0,
-          totalChecks: 28,
-          passedChecks: 28,
+          totalChecks: 30,
+          passedChecks: 30,
           failedChecks: 0,
           passed: true
         }
@@ -568,6 +584,21 @@ describe("App", () => {
             phonologyNotes: ["First-person endings may lengthen in careful teaching speech."],
             lexicalNotes: ["mira remains the preferred public form for river."],
             grammarNotes: ["Person suffixes stay transparent after tense markers."],
+            history: {
+              summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
+              events: [
+                {
+                  period: "early workshop",
+                  description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
+                  evidencePassageIds: ["avn-c001", "avn-c005"]
+                },
+                {
+                  period: "review circle",
+                  description: "Learners kept the river noun stable while comparing careful and everyday suffix rhythm.",
+                  evidencePassageIds: ["avn-c004"]
+                }
+              ]
+            },
             examplePhrases: [
               {
                 standard: "mira talo-mi-na",
@@ -887,6 +918,10 @@ describe("App", () => {
     expect(screen.getByRole("region", { name: "Dialect variants" })).toBeInTheDocument();
     expect(screen.getByText("River teaching register")).toBeInTheDocument();
     expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
+    expect(screen.getByText("River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.")).toBeInTheDocument();
+    expect(screen.getByText("early workshop")).toBeInTheDocument();
+    expect(screen.getByText("Instructors lengthened first-person endings while demonstrating river-route movement clauses.")).toBeInTheDocument();
+    expect(screen.getAllByText("avn-c005").length).toBeGreaterThan(0);
     expect(screen.getByText("mira talo-mi-nena")).toBeInTheDocument();
     const discourseExamples = screen.getByRole("region", { name: "Discourse examples" });
     expect(discourseExamples).toBeInTheDocument();
@@ -1250,7 +1285,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 28 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 30 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

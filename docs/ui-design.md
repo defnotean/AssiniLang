@@ -50,6 +50,7 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 The profile view should make the synthetic language system inspectable:
 
 - Keep phonology, grammar inventory, paradigms, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
+- Show dialect histories as compact timelines with period labels, short descriptions, and corpus evidence chips.
 - Show discourse examples with function, context, target text, translation, and pragmatic notes.
 - Show teaching sequences as compact paths that link rule IDs, corpus passage IDs, exercise IDs, and ordered prompts without revealing answer keys.
 - Keep fixture-quality counters near the top so reviewers can see data-depth gaps before reading detailed panels.

@@ -27,6 +27,14 @@ export type DialectVariant = {
   phonologyNotes: string[];
   lexicalNotes: string[];
   grammarNotes: string[];
+  history: {
+    summary: string;
+    events: Array<{
+      period: string;
+      description: string;
+      evidencePassageIds: string[];
+    }>;
+  };
   examplePhrases: Array<{
     standard: string;
     variant: string;
@@ -146,6 +154,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "Tense still precedes person even when the person ending is expanded for careful speech.",
           "Locative -ke is retained on place nouns in slow instructional examples."
         ],
+        history: {
+          summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
+          events: [
+            {
+              period: "early workshop",
+              description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
+              evidencePassageIds: ["avn-c001", "avn-c005"]
+            },
+            {
+              period: "review circle",
+              description: "Learners kept the river noun stable while comparing careful and everyday suffix rhythm.",
+              evidencePassageIds: ["avn-c004"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "mira talo-mi-na",
@@ -175,6 +198,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "Object case remains before coordination in linked classroom nouns.",
           "SOV order is maintained even in short command-like practice examples."
         ],
+        history: {
+          summary: "Courtyard Avenik practice speech developed around object-handling drills and quick repair turns.",
+          events: [
+            {
+              period: "sorting drills",
+              description: "Lamp-token and clay-tile activities encouraged lighter object-case vowels in rapid practice.",
+              evidencePassageIds: ["avn-c006", "avn-c007"]
+            },
+            {
+              period: "repair rounds",
+              description: "Reviewers kept coordination order visible while contrasting classroom objects.",
+              evidencePassageIds: ["avn-c012"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "saku-ra-ne nemi-lo-ki",
@@ -480,6 +518,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "Location phrases remain final after linked objects.",
           "The durative particle so stays before the verb, even in careful speech."
         ],
+        history: {
+          summary: "Circle Solari speech formed around group recitation where final locations anchored shared classroom attention.",
+          events: [
+            {
+              period: "circle recitation",
+              description: "Learners kept particles fully voiced while repeating listening clauses in the central circle.",
+              evidencePassageIds: ["sol-c001", "sol-c005"]
+            },
+            {
+              period: "location review",
+              description: "Final locative phrases became the stable cue for where a lesson action happened.",
+              evidencePassageIds: ["sol-c003", "sol-c011"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "mi so len nua",
@@ -509,6 +562,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "The linker e can join repeated object nouns without changing verb position.",
           "Past particle pa remains before the durative particle so when both occur."
         ],
+        history: {
+          summary: "Card-sorting Solari speech emerged from edge-table comparison tasks with compact object lists.",
+          events: [
+            {
+              period: "card sorting",
+              description: "Repeated card and board prompts made object coordination the main contrastive pattern.",
+              evidencePassageIds: ["sol-c004", "sol-c012"]
+            },
+            {
+              period: "prompt tracing",
+              description: "Past and durative particles stayed separate while learners traced memory-line prompts.",
+              evidencePassageIds: ["sol-c011"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "ta ko luma e rei",
@@ -822,6 +890,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "Fused tense-person endings are not split in surface spelling.",
           "Objects remain after the finite verb in all tense frames."
         ],
+        history: {
+          summary: "Stone-table Velari speech grew from citation drills that made fused endings audible before object comparison.",
+          events: [
+            {
+              period: "citation table",
+              description: "Teachers held fused endings clearly while arranging lesson-stone prompts.",
+              evidencePassageIds: ["vel-c003", "vel-c005"]
+            },
+            {
+              period: "comparison practice",
+              description: "Stable object-after-verb order was reinforced through practice-light marking tasks.",
+              evidencePassageIds: ["vel-c011"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "kelin sora",
@@ -851,6 +934,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "The fused ending still carries both tense and agreement.",
           "Object order does not change when a visual marker is topical."
         ],
+        history: {
+          summary: "Lantern Velari review speech developed around evening recall lessons with softened past endings.",
+          events: [
+            {
+              period: "evening recall",
+              description: "Reviewers softened final past consonants while recounting completed object lessons.",
+              evidencePassageIds: ["vel-c001", "vel-c012"]
+            },
+            {
+              period: "visual review",
+              description: "Practice-light prompts extended object vocabulary without changing the finite-verb frame.",
+              evidencePassageIds: ["vel-c004", "vel-c010"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "daneth loma",
@@ -1141,6 +1239,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "The final aspect slot may hold -su instead of a time suffix.",
           "Stacked object prefixes preserve their order before the root."
         ],
+        history: {
+          summary: "Display-table Ketharu speech formed around table demonstrations where object stacks had to remain visible.",
+          events: [
+            {
+              period: "table display",
+              description: "Clay-tile tasks favored an emphatic display suffix after stable subject-object-root slots.",
+              evidencePassageIds: ["ket-c005", "ket-c011"]
+            },
+            {
+              period: "object-stack practice",
+              description: "Instructors contrasted clay and story object prefixes during arrangement drills.",
+              evidencePassageIds: ["ket-c003"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "ka-pi-tani-su",
@@ -1170,6 +1283,21 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
           "A time suffix can carry a chaining sense before the next predicate begins.",
           "The subject prefix remains first even when a narrative object is topical."
         ],
+        history: {
+          summary: "Story-chain Ketharu speech developed from narrative teaching rounds that linked predicate words across turns.",
+          events: [
+            {
+              period: "story rounds",
+              description: "Story-object prefixes were held longer as learners repeated yesterday-story clauses.",
+              evidencePassageIds: ["ket-c002", "ket-c012"]
+            },
+            {
+              period: "linked narration",
+              description: "Chained time suffixes became the public cue that one predicate leads into another.",
+              evidencePassageIds: ["ket-c006"]
+            }
+          ]
+        },
         examplePhrases: [
           {
             standard: "ka-se-lom-ra",

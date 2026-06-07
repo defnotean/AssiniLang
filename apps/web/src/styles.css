@@ -1481,6 +1481,55 @@ label,
   overflow-wrap: anywhere;
 }
 
+.dialect-history {
+  display: grid;
+  gap: 0.48rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.56rem;
+}
+
+.dialect-history > strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.dialect-history > p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.dialect-history-events {
+  display: grid;
+  gap: 0.46rem;
+}
+
+.dialect-history-event {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7rem, 0.34fr);
+  gap: 0.54rem;
+  align-items: start;
+  border-top: 1px solid var(--border);
+  padding-top: 0.44rem;
+}
+
+.dialect-history-event span {
+  color: var(--text);
+  font-size: 0.73rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dialect-history-event p {
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+}
+
 .dialect-example-list {
   display: grid;
   gap: 0.44rem;
@@ -2241,6 +2290,10 @@ label,
   }
 
   .dialect-example {
+    grid-template-columns: 1fr;
+  }
+
+  .dialect-history-event {
     grid-template-columns: 1fr;
   }
 }

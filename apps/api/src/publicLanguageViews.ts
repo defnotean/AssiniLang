@@ -497,6 +497,13 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       phonologyNotes: [...dialect.phonologyNotes],
       lexicalNotes: [...dialect.lexicalNotes],
       grammarNotes: [...dialect.grammarNotes],
+      history: {
+        summary: dialect.history.summary,
+        events: dialect.history.events.map((event) => ({
+          ...event,
+          evidencePassageIds: [...event.evidencePassageIds]
+        }))
+      },
       examplePhrases: dialect.examplePhrases.map((example) => ({ ...example }))
     })) ?? [],
     discourseExamples: fixture?.discourseExamples.map((example) => ({

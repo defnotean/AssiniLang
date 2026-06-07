@@ -1750,6 +1750,25 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
                   ))}
                 </div>
               </div>
+              <div className="dialect-history">
+                <strong>History</strong>
+                <p>{dialect.history.summary}</p>
+                <div className="dialect-history-events">
+                  {dialect.history.events.map((event) => (
+                    <div className="dialect-history-event" key={`${dialect.id}-${event.period}`}>
+                      <div>
+                        <span>{event.period}</span>
+                        <p>{event.description}</p>
+                      </div>
+                      <div className="pill-row">
+                        {event.evidencePassageIds.map((passageId) => (
+                          <span className="pill" key={`${dialect.id}-${event.period}-${passageId}`}>{passageId}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
               <div className="dialect-example-list">
                 {dialect.examplePhrases.map((example) => (
                   <div className="dialect-example" key={`${dialect.id}-${example.standard}-${example.variant}`}>

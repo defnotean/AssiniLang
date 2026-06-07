@@ -20,7 +20,19 @@ describe("synthetic fixture validation module", () => {
       { answer: avenik.exercisesAnswerKey[0].expectedAnswers[0], reason: "Duplicates the expected answer." }
     ];
     (avenik as unknown as {
-      dialectVariants: Array<{ id: string; name: string; regionLabel: string; phonologyNotes: string[]; lexicalNotes: string[]; grammarNotes: string[]; examplePhrases: unknown[] }>;
+      dialectVariants: Array<{
+        id: string;
+        name: string;
+        regionLabel: string;
+        phonologyNotes: string[];
+        lexicalNotes: string[];
+        grammarNotes: string[];
+        history: {
+          summary: string;
+          events: Array<{ period: string; description: string; evidencePassageIds: string[] }>;
+        };
+        examplePhrases: unknown[];
+      }>;
     }).dialectVariants = [
       {
         id: "duplicate-dialect",
@@ -29,6 +41,10 @@ describe("synthetic fixture validation module", () => {
         phonologyNotes: ["short vowels remain stable"],
         lexicalNotes: ["test lexical note"],
         grammarNotes: ["test grammar note"],
+        history: {
+          summary: "",
+          events: []
+        },
         examplePhrases: [{ standard: "mira", variant: "mira", translation: "river" }]
       },
       {
@@ -38,6 +54,16 @@ describe("synthetic fixture validation module", () => {
         phonologyNotes: [],
         lexicalNotes: [],
         grammarNotes: [],
+        history: {
+          summary: "Repair history",
+          events: [
+            {
+              period: "",
+              description: "",
+              evidencePassageIds: ["missing-history-passage"]
+            }
+          ]
+        },
         examplePhrases: []
       }
     ];
@@ -115,6 +141,12 @@ describe("synthetic fixture validation module", () => {
         "avenik dialect variant duplicate-dialect needs at least one phonology note",
         "avenik dialect variant duplicate-dialect needs at least one lexical note",
         "avenik dialect variant duplicate-dialect needs at least one grammar note",
+        "avenik dialect variant duplicate-dialect is missing a history summary",
+        "avenik dialect variant duplicate-dialect needs at least 2 history events (found 0)",
+        "avenik dialect variant duplicate-dialect needs at least 2 history events (found 1)",
+        "avenik dialect variant duplicate-dialect history event 1 is missing a period",
+        "avenik dialect variant duplicate-dialect history event 1 is missing a description",
+        "avenik dialect variant duplicate-dialect history event 1 references missing corpus passage missing-history-passage",
         "avenik dialect variant duplicate-dialect needs at least one example phrase",
         "avenik has duplicate discourse example id duplicate-discourse",
         "avenik discourse example duplicate-discourse is missing a function label",
@@ -275,6 +307,10 @@ describe("synthetic fixture validation module", () => {
     avenik.paradigms = avenik.paradigms.slice(0, 1);
     avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
     avenik.dialectVariants = avenik.dialectVariants.slice(0, 1);
+    (avenik.dialectVariants[0] as unknown as { history: { summary: string; events: unknown[] } }).history = {
+      summary: "River-side history placeholder",
+      events: []
+    };
     avenik.discourseExamples = avenik.discourseExamples.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1);
     (avenik as unknown as { teachingSequences: unknown[] }).teachingSequences = [];
 
@@ -294,6 +330,7 @@ describe("synthetic fixture validation module", () => {
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigms} paradigm tables (found 1)`,
         `avenik paradigm avn-paradigm-verb-chain needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigmRows} rows (found 2)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants} dialect variants (found 1)`,
+        `avenik dialect variant avn-dialect-river needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectHistoryEvents} history events (found 0)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples} discourse examples (found ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1})`,
         "avenik needs at least 2 teaching sequences (found 0)"
       ])

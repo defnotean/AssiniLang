@@ -86,6 +86,7 @@ describe("synthetic language fixtures", () => {
       paradigms: 2,
       paradigmRows: 3,
       dialectVariants: 2,
+      dialectHistoryEvents: 2,
       discourseExamples: 3,
       teachingSequences: 2
     });
@@ -94,8 +95,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: true,
-      totalChecks: 14,
-      passedChecks: 14,
+      totalChecks: 15,
+      passedChecks: 15,
       failedChecks: 0
     });
     expect(summary.checks.map((check) => check.id)).toEqual([
@@ -111,6 +112,7 @@ describe("synthetic language fixtures", () => {
       "paradigms",
       "paradigmRows",
       "dialectVariants",
+      "dialectHistoryEvents",
       "discourseExamples",
       "teachingSequences"
     ]);
@@ -119,6 +121,13 @@ describe("synthetic language fixtures", () => {
       label: "Exercise types",
       actual: 3,
       minimum: SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "dialectHistoryEvents",
+      label: "Dialect history events",
+      actual: 2,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.dialectHistoryEvents,
       passed: true
     });
     expect(summary.checks).toContainEqual({
@@ -149,8 +158,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: false,
-      totalChecks: 14,
-      passedChecks: 12,
+      totalChecks: 15,
+      passedChecks: 13,
       failedChecks: 2
     });
     expect(summary.checks).toContainEqual({
@@ -234,6 +243,10 @@ describe("synthetic language fixtures", () => {
           phonologyNotes: string[];
           lexicalNotes: string[];
           grammarNotes: string[];
+          history: {
+            summary: string;
+            events: Array<{ period: string; description: string; evidencePassageIds: string[] }>;
+          };
           examplePhrases: Array<{ standard: string; variant: string; translation: string }>;
         }>;
       }).dialectVariants;
@@ -246,7 +259,28 @@ describe("synthetic language fixtures", () => {
         expect(dialect.phonologyNotes.length, `${fixture.language.id} ${dialect.id} phonology notes`).toBeGreaterThan(0);
         expect(dialect.lexicalNotes.length, `${fixture.language.id} ${dialect.id} lexical notes`).toBeGreaterThan(0);
         expect(dialect.grammarNotes.length, `${fixture.language.id} ${dialect.id} grammar notes`).toBeGreaterThan(0);
+        expect(dialect.history.summary, `${fixture.language.id} ${dialect.id} history summary`).toBeTruthy();
+        expect(dialect.history.events.length, `${fixture.language.id} ${dialect.id} history events`).toBeGreaterThanOrEqual(
+          SYNTHETIC_FIXTURE_MINIMUMS.dialectHistoryEvents
+        );
         expect(dialect.examplePhrases.length, `${fixture.language.id} ${dialect.id} examples`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("provides dialect history timelines that cite real corpus evidence", () => {
+    for (const fixture of syntheticLanguageFixtures) {
+      const corpusIds = new Set(fixture.corpus.map((passage) => passage.id));
+
+      for (const dialect of fixture.dialectVariants) {
+        expect(dialect.history.summary, `${fixture.language.id} ${dialect.id} history summary`).toBeTruthy();
+        expect(dialect.history.events.length, `${fixture.language.id} ${dialect.id} events`).toBeGreaterThanOrEqual(2);
+        for (const event of dialect.history.events) {
+          expect(event.period, `${fixture.language.id} ${dialect.id} event period`).toBeTruthy();
+          expect(event.description, `${fixture.language.id} ${dialect.id} event description`).toBeTruthy();
+          expect(event.evidencePassageIds.length, `${fixture.language.id} ${dialect.id} event evidence`).toBeGreaterThan(0);
+          expect(event.evidencePassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
+        }
       }
     }
   });

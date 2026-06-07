@@ -14,6 +14,7 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigms: 2,
   paradigmRows: 3,
   dialectVariants: 2,
+  dialectHistoryEvents: 2,
   discourseExamples: 3,
   teachingSequences: 2
 } as const;
@@ -51,6 +52,7 @@ const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, s
   paradigms: "Paradigm tables",
   paradigmRows: "Minimum paradigm rows",
   dialectVariants: "Dialect variants",
+  dialectHistoryEvents: "Dialect history events",
   discourseExamples: "Discourse examples",
   teachingSequences: "Teaching sequences"
 };
@@ -68,6 +70,7 @@ const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
   "paradigms",
   "paradigmRows",
   "dialectVariants",
+  "dialectHistoryEvents",
   "discourseExamples",
   "teachingSequences"
 ];
@@ -77,6 +80,11 @@ const TEACHING_SEQUENCE_LEVELS = new Set(["intro", "practice", "review"]);
 function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
   if (!fixture || fixture.paradigms.length === 0) return 0;
   return Math.min(...fixture.paradigms.map((paradigm) => paradigm.rows.length));
+}
+
+function minimumDialectHistoryEvents(fixture: SyntheticLanguageFixture | undefined): number {
+  if (!fixture || fixture.dialectVariants.length === 0) return 0;
+  return Math.min(...fixture.dialectVariants.map((dialect) => dialect.history.events.length));
 }
 
 export function buildSyntheticFixtureQualityActuals(
@@ -95,6 +103,7 @@ export function buildSyntheticFixtureQualityActuals(
     paradigms: fixture?.paradigms.length ?? 0,
     paradigmRows: minimumParadigmRows(fixture),
     dialectVariants: fixture?.dialectVariants.length ?? 0,
+    dialectHistoryEvents: minimumDialectHistoryEvents(fixture),
     discourseExamples: fixture?.discourseExamples.length ?? 0,
     teachingSequences: fixture?.teachingSequences.length ?? 0
   };
@@ -332,6 +341,15 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     "dialect variants",
     diagnostics
   );
+  for (const dialect of fixture.dialectVariants) {
+    addMinimumCountDiagnostic(
+      dialect.history.events.length,
+      SYNTHETIC_FIXTURE_MINIMUMS.dialectHistoryEvents,
+      `${languageId} dialect variant ${dialect.id}`,
+      "history events",
+      diagnostics
+    );
+  }
   addMinimumCountDiagnostic(
     fixture.discourseExamples.length,
     SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples,
@@ -485,6 +503,37 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
       if (dialect.grammarNotes.length === 0) {
         diagnostics.push(`${dialectLabel} needs at least one grammar note`);
       }
+      if (!dialect.history.summary.trim()) {
+        diagnostics.push(`${dialectLabel} is missing a history summary`);
+      }
+      addDuplicateNormalizedDiagnostics(
+        dialect.history.events.map((event) => event.period),
+        `${dialectLabel} history event period is duplicated:`,
+        diagnostics
+      );
+      dialect.history.events.forEach((event, index) => {
+        const eventNumber = index + 1;
+        const eventLabel = `${dialectLabel} history event ${eventNumber}`;
+        if (!event.period.trim()) {
+          diagnostics.push(`${eventLabel} is missing a period`);
+        }
+        if (!event.description.trim()) {
+          diagnostics.push(`${eventLabel} is missing a description`);
+        }
+        if (event.evidencePassageIds.length === 0) {
+          diagnostics.push(`${eventLabel} needs at least one evidence passage`);
+        }
+        addDuplicateNormalizedDiagnostics(
+          event.evidencePassageIds,
+          `${eventLabel} evidence passage is duplicated:`,
+          diagnostics
+        );
+        for (const passageId of event.evidencePassageIds) {
+          if (!corpusIdSet.has(passageId)) {
+            diagnostics.push(`${eventLabel} references missing corpus passage ${passageId}`);
+          }
+        }
+      });
       if (dialect.examplePhrases.length === 0) {
         diagnostics.push(`${dialectLabel} needs at least one example phrase`);
       }

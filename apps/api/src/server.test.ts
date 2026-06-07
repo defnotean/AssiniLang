@@ -131,7 +131,16 @@ describe("api server", () => {
     expect(profile.json().dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
       name: "River teaching register",
-      regionLabel: "river-side workshop register"
+      regionLabel: "river-side workshop register",
+      history: {
+        summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
+        events: expect.arrayContaining([
+          expect.objectContaining({
+            period: "early workshop",
+            evidencePassageIds: ["avn-c001", "avn-c005"]
+          })
+        ])
+      }
     });
     expect(profile.json().dialectVariants[0].examplePhrases[0]).toMatchObject({
       standard: "mira talo-mi-na",
@@ -1214,7 +1223,15 @@ describe("api server", () => {
     });
     expect(snapshot.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
-      name: "River teaching register"
+      name: "River teaching register",
+      history: {
+        events: expect.arrayContaining([
+          expect.objectContaining({
+            period: "early workshop",
+            evidencePassageIds: ["avn-c001", "avn-c005"]
+          })
+        ])
+      }
     });
     expect(snapshot.linguisticProfile.vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
       gloss: "present tense",

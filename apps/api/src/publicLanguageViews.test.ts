@@ -54,6 +54,7 @@ describe("public language views", () => {
         { id: "paradigms", label: "Paradigm tables", actual: 2, minimum: 2, passed: true },
         { id: "paradigmRows", label: "Minimum paradigm rows", actual: 3, minimum: 3, passed: true },
         { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true },
+        { id: "dialectHistoryEvents", label: "Dialect history events", actual: 2, minimum: 2, passed: true },
         { id: "discourseExamples", label: "Discourse examples", actual: 3, minimum: 3, passed: true },
         { id: "teachingSequences", label: "Teaching sequences", actual: 2, minimum: 2, passed: true }
       ]
@@ -84,6 +85,16 @@ describe("public language views", () => {
       target: "kilo-ke saku-ra nemi-mi-na",
       translation: "At the first step, I teach the child."
     });
+    expect(profile?.dialectVariants[0].history).toMatchObject({
+      summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
+      events: expect.arrayContaining([
+        expect.objectContaining({
+          period: "early workshop",
+          description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
+          evidencePassageIds: ["avn-c001", "avn-c005"]
+        })
+      ])
+    });
     expect(profile?.teachingSequences[0]).toMatchObject({
       id: "avn-teach-verb-chain",
       title: "Build a transparent verb chain",
@@ -98,6 +109,11 @@ describe("public language views", () => {
       variant: "test",
       translation: "test"
     });
+    profile?.dialectVariants[0].history.events.push({
+      period: "test",
+      description: "test",
+      evidencePassageIds: ["test"]
+    });
     profile?.discourseExamples[0].notes.push("test-note");
     profile?.teachingSequences[0].steps.push({ label: "test", prompt: "test" });
     profile?.vocabulary[0].tags.push("test-tag");
@@ -107,6 +123,9 @@ describe("public language views", () => {
     expect(fixture?.paradigms[0].rows[0].morphemes).not.toContain("-test");
     expect(fixture?.dialectVariants[0].examplePhrases).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ standard: "test" })])
+    );
+    expect(fixture?.dialectVariants[0].history.events).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ period: "test" })])
     );
     expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
     expect(fixture?.teachingSequences[0].steps).not.toEqual(
@@ -145,7 +164,15 @@ describe("public language views", () => {
     });
     expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
-      name: "River teaching register"
+      name: "River teaching register",
+      history: {
+        events: expect.arrayContaining([
+          expect.objectContaining({
+            period: "early workshop",
+            evidencePassageIds: ["avn-c001", "avn-c005"]
+          })
+        ])
+      }
     });
     expect(snapshot?.linguisticProfile.discourseExamples[0]).toMatchObject({
       id: "avn-discourse-opening",
@@ -262,8 +289,8 @@ describe("public language views", () => {
           languages: 4,
           passedLanguages: 4,
           failedLanguages: 0,
-          totalChecks: 56,
-          passedChecks: 56,
+          totalChecks: 60,
+          passedChecks: 60,
           failedChecks: 0,
           passed: true
         }

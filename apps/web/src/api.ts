@@ -47,6 +47,7 @@ export type FixtureMinimums = {
   paradigms: number;
   paradigmRows: number;
   dialectVariants: number;
+  dialectHistoryEvents: number;
   discourseExamples: number;
   teachingSequences: number;
 };
@@ -103,6 +104,14 @@ export type LanguageProfile = {
     phonologyNotes: string[];
     lexicalNotes: string[];
     grammarNotes: string[];
+    history: {
+      summary: string;
+      events: Array<{
+        period: string;
+        description: string;
+        evidencePassageIds: string[];
+      }>;
+    };
     examplePhrases: Array<{
       standard: string;
       variant: string;
