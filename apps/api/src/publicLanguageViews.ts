@@ -28,6 +28,7 @@ export type SyntheticLanguageProfile = {
   paradigms: SyntheticLanguageFixture["paradigms"];
   dialectVariants: SyntheticLanguageFixture["dialectVariants"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
+  teachingSequences: SyntheticLanguageFixture["teachingSequences"];
   vocabulary: SyntheticLanguageFixture["vocabulary"];
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
@@ -39,6 +40,7 @@ export type SyntheticLanguageProfile = {
     paradigms: number;
     dialectVariants: number;
     discourseExamples: number;
+    teachingSequences: number;
     corpusPassages: number;
     notes: number;
     exercises: number;
@@ -464,6 +466,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
     paradigms: fixture?.paradigms.length ?? 0,
     dialectVariants: fixture?.dialectVariants.length ?? 0,
     discourseExamples: fixture?.discourseExamples.length ?? 0,
+    teachingSequences: fixture?.teachingSequences.length ?? 0,
     corpusPassages: state.corpus.filter((passage) => passage.languageId === languageId).length,
     notes: state.notes.filter((note) => note.languageId === languageId).length,
     exercises: exercises.length,
@@ -500,6 +503,13 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       ...example,
       notes: [...example.notes]
     })) ?? [],
+    teachingSequences: fixture?.teachingSequences.map((sequence) => ({
+      ...sequence,
+      ruleIds: [...sequence.ruleIds],
+      corpusPassageIds: [...sequence.corpusPassageIds],
+      exerciseIds: [...sequence.exerciseIds],
+      steps: sequence.steps.map((step) => ({ ...step }))
+    })) ?? [],
     vocabulary: fixture?.vocabulary.map((item) => ({
       ...item,
       tags: [...item.tags]
@@ -520,7 +530,8 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       exerciseTypes: Object.keys(stats.exerciseTypes).length,
       paradigms: stats.paradigms,
       dialectVariants: stats.dialectVariants,
-      discourseExamples: stats.discourseExamples
+      discourseExamples: stats.discourseExamples,
+      teachingSequences: stats.teachingSequences
     }),
     stats
   };

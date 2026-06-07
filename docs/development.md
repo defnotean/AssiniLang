@@ -105,6 +105,8 @@ Each language should include:
 - Every grammar rule should be covered by a note answer key and by at least one learner exercise allow-list.
 - At least two exercise types.
 - Two curated adversarial probes per exercise.
+- At least three discourse examples.
+- At least two teaching sequences that cite existing grammar rules, corpus passages, and learner exercises, with intro/practice/review levels and nonblank ordered steps.
 
 After adding or editing fixtures:
 

@@ -86,15 +86,16 @@ describe("synthetic language fixtures", () => {
       paradigms: 2,
       paradigmRows: 3,
       dialectVariants: 2,
-      discourseExamples: 3
+      discourseExamples: 3,
+      teachingSequences: 2
     });
 
     const summary = summarizeSyntheticFixtureQuality(actuals);
 
     expect(summary).toMatchObject({
       passed: true,
-      totalChecks: 13,
-      passedChecks: 13,
+      totalChecks: 14,
+      passedChecks: 14,
       failedChecks: 0
     });
     expect(summary.checks.map((check) => check.id)).toEqual([
@@ -110,7 +111,8 @@ describe("synthetic language fixtures", () => {
       "paradigms",
       "paradigmRows",
       "dialectVariants",
-      "discourseExamples"
+      "discourseExamples",
+      "teachingSequences"
     ]);
     expect(summary.checks).toContainEqual({
       id: "exerciseTypes",
@@ -124,6 +126,13 @@ describe("synthetic language fixtures", () => {
       label: "Discourse examples",
       actual: 3,
       minimum: SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "teachingSequences",
+      label: "Teaching sequences",
+      actual: 2,
+      minimum: 2,
       passed: true
     });
   });
@@ -140,8 +149,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: false,
-      totalChecks: 13,
-      passedChecks: 11,
+      totalChecks: 14,
+      passedChecks: 12,
       failedChecks: 2
     });
     expect(summary.checks).toContainEqual({
@@ -265,6 +274,41 @@ describe("synthetic language fixtures", () => {
         expect(example.target, `${fixture.language.id} ${example.id} target`).toBeTruthy();
         expect(example.translation, `${fixture.language.id} ${example.id} translation`).toBeTruthy();
         expect(example.notes.length, `${fixture.language.id} ${example.id} notes`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("provides teaching sequences that reference real fixture materials", () => {
+    for (const fixture of syntheticLanguageFixtures) {
+      const teachingSequences = (fixture as unknown as {
+        teachingSequences?: Array<{
+          id: string;
+          title: string;
+          objective: string;
+          level: "intro" | "practice" | "review";
+          ruleIds: string[];
+          corpusPassageIds: string[];
+          exerciseIds: string[];
+          steps: Array<{ label: string; prompt: string }>;
+        }>;
+      }).teachingSequences;
+      const ruleIds = new Set(fixture.grammarRules.map((rule) => rule.id));
+      const corpusIds = new Set(fixture.corpus.map((passage) => passage.id));
+      const exerciseIds = new Set(fixture.exercisesAnswerKey.map((exercise) => exercise.id));
+
+      expect(teachingSequences, `${fixture.language.id} teaching sequences`).toHaveLength(2);
+      for (const sequence of teachingSequences ?? []) {
+        expect(sequence.id, `${fixture.language.id} teaching sequence id`).toBeTruthy();
+        expect(sequence.title, `${fixture.language.id} ${sequence.id} title`).toBeTruthy();
+        expect(sequence.objective, `${fixture.language.id} ${sequence.id} objective`).toBeTruthy();
+        expect(["intro", "practice", "review"]).toContain(sequence.level);
+        expect(sequence.ruleIds.length, `${fixture.language.id} ${sequence.id} rules`).toBeGreaterThan(0);
+        expect(sequence.corpusPassageIds.length, `${fixture.language.id} ${sequence.id} corpus`).toBeGreaterThan(0);
+        expect(sequence.exerciseIds.length, `${fixture.language.id} ${sequence.id} exercises`).toBeGreaterThan(0);
+        expect(sequence.steps.length, `${fixture.language.id} ${sequence.id} steps`).toBeGreaterThanOrEqual(2);
+        expect(sequence.ruleIds.every((ruleId) => ruleIds.has(ruleId))).toBe(true);
+        expect(sequence.corpusPassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
+        expect(sequence.exerciseIds.every((exerciseId) => exerciseIds.has(exerciseId))).toBe(true);
       }
     }
   });

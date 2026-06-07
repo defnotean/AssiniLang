@@ -14,7 +14,8 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigms: 2,
   paradigmRows: 3,
   dialectVariants: 2,
-  discourseExamples: 3
+  discourseExamples: 3,
+  teachingSequences: 2
 } as const;
 
 export type SyntheticFixtureQualityCheckId = keyof typeof SYNTHETIC_FIXTURE_MINIMUMS;
@@ -50,7 +51,8 @@ const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, s
   paradigms: "Paradigm tables",
   paradigmRows: "Minimum paradigm rows",
   dialectVariants: "Dialect variants",
-  discourseExamples: "Discourse examples"
+  discourseExamples: "Discourse examples",
+  teachingSequences: "Teaching sequences"
 };
 
 const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
@@ -66,8 +68,11 @@ const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
   "paradigms",
   "paradigmRows",
   "dialectVariants",
-  "discourseExamples"
+  "discourseExamples",
+  "teachingSequences"
 ];
+
+const TEACHING_SEQUENCE_LEVELS = new Set(["intro", "practice", "review"]);
 
 function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
   if (!fixture || fixture.paradigms.length === 0) return 0;
@@ -90,7 +95,8 @@ export function buildSyntheticFixtureQualityActuals(
     paradigms: fixture?.paradigms.length ?? 0,
     paradigmRows: minimumParadigmRows(fixture),
     dialectVariants: fixture?.dialectVariants.length ?? 0,
-    discourseExamples: fixture?.discourseExamples.length ?? 0
+    discourseExamples: fixture?.discourseExamples.length ?? 0,
+    teachingSequences: fixture?.teachingSequences.length ?? 0
   };
 }
 
@@ -333,6 +339,13 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     "discourse examples",
     diagnostics
   );
+  addMinimumCountDiagnostic(
+    fixture.teachingSequences.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.teachingSequences,
+    languageId,
+    "teaching sequences",
+    diagnostics
+  );
 }
 
 function addGrammarRuleCoverageDiagnostics(fixture: SyntheticLanguageFixture, diagnostics: string[]) {
@@ -365,8 +378,10 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const paradigmIds = fixture.paradigms.map((paradigm) => paradigm.id);
     const dialectVariantIds = fixture.dialectVariants.map((dialect) => dialect.id);
     const discourseExampleIds = fixture.discourseExamples.map((example) => example.id);
+    const teachingSequenceIds = fixture.teachingSequences.map((sequence) => sequence.id);
     const noteIds = fixture.notesAnswerKey.map((note) => note.id);
     const exerciseIds = fixture.exercisesAnswerKey.map((exercise) => exercise.id);
+    const exerciseIdSet = new Set(exerciseIds);
     const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
     const corpusTargets = new Set(fixture.corpus.map((passage) => normalizedText(passage.textTarget)));
     const vocabularyIds = fixture.vocabulary.map((item) => item.id);
@@ -381,6 +396,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);
     addDuplicateDiagnostics(dialectVariantIds, `${languageId} has duplicate dialect variant id`, diagnostics);
     addDuplicateDiagnostics(discourseExampleIds, `${languageId} has duplicate discourse example id`, diagnostics);
+    addDuplicateDiagnostics(teachingSequenceIds, `${languageId} has duplicate teaching sequence id`, diagnostics);
     addDuplicateDiagnostics(noteIds, `${languageId} has duplicate note id`, diagnostics);
     addDuplicateDiagnostics(exerciseIds, `${languageId} has duplicate exercise id`, diagnostics);
 
@@ -512,6 +528,73 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
           diagnostics.push(`${exampleLabel} has a blank note`);
         }
       }
+    }
+
+    for (const sequence of fixture.teachingSequences) {
+      const sequenceLabel = `${languageId} teaching sequence ${sequence.id}`;
+      if (!sequence.id.trim()) {
+        diagnostics.push(`${languageId} has a teaching sequence without an id`);
+      }
+      if (!sequence.title.trim()) {
+        diagnostics.push(`${sequenceLabel} is missing a title`);
+      }
+      if (!sequence.objective.trim()) {
+        diagnostics.push(`${sequenceLabel} is missing an objective`);
+      }
+      if (!TEACHING_SEQUENCE_LEVELS.has(sequence.level as string)) {
+        diagnostics.push(`${sequenceLabel} has invalid level ${sequence.level}`);
+      }
+      if (sequence.ruleIds.length === 0) {
+        diagnostics.push(`${sequenceLabel} needs at least one rule`);
+      }
+      if (sequence.corpusPassageIds.length === 0) {
+        diagnostics.push(`${sequenceLabel} needs at least one corpus passage`);
+      }
+      if (sequence.exerciseIds.length === 0) {
+        diagnostics.push(`${sequenceLabel} needs at least one exercise`);
+      }
+      addDuplicateNormalizedDiagnostics(
+        sequence.ruleIds,
+        `${sequenceLabel} rule is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        sequence.corpusPassageIds,
+        `${sequenceLabel} corpus passage is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        sequence.exerciseIds,
+        `${sequenceLabel} exercise is duplicated:`,
+        diagnostics
+      );
+      for (const ruleId of sequence.ruleIds) {
+        if (!ruleIdSet.has(ruleId)) {
+          diagnostics.push(`${sequenceLabel} references missing rule ${ruleId}`);
+        }
+      }
+      for (const passageId of sequence.corpusPassageIds) {
+        if (!corpusIdSet.has(passageId)) {
+          diagnostics.push(`${sequenceLabel} references missing corpus passage ${passageId}`);
+        }
+      }
+      for (const exerciseId of sequence.exerciseIds) {
+        if (!exerciseIdSet.has(exerciseId)) {
+          diagnostics.push(`${sequenceLabel} references missing exercise ${exerciseId}`);
+        }
+      }
+      if (sequence.steps.length === 0) {
+        diagnostics.push(`${sequenceLabel} needs at least one step`);
+      }
+      sequence.steps.forEach((step, index) => {
+        const stepNumber = index + 1;
+        if (!step.label.trim()) {
+          diagnostics.push(`${sequenceLabel} step ${stepNumber} is missing a label`);
+        }
+        if (!step.prompt.trim()) {
+          diagnostics.push(`${sequenceLabel} step ${stepNumber} is missing a prompt`);
+        }
+      });
     }
 
     for (const note of fixture.notesAnswerKey) {

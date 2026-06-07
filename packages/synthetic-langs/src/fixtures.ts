@@ -43,12 +43,29 @@ export type DiscourseExample = {
   notes: string[];
 };
 
+export type TeachingSequenceLevel = "intro" | "practice" | "review";
+
+export type TeachingSequence = {
+  id: string;
+  title: string;
+  objective: string;
+  level: TeachingSequenceLevel;
+  ruleIds: string[];
+  corpusPassageIds: string[];
+  exerciseIds: string[];
+  steps: Array<{
+    label: string;
+    prompt: string;
+  }>;
+};
+
 export type SyntheticLanguageFixture = {
   language: Language;
   phonology: PhonologyProfile;
   paradigms: ParadigmTable[];
   dialectVariants: DialectVariant[];
   discourseExamples: DiscourseExample[];
+  teachingSequences: TeachingSequence[];
   vocabulary: Array<{ id: string; form: string; gloss: string; partOfSpeech: string; tags: string[] }>;
   grammarRules: Array<{ id: string; topic: string; explanation: string; evidencePassageIds: string[]; confidence: "low" | "medium" | "high" }>;
   corpus: CorpusPassage[];
@@ -173,6 +190,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     discourseExamples: [],
+    teachingSequences: [],
     vocabulary: [
       { id: "avn-v-001", form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"] },
       { id: "avn-v-002", form: "nemi", gloss: "teach / explain", partOfSpeech: "verb", tags: ["learning"] },
@@ -506,6 +524,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     discourseExamples: [],
+    teachingSequences: [],
     vocabulary: [
       { id: "sol-p-001", form: "mi", gloss: "I", partOfSpeech: "pronoun", tags: ["subject"] },
       { id: "sol-p-002", form: "ta", gloss: "they", partOfSpeech: "pronoun", tags: ["subject"] },
@@ -847,6 +866,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     discourseExamples: [],
+    teachingSequences: [],
     vocabulary: [
       { id: "vel-v-001", form: "dan", gloss: "eat", partOfSpeech: "verb-root", tags: ["food"] },
       { id: "vel-v-002", form: "mir", gloss: "see", partOfSpeech: "verb-root", tags: ["perception"] },
@@ -1165,6 +1185,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     discourseExamples: [],
+    teachingSequences: [],
     vocabulary: [
       { id: "ket-pr-001", form: "na-", gloss: "I (subject prefix)", partOfSpeech: "prefix", tags: ["subject"] },
       { id: "ket-pr-002", form: "ka-", gloss: "they (subject prefix)", partOfSpeech: "prefix", tags: ["subject"] },
@@ -1401,6 +1422,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
 type FixtureRichnessExpansion = {
   vocabulary: SyntheticLanguageFixture["vocabulary"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
+  teachingSequences: SyntheticLanguageFixture["teachingSequences"];
   corpus: CorpusPassage[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
   exercises: Exercise[];
@@ -1446,6 +1468,46 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         notes: [
           "The reviewed item stays before the speech verb.",
           "Third-person -ki keeps the closure impersonal."
+        ]
+      }
+    ],
+    teachingSequences: [
+      {
+        id: "avn-teach-verb-chain",
+        title: "Build a transparent verb chain",
+        objective: "Recognize and produce root-tense-person chains in short Avenik clauses.",
+        level: "intro",
+        ruleIds: ["avn-rule-verb-chain"],
+        corpusPassageIds: ["avn-c001", "avn-c002"],
+        exerciseIds: ["avn-ex001", "avn-ex002"],
+        steps: [
+          {
+            label: "Observe",
+            prompt: "Read mira talo-mi-na and identify the verb chain."
+          },
+          {
+            label: "Practice",
+            prompt: "Translate a new first-person present clause."
+          }
+        ]
+      },
+      {
+        id: "avn-teach-review-object-frame",
+        title: "Coordinate reviewed objects",
+        objective: "Use accusative -ra and coordination -ne in classroom-object review clauses.",
+        level: "practice",
+        ruleIds: ["avn-rule-review-object-frame", "avn-rule-demo-agent-marking"],
+        corpusPassageIds: ["avn-c011", "avn-c012"],
+        exerciseIds: ["avn-ex004", "avn-ex006"],
+        steps: [
+          {
+            label: "Locate",
+            prompt: "Find each object noun and mark where -ra appears."
+          },
+          {
+            label: "Repair",
+            prompt: "Explain why seya-ne-ra is not the expected review-object order."
+          }
         ]
       }
     ],
@@ -1560,6 +1622,46 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         ]
       }
     ],
+    teachingSequences: [
+      {
+        id: "sol-teach-particle-frame",
+        title: "Place particles before the verb",
+        objective: "Use clause-initial pronouns and pre-verbal particles in basic Solari clauses.",
+        level: "intro",
+        ruleIds: ["sol-rule-past-particle", "sol-rule-svo"],
+        corpusPassageIds: ["sol-c001", "sol-c002"],
+        exerciseIds: ["sol-ex001", "sol-ex002"],
+        steps: [
+          {
+            label: "Identify",
+            prompt: "Point to the subject, particle, verb, and object in ta pa ko nua."
+          },
+          {
+            label: "Produce",
+            prompt: "Build a past-time clause with the same pronoun-particle-verb-object frame."
+          }
+        ]
+      },
+      {
+        id: "sol-teach-coordination-review",
+        title: "Review coordinated objects",
+        objective: "Keep Solari tense/aspect particles before the verb while coordinating object nouns after it.",
+        level: "practice",
+        ruleIds: ["sol-rule-pronoun-particle-frame", "sol-rule-object-coordination"],
+        corpusPassageIds: ["sol-c011", "sol-c012"],
+        exerciseIds: ["sol-ex004", "sol-ex006"],
+        steps: [
+          {
+            label: "Compare",
+            prompt: "Contrast mi pa ko rei e luma with lo pa ko lisa e tero."
+          },
+          {
+            label: "Explain",
+            prompt: "Describe why moving pa after ko changes the expected Solari frame."
+          }
+        ]
+      }
+    ],
     corpus: [
       {
         id: "sol-c011",
@@ -1666,6 +1768,46 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         ]
       }
     ],
+    teachingSequences: [
+      {
+        id: "vel-teach-fused-endings",
+        title: "Decode fused endings",
+        objective: "Read Velari person, number, and tense from fused verb endings before translating the object.",
+        level: "intro",
+        ruleIds: ["vel-rule-fused-ending", "vel-rule-object-after-verb"],
+        corpusPassageIds: ["vel-c001", "vel-c002"],
+        exerciseIds: ["vel-ex001", "vel-ex002"],
+        steps: [
+          {
+            label: "Segment",
+            prompt: "Separate miror into root and ending before naming its person and tense."
+          },
+          {
+            label: "Translate",
+            prompt: "Use the ending first, then add the following object noun."
+          }
+        ]
+      },
+      {
+        id: "vel-teach-root-stability",
+        title: "Track stable roots across endings",
+        objective: "Compare Velari forms that keep the same lexical root while changing fused endings.",
+        level: "review",
+        ruleIds: ["vel-rule-root-stability", "vel-rule-object-after-verb"],
+        corpusPassageIds: ["vel-c011", "vel-c012"],
+        exerciseIds: ["vel-ex003", "vel-ex006"],
+        steps: [
+          {
+            label: "Compare",
+            prompt: "Underline mor in moror and moreth, then name each ending."
+          },
+          {
+            label: "Check",
+            prompt: "Translate moreth rali without treating -eth as future time."
+          }
+        ]
+      }
+    ],
     corpus: [
       {
         id: "vel-c011",
@@ -1763,6 +1905,46 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         notes: [
           "The signal object prefix is ru-.",
           "Careful-review -ko replaces the ordinary time suffix."
+        ]
+      }
+    ],
+    teachingSequences: [
+      {
+        id: "ket-teach-slot-order",
+        title: "Read the predicate slots",
+        objective: "Segment Ketharu predicate words by subject, object, root, and suffix slots.",
+        level: "intro",
+        ruleIds: ["ket-rule-slot-order", "ket-rule-verb-as-clause"],
+        corpusPassageIds: ["ket-c001", "ket-c002"],
+        exerciseIds: ["ket-ex001", "ket-ex002"],
+        steps: [
+          {
+            label: "Map",
+            prompt: "Assign each part of na-mo-wan-tu to its predicate slot."
+          },
+          {
+            label: "Build",
+            prompt: "Create a new predicate word with ka- in the subject slot."
+          }
+        ]
+      },
+      {
+        id: "ket-teach-review-aspect",
+        title: "Review careful aspect endings",
+        objective: "Keep Ketharu slot order stable while reading -ko as careful-review aspect.",
+        level: "practice",
+        ruleIds: ["ket-rule-review-aspect", "ket-rule-slot-order"],
+        corpusPassageIds: ["ket-c011", "ket-c012"],
+        exerciseIds: ["ket-ex006", "ket-ex007"],
+        steps: [
+          {
+            label: "Segment",
+            prompt: "Separate wa-ro-hali-ko into subject, object, root, and aspect."
+          },
+          {
+            label: "Explain",
+            prompt: "Describe how -ko changes the review meaning without changing slot order."
+          }
         ]
       }
     ],
@@ -2183,4 +2365,8 @@ for (const fixture of syntheticLanguageFixtures) {
     ...(exerciseMap[fixture.language.id] ?? []),
     ...(fixtureRichnessExpansion[fixture.language.id]?.exercises ?? [])
   ];
+}
+
+for (const fixture of syntheticLanguageFixtures) {
+  fixture.teachingSequences.push(...(fixtureRichnessExpansion[fixture.language.id]?.teachingSequences ?? []));
 }

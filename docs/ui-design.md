@@ -51,6 +51,7 @@ The profile view should make the synthetic language system inspectable:
 
 - Keep phonology, grammar inventory, paradigms, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
 - Show discourse examples with function, context, target text, translation, and pragmatic notes.
+- Show teaching sequences as compact paths that link rule IDs, corpus passage IDs, exercise IDs, and ordered prompts without revealing answer keys.
 - Keep fixture-quality counters near the top so reviewers can see data-depth gaps before reading detailed panels.
 
 ### Corpus Browser
@@ -96,7 +97,7 @@ Governance and model setup are operational surfaces:
 
 - Keep policy records, dispositions, audit events, and exports data-forward.
 - Do not over-style these views; reliability and scanability matter most.
-- Snapshot export summaries should include fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
+- Snapshot export summaries should include teaching-sequence counts and fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness

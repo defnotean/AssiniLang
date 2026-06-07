@@ -32,6 +32,7 @@ describe("public language views", () => {
         paradigms: 2,
         dialectVariants: 2,
         discourseExamples: 3,
+        teachingSequences: 2,
         corpusPassages: 12,
         notes: 6,
         exercises: 6
@@ -53,7 +54,8 @@ describe("public language views", () => {
         { id: "paradigms", label: "Paradigm tables", actual: 2, minimum: 2, passed: true },
         { id: "paradigmRows", label: "Minimum paradigm rows", actual: 3, minimum: 3, passed: true },
         { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true },
-        { id: "discourseExamples", label: "Discourse examples", actual: 3, minimum: 3, passed: true }
+        { id: "discourseExamples", label: "Discourse examples", actual: 3, minimum: 3, passed: true },
+        { id: "teachingSequences", label: "Teaching sequences", actual: 2, minimum: 2, passed: true }
       ]
     });
     expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
@@ -82,6 +84,12 @@ describe("public language views", () => {
       target: "kilo-ke saku-ra nemi-mi-na",
       translation: "At the first step, I teach the child."
     });
+    expect(profile?.teachingSequences[0]).toMatchObject({
+      id: "avn-teach-verb-chain",
+      title: "Build a transparent verb chain",
+      ruleIds: ["avn-rule-verb-chain"],
+      exerciseIds: ["avn-ex001", "avn-ex002"]
+    });
 
     profile?.phonology.consonants.push("x-test");
     profile?.paradigms[0].rows[0].morphemes.push("-test");
@@ -91,6 +99,7 @@ describe("public language views", () => {
       translation: "test"
     });
     profile?.discourseExamples[0].notes.push("test-note");
+    profile?.teachingSequences[0].steps.push({ label: "test", prompt: "test" });
     profile?.vocabulary[0].tags.push("test-tag");
 
     const fixture = syntheticLanguageFixtures.find((item) => item.language.id === "avenik");
@@ -100,6 +109,9 @@ describe("public language views", () => {
       expect.arrayContaining([expect.objectContaining({ standard: "test" })])
     );
     expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
+    expect(fixture?.teachingSequences[0].steps).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: "test" })])
+    );
     expect(fixture?.vocabulary[0].tags).not.toContain("test-tag");
   });
 
@@ -121,7 +133,7 @@ describe("public language views", () => {
             { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
           ])
         },
-        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2, discourseExamples: 3 },
+        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
@@ -138,6 +150,11 @@ describe("public language views", () => {
     expect(snapshot?.linguisticProfile.discourseExamples[0]).toMatchObject({
       id: "avn-discourse-opening",
       functionLabel: "Opening a teaching turn"
+    });
+    expect(snapshot?.linguisticProfile.teachingSequences[0]).toMatchObject({
+      id: "avn-teach-verb-chain",
+      corpusPassageIds: ["avn-c001", "avn-c002"],
+      exerciseIds: ["avn-ex001", "avn-ex002"]
     });
     expect(snapshot?.integrity).toMatchObject({
       algorithm: "sha256",
@@ -245,8 +262,8 @@ describe("public language views", () => {
           languages: 4,
           passedLanguages: 4,
           failedLanguages: 0,
-          totalChecks: 52,
-          passedChecks: 52,
+          totalChecks: 56,
+          passedChecks: 56,
           failedChecks: 0,
           passed: true
         }

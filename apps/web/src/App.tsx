@@ -232,6 +232,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
     formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
     formatCount(snapshot.linguisticProfile.stats.discourseExamples, "discourse example"),
+    formatCount(snapshot.linguisticProfile.stats.teachingSequences, "teaching sequence"),
     formatFixtureQualityLabel(snapshot.linguisticProfile.fixtureQuality),
     formatIntegrityLabel(snapshot.integrity)
   ].join(", ");
@@ -1556,6 +1557,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     paradigms,
     dialectVariants,
     discourseExamples,
+    teachingSequences,
     grammarRules,
     vocabulary,
     morphemeInventory,
@@ -1601,6 +1603,10 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
           <div>
             <dt>Discourse examples</dt>
             <dd>{stats.discourseExamples}</dd>
+          </div>
+          <div>
+            <dt>Teaching sequences</dt>
+            <dd>{stats.teachingSequences}</dd>
           </div>
         </dl>
       </section>
@@ -1779,6 +1785,62 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
                   <span className="pill" key={`${example.id}-${note}`}>{note}</span>
                 ))}
               </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-card teaching-sequence-panel" aria-label="Teaching sequences">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Teaching sequences</span>
+            <h2>{formatCount(teachingSequences.length, "sequence")}</h2>
+          </div>
+        </div>
+        <div className="teaching-sequence-grid">
+          {teachingSequences.map((sequence) => (
+            <article className="teaching-sequence-card" key={sequence.id}>
+              <div className="record-topline">
+                <div>
+                  <h3>{sequence.title}</h3>
+                  <p>{sequence.objective}</p>
+                </div>
+                <span className="id-badge">{sequence.level}</span>
+              </div>
+              <div className="sequence-reference-grid">
+                <div>
+                  <strong>Rules</strong>
+                  <div className="pill-row">
+                    {sequence.ruleIds.map((ruleId) => (
+                      <span className="pill" key={`${sequence.id}-${ruleId}`}>{ruleId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Corpus</strong>
+                  <div className="pill-row">
+                    {sequence.corpusPassageIds.map((passageId) => (
+                      <span className="pill" key={`${sequence.id}-${passageId}`}>{passageId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Exercises</strong>
+                  <div className="pill-row">
+                    {sequence.exerciseIds.map((exerciseId) => (
+                      <span className="pill" key={`${sequence.id}-${exerciseId}`}>{exerciseId}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <ol className="sequence-step-list">
+                {sequence.steps.map((step) => (
+                  <li key={`${sequence.id}-${step.label}-${step.prompt}`}>
+                    <strong>{step.label}</strong>
+                    <span>{step.prompt}</span>
+                  </li>
+                ))}
+              </ol>
             </article>
           ))}
         </div>

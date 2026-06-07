@@ -48,6 +48,7 @@ export type FixtureMinimums = {
   paradigmRows: number;
   dialectVariants: number;
   discourseExamples: number;
+  teachingSequences: number;
 };
 
 export type FixtureQualityCheck = {
@@ -116,6 +117,19 @@ export type LanguageProfile = {
     translation: string;
     notes: string[];
   }>;
+  teachingSequences: Array<{
+    id: string;
+    title: string;
+    objective: string;
+    level: "intro" | "practice" | "review";
+    ruleIds: string[];
+    corpusPassageIds: string[];
+    exerciseIds: string[];
+    steps: Array<{
+      label: string;
+      prompt: string;
+    }>;
+  }>;
   vocabulary: Array<{
     id: string;
     form: string;
@@ -151,6 +165,7 @@ export type LanguageProfile = {
     paradigms: number;
     dialectVariants: number;
     discourseExamples: number;
+    teachingSequences: number;
     corpusPassages: number;
     notes: number;
     exercises: number;

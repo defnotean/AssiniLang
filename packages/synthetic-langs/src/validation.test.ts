@@ -68,6 +68,39 @@ describe("synthetic fixture validation module", () => {
         notes: [""]
       }
     ];
+    (avenik as unknown as {
+      teachingSequences: Array<{
+        id: string;
+        title: string;
+        objective: string;
+        level: string;
+        ruleIds: string[];
+        corpusPassageIds: string[];
+        exerciseIds: string[];
+        steps: Array<{ label: string; prompt: string }>;
+      }>;
+    }).teachingSequences = [
+      {
+        id: "duplicate-sequence",
+        title: "",
+        objective: "",
+        level: "advanced",
+        ruleIds: ["missing-rule"],
+        corpusPassageIds: ["missing-passage"],
+        exerciseIds: ["missing-exercise"],
+        steps: []
+      },
+      {
+        id: "duplicate-sequence",
+        title: "Repair drill",
+        objective: "Practice a repair sequence.",
+        level: "practice",
+        ruleIds: ["avn-rule-verb-chain"],
+        corpusPassageIds: ["avn-c001"],
+        exerciseIds: ["avn-ex001"],
+        steps: [{ label: "", prompt: "" }]
+      }
+    ];
 
     expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
       expect.arrayContaining([
@@ -89,7 +122,17 @@ describe("synthetic fixture validation module", () => {
         "avenik discourse example duplicate-discourse target uses z outside phonology inventory",
         "avenik discourse example duplicate-discourse is missing a translation",
         "avenik discourse example duplicate-discourse needs at least one note",
-        "avenik discourse example duplicate-discourse has a blank note"
+        "avenik discourse example duplicate-discourse has a blank note",
+        "avenik has duplicate teaching sequence id duplicate-sequence",
+        "avenik teaching sequence duplicate-sequence is missing a title",
+        "avenik teaching sequence duplicate-sequence is missing an objective",
+        "avenik teaching sequence duplicate-sequence has invalid level advanced",
+        "avenik teaching sequence duplicate-sequence references missing rule missing-rule",
+        "avenik teaching sequence duplicate-sequence references missing corpus passage missing-passage",
+        "avenik teaching sequence duplicate-sequence references missing exercise missing-exercise",
+        "avenik teaching sequence duplicate-sequence needs at least one step",
+        "avenik teaching sequence duplicate-sequence step 1 is missing a label",
+        "avenik teaching sequence duplicate-sequence step 1 is missing a prompt"
       ])
     );
   });
@@ -233,6 +276,7 @@ describe("synthetic fixture validation module", () => {
     avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
     avenik.dialectVariants = avenik.dialectVariants.slice(0, 1);
     avenik.discourseExamples = avenik.discourseExamples.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1);
+    (avenik as unknown as { teachingSequences: unknown[] }).teachingSequences = [];
 
     expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
       expect.arrayContaining([
@@ -250,7 +294,8 @@ describe("synthetic fixture validation module", () => {
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigms} paradigm tables (found 1)`,
         `avenik paradigm avn-paradigm-verb-chain needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigmRows} rows (found 2)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants} dialect variants (found 1)`,
-        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples} discourse examples (found ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1})`
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples} discourse examples (found ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1})`,
+        "avenik needs at least 2 teaching sequences (found 0)"
       ])
     );
   });
