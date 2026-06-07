@@ -207,7 +207,12 @@ function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): string 
   return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
 }
 
-function formatFixtureQualityLabel(fixtureQuality: LanguageSnapshot["linguisticProfile"]["fixtureQuality"]): string {
+type FixtureQualityCounters = Pick<
+  LanguageSnapshot["linguisticProfile"]["fixtureQuality"],
+  "passed" | "totalChecks" | "passedChecks" | "failedChecks"
+>;
+
+function formatFixtureQualityLabel(fixtureQuality: FixtureQualityCounters): string {
   const totalChecks = fixtureQuality.totalChecks;
   if (totalChecks === 0) return "0 fixture checks available";
 
@@ -245,6 +250,7 @@ function buildEvaluationArtifactDownload(artifact: EvaluationArtifact): Snapshot
     formatCount(artifact.summary.regressedLatestRuns, "regressed latest run"),
     formatCount(artifact.summary.failureCount, "failure line"),
     `${Math.round(artifact.summary.averageLatestScore * 100)}% average latest score`,
+    formatFixtureQualityLabel(artifact.summary.fixtureQuality),
     formatIntegrityLabel(artifact.integrity)
   ].join(", ");
 

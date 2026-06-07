@@ -88,6 +88,8 @@ The evaluation dashboard shows latest synthetic evaluation runs, category scores
 
 The seeded baseline currently scores all four synthetic languages at 100%.
 
+Programmers can export a sanitized evaluation artifact from this view. The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, SHA-256 integrity metadata, and aggregate fixture-quality readiness across the synthetic language set. The web confirmation includes the fixture-check pass count so reviewers can see baseline data depth without opening the JSON first.
+
 ### Governance
 
 The governance view exposes local prototype safety rails:
@@ -137,6 +139,8 @@ Prototype auth exists to test workflow permissions. Replace it before production
 ## Export Surfaces
 
 Sanitized language snapshots include public language metadata, linguistic profile data, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries. The web download summary includes the fixture-quality pass count so reviewers can see baseline readiness before opening the JSON artifact.
+
+Sanitized evaluation artifacts include latest evaluation runs, latest-vs-previous trend records, failure lines, aggregate gate metadata, aggregate fixture-quality readiness, and integrity metadata. They summarize fixture checks across all exported synthetic languages so the artifact can be reviewed as both an evaluation-health and data-depth record.
 
 Exports intentionally omit:
 

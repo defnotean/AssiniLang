@@ -226,7 +226,16 @@ describe("public language views", () => {
         failedLatestRuns: 1,
         averageLatestScore: 0.9375,
         passed: false,
-        failureCount: 2
+        failureCount: 2,
+        fixtureQuality: {
+          languages: 4,
+          passedLanguages: 4,
+          failedLanguages: 0,
+          totalChecks: 48,
+          passedChecks: 48,
+          failedChecks: 0,
+          passed: true
+        }
       }
     });
     expect(artifact.integrity).toMatchObject({

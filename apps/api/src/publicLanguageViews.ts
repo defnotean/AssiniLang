@@ -44,6 +44,16 @@ export type SyntheticLanguageProfile = {
   };
 };
 
+export type PublicFixtureQualitySummary = {
+  languages: number;
+  passedLanguages: number;
+  failedLanguages: number;
+  totalChecks: number;
+  passedChecks: number;
+  failedChecks: number;
+  passed: boolean;
+};
+
 export type MorphemeInventoryItem = {
   surface: string;
   lemma: string;
@@ -82,6 +92,7 @@ export type PublicEvaluationArtifact = {
     averageLatestScore: number;
     passed: boolean;
     failureCount: number;
+    fixtureQuality: PublicFixtureQualitySummary;
   };
   latestRuns: EvaluationRun[];
   runsByLanguage: Record<string, string[]>;
@@ -260,6 +271,28 @@ function evaluationTrendsForRuns(runs: EvaluationRun[]): EvaluationTrend[] {
     .sort((left, right) => left.languageId.localeCompare(right.languageId));
 }
 
+function aggregateFixtureQualityForState(state: AppState): PublicFixtureQualitySummary {
+  const summaries = state.languages
+    .map((language) => buildSyntheticLanguageProfile(state, language.id)?.fixtureQuality)
+    .filter((summary): summary is SyntheticFixtureQualitySummary => summary !== undefined);
+  const passedLanguages = summaries.filter((summary) => summary.passed).length;
+  const totalChecks = summaries.reduce((total, summary) => total + summary.totalChecks, 0);
+  const passedChecks = summaries.reduce((total, summary) => total + summary.passedChecks, 0);
+  const failedChecks = summaries.reduce((total, summary) => total + summary.failedChecks, 0);
+
+  return {
+    languages: summaries.length,
+    passedLanguages,
+    failedLanguages: summaries.length - passedLanguages,
+    totalChecks,
+    passedChecks,
+    failedChecks,
+    passed: summaries.length > 0
+      && summaries.length === state.languages.length
+      && summaries.every((summary) => summary.passed)
+  };
+}
+
 export function toPublicExercise(exercise: Exercise): PublicExercise {
   const {
     expectedAnswers: _expectedAnswers,
@@ -399,7 +432,8 @@ export function toPublicEvaluationArtifact(
       singleRunLanguages: trends.filter((trend) => trend.status === "single-run").length,
       averageLatestScore,
       passed: gateSummary.passed,
-      failureCount: gateSummary.failureLines.length
+      failureCount: gateSummary.failureLines.length,
+      fixtureQuality: aggregateFixtureQualityForState(state)
     },
     latestRuns,
     runsByLanguage: state.evaluationRuns.reduce<Record<string, string[]>>((runsByLanguage, run) => {

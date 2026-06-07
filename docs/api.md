@@ -50,7 +50,7 @@ Do not treat prototype auth as production security.
 | `GET /evaluations` | Return previous evaluation runs. |
 | `POST /evaluations/run` | Run evaluation for all languages. |
 | `GET /exports/languages/:languageId/snapshot` | Return a sanitized language snapshot with integrity metadata. |
-| `GET /exports/evaluations/artifact` | Return a sanitized evaluation artifact with trend and integrity metadata. |
+| `GET /exports/evaluations/artifact` | Return a sanitized evaluation artifact with trend, fixture-quality, and integrity metadata. |
 | `GET /governance` | List synthetic governance records. |
 | `POST /governance` | Create a synthetic consent, access, or generation policy record. |
 | `GET /languages/:languageId/review-policy` | Return review policy for one language. |
@@ -212,7 +212,7 @@ The persisted app-state schema also enforces one approval per language, note, an
 
 ## Sanitized Exports
 
-Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object and `fixtureQuality` summary so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. The `fixtureQuality` summary includes aggregate `totalChecks`, `passedChecks`, and `failedChecks` counters plus per-check actual/minimum rows. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
+Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object and `fixtureQuality` summary so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. The snapshot `fixtureQuality` summary includes aggregate `totalChecks`, `passedChecks`, and `failedChecks` counters plus per-check actual/minimum rows. Evaluation artifacts include aggregate fixture-quality readiness in `summary.fixtureQuality`, with language counts, passed/failed language counts, total check counts, passed check counts, failed check counts, and an overall pass flag. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
 
 ## Evaluation Runs
 

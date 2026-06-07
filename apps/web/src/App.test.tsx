@@ -457,7 +457,16 @@ describe("App", () => {
         singleRunLanguages: 1,
         averageLatestScore: 0.85,
         passed: true,
-        failureCount: 0
+        failureCount: 0,
+        fixtureQuality: {
+          languages: 2,
+          passedLanguages: 2,
+          failedLanguages: 0,
+          totalChecks: 24,
+          passedChecks: 24,
+          failedChecks: 0,
+          passed: true
+        }
       },
       latestRuns: createDashboardData().evaluations,
       runsByLanguage: { avenik: ["eval-1"] },
@@ -1168,7 +1177,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 24 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

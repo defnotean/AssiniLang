@@ -57,12 +57,21 @@ export type FixtureQualityCheck = {
   passed: boolean;
 };
 
-export type FixtureQualitySummary = {
+export type FixtureQualityCounters = {
   passed: boolean;
   totalChecks: number;
   passedChecks: number;
   failedChecks: number;
+};
+
+export type FixtureQualitySummary = FixtureQualityCounters & {
   checks: FixtureQualityCheck[];
+};
+
+export type EvaluationFixtureQualitySummary = FixtureQualityCounters & {
+  languages: number;
+  passedLanguages: number;
+  failedLanguages: number;
 };
 
 export type LanguageProfile = {
@@ -170,6 +179,7 @@ export type EvaluationArtifact = {
     averageLatestScore: number;
     passed: boolean;
     failureCount: number;
+    fixtureQuality: EvaluationFixtureQualitySummary;
   };
   latestRuns: EvaluationRun[];
   runsByLanguage: Record<string, string[]>;
