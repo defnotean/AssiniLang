@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { syntheticLanguageFixtures } from "./fixtures";
-import { validateSyntheticLanguageFixtures } from "./validation";
+import { SYNTHETIC_FIXTURE_MINIMUMS, validateSyntheticLanguageFixtures } from "./validation";
 
 function cloneFixtures(): typeof syntheticLanguageFixtures {
   return structuredClone(syntheticLanguageFixtures);
@@ -182,15 +182,18 @@ describe("synthetic fixture validation module", () => {
     const avenik = brokenFixtures[0];
     if (!avenik) throw new Error("Missing Avenik fixture");
 
-    avenik.phonology.consonants = avenik.phonology.consonants.slice(0, 5);
-    avenik.phonology.vowels = avenik.phonology.vowels.slice(0, 2);
-    avenik.phonology.phonotactics = avenik.phonology.phonotactics.slice(0, 1);
+    avenik.phonology.consonants = avenik.phonology.consonants.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.consonants - 1);
+    avenik.phonology.vowels = avenik.phonology.vowels.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.vowels - 1);
+    avenik.phonology.phonotactics = avenik.phonology.phonotactics.slice(
+      0,
+      SYNTHETIC_FIXTURE_MINIMUMS.phonotacticNotes - 1
+    );
     avenik.phonology.syllableTemplate = "";
     avenik.phonology.stress = "";
-    avenik.vocabulary = avenik.vocabulary.slice(0, 23);
-    avenik.corpus = avenik.corpus.slice(0, 11);
-    avenik.grammarRules = avenik.grammarRules.slice(0, 5);
-    avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, 5);
+    avenik.vocabulary = avenik.vocabulary.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems - 1);
+    avenik.corpus = avenik.corpus.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1);
+    avenik.grammarRules = avenik.grammarRules.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1);
+    avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1);
     avenik.exercisesAnswerKey = avenik.exercisesAnswerKey.filter((exercise) => exercise.type === "translate_to_target");
     avenik.paradigms = avenik.paradigms.slice(0, 1);
     avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
@@ -198,20 +201,20 @@ describe("synthetic fixture validation module", () => {
 
     expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
       expect.arrayContaining([
-        "avenik phonology needs at least 6 consonants (found 5)",
-        "avenik phonology needs at least 3 vowels (found 2)",
-        "avenik phonology needs at least 2 phonotactic notes (found 1)",
+        `avenik phonology needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.consonants} consonants (found ${SYNTHETIC_FIXTURE_MINIMUMS.consonants - 1})`,
+        `avenik phonology needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.vowels} vowels (found ${SYNTHETIC_FIXTURE_MINIMUMS.vowels - 1})`,
+        `avenik phonology needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.phonotacticNotes} phonotactic notes (found ${SYNTHETIC_FIXTURE_MINIMUMS.phonotacticNotes - 1})`,
         "avenik phonology is missing a syllable template",
         "avenik phonology is missing a stress rule",
-        "avenik needs at least 24 vocabulary items (found 23)",
-        "avenik needs at least 12 corpus passages (found 11)",
-        "avenik needs at least 6 grammar rules (found 5)",
-        "avenik needs at least 6 note answer keys (found 5)",
-        "avenik needs at least 6 exercise answer keys (found 4)",
-        "avenik needs at least 2 exercise types (found 1)",
-        "avenik needs at least 2 paradigm tables (found 1)",
-        "avenik paradigm avn-paradigm-verb-chain needs at least 3 rows (found 2)",
-        "avenik needs at least 2 dialect variants (found 1)"
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems} vocabulary items (found ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems - 1})`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages} corpus passages (found ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1})`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules} grammar rules (found ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1})`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys} note answer keys (found ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1})`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys} exercise answer keys (found 4)`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes} exercise types (found 1)`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigms} paradigm tables (found 1)`,
+        `avenik paradigm avn-paradigm-verb-chain needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigmRows} rows (found 2)`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants} dialect variants (found 1)`
       ])
     );
   });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { parseAppState } from "@assini/db";
-import { buildSeedState, syntheticLanguageFixtures, validateSyntheticLanguageFixtures } from "./loader";
+import {
+  buildSeedState,
+  SYNTHETIC_FIXTURE_MINIMUMS,
+  syntheticLanguageFixtures,
+  validateSyntheticLanguageFixtures
+} from "./loader";
 
 function cloneFixtures(): typeof syntheticLanguageFixtures {
   return structuredClone(syntheticLanguageFixtures);
@@ -17,17 +22,37 @@ describe("synthetic language fixtures", () => {
 
   it("labels every passage as synthetic testing data", () => {
     const state = buildSeedState();
-    expect(state.corpus.length).toBeGreaterThanOrEqual(48);
+    expect(state.corpus.length).toBeGreaterThanOrEqual(
+      SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages * syntheticLanguageFixtures.length
+    );
     expect(state.corpus.every((passage) => passage.consentStatus.use === "synthetic-testing-only")).toBe(true);
   });
 
   it("provides a richer grammar and exercise baseline for every synthetic language", () => {
+    expect(SYNTHETIC_FIXTURE_MINIMUMS).toMatchObject({
+      vocabularyItems: 24,
+      corpusPassages: 12,
+      grammarRules: 6,
+      noteAnswerKeys: 6,
+      exerciseAnswerKeys: 6
+    });
+
     for (const fixture of syntheticLanguageFixtures) {
-      expect(fixture.vocabulary.length, `${fixture.language.id} vocabulary items`).toBeGreaterThanOrEqual(24);
-      expect(fixture.corpus, `${fixture.language.id} corpus passages`).toHaveLength(12);
-      expect(fixture.grammarRules, `${fixture.language.id} grammar rules`).toHaveLength(6);
-      expect(fixture.notesAnswerKey, `${fixture.language.id} note answer keys`).toHaveLength(6);
-      expect(fixture.exercisesAnswerKey.length, `${fixture.language.id} exercise answer keys`).toBeGreaterThanOrEqual(6);
+      expect(fixture.vocabulary.length, `${fixture.language.id} vocabulary items`).toBeGreaterThanOrEqual(
+        SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems
+      );
+      expect(fixture.corpus, `${fixture.language.id} corpus passages`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages
+      );
+      expect(fixture.grammarRules, `${fixture.language.id} grammar rules`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.grammarRules
+      );
+      expect(fixture.notesAnswerKey, `${fixture.language.id} note answer keys`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys
+      );
+      expect(fixture.exercisesAnswerKey.length, `${fixture.language.id} exercise answer keys`).toBeGreaterThanOrEqual(
+        SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys
+      );
 
       const coveredExerciseTypes = new Set(fixture.exercisesAnswerKey.map((exercise) => exercise.type));
       expect(coveredExerciseTypes.size, `${fixture.language.id} exercise type variety`).toBeGreaterThanOrEqual(2);
@@ -189,15 +214,19 @@ describe("synthetic language fixtures", () => {
   it("connects notes and exercises to existing languages", () => {
     const state = buildSeedState();
     const languageIds = new Set(state.languages.map((language) => language.id));
-    expect(state.notes).toHaveLength(24);
-    expect(state.exercises.length).toBeGreaterThanOrEqual(24);
+    expect(state.notes).toHaveLength(SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys * syntheticLanguageFixtures.length);
+    expect(state.exercises.length).toBeGreaterThanOrEqual(
+      SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys * syntheticLanguageFixtures.length
+    );
     expect(state.notes.every((note) => note.status === "draft")).toBe(true);
     expect(state.notes.every((note) => languageIds.has(note.languageId))).toBe(true);
     expect(state.exercises.every((exercise) => languageIds.has(exercise.languageId))).toBe(true);
     expect(syntheticLanguageFixtures).toHaveLength(4);
 
     for (const language of state.languages) {
-      expect(state.exercises.filter((exercise) => exercise.languageId === language.id).length).toBeGreaterThanOrEqual(6);
+      expect(state.exercises.filter((exercise) => exercise.languageId === language.id).length).toBeGreaterThanOrEqual(
+        SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys
+      );
     }
   });
 

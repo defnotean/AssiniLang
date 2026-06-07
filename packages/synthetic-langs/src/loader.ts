@@ -14,7 +14,7 @@ import { syntheticLanguageFixtures, type SyntheticLanguageFixture } from "./fixt
 import { validateSyntheticLanguageFixtures } from "./validation";
 
 export { syntheticLanguageFixtures };
-export { validateSyntheticLanguageFixtures } from "./validation";
+export { SYNTHETIC_FIXTURE_MINIMUMS, validateSyntheticLanguageFixtures } from "./validation";
 
 function cloneNote(note: Note): Note {
   return {

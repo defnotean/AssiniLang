@@ -1,18 +1,20 @@
 import type { Exercise, Morpheme } from "@assini/db";
 import type { SyntheticLanguageFixture } from "./fixtures";
 
-const MIN_CONSONANTS = 6;
-const MIN_VOWELS = 3;
-const MIN_PHONOTACTIC_NOTES = 2;
-const MIN_VOCABULARY_ITEMS = 24;
-const MIN_CORPUS_PASSAGES = 12;
-const MIN_GRAMMAR_RULES = 6;
-const MIN_NOTE_ANSWER_KEYS = 6;
-const MIN_EXERCISE_ANSWER_KEYS = 6;
-const MIN_EXERCISE_TYPES = 2;
-const MIN_PARADIGMS = 2;
-const MIN_PARADIGM_ROWS = 3;
-const MIN_DIALECT_VARIANTS = 2;
+export const SYNTHETIC_FIXTURE_MINIMUMS = {
+  consonants: 6,
+  vowels: 3,
+  phonotacticNotes: 2,
+  vocabularyItems: 24,
+  corpusPassages: 12,
+  grammarRules: 6,
+  noteAnswerKeys: 6,
+  exerciseAnswerKeys: 6,
+  exerciseTypes: 2,
+  paradigms: 2,
+  paradigmRows: 3,
+  dialectVariants: 2
+} as const;
 
 function normalizedText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
@@ -126,11 +128,23 @@ function addOrthographyDiagnostics(
 
 function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagnostics: string[]) {
   const languageId = fixture.language.id;
-  addMinimumCountDiagnostic(fixture.phonology.consonants.length, MIN_CONSONANTS, `${languageId} phonology`, "consonants", diagnostics);
-  addMinimumCountDiagnostic(fixture.phonology.vowels.length, MIN_VOWELS, `${languageId} phonology`, "vowels", diagnostics);
+  addMinimumCountDiagnostic(
+    fixture.phonology.consonants.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.consonants,
+    `${languageId} phonology`,
+    "consonants",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
+    fixture.phonology.vowels.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.vowels,
+    `${languageId} phonology`,
+    "vowels",
+    diagnostics
+  );
   addMinimumCountDiagnostic(
     fixture.phonology.phonotactics.length,
-    MIN_PHONOTACTIC_NOTES,
+    SYNTHETIC_FIXTURE_MINIMUMS.phonotacticNotes,
     `${languageId} phonology`,
     "phonotactic notes",
     diagnostics
@@ -142,29 +156,59 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     diagnostics.push(`${languageId} phonology is missing a stress rule`);
   }
 
-  addMinimumCountDiagnostic(fixture.vocabulary.length, MIN_VOCABULARY_ITEMS, languageId, "vocabulary items", diagnostics);
-  addMinimumCountDiagnostic(fixture.corpus.length, MIN_CORPUS_PASSAGES, languageId, "corpus passages", diagnostics);
-  addMinimumCountDiagnostic(fixture.grammarRules.length, MIN_GRAMMAR_RULES, languageId, "grammar rules", diagnostics);
-  addMinimumCountDiagnostic(fixture.notesAnswerKey.length, MIN_NOTE_ANSWER_KEYS, languageId, "note answer keys", diagnostics);
+  addMinimumCountDiagnostic(
+    fixture.vocabulary.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems,
+    languageId,
+    "vocabulary items",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
+    fixture.corpus.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages,
+    languageId,
+    "corpus passages",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
+    fixture.grammarRules.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.grammarRules,
+    languageId,
+    "grammar rules",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
+    fixture.notesAnswerKey.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys,
+    languageId,
+    "note answer keys",
+    diagnostics
+  );
   addMinimumCountDiagnostic(
     fixture.exercisesAnswerKey.length,
-    MIN_EXERCISE_ANSWER_KEYS,
+    SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys,
     languageId,
     "exercise answer keys",
     diagnostics
   );
   addMinimumCountDiagnostic(
     new Set<Exercise["type"]>(fixture.exercisesAnswerKey.map((exercise) => exercise.type)).size,
-    MIN_EXERCISE_TYPES,
+    SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes,
     languageId,
     "exercise types",
     diagnostics
   );
-  addMinimumCountDiagnostic(fixture.paradigms.length, MIN_PARADIGMS, languageId, "paradigm tables", diagnostics);
+  addMinimumCountDiagnostic(
+    fixture.paradigms.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.paradigms,
+    languageId,
+    "paradigm tables",
+    diagnostics
+  );
   for (const paradigm of fixture.paradigms) {
     addMinimumCountDiagnostic(
       paradigm.rows.length,
-      MIN_PARADIGM_ROWS,
+      SYNTHETIC_FIXTURE_MINIMUMS.paradigmRows,
       `${languageId} paradigm ${paradigm.id}`,
       "rows",
       diagnostics
@@ -172,7 +216,7 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
   }
   addMinimumCountDiagnostic(
     fixture.dialectVariants.length,
-    MIN_DIALECT_VARIANTS,
+    SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants,
     languageId,
     "dialect variants",
     diagnostics
