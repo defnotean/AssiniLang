@@ -44,6 +44,20 @@ const EXPORT_REDACTION_POLICY = [
   "ai-sessions-omitted",
   "local-users-omitted"
 ];
+const SYNTHETIC_FIXTURE_MINIMUMS = {
+  consonants: 6,
+  vowels: 3,
+  phonotacticNotes: 2,
+  vocabularyItems: 24,
+  corpusPassages: 12,
+  grammarRules: 6,
+  noteAnswerKeys: 6,
+  exerciseAnswerKeys: 6,
+  exerciseTypes: 2,
+  paradigms: 2,
+  paradigmRows: 3,
+  dialectVariants: 2
+};
 
 function createDashboardData() {
   return {
@@ -313,7 +327,8 @@ function createLanguageProfile() {
       notes: 2,
       exercises: 2,
       exerciseTypes: { translate_to_target: 1, segment: 1 }
-    }
+    },
+    fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS
   };
 }
 
@@ -756,6 +771,12 @@ describe("App", () => {
     expect(await screen.findByRole("region", { name: "Grammar inventory" })).toBeInTheDocument();
     expect(screen.getByText("morphology/verb/tense-person-suffix-chain")).toBeInTheDocument();
     expect(screen.getByText("Avenik finite verbs use root + tense + person suffixes.")).toBeInTheDocument();
+    const qualityFloor = screen.getByRole("region", { name: "Synthetic fixture quality floor" });
+    expect(within(qualityFloor).getByText("24 vocabulary entries")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("12 corpus passages")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("6 grammar rules")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("6 note answer keys")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("6 exercise answer keys")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Phonology profile" })).toBeInTheDocument();
     expect(screen.getByText("word-initial")).toBeInTheDocument();
     expect(screen.getByText("Consonant clusters are disallowed inside native roots.")).toBeInTheDocument();

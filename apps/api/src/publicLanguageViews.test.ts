@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSeedState, syntheticLanguageFixtures } from "@assini/synthetic-langs";
+import { buildSeedState, SYNTHETIC_FIXTURE_MINIMUMS, syntheticLanguageFixtures } from "@assini/synthetic-langs";
 import {
   buildSyntheticLanguageProfile,
   toPublicExercise,
@@ -36,6 +36,7 @@ describe("public language views", () => {
         exercises: 6
       }
     });
+    expect(profile?.fixtureMinimums).toEqual(SYNTHETIC_FIXTURE_MINIMUMS);
     expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
     expect(profile?.paradigms[0].rows[0]).toMatchObject({
       form: "talo-mi-na",
@@ -84,6 +85,7 @@ describe("public language views", () => {
       exportedAt: "2026-06-06T00:00:00.000Z",
       language: { id: "avenik" },
       linguisticProfile: {
+        fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
         stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }

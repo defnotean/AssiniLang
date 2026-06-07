@@ -106,6 +106,20 @@ export type LanguageProfile = {
     exercises: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
+  fixtureMinimums: {
+    consonants: number;
+    vowels: number;
+    phonotacticNotes: number;
+    vocabularyItems: number;
+    corpusPassages: number;
+    grammarRules: number;
+    noteAnswerKeys: number;
+    exerciseAnswerKeys: number;
+    exerciseTypes: number;
+    paradigms: number;
+    paradigmRows: number;
+    dialectVariants: number;
+  };
 };
 
 export type LanguageSnapshot = {

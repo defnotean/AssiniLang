@@ -26,6 +26,7 @@ The profile view presents public linguistic metadata:
 - Paradigm tables.
 - Dialect variants with region labels, notes, and standard-vs-variant examples.
 - Fixture counts for corpus, notes, exercises, and profile structures.
+- The synthetic fixture quality floor from `SYNTHETIC_FIXTURE_MINIMUMS`, shown as the minimum expected vocabulary, corpus, grammar, note, exercise, paradigm, and dialect coverage for every synthetic language.
 
 Use this view to understand what forms and rules the selected synthetic language is allowed to use.
 
@@ -134,7 +135,7 @@ Prototype auth exists to test workflow permissions. Replace it before production
 
 ## Export Surfaces
 
-Sanitized language snapshots include public language metadata, linguistic profile data, corpus, public review notes, public learner exercises, governance records, and evaluation summaries.
+Sanitized language snapshots include public language metadata, linguistic profile data, the same synthetic fixture quality floor shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries.
 
 Exports intentionally omit:
 

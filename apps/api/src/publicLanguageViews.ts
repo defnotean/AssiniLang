@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 
 import type { AppState, EvaluationFailure, EvaluationRun, Exercise, ExerciseSubmission, Note } from "@assini/db";
-import { syntheticLanguageFixtures, type SyntheticLanguageFixture } from "@assini/synthetic-langs";
+import {
+  SYNTHETIC_FIXTURE_MINIMUMS,
+  syntheticLanguageFixtures,
+  type SyntheticLanguageFixture
+} from "@assini/synthetic-langs";
 import { summarizeEvaluationGate } from "@assini/eval";
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
@@ -23,6 +27,7 @@ export type SyntheticLanguageProfile = {
   vocabulary: SyntheticLanguageFixture["vocabulary"];
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
+  fixtureMinimums: typeof SYNTHETIC_FIXTURE_MINIMUMS;
   stats: {
     vocabularyItems: number;
     grammarRules: number;
@@ -446,6 +451,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       ...rule,
       evidencePassageIds: [...rule.evidencePassageIds]
     })) ?? [],
+    fixtureMinimums: { ...SYNTHETIC_FIXTURE_MINIMUMS },
     stats: {
       vocabularyItems: fixture?.vocabulary.length ?? 0,
       grammarRules: fixture?.grammarRules.length ?? 0,

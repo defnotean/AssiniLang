@@ -1532,7 +1532,17 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     );
   }
 
-  const { language, stats, phonology, paradigms, dialectVariants, grammarRules, vocabulary, morphemeInventory } = profileState.data;
+  const {
+    language,
+    stats,
+    phonology,
+    paradigms,
+    dialectVariants,
+    grammarRules,
+    vocabulary,
+    morphemeInventory,
+    fixtureMinimums
+  } = profileState.data;
 
   return (
     <div className="profile-view">
@@ -1569,6 +1579,44 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
           <div>
             <dt>Dialects</dt>
             <dd>{stats.dialectVariants}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="panel-card fixture-floor-panel" aria-label="Synthetic fixture quality floor">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Synthetic fixture quality floor</span>
+            <h2>Published baseline</h2>
+          </div>
+          <span className="id-badge">minimums</span>
+        </div>
+        <dl className="detail-grid">
+          <div>
+            <dt>Vocabulary</dt>
+            <dd>{formatCount(fixtureMinimums.vocabularyItems, "vocabulary entry", "vocabulary entries")}</dd>
+          </div>
+          <div>
+            <dt>Corpus</dt>
+            <dd>{formatCount(fixtureMinimums.corpusPassages, "corpus passage")}</dd>
+          </div>
+          <div>
+            <dt>Grammar</dt>
+            <dd>{formatCount(fixtureMinimums.grammarRules, "grammar rule")}</dd>
+          </div>
+          <div>
+            <dt>Notes</dt>
+            <dd>{formatCount(fixtureMinimums.noteAnswerKeys, "note answer key")}</dd>
+          </div>
+          <div>
+            <dt>Exercises</dt>
+            <dd>{formatCount(fixtureMinimums.exerciseAnswerKeys, "exercise answer key")}</dd>
+          </div>
+          <div>
+            <dt>Coverage structures</dt>
+            <dd>
+              {formatCount(fixtureMinimums.exerciseTypes, "exercise type")} / {formatCount(fixtureMinimums.paradigms, "paradigm table")} / {formatCount(fixtureMinimums.dialectVariants, "dialect variant")}
+            </dd>
           </div>
         </dl>
       </section>
