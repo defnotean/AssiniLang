@@ -49,8 +49,9 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 
 The profile view should make the synthetic language system inspectable:
 
-- Keep phonology, grammar inventory, paradigms, semantic domains, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
+- Keep phonology, grammar inventory, paradigms, semantic domains, register profiles, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
 - Show semantic domains as compact cards with a label, short description, vocabulary ID chips, corpus evidence chips, and usage notes.
+- Show register profiles as compact cards with a style label, usage context, semantic-domain chips, discourse-example chips, teaching-sequence chips, corpus evidence chips, and usage notes.
 - Show dialect histories as compact timelines with period labels, short descriptions, and corpus evidence chips.
 - Show discourse examples with function, context, target text, translation, and pragmatic notes.
 - Show teaching sequences as compact paths that link rule IDs, corpus passage IDs, exercise IDs, and ordered prompts without revealing answer keys.
@@ -99,7 +100,7 @@ Governance and model setup are operational surfaces:
 
 - Keep policy records, dispositions, audit events, and exports data-forward.
 - Do not over-style these views; reliability and scanability matter most.
-- Snapshot export summaries should include semantic-domain, teaching-sequence, and fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
+- Snapshot export summaries should include semantic-domain, register-profile, teaching-sequence, and fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness

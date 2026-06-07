@@ -29,6 +29,18 @@ export type SemanticDomain = {
   usageNotes: string[];
 };
 
+export type RegisterProfile = {
+  id: string;
+  label: string;
+  context: string;
+  styleLabel: string;
+  semanticDomainIds: string[];
+  discourseExampleIds: string[];
+  teachingSequenceIds: string[];
+  evidencePassageIds: string[];
+  usageNotes: string[];
+};
+
 export type DialectVariant = {
   id: string;
   name: string;
@@ -81,6 +93,7 @@ export type SyntheticLanguageFixture = {
   phonology: PhonologyProfile;
   paradigms: ParadigmTable[];
   semanticDomains: SemanticDomain[];
+  registerProfiles: RegisterProfile[];
   dialectVariants: DialectVariant[];
   discourseExamples: DiscourseExample[];
   teachingSequences: TeachingSequence[];
@@ -238,6 +251,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     semanticDomains: [],
+    registerProfiles: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -603,6 +617,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     semanticDomains: [],
+    registerProfiles: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -976,6 +991,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     semanticDomains: [],
+    registerProfiles: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -1326,6 +1342,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       }
     ],
     semanticDomains: [],
+    registerProfiles: [],
     discourseExamples: [],
     teachingSequences: [],
     vocabulary: [
@@ -1564,6 +1581,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
 type FixtureRichnessExpansion = {
   vocabulary: SyntheticLanguageFixture["vocabulary"];
   semanticDomains: SyntheticLanguageFixture["semanticDomains"];
+  registerProfiles: SyntheticLanguageFixture["registerProfiles"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   teachingSequences: SyntheticLanguageFixture["teachingSequences"];
   corpus: CorpusPassage[];
@@ -1611,6 +1629,36 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         usageNotes: [
           "Speech verbs introduce review objects after the setting frame.",
           "Memory nouns support repair turns without changing the verb-chain template."
+        ]
+      }
+    ],
+    registerProfiles: [
+      {
+        id: "avn-register-careful-teaching",
+        label: "Careful teaching register",
+        context: "Used when instructors slow suffix chains for first-pass learner explanation.",
+        styleLabel: "careful suffix demonstration",
+        semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
+        discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
+        teachingSequenceIds: ["avn-teach-verb-chain"],
+        evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
+        usageNotes: [
+          "Lengthened endings are teaching emphasis, not new person categories.",
+          "Object and route evidence stay visible while learners practice suffix order."
+        ]
+      },
+      {
+        id: "avn-register-workshop-review",
+        label: "Workshop review register",
+        context: "Used when sorting cards, tiles, and review lines during practice rounds.",
+        styleLabel: "object-focused review",
+        semanticDomainIds: ["avn-domain-classroom-objects", "avn-domain-review-speech"],
+        discourseExampleIds: ["avn-discourse-repair", "avn-discourse-closure"],
+        teachingSequenceIds: ["avn-teach-review-object-frame"],
+        evidencePassageIds: ["avn-c010", "avn-c012"],
+        usageNotes: [
+          "Keep -ra visible on reviewed objects before adding coordination.",
+          "The register favors explicit object labels over pronoun shortcuts."
         ]
       }
     ],
@@ -1800,6 +1848,36 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         ]
       }
     ],
+    registerProfiles: [
+      {
+        id: "sol-register-shared-prompt",
+        label: "Shared prompt register",
+        context: "Used when a group starts listening, tracing, or response practice together.",
+        styleLabel: "group prompt",
+        semanticDomainIds: ["sol-domain-participant-particles", "sol-domain-memory-tracing"],
+        discourseExampleIds: ["sol-discourse-opening", "sol-discourse-repair"],
+        teachingSequenceIds: ["sol-teach-particle-frame"],
+        evidencePassageIds: ["sol-c001", "sol-c011"],
+        usageNotes: [
+          "Clause-initial pronouns keep group participation explicit.",
+          "Particles mark time and continuity without changing verb forms."
+        ]
+      },
+      {
+        id: "sol-register-object-choice",
+        label: "Object choice register",
+        context: "Used when reviewers contrast cards, mats, and stones during choice tasks.",
+        styleLabel: "choice contrast",
+        semanticDomainIds: ["sol-domain-classroom-objects", "sol-domain-participant-particles"],
+        discourseExampleIds: ["sol-discourse-choice"],
+        teachingSequenceIds: ["sol-teach-coordination-review"],
+        evidencePassageIds: ["sol-c004", "sol-c012"],
+        usageNotes: [
+          "The linker e joins object nouns without case or agreement.",
+          "The register keeps the choice pair after the verb for quick comparison."
+        ]
+      }
+    ],
     discourseExamples: [
       {
         id: "sol-discourse-opening",
@@ -1981,6 +2059,36 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         ]
       }
     ],
+    registerProfiles: [
+      {
+        id: "vel-register-ending-drill",
+        label: "Ending drill register",
+        context: "Used when reviewers compare fused person-tense endings before translating objects.",
+        styleLabel: "ending-first comparison",
+        semanticDomainIds: ["vel-domain-fused-endings", "vel-domain-object-review"],
+        discourseExampleIds: ["vel-discourse-opening", "vel-discourse-recall"],
+        teachingSequenceIds: ["vel-teach-fused-endings", "vel-teach-root-stability"],
+        evidencePassageIds: ["vel-c001", "vel-c011", "vel-c012"],
+        usageNotes: [
+          "Students identify the ending before naming the object.",
+          "Root stability is highlighted by pairing moror and moreth."
+        ]
+      },
+      {
+        id: "vel-register-cueing-next-step",
+        label: "Next-step cue register",
+        context: "Used when the instructor points from a visible cue to a future action.",
+        styleLabel: "future cue",
+        semanticDomainIds: ["vel-domain-perception-cues", "vel-domain-fused-endings"],
+        discourseExampleIds: ["vel-discourse-next-step"],
+        teachingSequenceIds: ["vel-teach-fused-endings"],
+        evidencePassageIds: ["vel-c004", "vel-c010"],
+        usageNotes: [
+          "Future cue nouns help separate -un from present plural endings.",
+          "The object remains after the fused verb even in prompt turns."
+        ]
+      }
+    ],
     discourseExamples: [
       {
         id: "vel-discourse-opening",
@@ -2156,6 +2264,36 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
         ]
       }
     ],
+    registerProfiles: [
+      {
+        id: "ket-register-slot-map",
+        label: "Slot-mapping register",
+        context: "Used when instructors segment one-word predicates into subject, object, root, and suffix slots.",
+        styleLabel: "predicate-slot mapping",
+        semanticDomainIds: ["ket-domain-predicate-slots", "ket-domain-display-objects"],
+        discourseExampleIds: ["ket-discourse-opening"],
+        teachingSequenceIds: ["ket-teach-slot-order"],
+        evidencePassageIds: ["ket-c001", "ket-c004"],
+        usageNotes: [
+          "Each prompt names the slot before asking for the translation.",
+          "Subject and object prefixes are kept separate in learner-facing speech."
+        ]
+      },
+      {
+        id: "ket-register-careful-review",
+        label: "Careful review register",
+        context: "Used when reviewers check learner or review-token predicates with careful aspect.",
+        styleLabel: "careful aspect review",
+        semanticDomainIds: ["ket-domain-review-checking", "ket-domain-predicate-slots"],
+        discourseExampleIds: ["ket-discourse-learner-check", "ket-discourse-closure"],
+        teachingSequenceIds: ["ket-teach-review-aspect"],
+        evidencePassageIds: ["ket-c011", "ket-c012"],
+        usageNotes: [
+          "Careful -ko signals review work without changing slot order.",
+          "Learner and review-token object prefixes show the register's role focus."
+        ]
+      }
+    ],
     discourseExamples: [
       {
         id: "ket-discourse-opening",
@@ -2298,6 +2436,7 @@ for (const fixture of syntheticLanguageFixtures) {
   if (!expansion) continue;
   fixture.vocabulary.push(...expansion.vocabulary);
   fixture.semanticDomains.push(...expansion.semanticDomains);
+  fixture.registerProfiles.push(...expansion.registerProfiles);
   fixture.discourseExamples.push(...expansion.discourseExamples);
   fixture.corpus.push(...expansion.corpus);
   fixture.grammarRules.push(...expansion.grammarRules);

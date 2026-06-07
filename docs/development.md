@@ -99,6 +99,7 @@ Each language should include:
 - At least two history events per dialect variant, each with a nonblank period, description, and same-language corpus evidence IDs.
 - At least 24 public vocabulary items, including enough roots, particles, affixes, endings, or prefixes to support the language typology. Vocabulary IDs, normalized forms, and per-item tags must be unique.
 - At least three semantic domains, each with a nonblank label and description, at least three existing vocabulary IDs, at least one same-language corpus evidence ID, and nonblank usage notes.
+- At least two register profiles, each with a nonblank label, usage context, style label, same-language semantic-domain IDs, discourse-example IDs, teaching-sequence IDs, corpus evidence IDs, and usage notes.
 - At least six grammar rules.
 - At least 12 corpus passages.
 - Morphological segmentation.

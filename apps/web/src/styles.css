@@ -1267,6 +1267,12 @@ label,
   gap: 0.74rem;
 }
 
+.register-profile-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.74rem;
+}
+
 .teaching-sequence-panel {
   display: grid;
   grid-column: 1 / -1;
@@ -1486,6 +1492,72 @@ label,
 }
 
 .domain-note-list p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.register-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 0.68rem;
+}
+
+.register-profile-card {
+  display: grid;
+  align-content: start;
+  gap: 0.72rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 0.78rem;
+  background: var(--panel-soft);
+}
+
+.register-profile-card h3,
+.register-profile-card p {
+  margin: 0;
+}
+
+.register-profile-card h3 {
+  color: var(--text);
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.register-profile-card .id-badge {
+  max-width: 13rem;
+  white-space: normal;
+}
+
+.register-reference-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.58rem;
+}
+
+.register-reference-grid > div {
+  display: grid;
+  align-content: start;
+  gap: 0.36rem;
+  min-width: 0;
+}
+
+.register-reference-grid strong {
+  color: var(--text);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.register-note-list {
+  display: grid;
+  gap: 0.38rem;
+  border-top: 1px solid var(--border);
+  padding-top: 0.56rem;
+}
+
+.register-note-list p {
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.45;
@@ -2380,6 +2452,7 @@ label,
   .detail-grid,
   .corpus-import-grid,
   .domain-reference-grid,
+  .register-reference-grid,
   .sequence-reference-grid,
   .sequence-step-list li {
     grid-template-columns: 1fr;

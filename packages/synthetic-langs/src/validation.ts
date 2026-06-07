@@ -15,6 +15,7 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigmRows: 3,
   semanticDomains: 3,
   semanticDomainVocabulary: 3,
+  registerProfiles: 2,
   dialectVariants: 2,
   dialectHistoryEvents: 2,
   discourseExamples: 3,
@@ -55,6 +56,7 @@ const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, s
   paradigmRows: "Minimum paradigm rows",
   semanticDomains: "Semantic domains",
   semanticDomainVocabulary: "Semantic domain vocabulary",
+  registerProfiles: "Register profiles",
   dialectVariants: "Dialect variants",
   dialectHistoryEvents: "Dialect history events",
   discourseExamples: "Discourse examples",
@@ -68,6 +70,7 @@ const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
   "vocabularyItems",
   "semanticDomains",
   "semanticDomainVocabulary",
+  "registerProfiles",
   "corpusPassages",
   "grammarRules",
   "noteAnswerKeys",
@@ -115,6 +118,7 @@ export function buildSyntheticFixtureQualityActuals(
     paradigmRows: minimumParadigmRows(fixture),
     semanticDomains: fixture?.semanticDomains.length ?? 0,
     semanticDomainVocabulary: minimumSemanticDomainVocabulary(fixture),
+    registerProfiles: fixture?.registerProfiles.length ?? 0,
     dialectVariants: fixture?.dialectVariants.length ?? 0,
     dialectHistoryEvents: minimumDialectHistoryEvents(fixture),
     discourseExamples: fixture?.discourseExamples.length ?? 0,
@@ -313,6 +317,13 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     );
   }
   addMinimumCountDiagnostic(
+    fixture.registerProfiles.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.registerProfiles,
+    languageId,
+    "register profiles",
+    diagnostics
+  );
+  addMinimumCountDiagnostic(
     fixture.corpus.length,
     SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages,
     languageId,
@@ -424,9 +435,13 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const ruleIdSet = new Set(ruleIds);
     const paradigmIds = fixture.paradigms.map((paradigm) => paradigm.id);
     const semanticDomainIds = fixture.semanticDomains.map((domain) => domain.id);
+    const semanticDomainIdSet = new Set(semanticDomainIds);
+    const registerProfileIds = fixture.registerProfiles.map((register) => register.id);
     const dialectVariantIds = fixture.dialectVariants.map((dialect) => dialect.id);
     const discourseExampleIds = fixture.discourseExamples.map((example) => example.id);
+    const discourseExampleIdSet = new Set(discourseExampleIds);
     const teachingSequenceIds = fixture.teachingSequences.map((sequence) => sequence.id);
+    const teachingSequenceIdSet = new Set(teachingSequenceIds);
     const noteIds = fixture.notesAnswerKey.map((note) => note.id);
     const exerciseIds = fixture.exercisesAnswerKey.map((exercise) => exercise.id);
     const exerciseIdSet = new Set(exerciseIds);
@@ -444,6 +459,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     addDuplicateDiagnostics(ruleIds, `${languageId} has duplicate grammar rule id`, diagnostics);
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);
     addDuplicateDiagnostics(semanticDomainIds, `${languageId} has duplicate semantic domain id`, diagnostics);
+    addDuplicateDiagnostics(registerProfileIds, `${languageId} has duplicate register profile id`, diagnostics);
     addDuplicateDiagnostics(dialectVariantIds, `${languageId} has duplicate dialect variant id`, diagnostics);
     addDuplicateDiagnostics(discourseExampleIds, `${languageId} has duplicate discourse example id`, diagnostics);
     addDuplicateDiagnostics(teachingSequenceIds, `${languageId} has duplicate teaching sequence id`, diagnostics);
@@ -558,6 +574,82 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
       for (const usageNote of domain.usageNotes) {
         if (!usageNote.trim()) {
           diagnostics.push(`${domainLabel} has a blank usage note`);
+        }
+      }
+    }
+
+    for (const register of fixture.registerProfiles) {
+      const registerLabel = `${languageId} register profile ${register.id}`;
+      if (!register.id.trim()) {
+        diagnostics.push(`${languageId} has a register profile without an id`);
+      }
+      if (!register.label.trim()) {
+        diagnostics.push(`${registerLabel} is missing a label`);
+      }
+      if (!register.context.trim()) {
+        diagnostics.push(`${registerLabel} is missing a context`);
+      }
+      if (!register.styleLabel.trim()) {
+        diagnostics.push(`${registerLabel} is missing a style label`);
+      }
+      if (register.semanticDomainIds.length === 0) {
+        diagnostics.push(`${registerLabel} needs at least one semantic domain`);
+      }
+      if (register.discourseExampleIds.length === 0) {
+        diagnostics.push(`${registerLabel} needs at least one discourse example`);
+      }
+      if (register.teachingSequenceIds.length === 0) {
+        diagnostics.push(`${registerLabel} needs at least one teaching sequence`);
+      }
+      if (register.evidencePassageIds.length === 0) {
+        diagnostics.push(`${registerLabel} needs at least one evidence passage`);
+      }
+      if (register.usageNotes.length === 0) {
+        diagnostics.push(`${registerLabel} needs at least one usage note`);
+      }
+      addDuplicateNormalizedDiagnostics(
+        register.semanticDomainIds,
+        `${registerLabel} semantic domain is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        register.discourseExampleIds,
+        `${registerLabel} discourse example is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        register.teachingSequenceIds,
+        `${registerLabel} teaching sequence is duplicated:`,
+        diagnostics
+      );
+      addDuplicateNormalizedDiagnostics(
+        register.evidencePassageIds,
+        `${registerLabel} evidence passage is duplicated:`,
+        diagnostics
+      );
+      for (const domainId of register.semanticDomainIds) {
+        if (!semanticDomainIdSet.has(domainId)) {
+          diagnostics.push(`${registerLabel} references missing semantic domain ${domainId}`);
+        }
+      }
+      for (const exampleId of register.discourseExampleIds) {
+        if (!discourseExampleIdSet.has(exampleId)) {
+          diagnostics.push(`${registerLabel} references missing discourse example ${exampleId}`);
+        }
+      }
+      for (const sequenceId of register.teachingSequenceIds) {
+        if (!teachingSequenceIdSet.has(sequenceId)) {
+          diagnostics.push(`${registerLabel} references missing teaching sequence ${sequenceId}`);
+        }
+      }
+      for (const passageId of register.evidencePassageIds) {
+        if (!corpusIdSet.has(passageId)) {
+          diagnostics.push(`${registerLabel} references missing corpus passage ${passageId}`);
+        }
+      }
+      for (const usageNote of register.usageNotes) {
+        if (!usageNote.trim()) {
+          diagnostics.push(`${registerLabel} has a blank usage note`);
         }
       }
     }

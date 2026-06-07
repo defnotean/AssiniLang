@@ -27,6 +27,7 @@ export type SyntheticLanguageProfile = {
   phonology: SyntheticLanguageFixture["phonology"];
   paradigms: SyntheticLanguageFixture["paradigms"];
   semanticDomains: SyntheticLanguageFixture["semanticDomains"];
+  registerProfiles: SyntheticLanguageFixture["registerProfiles"];
   dialectVariants: SyntheticLanguageFixture["dialectVariants"];
   discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   teachingSequences: SyntheticLanguageFixture["teachingSequences"];
@@ -40,6 +41,7 @@ export type SyntheticLanguageProfile = {
     grammarRules: number;
     paradigms: number;
     semanticDomains: number;
+    registerProfiles: number;
     dialectVariants: number;
     discourseExamples: number;
     teachingSequences: number;
@@ -467,6 +469,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
     grammarRules: fixture?.grammarRules.length ?? 0,
     paradigms: fixture?.paradigms.length ?? 0,
     semanticDomains: fixture?.semanticDomains.length ?? 0,
+    registerProfiles: fixture?.registerProfiles.length ?? 0,
     dialectVariants: fixture?.dialectVariants.length ?? 0,
     discourseExamples: fixture?.discourseExamples.length ?? 0,
     teachingSequences: fixture?.teachingSequences.length ?? 0,
@@ -500,6 +503,14 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       coreVocabularyIds: [...domain.coreVocabularyIds],
       evidencePassageIds: [...domain.evidencePassageIds],
       usageNotes: [...domain.usageNotes]
+    })) ?? [],
+    registerProfiles: fixture?.registerProfiles.map((register) => ({
+      ...register,
+      semanticDomainIds: [...register.semanticDomainIds],
+      discourseExampleIds: [...register.discourseExampleIds],
+      teachingSequenceIds: [...register.teachingSequenceIds],
+      evidencePassageIds: [...register.evidencePassageIds],
+      usageNotes: [...register.usageNotes]
     })) ?? [],
     dialectVariants: fixture?.dialectVariants.map((dialect) => ({
       ...dialect,
@@ -546,6 +557,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       exerciseTypes: Object.keys(stats.exerciseTypes).length,
       paradigms: stats.paradigms,
       semanticDomains: stats.semanticDomains,
+      registerProfiles: stats.registerProfiles,
       dialectVariants: stats.dialectVariants,
       discourseExamples: stats.discourseExamples,
       teachingSequences: stats.teachingSequences

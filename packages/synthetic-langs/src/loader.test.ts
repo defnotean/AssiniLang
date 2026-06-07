@@ -80,6 +80,7 @@ describe("synthetic language fixtures", () => {
       vocabularyItems: 24,
       semanticDomains: 3,
       semanticDomainVocabulary: 3,
+      registerProfiles: 2,
       corpusPassages: 12,
       grammarRules: 6,
       noteAnswerKeys: 6,
@@ -97,8 +98,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: true,
-      totalChecks: 17,
-      passedChecks: 17,
+      totalChecks: 18,
+      passedChecks: 18,
       failedChecks: 0
     });
     expect(summary.checks.map((check) => check.id)).toEqual([
@@ -108,6 +109,7 @@ describe("synthetic language fixtures", () => {
       "vocabularyItems",
       "semanticDomains",
       "semanticDomainVocabulary",
+      "registerProfiles",
       "corpusPassages",
       "grammarRules",
       "noteAnswerKeys",
@@ -139,6 +141,13 @@ describe("synthetic language fixtures", () => {
       label: "Semantic domain vocabulary",
       actual: 3,
       minimum: SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "registerProfiles",
+      label: "Register profiles",
+      actual: 2,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.registerProfiles,
       passed: true
     });
     expect(summary.checks).toContainEqual({
@@ -176,8 +185,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: false,
-      totalChecks: 17,
-      passedChecks: 15,
+      totalChecks: 18,
+      passedChecks: 16,
       failedChecks: 2
     });
     expect(summary.checks).toContainEqual({
@@ -322,6 +331,34 @@ describe("synthetic language fixtures", () => {
         expect(domain.usageNotes.length, `${fixture.language.id} ${domain.id} usage notes`).toBeGreaterThan(0);
         expect(domain.coreVocabularyIds.every((vocabularyId) => vocabularyIds.has(vocabularyId))).toBe(true);
         expect(domain.evidencePassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
+      }
+    }
+  });
+
+  it("provides register profiles that link style guidance to profile evidence", () => {
+    for (const fixture of syntheticLanguageFixtures) {
+      const semanticDomainIds = new Set(fixture.semanticDomains.map((domain) => domain.id));
+      const discourseExampleIds = new Set(fixture.discourseExamples.map((example) => example.id));
+      const teachingSequenceIds = new Set(fixture.teachingSequences.map((sequence) => sequence.id));
+      const corpusIds = new Set(fixture.corpus.map((passage) => passage.id));
+
+      expect(fixture.registerProfiles, `${fixture.language.id} register profiles`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.registerProfiles
+      );
+      for (const register of fixture.registerProfiles) {
+        expect(register.id, `${fixture.language.id} register id`).toBeTruthy();
+        expect(register.label, `${fixture.language.id} ${register.id} label`).toBeTruthy();
+        expect(register.context, `${fixture.language.id} ${register.id} context`).toBeTruthy();
+        expect(register.styleLabel, `${fixture.language.id} ${register.id} style`).toBeTruthy();
+        expect(register.semanticDomainIds.length, `${fixture.language.id} ${register.id} semantic domains`).toBeGreaterThan(0);
+        expect(register.discourseExampleIds.length, `${fixture.language.id} ${register.id} discourse`).toBeGreaterThan(0);
+        expect(register.teachingSequenceIds.length, `${fixture.language.id} ${register.id} teaching`).toBeGreaterThan(0);
+        expect(register.evidencePassageIds.length, `${fixture.language.id} ${register.id} evidence`).toBeGreaterThan(0);
+        expect(register.usageNotes.length, `${fixture.language.id} ${register.id} notes`).toBeGreaterThan(0);
+        expect(register.semanticDomainIds.every((domainId) => semanticDomainIds.has(domainId))).toBe(true);
+        expect(register.discourseExampleIds.every((exampleId) => discourseExampleIds.has(exampleId))).toBe(true);
+        expect(register.teachingSequenceIds.every((sequenceId) => teachingSequenceIds.has(sequenceId))).toBe(true);
+        expect(register.evidencePassageIds.every((passageId) => corpusIds.has(passageId))).toBe(true);
       }
     }
   });

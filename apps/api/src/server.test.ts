@@ -107,6 +107,7 @@ describe("api server", () => {
         exercises: 6,
         vocabularyItems: 24,
         semanticDomains: 3,
+        registerProfiles: 2,
         dialectVariants: 2
       }
     });
@@ -153,6 +154,13 @@ describe("api server", () => {
       label: "Motion and route teaching",
       coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
       evidencePassageIds: ["avn-c001", "avn-c005"]
+    });
+    expect(profile.json().registerProfiles[0]).toMatchObject({
+      id: "avn-register-careful-teaching",
+      label: "Careful teaching register",
+      semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
+      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
+      evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"]
     });
     expect(profile.json().vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
       gloss: "present tense",
@@ -1222,6 +1230,7 @@ describe("api server", () => {
         grammarRules: 6,
         paradigms: 2,
         semanticDomains: 3,
+        registerProfiles: 2,
         dialectVariants: 2
       }
     });
@@ -1244,6 +1253,10 @@ describe("api server", () => {
     expect(snapshot.linguisticProfile.semanticDomains[0]).toMatchObject({
       id: "avn-domain-motion",
       evidencePassageIds: ["avn-c001", "avn-c005"]
+    });
+    expect(snapshot.linguisticProfile.registerProfiles[0]).toMatchObject({
+      id: "avn-register-careful-teaching",
+      teachingSequenceIds: ["avn-teach-verb-chain"]
     });
     expect(snapshot.linguisticProfile.vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
       gloss: "present tense",

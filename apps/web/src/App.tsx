@@ -231,6 +231,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
     formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
     formatCount(snapshot.linguisticProfile.stats.semanticDomains, "semantic domain"),
+    formatCount(snapshot.linguisticProfile.stats.registerProfiles, "register profile"),
     formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
     formatCount(snapshot.linguisticProfile.stats.discourseExamples, "discourse example"),
     formatCount(snapshot.linguisticProfile.stats.teachingSequences, "teaching sequence"),
@@ -1557,6 +1558,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     phonology,
     paradigms,
     semanticDomains,
+    registerProfiles,
     dialectVariants,
     discourseExamples,
     teachingSequences,
@@ -1601,6 +1603,10 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
           <div>
             <dt>Semantic domains</dt>
             <dd>{stats.semanticDomains}</dd>
+          </div>
+          <div>
+            <dt>Registers</dt>
+            <dd>{stats.registerProfiles}</dd>
           </div>
           <div>
             <dt>Dialects</dt>
@@ -1757,6 +1763,67 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
               <div className="domain-note-list">
                 {domain.usageNotes.map((note) => (
                   <p key={`${domain.id}-${note}`}>{note}</p>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-card register-profile-panel" aria-label="Register profiles">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Register profiles</span>
+            <h2>{formatCount(registerProfiles.length, "register profile")}</h2>
+          </div>
+        </div>
+        <div className="register-profile-grid">
+          {registerProfiles.map((register) => (
+            <article className="register-profile-card" key={register.id}>
+              <div className="record-topline">
+                <div>
+                  <h3>{register.label}</h3>
+                  <p>{register.context}</p>
+                </div>
+                <span className="id-badge">{register.styleLabel}</span>
+              </div>
+              <div className="register-reference-grid">
+                <div>
+                  <strong>Domains</strong>
+                  <div className="pill-row">
+                    {register.semanticDomainIds.map((domainId) => (
+                      <span className="pill" key={`${register.id}-${domainId}`}>{domainId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Discourse</strong>
+                  <div className="pill-row">
+                    {register.discourseExampleIds.map((exampleId) => (
+                      <span className="pill" key={`${register.id}-${exampleId}`}>{exampleId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Teaching</strong>
+                  <div className="pill-row">
+                    {register.teachingSequenceIds.map((sequenceId) => (
+                      <span className="pill" key={`${register.id}-${sequenceId}`}>{sequenceId}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <strong>Evidence</strong>
+                  <div className="pill-row">
+                    {register.evidencePassageIds.map((passageId) => (
+                      <span className="pill" key={`${register.id}-${passageId}`}>{passageId}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="register-note-list">
+                {register.usageNotes.map((note) => (
+                  <p key={`${register.id}-${note}`}>{note}</p>
                 ))}
               </div>
             </article>

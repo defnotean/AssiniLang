@@ -31,6 +31,7 @@ describe("public language views", () => {
         grammarRules: 6,
         paradigms: 2,
         semanticDomains: 3,
+        registerProfiles: 2,
         dialectVariants: 2,
         discourseExamples: 3,
         teachingSequences: 2,
@@ -49,6 +50,7 @@ describe("public language views", () => {
         { id: "vocabularyItems", label: "Vocabulary", actual: 24, minimum: 24, passed: true },
         { id: "semanticDomains", label: "Semantic domains", actual: 3, minimum: 3, passed: true },
         { id: "semanticDomainVocabulary", label: "Semantic domain vocabulary", actual: 3, minimum: 3, passed: true },
+        { id: "registerProfiles", label: "Register profiles", actual: 2, minimum: 2, passed: true },
         { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
         { id: "grammarRules", label: "Grammar rules", actual: 6, minimum: 6, passed: true },
         { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
@@ -89,6 +91,16 @@ describe("public language views", () => {
       evidencePassageIds: ["avn-c001", "avn-c005"],
       usageNotes: expect.arrayContaining(["Route nouns pair with transparent motion verbs before tense-person suffixes."])
     });
+    expect(profile?.registerProfiles[0]).toMatchObject({
+      id: "avn-register-careful-teaching",
+      label: "Careful teaching register",
+      styleLabel: "careful suffix demonstration",
+      semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
+      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
+      teachingSequenceIds: ["avn-teach-verb-chain"],
+      evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
+      usageNotes: expect.arrayContaining(["Lengthened endings are teaching emphasis, not new person categories."])
+    });
     expect(profile?.discourseExamples[0]).toMatchObject({
       id: "avn-discourse-opening",
       functionLabel: "Opening a teaching turn",
@@ -126,6 +138,8 @@ describe("public language views", () => {
     });
     profile?.semanticDomains[0].coreVocabularyIds.push("test-vocab");
     profile?.semanticDomains[0].usageNotes.push("test-note");
+    profile?.registerProfiles[0].semanticDomainIds.push("test-domain");
+    profile?.registerProfiles[0].usageNotes.push("test-note");
     profile?.discourseExamples[0].notes.push("test-note");
     profile?.teachingSequences[0].steps.push({ label: "test", prompt: "test" });
     profile?.vocabulary[0].tags.push("test-tag");
@@ -141,6 +155,8 @@ describe("public language views", () => {
     );
     expect(fixture?.semanticDomains[0].coreVocabularyIds).not.toContain("test-vocab");
     expect(fixture?.semanticDomains[0].usageNotes).not.toContain("test-note");
+    expect(fixture?.registerProfiles[0].semanticDomainIds).not.toContain("test-domain");
+    expect(fixture?.registerProfiles[0].usageNotes).not.toContain("test-note");
     expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
     expect(fixture?.teachingSequences[0].steps).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ label: "test" })])
@@ -166,7 +182,7 @@ describe("public language views", () => {
             { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
           ])
         },
-        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, semanticDomains: 3, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
+        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, semanticDomains: 3, registerProfiles: 2, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
@@ -179,6 +195,10 @@ describe("public language views", () => {
     expect(snapshot?.linguisticProfile.semanticDomains[0]).toMatchObject({
       id: "avn-domain-motion",
       evidencePassageIds: ["avn-c001", "avn-c005"]
+    });
+    expect(snapshot?.linguisticProfile.registerProfiles[0]).toMatchObject({
+      id: "avn-register-careful-teaching",
+      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"]
     });
     expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
@@ -307,8 +327,8 @@ describe("public language views", () => {
           languages: 4,
           passedLanguages: 4,
           failedLanguages: 0,
-          totalChecks: 68,
-          passedChecks: 68,
+          totalChecks: 72,
+          passedChecks: 72,
           failedChecks: 0,
           passed: true
         }

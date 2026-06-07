@@ -47,6 +47,42 @@ describe("synthetic fixture validation module", () => {
       }
     ];
     (avenik as unknown as {
+      registerProfiles: Array<{
+        id: string;
+        label: string;
+        context: string;
+        styleLabel: string;
+        semanticDomainIds: string[];
+        discourseExampleIds: string[];
+        teachingSequenceIds: string[];
+        evidencePassageIds: string[];
+        usageNotes: string[];
+      }>;
+    }).registerProfiles = [
+      {
+        id: "duplicate-register",
+        label: "",
+        context: "",
+        styleLabel: "",
+        semanticDomainIds: ["missing-domain"],
+        discourseExampleIds: ["missing-discourse"],
+        teachingSequenceIds: ["missing-sequence"],
+        evidencePassageIds: ["missing-register-passage"],
+        usageNotes: []
+      },
+      {
+        id: "duplicate-register",
+        label: "Repair register",
+        context: "repair desk",
+        styleLabel: "careful",
+        semanticDomainIds: ["duplicate-domain", "duplicate-domain"],
+        discourseExampleIds: ["duplicate-discourse", "duplicate-discourse"],
+        teachingSequenceIds: ["duplicate-sequence", "duplicate-sequence"],
+        evidencePassageIds: ["avn-c001", "avn-c001"],
+        usageNotes: [""]
+      }
+    ];
+    (avenik as unknown as {
       dialectVariants: Array<{
         id: string;
         name: string;
@@ -172,6 +208,20 @@ describe("synthetic fixture validation module", () => {
         "avenik semantic domain duplicate-domain vocabulary id is duplicated: avn-v-001",
         "avenik semantic domain duplicate-domain evidence passage is duplicated: avn-c001",
         "avenik semantic domain duplicate-domain has a blank usage note",
+        "avenik has duplicate register profile id duplicate-register",
+        "avenik register profile duplicate-register is missing a label",
+        "avenik register profile duplicate-register is missing a context",
+        "avenik register profile duplicate-register is missing a style label",
+        "avenik register profile duplicate-register references missing semantic domain missing-domain",
+        "avenik register profile duplicate-register references missing discourse example missing-discourse",
+        "avenik register profile duplicate-register references missing teaching sequence missing-sequence",
+        "avenik register profile duplicate-register references missing corpus passage missing-register-passage",
+        "avenik register profile duplicate-register needs at least one usage note",
+        "avenik register profile duplicate-register semantic domain is duplicated: duplicate-domain",
+        "avenik register profile duplicate-register discourse example is duplicated: duplicate-discourse",
+        "avenik register profile duplicate-register teaching sequence is duplicated: duplicate-sequence",
+        "avenik register profile duplicate-register evidence passage is duplicated: avn-c001",
+        "avenik register profile duplicate-register has a blank usage note",
         "avenik has duplicate dialect variant id duplicate-dialect",
         "avenik dialect variant duplicate-dialect is missing a name",
         "avenik dialect variant duplicate-dialect is missing a region label",
@@ -362,6 +412,7 @@ describe("synthetic fixture validation module", () => {
         coreVocabularyIds: ["avn-v-001", "avn-v-002"]
       }
     ];
+    (avenik as unknown as { registerProfiles: unknown[] }).registerProfiles = [];
     avenik.corpus = avenik.corpus.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1);
     avenik.grammarRules = avenik.grammarRules.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1);
     avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1);
@@ -386,6 +437,7 @@ describe("synthetic fixture validation module", () => {
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems} vocabulary items (found ${SYNTHETIC_FIXTURE_MINIMUMS.vocabularyItems - 1})`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.semanticDomains} semantic domains (found 1)`,
         `avenik semantic domain avn-domain-motion needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.semanticDomainVocabulary} vocabulary items (found 2)`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.registerProfiles} register profiles (found 0)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages} corpus passages (found ${SYNTHETIC_FIXTURE_MINIMUMS.corpusPassages - 1})`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules} grammar rules (found ${SYNTHETIC_FIXTURE_MINIMUMS.grammarRules - 1})`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys} note answer keys (found ${SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys - 1})`,

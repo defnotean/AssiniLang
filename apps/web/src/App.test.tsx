@@ -60,6 +60,7 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
   dialectHistoryEvents: 2,
   semanticDomains: 3,
   semanticDomainVocabulary: 3,
+  registerProfiles: 2,
   discourseExamples: 3,
   teachingSequences: 2
 };
@@ -323,6 +324,19 @@ function createLanguageProfile() {
         usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
       }
     ],
+    registerProfiles: [
+      {
+        id: "avn-register-careful-teaching",
+        label: "Careful teaching register",
+        context: "Used when instructors slow suffix chains for first-pass learner explanation.",
+        styleLabel: "careful suffix demonstration",
+        semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
+        discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
+        teachingSequenceIds: ["avn-teach-verb-chain"],
+        evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
+        usageNotes: ["Lengthened endings are teaching emphasis, not new person categories."]
+      }
+    ],
     discourseExamples: [
       {
         id: "avn-discourse-opening",
@@ -395,6 +409,7 @@ function createLanguageProfile() {
       grammarRules: 1,
       paradigms: 1,
       semanticDomains: 1,
+      registerProfiles: 1,
       dialectVariants: 1,
       discourseExamples: 1,
       teachingSequences: 1,
@@ -523,8 +538,8 @@ describe("App", () => {
           languages: 2,
           passedLanguages: 2,
           failedLanguages: 0,
-          totalChecks: 34,
-          passedChecks: 34,
+          totalChecks: 36,
+          passedChecks: 36,
           failedChecks: 0,
           passed: true
         }
@@ -631,6 +646,19 @@ describe("App", () => {
             usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
           }
         ],
+        registerProfiles: [
+          {
+            id: "avn-register-careful-teaching",
+            label: "Careful teaching register",
+            context: "Used when instructors slow suffix chains for first-pass learner explanation.",
+            styleLabel: "careful suffix demonstration",
+            semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
+            discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
+            teachingSequenceIds: ["avn-teach-verb-chain"],
+            evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
+            usageNotes: ["Lengthened endings are teaching emphasis, not new person categories."]
+          }
+        ],
         discourseExamples: [
           {
             id: "avn-discourse-opening",
@@ -677,6 +705,7 @@ describe("App", () => {
           grammarRules: 1,
           paradigms: 1,
           semanticDomains: 1,
+          registerProfiles: 1,
           dialectVariants: 1,
           discourseExamples: 1,
           teachingSequences: 1,
@@ -946,6 +975,15 @@ describe("App", () => {
     expect(within(semanticDomains).getByText("avn-n-001")).toBeInTheDocument();
     expect(within(semanticDomains).getByText("avn-c005")).toBeInTheDocument();
     expect(within(semanticDomains).getByText("Route nouns pair with transparent motion verbs before tense-person suffixes.")).toBeInTheDocument();
+    const registerProfiles = screen.getByRole("region", { name: "Register profiles" });
+    expect(registerProfiles).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("Careful teaching register")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("careful suffix demonstration")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("Used when instructors slow suffix chains for first-pass learner explanation.")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("avn-domain-review-speech")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("avn-discourse-repair")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("avn-teach-verb-chain")).toBeInTheDocument();
+    expect(within(registerProfiles).getByText("Lengthened endings are teaching emphasis, not new person categories.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Dialect variants" })).toBeInTheDocument();
     expect(screen.getByText("River teaching register")).toBeInTheDocument();
     expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
@@ -1249,7 +1287,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 semantic domain, 1 dialect variant, 1 discourse example, 1 teaching sequence, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 semantic domain, 1 register profile, 1 dialect variant, 1 discourse example, 1 teaching sequence, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
@@ -1316,7 +1354,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 34 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 36 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

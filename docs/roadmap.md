@@ -54,6 +54,7 @@ Next steps:
 
 - Add more synthetic languages.
 - Expand semantic-domain coverage into richer cultural-safety review packets before any real data is considered.
+- Expand register and style-profile coverage so teaching guidance can distinguish careful instruction, review work, prompts, and learner-facing repair contexts.
 - Continue expanding dialect histories beyond the current evidence-backed synthetic timelines.
 - Add historical trend charts.
 - Retain named evaluation baselines.
