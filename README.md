@@ -47,7 +47,7 @@ npm.cmd run dev
 
 ## What Works
 
-- Four synthetic languages with 40 corpus passages, 20 notes, 20+ learner exercises, and immutable answer keys.
+- Four synthetic languages with 48 corpus passages, 24 notes, 25 learner exercises, and immutable answer keys.
 - A Fastify API backed by a JSON local database.
 - A React web console for language profiles, corpus browsing/import, note review, learning exercises, evaluation, governance, elder corrections, and model setup.
 - Leadless browser prototype sessions for learners, Elders, reviewers, and programmers, with lead/admin authority retained server-side for policy integrity.

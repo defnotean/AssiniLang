@@ -27,13 +27,13 @@ describe("public language views", () => {
     expect(profile).toMatchObject({
       language: { id: "avenik", name: "Avenik" },
       stats: {
-        vocabularyItems: 20,
-        grammarRules: 5,
+        vocabularyItems: 24,
+        grammarRules: 6,
         paradigms: 2,
         dialectVariants: 2,
-        corpusPassages: 10,
-        notes: 5,
-        exercises: 5
+        corpusPassages: 12,
+        notes: 6,
+        exercises: 6
       }
     });
     expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
@@ -84,7 +84,7 @@ describe("public language views", () => {
       exportedAt: "2026-06-06T00:00:00.000Z",
       language: { id: "avenik" },
       linguisticProfile: {
-        stats: { vocabularyItems: 20, grammarRules: 5, paradigms: 2, dialectVariants: 2 },
+        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
@@ -104,8 +104,8 @@ describe("public language views", () => {
       redactionPolicy: EXPORT_REDACTION_POLICY
     });
     expect(snapshot?.integrity.contentHash).toMatch(SHA_256_HEX);
-    expect(snapshot?.corpus).toHaveLength(10);
-    expect(snapshot?.notes).toHaveLength(5);
+    expect(snapshot?.corpus).toHaveLength(12);
+    expect(snapshot?.notes).toHaveLength(6);
     expect(snapshot?.exercises[0]).not.toHaveProperty("expectedAnswers");
     expect(snapshot?.exercises[0]).not.toHaveProperty("gradingExplanation");
     expect(snapshot?.exercises[0]).not.toHaveProperty("adversarialAnswers");

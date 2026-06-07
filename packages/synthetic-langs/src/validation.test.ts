@@ -187,10 +187,10 @@ describe("synthetic fixture validation module", () => {
     avenik.phonology.phonotactics = avenik.phonology.phonotactics.slice(0, 1);
     avenik.phonology.syllableTemplate = "";
     avenik.phonology.stress = "";
-    avenik.vocabulary = avenik.vocabulary.slice(0, 19);
-    avenik.corpus = avenik.corpus.slice(0, 9);
-    avenik.grammarRules = avenik.grammarRules.slice(0, 4);
-    avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, 4);
+    avenik.vocabulary = avenik.vocabulary.slice(0, 23);
+    avenik.corpus = avenik.corpus.slice(0, 11);
+    avenik.grammarRules = avenik.grammarRules.slice(0, 5);
+    avenik.notesAnswerKey = avenik.notesAnswerKey.slice(0, 5);
     avenik.exercisesAnswerKey = avenik.exercisesAnswerKey.filter((exercise) => exercise.type === "translate_to_target");
     avenik.paradigms = avenik.paradigms.slice(0, 1);
     avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
@@ -203,11 +203,11 @@ describe("synthetic fixture validation module", () => {
         "avenik phonology needs at least 2 phonotactic notes (found 1)",
         "avenik phonology is missing a syllable template",
         "avenik phonology is missing a stress rule",
-        "avenik needs at least 20 vocabulary items (found 19)",
-        "avenik needs at least 10 corpus passages (found 9)",
-        "avenik needs at least 5 grammar rules (found 4)",
-        "avenik needs at least 5 note answer keys (found 4)",
-        "avenik needs at least 5 exercise answer keys (found 3)",
+        "avenik needs at least 24 vocabulary items (found 23)",
+        "avenik needs at least 12 corpus passages (found 11)",
+        "avenik needs at least 6 grammar rules (found 5)",
+        "avenik needs at least 6 note answer keys (found 5)",
+        "avenik needs at least 6 exercise answer keys (found 4)",
         "avenik needs at least 2 exercise types (found 1)",
         "avenik needs at least 2 paradigm tables (found 1)",
         "avenik paradigm avn-paradigm-verb-chain needs at least 3 rows (found 2)",

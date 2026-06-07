@@ -94,12 +94,12 @@ Each language should include:
 - Structured phonology and phonotactic notes that cover public vocabulary, corpus, and paradigm forms.
 - At least two paradigm tables with vocabulary-backed morphemes.
 - At least two public dialect variants with phonology, lexical, grammar, and example-phrase notes.
-- At least 20 public vocabulary items, including enough roots, particles, affixes, endings, or prefixes to support the language typology. Vocabulary IDs, normalized forms, and per-item tags must be unique.
-- At least five grammar rules.
-- At least ten corpus passages.
+- At least 24 public vocabulary items, including enough roots, particles, affixes, endings, or prefixes to support the language typology. Vocabulary IDs, normalized forms, and per-item tags must be unique.
+- At least six grammar rules.
+- At least 12 corpus passages.
 - Morphological segmentation.
-- Five note answer keys derived from those grammar rules.
-- At least five learner exercise answer keys.
+- Six note answer keys derived from those grammar rules.
+- At least six learner exercise answer keys.
 - Every grammar rule should be covered by a note answer key and by at least one learner exercise allow-list.
 - At least two exercise types.
 - Two curated adversarial probes per exercise.

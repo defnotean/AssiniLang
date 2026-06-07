@@ -101,11 +101,11 @@ describe("api server", () => {
     expect(profile.json()).toMatchObject({
       language: { id: "avenik", name: "Avenik", typology: "agglutinative" },
       stats: {
-        corpusPassages: 10,
-        grammarRules: 5,
-        notes: 5,
-        exercises: 5,
-        vocabularyItems: 20,
+        corpusPassages: 12,
+        grammarRules: 6,
+        notes: 6,
+        exercises: 6,
+        vocabularyItems: 24,
         dialectVariants: 2
       }
     });
@@ -154,7 +154,7 @@ describe("api server", () => {
       })
     });
     expect(profile.json().stats.exerciseTypes).toMatchObject({
-      translate_to_target: 3,
+      translate_to_target: 4,
       segment: 1,
       choose_particle: 1
     });
@@ -1195,15 +1195,15 @@ describe("api server", () => {
     });
     expect(snapshot.integrity.contentHash).toMatch(SHA_256_HEX);
     expect(Date.parse(snapshot.exportedAt)).not.toBeNaN();
-    expect(snapshot.corpus).toHaveLength(10);
+    expect(snapshot.corpus).toHaveLength(12);
     expect(snapshot.linguisticProfile).toMatchObject({
       phonology: {
         syllableTemplate: "CV",
         stress: "word-initial"
       },
       stats: {
-        vocabularyItems: 20,
-        grammarRules: 5,
+        vocabularyItems: 24,
+        grammarRules: 6,
         paradigms: 2,
         dialectVariants: 2
       }

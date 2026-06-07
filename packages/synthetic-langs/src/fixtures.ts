@@ -1384,6 +1384,303 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
   }
 ];
 
+type FixtureRichnessExpansion = {
+  vocabulary: SyntheticLanguageFixture["vocabulary"];
+  corpus: CorpusPassage[];
+  grammarRules: SyntheticLanguageFixture["grammarRules"];
+  exercises: Exercise[];
+};
+
+const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
+  avenik: {
+    vocabulary: [
+      { id: "avn-vocab-yano", form: "yano", gloss: "sample path", partOfSpeech: "noun", tags: ["place", "review"] },
+      { id: "avn-vocab-maku", form: "maku", gloss: "memory bead", partOfSpeech: "noun", tags: ["object", "memory"] },
+      { id: "avn-vocab-seya", form: "seya", gloss: "answer card", partOfSpeech: "noun", tags: ["classroom", "answer"] },
+      { id: "avn-vocab-roki", form: "roki", gloss: "review line", partOfSpeech: "noun", tags: ["review", "sequence"] }
+    ],
+    corpus: [
+      {
+        id: "avn-c011",
+        languageId: "avenik",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "yano-ke maku-ra nemi-mi-na",
+        textTranslation: "I explain the memory bead at the sample path.",
+        morphologicalSegmentation: [
+          { surface: "yano", lemma: "yano", gloss: "sample-path", features: ["noun", "place"] },
+          { surface: "-ke", lemma: "-ke", gloss: "locative", features: ["case-loc"] },
+          { surface: "maku", lemma: "maku", gloss: "memory-bead", features: ["noun", "object"] },
+          { surface: "-ra", lemma: "-ra", gloss: "accusative", features: ["case-acc"] },
+          { surface: "nemi", lemma: "nemi", gloss: "explain", features: ["verb-root"] },
+          { surface: "-mi", lemma: "-mi", gloss: "present", features: ["tense"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
+        ],
+        topicTags: ["invented-demo", "review", "memory", "locative"],
+        consentStatus: consent
+      },
+      {
+        id: "avn-c012",
+        languageId: "avenik",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "kita-ki seya-ra-ne roki-ra tani-lo-ki",
+        textTranslation: "The instructor arranged the answer card and review line.",
+        morphologicalSegmentation: [
+          { surface: "kita", lemma: "kita", gloss: "instructor", features: ["noun", "agent"] },
+          { surface: "-ki", lemma: "-ki", gloss: "demo-agent", features: ["role-marker"] },
+          { surface: "seya", lemma: "seya", gloss: "answer-card", features: ["noun", "object"] },
+          { surface: "-ra", lemma: "-ra", gloss: "accusative", features: ["case-acc"] },
+          { surface: "-ne", lemma: "-ne", gloss: "and", features: ["coordination"] },
+          { surface: "roki", lemma: "roki", gloss: "review-line", features: ["noun", "object"] },
+          { surface: "-ra", lemma: "-ra", gloss: "accusative", features: ["case-acc"] },
+          { surface: "tani", lemma: "tani", gloss: "arrange", features: ["verb-root"] },
+          { surface: "-lo", lemma: "-lo", gloss: "past", features: ["tense"] },
+          { surface: "-ki", lemma: "-ki", gloss: "3sg", features: ["person"] }
+        ],
+        topicTags: ["invented-demo", "coordination", "review", "classroom"],
+        consentStatus: consent
+      }
+    ],
+    grammarRules: [
+      {
+        id: "avn-rule-review-object-frame",
+        topic: "syntax/review-object-frame",
+        explanation: "Avenik review-work examples place locative setting nouns before the reviewed object, keep object nouns accusative with -ra, and coordinate paired review objects with -ne after the first accusative object.",
+        evidencePassageIds: ["avn-c011", "avn-c012", "avn-c008"],
+        confidence: "high"
+      }
+    ],
+    exercises: [
+      {
+        id: "avn-ex006",
+        languageId: "avenik",
+        type: "translate_to_target",
+        prompt: "Translate: The instructor arranged the answer card and review line.",
+        allowedVocabulary: ["kita", "-ki", "seya", "-ra", "-ne", "roki", "tani", "-lo"],
+        allowedRuleIds: ["avn-rule-review-object-frame", "avn-rule-demo-agent-marking"],
+        expectedAnswers: ["kita-ki seya-ra-ne roki-ra tani-lo-ki"],
+        adversarialAnswers: [
+          { answer: "kita seya-ra-ne roki-ra tani-lo-ki", reason: "Drops the demo-agent suffix from the instructor subject." },
+          { answer: "kita-ki seya-ne-ra roki-ra tani-lo-ki", reason: "Places coordination before the accusative case suffix." }
+        ],
+        gradingExplanation: "Use kita-ki for the instructor, mark both reviewed objects with -ra, attach -ne after the first object, and close with tani-lo-ki."
+      }
+    ]
+  },
+  solari: {
+    vocabulary: [
+      { id: "sol-vocab-lisa", form: "lisa", gloss: "story mat", partOfSpeech: "noun", tags: ["object", "story"] },
+      { id: "sol-vocab-moni", form: "moni", gloss: "memory line", partOfSpeech: "noun", tags: ["object", "memory"] },
+      { id: "sol-vocab-tero", form: "tero", gloss: "review stone", partOfSpeech: "noun", tags: ["review", "object"] },
+      { id: "sol-vocab-pume", form: "pume", gloss: "response shell", partOfSpeech: "noun", tags: ["response", "object"] }
+    ],
+    corpus: [
+      {
+        id: "sol-c011",
+        languageId: "solari",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "ra so rame moni na palo",
+        textTranslation: "We keep tracing the memory line on the practice path.",
+        morphologicalSegmentation: [
+          { surface: "ra", lemma: "ra", gloss: "we", features: ["pronoun", "subject"] },
+          { surface: "so", lemma: "so", gloss: "durative", features: ["aspect"] },
+          { surface: "rame", lemma: "rame", gloss: "trace", features: ["verb"] },
+          { surface: "moni", lemma: "moni", gloss: "memory-line", features: ["noun", "object"] },
+          { surface: "na", lemma: "na", gloss: "locative", features: ["location-marker"] },
+          { surface: "palo", lemma: "palo", gloss: "practice-path", features: ["noun", "location"] }
+        ],
+        topicTags: ["invented-demo", "aspect", "memory", "location"],
+        consentStatus: consent
+      },
+      {
+        id: "sol-c012",
+        languageId: "solari",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "lo pa ko lisa e tero",
+        textTranslation: "You made the story mat and review stone.",
+        morphologicalSegmentation: [
+          { surface: "lo", lemma: "lo", gloss: "you", features: ["pronoun", "subject"] },
+          { surface: "pa", lemma: "pa", gloss: "past", features: ["tense"] },
+          { surface: "ko", lemma: "ko", gloss: "make", features: ["verb"] },
+          { surface: "lisa", lemma: "lisa", gloss: "story-mat", features: ["noun", "object"] },
+          { surface: "e", lemma: "e", gloss: "and", features: ["coordination"] },
+          { surface: "tero", lemma: "tero", gloss: "review-stone", features: ["noun", "object"] }
+        ],
+        topicTags: ["invented-demo", "past", "coordination", "review"],
+        consentStatus: consent
+      }
+    ],
+    grammarRules: [
+      {
+        id: "sol-rule-pronoun-particle-frame",
+        topic: "syntax/pronoun-particle-frame",
+        explanation: "Solari pronoun subjects stay clause-initial, then tense or aspect particles immediately precede the verb, while object coordination and final locatives remain after the verb phrase.",
+        evidencePassageIds: ["sol-c011", "sol-c012", "sol-c010"],
+        confidence: "high"
+      }
+    ],
+    exercises: [
+      {
+        id: "sol-ex006",
+        languageId: "solari",
+        type: "translate_to_target",
+        prompt: "Translate: You made the story mat and review stone.",
+        allowedVocabulary: ["lo", "pa", "ko", "lisa", "e", "tero"],
+        allowedRuleIds: ["sol-rule-pronoun-particle-frame", "sol-rule-object-coordination"],
+        expectedAnswers: ["lo pa ko lisa e tero"],
+        adversarialAnswers: [
+          { answer: "lo ko pa lisa e tero", reason: "Moves the past particle after the verb." },
+          { answer: "pa lo ko lisa e tero", reason: "Places the tense particle before the pronoun subject." }
+        ],
+        gradingExplanation: "Use lo as the clause-initial subject, pa before ko for past time, and e between the two object nouns."
+      }
+    ]
+  },
+  velari: {
+    vocabulary: [
+      { id: "vel-vocab-mor", form: "mor", gloss: "compare / check", partOfSpeech: "verb-root", tags: ["review", "verb"] },
+      { id: "vel-vocab-tesa", form: "tesa", gloss: "teaching cord", partOfSpeech: "noun", tags: ["classroom", "object"] },
+      { id: "vel-vocab-rali", form: "rali", gloss: "review mark", partOfSpeech: "noun", tags: ["review", "object"] },
+      { id: "vel-vocab-huno", form: "huno", gloss: "future cue", partOfSpeech: "noun", tags: ["time", "prompt"] }
+    ],
+    corpus: [
+      {
+        id: "vel-c011",
+        languageId: "velari",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "moror tesa",
+        textTranslation: "I compare the teaching cord.",
+        morphologicalSegmentation: [
+          { surface: "mor", lemma: "mor", gloss: "compare", features: ["verb-root"] },
+          { surface: "-or", lemma: "-or", gloss: "1sg.present", features: ["fused-ending"] },
+          { surface: "tesa", lemma: "tesa", gloss: "teaching-cord", features: ["noun", "object"] }
+        ],
+        topicTags: ["invented-demo", "review", "present", "object"],
+        consentStatus: consent
+      },
+      {
+        id: "vel-c012",
+        languageId: "velari",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "moreth rali",
+        textTranslation: "They compared the review mark.",
+        morphologicalSegmentation: [
+          { surface: "mor", lemma: "mor", gloss: "compare", features: ["verb-root"] },
+          { surface: "-eth", lemma: "-eth", gloss: "3pl.past", features: ["fused-ending"] },
+          { surface: "rali", lemma: "rali", gloss: "review-mark", features: ["noun", "object"] }
+        ],
+        topicTags: ["invented-demo", "review", "past", "object"],
+        consentStatus: consent
+      }
+    ],
+    grammarRules: [
+      {
+        id: "vel-rule-root-stability",
+        topic: "morphology/verb/root-stability-with-fused-endings",
+        explanation: "Velari keeps the lexical root stable while fused endings carry person, number, and tense, so the same root can appear with -or for first-person present or -eth for third-person plural past.",
+        evidencePassageIds: ["vel-c011", "vel-c012", "vel-c001"],
+        confidence: "high"
+      }
+    ],
+    exercises: [
+      {
+        id: "vel-ex006",
+        languageId: "velari",
+        type: "translate_to_english",
+        prompt: "Translate: moreth rali",
+        allowedVocabulary: ["mor", "-eth", "rali"],
+        allowedRuleIds: ["vel-rule-root-stability", "vel-rule-object-after-verb"],
+        expectedAnswers: ["They compared the review mark.", "They compared the review mark"],
+        adversarialAnswers: [
+          { answer: "I compare the review mark.", reason: "Reads the third-person plural past ending as first-person present." },
+          { answer: "They will compare the review mark.", reason: "Reads the past fused ending as future." }
+        ],
+        gradingExplanation: "The root mor means compare, -eth marks third-person plural past, and rali is the object after the verb."
+      }
+    ]
+  },
+  ketharu: {
+    vocabulary: [
+      { id: "ket-vocab-me-prefix", form: "me-", gloss: "learner object prefix", partOfSpeech: "object-prefix", tags: ["object", "learner"] },
+      { id: "ket-vocab-ro-prefix", form: "ro-", gloss: "review-token object prefix", partOfSpeech: "object-prefix", tags: ["object", "review"] },
+      { id: "ket-vocab-hali", form: "hali", gloss: "check / compare", partOfSpeech: "verb-root", tags: ["review", "verb"] },
+      { id: "ket-vocab-ko-suffix", form: "-ko", gloss: "careful review aspect", partOfSpeech: "aspect-suffix", tags: ["aspect", "review"] }
+    ],
+    corpus: [
+      {
+        id: "ket-c011",
+        languageId: "ketharu",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "wa-ro-hali-ko",
+        textTranslation: "The instructor checks the review token carefully.",
+        morphologicalSegmentation: [
+          { surface: "wa-", lemma: "wa-", gloss: "instructor.subject", features: ["subject"] },
+          { surface: "ro-", lemma: "ro-", gloss: "review-token-object", features: ["object"] },
+          { surface: "hali", lemma: "hali", gloss: "check", features: ["verb-root"] },
+          { surface: "-ko", lemma: "-ko", gloss: "careful-review", features: ["aspect"] }
+        ],
+        topicTags: ["invented-demo", "review", "aspect", "instructor"],
+        consentStatus: consent
+      },
+      {
+        id: "ket-c012",
+        languageId: "ketharu",
+        source: "expanded synthetic review corpus",
+        sourceMetadata,
+        textTarget: "ka-me-hali-ni",
+        textTranslation: "They will check the learner soon.",
+        morphologicalSegmentation: [
+          { surface: "ka-", lemma: "ka-", gloss: "3pl.subject", features: ["subject"] },
+          { surface: "me-", lemma: "me-", gloss: "learner-object", features: ["object"] },
+          { surface: "hali", lemma: "hali", gloss: "check", features: ["verb-root"] },
+          { surface: "-ni", lemma: "-ni", gloss: "near-future", features: ["time"] }
+        ],
+        topicTags: ["invented-demo", "review", "future", "learner"],
+        consentStatus: consent
+      }
+    ],
+    grammarRules: [
+      {
+        id: "ket-rule-review-aspect",
+        topic: "morphology/verb/careful-review-aspect",
+        explanation: "Ketharu can close a predicate word with -ko to mark careful review work, while the normal subject-object-root-aspect slot order remains visible for review-token and learner-object prefixes.",
+        evidencePassageIds: ["ket-c011", "ket-c012", "ket-c009"],
+        confidence: "high"
+      }
+    ],
+    exercises: [
+      {
+        id: "ket-ex007",
+        languageId: "ketharu",
+        type: "segment",
+        prompt: "Segment: wa-ro-hali-ko",
+        allowedVocabulary: ["wa-", "ro-", "hali", "-ko"],
+        allowedRuleIds: ["ket-rule-review-aspect", "ket-rule-slot-order"],
+        expectedAnswers: ["wa-|ro-|hali|-ko", "wa- ro- hali -ko"],
+        adversarialAnswers: [
+          { answer: "wa-ro|hali|-ko", reason: "Collapses the subject and object prefixes into one segment." },
+          { answer: "ro-|wa-|hali|-ko", reason: "Moves the object prefix before the subject prefix." }
+        ],
+        gradingExplanation: "The review predicate keeps subject prefix wa-, object prefix ro-, root hali, and careful-review suffix -ko in order."
+      }
+    ]
+  }
+};
+
+for (const fixture of syntheticLanguageFixtures) {
+  const expansion = fixtureRichnessExpansion[fixture.language.id];
+  if (!expansion) continue;
+  fixture.vocabulary.push(...expansion.vocabulary);
+  fixture.corpus.push(...expansion.corpus);
+  fixture.grammarRules.push(...expansion.grammarRules);
+}
+
 for (const fixture of syntheticLanguageFixtures) {
   fixture.notesAnswerKey = fixture.grammarRules.map((rule) => ({
     id: `${rule.id}-note`,
@@ -1726,5 +2023,8 @@ const exerciseMap: Record<string, Exercise[]> = {
 };
 
 for (const fixture of syntheticLanguageFixtures) {
-  fixture.exercisesAnswerKey = exerciseMap[fixture.language.id] ?? [];
+  fixture.exercisesAnswerKey = [
+    ...(exerciseMap[fixture.language.id] ?? []),
+    ...(fixtureRichnessExpansion[fixture.language.id]?.exercises ?? [])
+  ];
 }

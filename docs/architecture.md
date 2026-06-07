@@ -33,16 +33,16 @@ Each synthetic language should include:
 
 - Language metadata.
 - Structured phonology and phonotactic notes.
-- Public vocabulary with at least 20 lexemes, particles, endings, prefixes, or other usable forms.
-- Corpus passages with translation and morpheme segmentation.
-- Grammar rules.
-- Note answer keys.
-- Learner exercise answer keys.
+- Public vocabulary with at least 24 lexemes, particles, endings, prefixes, or other usable forms.
+- At least 12 corpus passages with translation and morpheme segmentation.
+- At least 6 grammar rules.
+- At least 6 note answer keys.
+- At least 6 learner exercise answer keys.
 - At least two private adversarial exercise probes.
 - Paradigm tables.
 - Dialect variants.
 
-Fixture loading validates cross-references, linguistic consistency, and fixture depth. It rejects broken evidence IDs, duplicate IDs, duplicate vocabulary IDs or forms, duplicate vocabulary tags, empty dialect labels, undersized phonology inventories, missing stress or syllable-template metadata, lexicons below 20 public vocabulary items, corpus/rule/note/exercise/paradigm/dialect sets below the synthetic milestone floor, grammar rules without note or learner-exercise coverage, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted or adversarial answers, note evidence-count drift, and note examples that no longer match their cited corpus passage.
+Fixture loading validates cross-references, linguistic consistency, and fixture depth. It rejects broken evidence IDs, duplicate IDs, duplicate vocabulary IDs or forms, duplicate vocabulary tags, empty dialect labels, undersized phonology inventories, missing stress or syllable-template metadata, lexicons below 24 public vocabulary items, corpus/rule/note/exercise/paradigm/dialect sets below the synthetic milestone floor, grammar rules without note or learner-exercise coverage, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted answers or one another, note evidence-count drift, and note examples that no longer match their cited corpus passage.
 
 Validation rules live in `packages/synthetic-langs/src/validation.ts`; seed-state cloning and answer-key materialization live in `packages/synthetic-langs/src/loader.ts`.
 The shared orthography scanner is exported so fixture validation and live API imports use the same phonology-inventory rules.
