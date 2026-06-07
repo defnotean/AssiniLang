@@ -30,6 +30,9 @@ export type SyntheticFixtureQualityCheck = {
 
 export type SyntheticFixtureQualitySummary = {
   passed: boolean;
+  totalChecks: number;
+  passedChecks: number;
+  failedChecks: number;
   checks: SyntheticFixtureQualityCheck[];
 };
 
@@ -102,8 +105,14 @@ export function summarizeSyntheticFixtureQuality(
     };
   });
 
+  const passedChecks = checks.filter((check) => check.passed).length;
+  const totalChecks = checks.length;
+
   return {
-    passed: checks.every((check) => check.passed),
+    passed: passedChecks === totalChecks,
+    totalChecks,
+    passedChecks,
+    failedChecks: totalChecks - passedChecks,
     checks
   };
 }

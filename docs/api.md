@@ -212,7 +212,7 @@ The persisted app-state schema also enforces one approval per language, note, an
 
 ## Sanitized Exports
 
-Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object and `fixtureQuality` summary so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
+Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object and `fixtureQuality` summary so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. The `fixtureQuality` summary includes aggregate `totalChecks`, `passedChecks`, and `failedChecks` counters plus per-check actual/minimum rows. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
 
 ## Evaluation Runs
 

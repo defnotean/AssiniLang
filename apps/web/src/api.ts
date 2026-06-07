@@ -59,6 +59,9 @@ export type FixtureQualityCheck = {
 
 export type FixtureQualitySummary = {
   passed: boolean;
+  totalChecks: number;
+  passedChecks: number;
+  failedChecks: number;
   checks: FixtureQualityCheck[];
 };
 

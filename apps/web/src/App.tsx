@@ -208,14 +208,12 @@ function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): string 
 }
 
 function formatFixtureQualityLabel(fixtureQuality: LanguageSnapshot["linguisticProfile"]["fixtureQuality"]): string {
-  const totalChecks = fixtureQuality.checks.length;
+  const totalChecks = fixtureQuality.totalChecks;
   if (totalChecks === 0) return "0 fixture checks available";
 
-  const passedChecks = fixtureQuality.checks.filter((check) => check.passed).length;
   if (fixtureQuality.passed) return `${formatCount(totalChecks, "fixture check")} met`;
 
-  const missingChecks = totalChecks - passedChecks;
-  return `${passedChecks} of ${totalChecks} fixture checks met, ${formatCount(missingChecks, "fixture check")} need work`;
+  return `${fixtureQuality.passedChecks} of ${totalChecks} fixture checks met, ${formatCount(fixtureQuality.failedChecks, "fixture check")} need work`;
 }
 
 function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {

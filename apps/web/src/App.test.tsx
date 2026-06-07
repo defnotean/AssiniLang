@@ -60,6 +60,9 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
 };
 const SYNTHETIC_FIXTURE_QUALITY = {
   passed: false,
+  totalChecks: 6,
+  passedChecks: 1,
+  failedChecks: 5,
   checks: [
     { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
     { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },
@@ -559,6 +562,9 @@ describe("App", () => {
         fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
         fixtureQuality: {
           passed: false,
+          totalChecks: 3,
+          passedChecks: 1,
+          failedChecks: 2,
           checks: [
             { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
             { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },

@@ -90,7 +90,12 @@ describe("synthetic language fixtures", () => {
 
     const summary = summarizeSyntheticFixtureQuality(actuals);
 
-    expect(summary.passed).toBe(true);
+    expect(summary).toMatchObject({
+      passed: true,
+      totalChecks: 12,
+      passedChecks: 12,
+      failedChecks: 0
+    });
     expect(summary.checks.map((check) => check.id)).toEqual([
       "consonants",
       "vowels",
@@ -124,7 +129,12 @@ describe("synthetic language fixtures", () => {
 
     const summary = summarizeSyntheticFixtureQuality(actuals);
 
-    expect(summary.passed).toBe(false);
+    expect(summary).toMatchObject({
+      passed: false,
+      totalChecks: 12,
+      passedChecks: 10,
+      failedChecks: 2
+    });
     expect(summary.checks).toContainEqual({
       id: "noteAnswerKeys",
       label: "Public notes",
