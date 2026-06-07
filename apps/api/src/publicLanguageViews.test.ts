@@ -31,6 +31,7 @@ describe("public language views", () => {
         grammarRules: 6,
         paradigms: 2,
         dialectVariants: 2,
+        discourseExamples: 3,
         corpusPassages: 12,
         notes: 6,
         exercises: 6
@@ -51,7 +52,8 @@ describe("public language views", () => {
         { id: "exerciseTypes", label: "Exercise types", actual: 3, minimum: 2, passed: true },
         { id: "paradigms", label: "Paradigm tables", actual: 2, minimum: 2, passed: true },
         { id: "paradigmRows", label: "Minimum paradigm rows", actual: 3, minimum: 3, passed: true },
-        { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true }
+        { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true },
+        { id: "discourseExamples", label: "Discourse examples", actual: 3, minimum: 3, passed: true }
       ]
     });
     expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
@@ -74,6 +76,12 @@ describe("public language views", () => {
     expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.passageIds).toEqual(
       expect.arrayContaining(["avn-c001"])
     );
+    expect(profile?.discourseExamples[0]).toMatchObject({
+      id: "avn-discourse-opening",
+      functionLabel: "Opening a teaching turn",
+      target: "kilo-ke saku-ra nemi-mi-na",
+      translation: "At the first step, I teach the child."
+    });
 
     profile?.phonology.consonants.push("x-test");
     profile?.paradigms[0].rows[0].morphemes.push("-test");
@@ -82,6 +90,7 @@ describe("public language views", () => {
       variant: "test",
       translation: "test"
     });
+    profile?.discourseExamples[0].notes.push("test-note");
     profile?.vocabulary[0].tags.push("test-tag");
 
     const fixture = syntheticLanguageFixtures.find((item) => item.language.id === "avenik");
@@ -90,6 +99,7 @@ describe("public language views", () => {
     expect(fixture?.dialectVariants[0].examplePhrases).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ standard: "test" })])
     );
+    expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
     expect(fixture?.vocabulary[0].tags).not.toContain("test-tag");
   });
 
@@ -111,7 +121,7 @@ describe("public language views", () => {
             { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
           ])
         },
-        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2 },
+        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2, discourseExamples: 3 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
@@ -124,6 +134,10 @@ describe("public language views", () => {
     expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
       id: "avn-dialect-river",
       name: "River teaching register"
+    });
+    expect(snapshot?.linguisticProfile.discourseExamples[0]).toMatchObject({
+      id: "avn-discourse-opening",
+      functionLabel: "Opening a teaching turn"
     });
     expect(snapshot?.integrity).toMatchObject({
       algorithm: "sha256",
@@ -231,8 +245,8 @@ describe("public language views", () => {
           languages: 4,
           passedLanguages: 4,
           failedLanguages: 0,
-          totalChecks: 48,
-          passedChecks: 48,
+          totalChecks: 52,
+          passedChecks: 52,
           failedChecks: 0,
           passed: true
         }

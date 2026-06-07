@@ -1261,6 +1261,12 @@ label,
   gap: 0.74rem;
 }
 
+.discourse-panel {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 0.74rem;
+}
+
 .vocabulary-panel,
 .morpheme-panel {
   display: grid;
@@ -1275,6 +1281,17 @@ label,
 }
 
 .grammar-rule-row .pill-row {
+  grid-column: 1 / -1;
+}
+
+.discourse-example-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.55fr);
+  align-items: start;
+}
+
+.discourse-example-row > span,
+.discourse-example-row .pill-row {
   grid-column: 1 / -1;
 }
 

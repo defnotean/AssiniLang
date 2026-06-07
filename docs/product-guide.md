@@ -9,7 +9,7 @@ The current milestone is built around four fictional languages:
 - `Velari`: fusional endings.
 - `Ketharu`: polysynthetic-lite verb forms.
 
-Each language has at least 24 public vocabulary items, 12 corpus passages, 6 grammar notes, 6 learner exercises, answer keys, phonology, paradigms, dialect variants, and evaluation records.
+Each language has at least 24 public vocabulary items, 12 corpus passages, 6 grammar notes, 6 learner exercises, answer keys, phonology, paradigms, dialect variants, 3 discourse examples, and evaluation records.
 
 ## Web Console
 
@@ -25,8 +25,9 @@ The profile view presents public linguistic metadata:
 - A derived morpheme inventory with corpus-use counts, source passage IDs, glosses, features, and linked vocabulary metadata.
 - Paradigm tables.
 - Dialect variants with region labels, notes, and standard-vs-variant examples.
+- Discourse examples that show teaching-turn openings, repairs, choices, closures, or review cues with target text, translation, usage context, and pragmatic notes.
 - Fixture counts for corpus, notes, exercises, and profile structures.
-- The synthetic fixture quality floor from `SYNTHETIC_FIXTURE_MINIMUMS`, shown as the minimum expected vocabulary, corpus, grammar, note, exercise, paradigm, and dialect coverage for every synthetic language.
+- The synthetic fixture quality floor from `SYNTHETIC_FIXTURE_MINIMUMS`, shown as the minimum expected vocabulary, corpus, grammar, note, exercise, paradigm, dialect, and discourse-example coverage for every synthetic language.
 - Actual-vs-minimum fixture quality checks, so reviewers can see whether each public profile currently meets the synthetic depth baseline.
 
 Use this view to understand what forms and rules the selected synthetic language is allowed to use.
@@ -138,7 +139,7 @@ Prototype auth exists to test workflow permissions. Replace it before production
 
 ## Export Surfaces
 
-Sanitized language snapshots include public language metadata, linguistic profile data, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries. The web download summary includes the fixture-quality pass count so reviewers can see baseline readiness before opening the JSON artifact.
+Sanitized language snapshots include public language metadata, linguistic profile data, discourse examples, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries. The web download summary includes discourse-example and fixture-quality pass counts so reviewers can see baseline readiness before opening the JSON artifact.
 
 Sanitized evaluation artifacts include latest evaluation runs, latest-vs-previous trend records, failure lines, aggregate gate metadata, aggregate fixture-quality readiness, and integrity metadata. They summarize fixture checks across all exported synthetic languages so the artifact can be reviewed as both an evaluation-health and data-depth record.
 

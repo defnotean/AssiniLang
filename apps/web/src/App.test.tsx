@@ -56,7 +56,8 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
   exerciseTypes: 2,
   paradigms: 2,
   paradigmRows: 3,
-  dialectVariants: 2
+  dialectVariants: 2,
+  discourseExamples: 3
 };
 const SYNTHETIC_FIXTURE_QUALITY = {
   passed: false,
@@ -293,6 +294,19 @@ function createLanguageProfile() {
         ]
       }
     ],
+    discourseExamples: [
+      {
+        id: "avn-discourse-opening",
+        functionLabel: "Opening a teaching turn",
+        context: "Used when the instructor starts a careful review sequence.",
+        target: "kilo-ke saku-ra nemi-mi-na",
+        translation: "At the first step, I teach the child.",
+        notes: [
+          "The locative frame comes first.",
+          "The teaching verb keeps tense before person."
+        ]
+      }
+    ],
     grammarRules: [
       {
         id: "avn-rule-verb-chain",
@@ -337,6 +351,7 @@ function createLanguageProfile() {
       grammarRules: 1,
       paradigms: 1,
       dialectVariants: 1,
+      discourseExamples: 1,
       corpusPassages: 1,
       notes: 2,
       exercises: 2,
@@ -462,8 +477,8 @@ describe("App", () => {
           languages: 2,
           passedLanguages: 2,
           failedLanguages: 0,
-          totalChecks: 24,
-          passedChecks: 24,
+          totalChecks: 26,
+          passedChecks: 26,
           failedChecks: 0,
           passed: true
         }
@@ -545,6 +560,19 @@ describe("App", () => {
             ]
           }
         ],
+        discourseExamples: [
+          {
+            id: "avn-discourse-opening",
+            functionLabel: "Opening a teaching turn",
+            context: "Used when the instructor starts a careful review sequence.",
+            target: "kilo-ke saku-ra nemi-mi-na",
+            translation: "At the first step, I teach the child.",
+            notes: [
+              "The locative frame comes first.",
+              "The teaching verb keeps tense before person."
+            ]
+          }
+        ],
         vocabulary: [
           { id: "avn-s-001", form: "-mi", gloss: "present tense", partOfSpeech: "suffix", tags: ["tense"] },
           { id: "avn-v-001", form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"] }
@@ -563,6 +591,7 @@ describe("App", () => {
           grammarRules: 1,
           paradigms: 1,
           dialectVariants: 1,
+          discourseExamples: 1,
           corpusPassages: 1,
           notes: 2,
           exercises: 2,
@@ -826,6 +855,11 @@ describe("App", () => {
     expect(screen.getByText("River teaching register")).toBeInTheDocument();
     expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
     expect(screen.getByText("mira talo-mi-nena")).toBeInTheDocument();
+    const discourseExamples = screen.getByRole("region", { name: "Discourse examples" });
+    expect(discourseExamples).toBeInTheDocument();
+    expect(within(discourseExamples).getByText("Opening a teaching turn")).toBeInTheDocument();
+    expect(within(discourseExamples).getByText("kilo-ke saku-ra nemi-mi-na")).toBeInTheDocument();
+    expect(within(discourseExamples).getByText("The locative frame comes first.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Vocabulary inventory" })).toBeInTheDocument();
     expect(screen.getByText("-mi")).toBeInTheDocument();
     expect(screen.getByText("present tense")).toBeInTheDocument();
@@ -1110,7 +1144,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 dialect variant, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 dialect variant, 1 discourse example, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
@@ -1177,7 +1211,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 24 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 26 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

@@ -27,6 +27,7 @@ export type SyntheticLanguageProfile = {
   phonology: SyntheticLanguageFixture["phonology"];
   paradigms: SyntheticLanguageFixture["paradigms"];
   dialectVariants: SyntheticLanguageFixture["dialectVariants"];
+  discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   vocabulary: SyntheticLanguageFixture["vocabulary"];
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
@@ -37,6 +38,7 @@ export type SyntheticLanguageProfile = {
     grammarRules: number;
     paradigms: number;
     dialectVariants: number;
+    discourseExamples: number;
     corpusPassages: number;
     notes: number;
     exercises: number;
@@ -461,6 +463,7 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
     grammarRules: fixture?.grammarRules.length ?? 0,
     paradigms: fixture?.paradigms.length ?? 0,
     dialectVariants: fixture?.dialectVariants.length ?? 0,
+    discourseExamples: fixture?.discourseExamples.length ?? 0,
     corpusPassages: state.corpus.filter((passage) => passage.languageId === languageId).length,
     notes: state.notes.filter((note) => note.languageId === languageId).length,
     exercises: exercises.length,
@@ -493,6 +496,10 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       grammarNotes: [...dialect.grammarNotes],
       examplePhrases: dialect.examplePhrases.map((example) => ({ ...example }))
     })) ?? [],
+    discourseExamples: fixture?.discourseExamples.map((example) => ({
+      ...example,
+      notes: [...example.notes]
+    })) ?? [],
     vocabulary: fixture?.vocabulary.map((item) => ({
       ...item,
       tags: [...item.tags]
@@ -512,7 +519,8 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       exerciseAnswerKeys: stats.exercises,
       exerciseTypes: Object.keys(stats.exerciseTypes).length,
       paradigms: stats.paradigms,
-      dialectVariants: stats.dialectVariants
+      dialectVariants: stats.dialectVariants,
+      discourseExamples: stats.discourseExamples
     }),
     stats
   };

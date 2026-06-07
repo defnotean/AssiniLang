@@ -231,6 +231,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
     formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
     formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
+    formatCount(snapshot.linguisticProfile.stats.discourseExamples, "discourse example"),
     formatFixtureQualityLabel(snapshot.linguisticProfile.fixtureQuality),
     formatIntegrityLabel(snapshot.integrity)
   ].join(", ");
@@ -1554,6 +1555,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     phonology,
     paradigms,
     dialectVariants,
+    discourseExamples,
     grammarRules,
     vocabulary,
     morphemeInventory,
@@ -1595,6 +1597,10 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
           <div>
             <dt>Dialects</dt>
             <dd>{stats.dialectVariants}</dd>
+          </div>
+          <div>
+            <dt>Discourse examples</dt>
+            <dd>{stats.discourseExamples}</dd>
           </div>
         </dl>
       </section>
@@ -1745,6 +1751,32 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
                     <code>{example.variant}</code>
                     <span>{example.translation}</span>
                   </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="panel-card discourse-panel" aria-label="Discourse examples">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Discourse examples</span>
+            <h2>{formatCount(discourseExamples.length, "example")}</h2>
+          </div>
+        </div>
+        <div className="detail-list">
+          {discourseExamples.map((example) => (
+            <article className="detail-row discourse-example-row" key={example.id}>
+              <div>
+                <strong>{example.functionLabel}</strong>
+                <p>{example.context}</p>
+              </div>
+              <code>{example.target}</code>
+              <span>{example.translation}</span>
+              <div className="pill-row">
+                {example.notes.map((note) => (
+                  <span className="pill" key={`${example.id}-${note}`}>{note}</span>
                 ))}
               </div>
             </article>

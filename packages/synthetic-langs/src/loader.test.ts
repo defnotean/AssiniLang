@@ -85,15 +85,16 @@ describe("synthetic language fixtures", () => {
       exerciseTypes: 3,
       paradigms: 2,
       paradigmRows: 3,
-      dialectVariants: 2
+      dialectVariants: 2,
+      discourseExamples: 3
     });
 
     const summary = summarizeSyntheticFixtureQuality(actuals);
 
     expect(summary).toMatchObject({
       passed: true,
-      totalChecks: 12,
-      passedChecks: 12,
+      totalChecks: 13,
+      passedChecks: 13,
       failedChecks: 0
     });
     expect(summary.checks.map((check) => check.id)).toEqual([
@@ -108,13 +109,21 @@ describe("synthetic language fixtures", () => {
       "exerciseTypes",
       "paradigms",
       "paradigmRows",
-      "dialectVariants"
+      "dialectVariants",
+      "discourseExamples"
     ]);
     expect(summary.checks).toContainEqual({
       id: "exerciseTypes",
       label: "Exercise types",
       actual: 3,
       minimum: SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes,
+      passed: true
+    });
+    expect(summary.checks).toContainEqual({
+      id: "discourseExamples",
+      label: "Discourse examples",
+      actual: 3,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples,
       passed: true
     });
   });
@@ -131,8 +140,8 @@ describe("synthetic language fixtures", () => {
 
     expect(summary).toMatchObject({
       passed: false,
-      totalChecks: 12,
-      passedChecks: 10,
+      totalChecks: 13,
+      passedChecks: 11,
       failedChecks: 2
     });
     expect(summary.checks).toContainEqual({
@@ -229,6 +238,33 @@ describe("synthetic language fixtures", () => {
         expect(dialect.lexicalNotes.length, `${fixture.language.id} ${dialect.id} lexical notes`).toBeGreaterThan(0);
         expect(dialect.grammarNotes.length, `${fixture.language.id} ${dialect.id} grammar notes`).toBeGreaterThan(0);
         expect(dialect.examplePhrases.length, `${fixture.language.id} ${dialect.id} examples`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("provides discourse examples for every synthetic language", () => {
+    for (const fixture of syntheticLanguageFixtures) {
+      const discourseExamples = (fixture as unknown as {
+        discourseExamples?: Array<{
+          id: string;
+          functionLabel: string;
+          context: string;
+          target: string;
+          translation: string;
+          notes: string[];
+        }>;
+      }).discourseExamples;
+
+      expect(discourseExamples, `${fixture.language.id} discourse examples`).toHaveLength(
+        SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples
+      );
+      for (const example of discourseExamples ?? []) {
+        expect(example.id, `${fixture.language.id} discourse example id`).toBeTruthy();
+        expect(example.functionLabel, `${fixture.language.id} ${example.id} function`).toBeTruthy();
+        expect(example.context, `${fixture.language.id} ${example.id} context`).toBeTruthy();
+        expect(example.target, `${fixture.language.id} ${example.id} target`).toBeTruthy();
+        expect(example.translation, `${fixture.language.id} ${example.id} translation`).toBeTruthy();
+        expect(example.notes.length, `${fixture.language.id} ${example.id} notes`).toBeGreaterThan(0);
       }
     }
   });

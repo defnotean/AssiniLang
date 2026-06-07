@@ -13,7 +13,8 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   exerciseTypes: 2,
   paradigms: 2,
   paradigmRows: 3,
-  dialectVariants: 2
+  dialectVariants: 2,
+  discourseExamples: 3
 } as const;
 
 export type SyntheticFixtureQualityCheckId = keyof typeof SYNTHETIC_FIXTURE_MINIMUMS;
@@ -48,7 +49,8 @@ const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, s
   exerciseTypes: "Exercise types",
   paradigms: "Paradigm tables",
   paradigmRows: "Minimum paradigm rows",
-  dialectVariants: "Dialect variants"
+  dialectVariants: "Dialect variants",
+  discourseExamples: "Discourse examples"
 };
 
 const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
@@ -63,7 +65,8 @@ const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
   "exerciseTypes",
   "paradigms",
   "paradigmRows",
-  "dialectVariants"
+  "dialectVariants",
+  "discourseExamples"
 ];
 
 function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
@@ -86,7 +89,8 @@ export function buildSyntheticFixtureQualityActuals(
     exerciseTypes: new Set<Exercise["type"]>(fixture?.exercisesAnswerKey.map((exercise) => exercise.type) ?? []).size,
     paradigms: fixture?.paradigms.length ?? 0,
     paradigmRows: minimumParadigmRows(fixture),
-    dialectVariants: fixture?.dialectVariants.length ?? 0
+    dialectVariants: fixture?.dialectVariants.length ?? 0,
+    discourseExamples: fixture?.discourseExamples.length ?? 0
   };
 }
 
@@ -322,6 +326,13 @@ function addFixtureRichnessDiagnostics(fixture: SyntheticLanguageFixture, diagno
     "dialect variants",
     diagnostics
   );
+  addMinimumCountDiagnostic(
+    fixture.discourseExamples.length,
+    SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples,
+    languageId,
+    "discourse examples",
+    diagnostics
+  );
 }
 
 function addGrammarRuleCoverageDiagnostics(fixture: SyntheticLanguageFixture, diagnostics: string[]) {
@@ -353,6 +364,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     const ruleIdSet = new Set(ruleIds);
     const paradigmIds = fixture.paradigms.map((paradigm) => paradigm.id);
     const dialectVariantIds = fixture.dialectVariants.map((dialect) => dialect.id);
+    const discourseExampleIds = fixture.discourseExamples.map((example) => example.id);
     const noteIds = fixture.notesAnswerKey.map((note) => note.id);
     const exerciseIds = fixture.exercisesAnswerKey.map((exercise) => exercise.id);
     const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
@@ -368,6 +380,7 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
     addDuplicateDiagnostics(ruleIds, `${languageId} has duplicate grammar rule id`, diagnostics);
     addDuplicateDiagnostics(paradigmIds, `${languageId} has duplicate paradigm id`, diagnostics);
     addDuplicateDiagnostics(dialectVariantIds, `${languageId} has duplicate dialect variant id`, diagnostics);
+    addDuplicateDiagnostics(discourseExampleIds, `${languageId} has duplicate discourse example id`, diagnostics);
     addDuplicateDiagnostics(noteIds, `${languageId} has duplicate note id`, diagnostics);
     addDuplicateDiagnostics(exerciseIds, `${languageId} has duplicate exercise id`, diagnostics);
 
@@ -468,6 +481,35 @@ export function validateSyntheticLanguageFixtures(fixtures: SyntheticLanguageFix
         }
         if (!example.translation.trim()) {
           diagnostics.push(`${dialectLabel} has an example phrase without a translation`);
+        }
+      }
+    }
+
+    for (const example of fixture.discourseExamples) {
+      const exampleLabel = `${languageId} discourse example ${example.id}`;
+      if (!example.id.trim()) {
+        diagnostics.push(`${languageId} has a discourse example without an id`);
+      }
+      if (!example.functionLabel.trim()) {
+        diagnostics.push(`${exampleLabel} is missing a function label`);
+      }
+      if (!example.context.trim()) {
+        diagnostics.push(`${exampleLabel} is missing a context`);
+      }
+      if (!example.target.trim()) {
+        diagnostics.push(`${exampleLabel} is missing a target form`);
+      } else {
+        addOrthographyDiagnostics(example.target, fixture, `${exampleLabel} target`, diagnostics);
+      }
+      if (!example.translation.trim()) {
+        diagnostics.push(`${exampleLabel} is missing a translation`);
+      }
+      if (example.notes.length === 0) {
+        diagnostics.push(`${exampleLabel} needs at least one note`);
+      }
+      for (const note of example.notes) {
+        if (!note.trim()) {
+          diagnostics.push(`${exampleLabel} has a blank note`);
         }
       }
     }

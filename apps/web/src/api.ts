@@ -47,6 +47,7 @@ export type FixtureMinimums = {
   paradigms: number;
   paradigmRows: number;
   dialectVariants: number;
+  discourseExamples: number;
 };
 
 export type FixtureQualityCheck = {
@@ -107,6 +108,14 @@ export type LanguageProfile = {
       translation: string;
     }>;
   }>;
+  discourseExamples: Array<{
+    id: string;
+    functionLabel: string;
+    context: string;
+    target: string;
+    translation: string;
+    notes: string[];
+  }>;
   vocabulary: Array<{
     id: string;
     form: string;
@@ -141,6 +150,7 @@ export type LanguageProfile = {
     grammarRules: number;
     paradigms: number;
     dialectVariants: number;
+    discourseExamples: number;
     corpusPassages: number;
     notes: number;
     exercises: number;

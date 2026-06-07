@@ -41,6 +41,33 @@ describe("synthetic fixture validation module", () => {
         examplePhrases: []
       }
     ];
+    (avenik as unknown as {
+      discourseExamples: Array<{
+        id: string;
+        functionLabel: string;
+        context: string;
+        target: string;
+        translation: string;
+        notes: string[];
+      }>;
+    }).discourseExamples = [
+      {
+        id: "duplicate-discourse",
+        functionLabel: "",
+        context: "",
+        target: "zalo",
+        translation: "",
+        notes: []
+      },
+      {
+        id: "duplicate-discourse",
+        functionLabel: "repair",
+        context: "review desk",
+        target: "mira",
+        translation: "river",
+        notes: [""]
+      }
+    ];
 
     expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
       expect.arrayContaining([
@@ -55,7 +82,14 @@ describe("synthetic fixture validation module", () => {
         "avenik dialect variant duplicate-dialect needs at least one phonology note",
         "avenik dialect variant duplicate-dialect needs at least one lexical note",
         "avenik dialect variant duplicate-dialect needs at least one grammar note",
-        "avenik dialect variant duplicate-dialect needs at least one example phrase"
+        "avenik dialect variant duplicate-dialect needs at least one example phrase",
+        "avenik has duplicate discourse example id duplicate-discourse",
+        "avenik discourse example duplicate-discourse is missing a function label",
+        "avenik discourse example duplicate-discourse is missing a context",
+        "avenik discourse example duplicate-discourse target uses z outside phonology inventory",
+        "avenik discourse example duplicate-discourse is missing a translation",
+        "avenik discourse example duplicate-discourse needs at least one note",
+        "avenik discourse example duplicate-discourse has a blank note"
       ])
     );
   });
@@ -198,6 +232,7 @@ describe("synthetic fixture validation module", () => {
     avenik.paradigms = avenik.paradigms.slice(0, 1);
     avenik.paradigms[0].rows = avenik.paradigms[0].rows.slice(0, 2);
     avenik.dialectVariants = avenik.dialectVariants.slice(0, 1);
+    avenik.discourseExamples = avenik.discourseExamples.slice(0, SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1);
 
     expect(validateSyntheticLanguageFixtures(brokenFixtures)).toEqual(
       expect.arrayContaining([
@@ -214,7 +249,8 @@ describe("synthetic fixture validation module", () => {
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes} exercise types (found 1)`,
         `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigms} paradigm tables (found 1)`,
         `avenik paradigm avn-paradigm-verb-chain needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.paradigmRows} rows (found 2)`,
-        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants} dialect variants (found 1)`
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.dialectVariants} dialect variants (found 1)`,
+        `avenik needs at least ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples} discourse examples (found ${SYNTHETIC_FIXTURE_MINIMUMS.discourseExamples - 1})`
       ])
     );
   });

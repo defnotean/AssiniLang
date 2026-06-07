@@ -34,11 +34,21 @@ export type DialectVariant = {
   }>;
 };
 
+export type DiscourseExample = {
+  id: string;
+  functionLabel: string;
+  context: string;
+  target: string;
+  translation: string;
+  notes: string[];
+};
+
 export type SyntheticLanguageFixture = {
   language: Language;
   phonology: PhonologyProfile;
   paradigms: ParadigmTable[];
   dialectVariants: DialectVariant[];
+  discourseExamples: DiscourseExample[];
   vocabulary: Array<{ id: string; form: string; gloss: string; partOfSpeech: string; tags: string[] }>;
   grammarRules: Array<{ id: string; topic: string; explanation: string; evidencePassageIds: string[]; confidence: "low" | "medium" | "high" }>;
   corpus: CorpusPassage[];
@@ -162,6 +172,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    discourseExamples: [],
     vocabulary: [
       { id: "avn-v-001", form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"] },
       { id: "avn-v-002", form: "nemi", gloss: "teach / explain", partOfSpeech: "verb", tags: ["learning"] },
@@ -494,6 +505,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    discourseExamples: [],
     vocabulary: [
       { id: "sol-p-001", form: "mi", gloss: "I", partOfSpeech: "pronoun", tags: ["subject"] },
       { id: "sol-p-002", form: "ta", gloss: "they", partOfSpeech: "pronoun", tags: ["subject"] },
@@ -834,6 +846,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    discourseExamples: [],
     vocabulary: [
       { id: "vel-v-001", form: "dan", gloss: "eat", partOfSpeech: "verb-root", tags: ["food"] },
       { id: "vel-v-002", form: "mir", gloss: "see", partOfSpeech: "verb-root", tags: ["perception"] },
@@ -1151,6 +1164,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
         ]
       }
     ],
+    discourseExamples: [],
     vocabulary: [
       { id: "ket-pr-001", form: "na-", gloss: "I (subject prefix)", partOfSpeech: "prefix", tags: ["subject"] },
       { id: "ket-pr-002", form: "ka-", gloss: "they (subject prefix)", partOfSpeech: "prefix", tags: ["subject"] },
@@ -1386,6 +1400,7 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
 
 type FixtureRichnessExpansion = {
   vocabulary: SyntheticLanguageFixture["vocabulary"];
+  discourseExamples: SyntheticLanguageFixture["discourseExamples"];
   corpus: CorpusPassage[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
   exercises: Exercise[];
@@ -1398,6 +1413,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "avn-vocab-maku", form: "maku", gloss: "memory bead", partOfSpeech: "noun", tags: ["object", "memory"] },
       { id: "avn-vocab-seya", form: "seya", gloss: "answer card", partOfSpeech: "noun", tags: ["classroom", "answer"] },
       { id: "avn-vocab-roki", form: "roki", gloss: "review line", partOfSpeech: "noun", tags: ["review", "sequence"] }
+    ],
+    discourseExamples: [
+      {
+        id: "avn-discourse-opening",
+        functionLabel: "Opening a teaching turn",
+        context: "Used when the instructor starts a careful review sequence.",
+        target: "kilo-ke saku-ra nemi-mi-na",
+        translation: "At the first step, I teach the child.",
+        notes: [
+          "The locative frame comes first.",
+          "The finite verb keeps tense before person."
+        ]
+      },
+      {
+        id: "avn-discourse-repair",
+        functionLabel: "Repairing an object label",
+        context: "Used after a learner chooses the wrong classroom object.",
+        target: "seya-ra maku-ra-ne tani-mi-na",
+        translation: "I arrange the answer card and memory bead.",
+        notes: [
+          "Both objects carry accusative -ra.",
+          "The coordination suffix follows the first marked object."
+        ]
+      },
+      {
+        id: "avn-discourse-closure",
+        functionLabel: "Closing a review step",
+        context: "Used when the review leader names the final line.",
+        target: "roki-ra nemu-mi-ki",
+        translation: "They say the review line.",
+        notes: [
+          "The reviewed item stays before the speech verb.",
+          "Third-person -ki keeps the closure impersonal."
+        ]
+      }
     ],
     corpus: [
       {
@@ -1475,6 +1525,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "sol-vocab-tero", form: "tero", gloss: "review stone", partOfSpeech: "noun", tags: ["review", "object"] },
       { id: "sol-vocab-pume", form: "pume", gloss: "response shell", partOfSpeech: "noun", tags: ["response", "object"] }
     ],
+    discourseExamples: [
+      {
+        id: "sol-discourse-opening",
+        functionLabel: "Opening a shared prompt",
+        context: "Used before a group begins listening practice.",
+        target: "ra so len nua na sao",
+        translation: "We keep listening to the song in the practice circle.",
+        notes: [
+          "The subject pronoun opens the clause.",
+          "The durative particle stays before the verb."
+        ]
+      },
+      {
+        id: "sol-discourse-choice",
+        functionLabel: "Presenting a choice",
+        context: "Used when a reviewer contrasts two classroom objects.",
+        target: "lo ko lisa e tero",
+        translation: "You make the story mat and review stone.",
+        notes: [
+          "The linker e joins the object nouns.",
+          "No case marking is added to either object."
+        ]
+      },
+      {
+        id: "sol-discourse-repair",
+        functionLabel: "Repairing a memory cue",
+        context: "Used when a learner must trace the prompt again.",
+        target: "mi pa rame moni",
+        translation: "I traced the memory line.",
+        notes: [
+          "The past particle pa precedes the verb.",
+          "The object remains after the verb without morphology."
+        ]
+      }
+    ],
     corpus: [
       {
         id: "sol-c011",
@@ -1546,6 +1631,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "vel-vocab-rali", form: "rali", gloss: "review mark", partOfSpeech: "noun", tags: ["review", "object"] },
       { id: "vel-vocab-huno", form: "huno", gloss: "future cue", partOfSpeech: "noun", tags: ["time", "prompt"] }
     ],
+    discourseExamples: [
+      {
+        id: "vel-discourse-opening",
+        functionLabel: "Opening a comparison",
+        context: "Used when the reviewer starts a form comparison.",
+        target: "moror tesa",
+        translation: "I compare the teaching cord.",
+        notes: [
+          "The fused ending marks first-person present.",
+          "The object follows the completed verb form."
+        ]
+      },
+      {
+        id: "vel-discourse-recall",
+        functionLabel: "Recalling a completed review",
+        context: "Used to report that a group compared a mark earlier.",
+        target: "moreth rali",
+        translation: "They compared the review mark.",
+        notes: [
+          "-eth carries third-person plural past.",
+          "The root mor remains recoverable before the fused ending."
+        ]
+      },
+      {
+        id: "vel-discourse-next-step",
+        functionLabel: "Cueing the next step",
+        context: "Used when the instructor points to a future prompt.",
+        target: "mirun huno",
+        translation: "They will see the future cue.",
+        notes: [
+          "-un marks future plural reference.",
+          "The time cue remains a separate object noun."
+        ]
+      }
+    ],
     corpus: [
       {
         id: "vel-c011",
@@ -1610,6 +1730,41 @@ const fixtureRichnessExpansion: Record<string, FixtureRichnessExpansion> = {
       { id: "ket-vocab-ro-prefix", form: "ro-", gloss: "review-token object prefix", partOfSpeech: "object-prefix", tags: ["object", "review"] },
       { id: "ket-vocab-hali", form: "hali", gloss: "check / compare", partOfSpeech: "verb-root", tags: ["review", "verb"] },
       { id: "ket-vocab-ko-suffix", form: "-ko", gloss: "careful review aspect", partOfSpeech: "aspect-suffix", tags: ["aspect", "review"] }
+    ],
+    discourseExamples: [
+      {
+        id: "ket-discourse-opening",
+        functionLabel: "Opening a predicate lesson",
+        context: "Used when the instructor introduces a new review token.",
+        target: "wa-ro-hali-ko",
+        translation: "The instructor checks the review token carefully.",
+        notes: [
+          "The subject prefix opens the predicate word.",
+          "The object prefix precedes the verb root."
+        ]
+      },
+      {
+        id: "ket-discourse-learner-check",
+        functionLabel: "Checking a learner response",
+        context: "Used when several reviewers inspect a learner answer.",
+        target: "ka-me-hali-ni",
+        translation: "They will check the learner soon.",
+        notes: [
+          "The learner object is encoded as me-.",
+          "Near-future -ni closes the predicate word."
+        ]
+      },
+      {
+        id: "ket-discourse-closure",
+        functionLabel: "Closing a careful review",
+        context: "Used after a reviewed signal has been carried forward.",
+        target: "na-ru-wan-ko",
+        translation: "I carry the signal carefully.",
+        notes: [
+          "The signal object prefix is ru-.",
+          "Careful-review -ko replaces the ordinary time suffix."
+        ]
+      }
     ],
     corpus: [
       {
@@ -1677,6 +1832,7 @@ for (const fixture of syntheticLanguageFixtures) {
   const expansion = fixtureRichnessExpansion[fixture.language.id];
   if (!expansion) continue;
   fixture.vocabulary.push(...expansion.vocabulary);
+  fixture.discourseExamples.push(...expansion.discourseExamples);
   fixture.corpus.push(...expansion.corpus);
   fixture.grammarRules.push(...expansion.grammarRules);
 }

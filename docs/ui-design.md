@@ -45,6 +45,14 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 
 ## Workspaces
 
+### Language Profile
+
+The profile view should make the synthetic language system inspectable:
+
+- Keep phonology, grammar inventory, paradigms, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
+- Show discourse examples with function, context, target text, translation, and pragmatic notes.
+- Keep fixture-quality counters near the top so reviewers can see data-depth gaps before reading detailed panels.
+
 ### Corpus Browser
 
 The corpus view should make source material scannable:
