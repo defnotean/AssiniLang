@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseAppState } from "@assini/db";
 import {
   buildSeedState,
+  buildSyntheticFixtureQualityActuals,
   SYNTHETIC_FIXTURE_MINIMUMS,
+  summarizeSyntheticFixtureQuality,
   syntheticLanguageFixtures,
   validateSyntheticLanguageFixtures
 } from "./loader";
@@ -65,6 +67,78 @@ describe("synthetic language fixtures", () => {
         }
       }
     }
+  });
+
+  it("summarizes fixture quality from shared minimums in a stable order", () => {
+    const avenik = syntheticLanguageFixtures.find((fixture) => fixture.language.id === "avenik");
+    const actuals = buildSyntheticFixtureQualityActuals(avenik);
+
+    expect(actuals).toMatchObject({
+      consonants: 9,
+      vowels: 5,
+      phonotacticNotes: 3,
+      vocabularyItems: 24,
+      corpusPassages: 12,
+      grammarRules: 6,
+      noteAnswerKeys: 6,
+      exerciseAnswerKeys: 6,
+      exerciseTypes: 3,
+      paradigms: 2,
+      paradigmRows: 3,
+      dialectVariants: 2
+    });
+
+    const summary = summarizeSyntheticFixtureQuality(actuals);
+
+    expect(summary.passed).toBe(true);
+    expect(summary.checks.map((check) => check.id)).toEqual([
+      "consonants",
+      "vowels",
+      "phonotacticNotes",
+      "vocabularyItems",
+      "corpusPassages",
+      "grammarRules",
+      "noteAnswerKeys",
+      "exerciseAnswerKeys",
+      "exerciseTypes",
+      "paradigms",
+      "paradigmRows",
+      "dialectVariants"
+    ]);
+    expect(summary.checks).toContainEqual({
+      id: "exerciseTypes",
+      label: "Exercise types",
+      actual: 3,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.exerciseTypes,
+      passed: true
+    });
+  });
+
+  it("supports app-state actual overrides when reporting fixture quality", () => {
+    const avenik = syntheticLanguageFixtures.find((fixture) => fixture.language.id === "avenik");
+    const actuals = {
+      ...buildSyntheticFixtureQualityActuals(avenik),
+      noteAnswerKeys: 2,
+      exerciseAnswerKeys: 1
+    };
+
+    const summary = summarizeSyntheticFixtureQuality(actuals);
+
+    expect(summary.passed).toBe(false);
+    expect(summary.checks).toContainEqual({
+      id: "noteAnswerKeys",
+      label: "Public notes",
+      actual: 2,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.noteAnswerKeys,
+      passed: false
+    });
+    expect(summary.checks).toContainEqual({
+      id: "exerciseAnswerKeys",
+      label: "Learner exercises",
+      actual: 1,
+      minimum: SYNTHETIC_FIXTURE_MINIMUMS.exerciseAnswerKeys,
+      passed: false
+    });
   });
 
   it("seeds default review policies for every synthetic language", () => {

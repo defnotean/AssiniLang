@@ -16,6 +16,98 @@ export const SYNTHETIC_FIXTURE_MINIMUMS = {
   dialectVariants: 2
 } as const;
 
+export type SyntheticFixtureQualityCheckId = keyof typeof SYNTHETIC_FIXTURE_MINIMUMS;
+
+export type SyntheticFixtureQualityActuals = Record<SyntheticFixtureQualityCheckId, number>;
+
+export type SyntheticFixtureQualityCheck = {
+  id: SyntheticFixtureQualityCheckId;
+  label: string;
+  actual: number;
+  minimum: number;
+  passed: boolean;
+};
+
+export type SyntheticFixtureQualitySummary = {
+  passed: boolean;
+  checks: SyntheticFixtureQualityCheck[];
+};
+
+const SYNTHETIC_FIXTURE_QUALITY_LABELS: Record<SyntheticFixtureQualityCheckId, string> = {
+  consonants: "Consonants",
+  vowels: "Vowels",
+  phonotacticNotes: "Phonotactic notes",
+  vocabularyItems: "Vocabulary",
+  corpusPassages: "Corpus passages",
+  grammarRules: "Grammar rules",
+  noteAnswerKeys: "Public notes",
+  exerciseAnswerKeys: "Learner exercises",
+  exerciseTypes: "Exercise types",
+  paradigms: "Paradigm tables",
+  paradigmRows: "Minimum paradigm rows",
+  dialectVariants: "Dialect variants"
+};
+
+const SYNTHETIC_FIXTURE_QUALITY_ORDER: SyntheticFixtureQualityCheckId[] = [
+  "consonants",
+  "vowels",
+  "phonotacticNotes",
+  "vocabularyItems",
+  "corpusPassages",
+  "grammarRules",
+  "noteAnswerKeys",
+  "exerciseAnswerKeys",
+  "exerciseTypes",
+  "paradigms",
+  "paradigmRows",
+  "dialectVariants"
+];
+
+function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
+  if (!fixture || fixture.paradigms.length === 0) return 0;
+  return Math.min(...fixture.paradigms.map((paradigm) => paradigm.rows.length));
+}
+
+export function buildSyntheticFixtureQualityActuals(
+  fixture: SyntheticLanguageFixture | undefined
+): SyntheticFixtureQualityActuals {
+  return {
+    consonants: fixture?.phonology.consonants.length ?? 0,
+    vowels: fixture?.phonology.vowels.length ?? 0,
+    phonotacticNotes: fixture?.phonology.phonotactics.length ?? 0,
+    vocabularyItems: fixture?.vocabulary.length ?? 0,
+    corpusPassages: fixture?.corpus.length ?? 0,
+    grammarRules: fixture?.grammarRules.length ?? 0,
+    noteAnswerKeys: fixture?.notesAnswerKey.length ?? 0,
+    exerciseAnswerKeys: fixture?.exercisesAnswerKey.length ?? 0,
+    exerciseTypes: new Set<Exercise["type"]>(fixture?.exercisesAnswerKey.map((exercise) => exercise.type) ?? []).size,
+    paradigms: fixture?.paradigms.length ?? 0,
+    paradigmRows: minimumParadigmRows(fixture),
+    dialectVariants: fixture?.dialectVariants.length ?? 0
+  };
+}
+
+export function summarizeSyntheticFixtureQuality(
+  actuals: SyntheticFixtureQualityActuals
+): SyntheticFixtureQualitySummary {
+  const checks = SYNTHETIC_FIXTURE_QUALITY_ORDER.map((id) => {
+    const minimum = SYNTHETIC_FIXTURE_MINIMUMS[id];
+    const actual = actuals[id];
+    return {
+      id,
+      label: SYNTHETIC_FIXTURE_QUALITY_LABELS[id],
+      actual,
+      minimum,
+      passed: actual >= minimum
+    };
+  });
+
+  return {
+    passed: checks.every((check) => check.passed),
+    checks
+  };
+}
+
 function normalizedText(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }

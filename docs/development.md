@@ -88,7 +88,7 @@ Useful smoke checks:
 
 Add fixture data in `packages/synthetic-langs/src/fixtures.ts`.
 
-The authoritative richness floor is `SYNTHETIC_FIXTURE_MINIMUMS` in `packages/synthetic-langs/src/validation.ts`. Update that exported contract first when raising fixture depth, then update docs and tests to match.
+The authoritative richness floor is `SYNTHETIC_FIXTURE_MINIMUMS` in `packages/synthetic-langs/src/validation.ts`. Update that exported contract first when raising fixture depth, then update docs and tests to match. Use `buildSyntheticFixtureQualityActuals` and `summarizeSyntheticFixtureQuality` from the same package for any actual-vs-minimum reporting instead of recreating quality-check labels or ordering in API or UI code.
 
 Each language should include:
 

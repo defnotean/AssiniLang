@@ -3,7 +3,10 @@ import { createHash } from "node:crypto";
 import type { AppState, EvaluationFailure, EvaluationRun, Exercise, ExerciseSubmission, Note } from "@assini/db";
 import {
   SYNTHETIC_FIXTURE_MINIMUMS,
+  buildSyntheticFixtureQualityActuals,
+  summarizeSyntheticFixtureQuality,
   syntheticLanguageFixtures,
+  type SyntheticFixtureQualitySummary,
   type SyntheticLanguageFixture
 } from "@assini/synthetic-langs";
 import { summarizeEvaluationGate } from "@assini/eval";
@@ -28,7 +31,7 @@ export type SyntheticLanguageProfile = {
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
   fixtureMinimums: typeof SYNTHETIC_FIXTURE_MINIMUMS;
-  fixtureQuality: FixtureQualitySummary;
+  fixtureQuality: SyntheticFixtureQualitySummary;
   stats: {
     vocabularyItems: number;
     grammarRules: number;
@@ -39,21 +42,6 @@ export type SyntheticLanguageProfile = {
     exercises: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
-};
-
-export type FixtureQualityCheckId = keyof typeof SYNTHETIC_FIXTURE_MINIMUMS;
-
-export type FixtureQualityCheck = {
-  id: FixtureQualityCheckId;
-  label: string;
-  actual: number;
-  minimum: number;
-  passed: boolean;
-};
-
-export type FixtureQualitySummary = {
-  passed: boolean;
-  checks: FixtureQualityCheck[];
 };
 
 export type MorphemeInventoryItem = {
@@ -428,51 +416,6 @@ export function toPublicEvaluationArtifact(
   };
 }
 
-function buildFixtureQualityCheck(
-  id: FixtureQualityCheckId,
-  label: string,
-  actual: number
-): FixtureQualityCheck {
-  const minimum = SYNTHETIC_FIXTURE_MINIMUMS[id];
-  return {
-    id,
-    label,
-    actual,
-    minimum,
-    passed: actual >= minimum
-  };
-}
-
-function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
-  if (!fixture || fixture.paradigms.length === 0) return 0;
-  return Math.min(...fixture.paradigms.map((paradigm) => paradigm.rows.length));
-}
-
-function buildFixtureQuality(
-  fixture: SyntheticLanguageFixture | undefined,
-  stats: SyntheticLanguageProfile["stats"]
-): FixtureQualitySummary {
-  const checks: FixtureQualityCheck[] = [
-    buildFixtureQualityCheck("consonants", "Consonants", fixture?.phonology.consonants.length ?? 0),
-    buildFixtureQualityCheck("vowels", "Vowels", fixture?.phonology.vowels.length ?? 0),
-    buildFixtureQualityCheck("phonotacticNotes", "Phonotactic notes", fixture?.phonology.phonotactics.length ?? 0),
-    buildFixtureQualityCheck("vocabularyItems", "Vocabulary", stats.vocabularyItems),
-    buildFixtureQualityCheck("corpusPassages", "Corpus passages", stats.corpusPassages),
-    buildFixtureQualityCheck("grammarRules", "Grammar rules", stats.grammarRules),
-    buildFixtureQualityCheck("noteAnswerKeys", "Public notes", stats.notes),
-    buildFixtureQualityCheck("exerciseAnswerKeys", "Learner exercises", stats.exercises),
-    buildFixtureQualityCheck("exerciseTypes", "Exercise types", Object.keys(stats.exerciseTypes).length),
-    buildFixtureQualityCheck("paradigms", "Paradigm tables", stats.paradigms),
-    buildFixtureQualityCheck("paradigmRows", "Minimum paradigm rows", minimumParadigmRows(fixture)),
-    buildFixtureQualityCheck("dialectVariants", "Dialect variants", stats.dialectVariants)
-  ];
-
-  return {
-    passed: checks.every((check) => check.passed),
-    checks
-  };
-}
-
 export function buildSyntheticLanguageProfile(state: AppState, languageId: string): SyntheticLanguageProfile | undefined {
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) return undefined;
@@ -526,7 +469,17 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       evidencePassageIds: [...rule.evidencePassageIds]
     })) ?? [],
     fixtureMinimums: { ...SYNTHETIC_FIXTURE_MINIMUMS },
-    fixtureQuality: buildFixtureQuality(fixture, stats),
+    fixtureQuality: summarizeSyntheticFixtureQuality({
+      ...buildSyntheticFixtureQualityActuals(fixture),
+      vocabularyItems: stats.vocabularyItems,
+      corpusPassages: stats.corpusPassages,
+      grammarRules: stats.grammarRules,
+      noteAnswerKeys: stats.notes,
+      exerciseAnswerKeys: stats.exercises,
+      exerciseTypes: Object.keys(stats.exerciseTypes).length,
+      paradigms: stats.paradigms,
+      dialectVariants: stats.dialectVariants
+    }),
     stats
   };
 }

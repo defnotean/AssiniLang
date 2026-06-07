@@ -14,7 +14,16 @@ import { syntheticLanguageFixtures, type SyntheticLanguageFixture } from "./fixt
 import { validateSyntheticLanguageFixtures } from "./validation";
 
 export { syntheticLanguageFixtures };
-export { SYNTHETIC_FIXTURE_MINIMUMS, validateSyntheticLanguageFixtures } from "./validation";
+export {
+  buildSyntheticFixtureQualityActuals,
+  SYNTHETIC_FIXTURE_MINIMUMS,
+  summarizeSyntheticFixtureQuality,
+  validateSyntheticLanguageFixtures,
+  type SyntheticFixtureQualityActuals,
+  type SyntheticFixtureQualityCheck,
+  type SyntheticFixtureQualityCheckId,
+  type SyntheticFixtureQualitySummary
+} from "./validation";
 
 function cloneNote(note: Note): Note {
   return {
