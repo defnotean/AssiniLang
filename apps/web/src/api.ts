@@ -34,6 +34,34 @@ export type DashboardData = {
   evaluations: EvaluationRun[];
 };
 
+export type FixtureMinimums = {
+  consonants: number;
+  vowels: number;
+  phonotacticNotes: number;
+  vocabularyItems: number;
+  corpusPassages: number;
+  grammarRules: number;
+  noteAnswerKeys: number;
+  exerciseAnswerKeys: number;
+  exerciseTypes: number;
+  paradigms: number;
+  paradigmRows: number;
+  dialectVariants: number;
+};
+
+export type FixtureQualityCheck = {
+  id: keyof FixtureMinimums;
+  label: string;
+  actual: number;
+  minimum: number;
+  passed: boolean;
+};
+
+export type FixtureQualitySummary = {
+  passed: boolean;
+  checks: FixtureQualityCheck[];
+};
+
 export type LanguageProfile = {
   language: Language;
   phonology: {
@@ -106,20 +134,8 @@ export type LanguageProfile = {
     exercises: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
-  fixtureMinimums: {
-    consonants: number;
-    vowels: number;
-    phonotacticNotes: number;
-    vocabularyItems: number;
-    corpusPassages: number;
-    grammarRules: number;
-    noteAnswerKeys: number;
-    exerciseAnswerKeys: number;
-    exerciseTypes: number;
-    paradigms: number;
-    paradigmRows: number;
-    dialectVariants: number;
-  };
+  fixtureMinimums: FixtureMinimums;
+  fixtureQuality: FixtureQualitySummary;
 };
 
 export type LanguageSnapshot = {

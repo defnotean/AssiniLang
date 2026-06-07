@@ -37,6 +37,23 @@ describe("public language views", () => {
       }
     });
     expect(profile?.fixtureMinimums).toEqual(SYNTHETIC_FIXTURE_MINIMUMS);
+    expect(profile?.fixtureQuality).toMatchObject({
+      passed: true,
+      checks: [
+        { id: "consonants", label: "Consonants", actual: 9, minimum: 6, passed: true },
+        { id: "vowels", label: "Vowels", actual: 5, minimum: 3, passed: true },
+        { id: "phonotacticNotes", label: "Phonotactic notes", actual: 3, minimum: 2, passed: true },
+        { id: "vocabularyItems", label: "Vocabulary", actual: 24, minimum: 24, passed: true },
+        { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
+        { id: "grammarRules", label: "Grammar rules", actual: 6, minimum: 6, passed: true },
+        { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
+        { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true },
+        { id: "exerciseTypes", label: "Exercise types", actual: 3, minimum: 2, passed: true },
+        { id: "paradigms", label: "Paradigm tables", actual: 2, minimum: 2, passed: true },
+        { id: "paradigmRows", label: "Minimum paradigm rows", actual: 3, minimum: 3, passed: true },
+        { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true }
+      ]
+    });
     expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
     expect(profile?.paradigms[0].rows[0]).toMatchObject({
       form: "talo-mi-na",
@@ -86,6 +103,14 @@ describe("public language views", () => {
       language: { id: "avenik" },
       linguisticProfile: {
         fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
+        fixtureQuality: {
+          passed: true,
+          checks: expect.arrayContaining([
+            { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
+            { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
+            { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
+          ])
+        },
         stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, dialectVariants: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }

@@ -28,6 +28,7 @@ export type SyntheticLanguageProfile = {
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: SyntheticLanguageFixture["grammarRules"];
   fixtureMinimums: typeof SYNTHETIC_FIXTURE_MINIMUMS;
+  fixtureQuality: FixtureQualitySummary;
   stats: {
     vocabularyItems: number;
     grammarRules: number;
@@ -38,6 +39,21 @@ export type SyntheticLanguageProfile = {
     exercises: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
+};
+
+export type FixtureQualityCheckId = keyof typeof SYNTHETIC_FIXTURE_MINIMUMS;
+
+export type FixtureQualityCheck = {
+  id: FixtureQualityCheckId;
+  label: string;
+  actual: number;
+  minimum: number;
+  passed: boolean;
+};
+
+export type FixtureQualitySummary = {
+  passed: boolean;
+  checks: FixtureQualityCheck[];
 };
 
 export type MorphemeInventoryItem = {
@@ -412,12 +428,70 @@ export function toPublicEvaluationArtifact(
   };
 }
 
+function buildFixtureQualityCheck(
+  id: FixtureQualityCheckId,
+  label: string,
+  actual: number
+): FixtureQualityCheck {
+  const minimum = SYNTHETIC_FIXTURE_MINIMUMS[id];
+  return {
+    id,
+    label,
+    actual,
+    minimum,
+    passed: actual >= minimum
+  };
+}
+
+function minimumParadigmRows(fixture: SyntheticLanguageFixture | undefined): number {
+  if (!fixture || fixture.paradigms.length === 0) return 0;
+  return Math.min(...fixture.paradigms.map((paradigm) => paradigm.rows.length));
+}
+
+function buildFixtureQuality(
+  fixture: SyntheticLanguageFixture | undefined,
+  stats: SyntheticLanguageProfile["stats"]
+): FixtureQualitySummary {
+  const checks: FixtureQualityCheck[] = [
+    buildFixtureQualityCheck("consonants", "Consonants", fixture?.phonology.consonants.length ?? 0),
+    buildFixtureQualityCheck("vowels", "Vowels", fixture?.phonology.vowels.length ?? 0),
+    buildFixtureQualityCheck("phonotacticNotes", "Phonotactic notes", fixture?.phonology.phonotactics.length ?? 0),
+    buildFixtureQualityCheck("vocabularyItems", "Vocabulary", stats.vocabularyItems),
+    buildFixtureQualityCheck("corpusPassages", "Corpus passages", stats.corpusPassages),
+    buildFixtureQualityCheck("grammarRules", "Grammar rules", stats.grammarRules),
+    buildFixtureQualityCheck("noteAnswerKeys", "Public notes", stats.notes),
+    buildFixtureQualityCheck("exerciseAnswerKeys", "Learner exercises", stats.exercises),
+    buildFixtureQualityCheck("exerciseTypes", "Exercise types", Object.keys(stats.exerciseTypes).length),
+    buildFixtureQualityCheck("paradigms", "Paradigm tables", stats.paradigms),
+    buildFixtureQualityCheck("paradigmRows", "Minimum paradigm rows", minimumParadigmRows(fixture)),
+    buildFixtureQualityCheck("dialectVariants", "Dialect variants", stats.dialectVariants)
+  ];
+
+  return {
+    passed: checks.every((check) => check.passed),
+    checks
+  };
+}
+
 export function buildSyntheticLanguageProfile(state: AppState, languageId: string): SyntheticLanguageProfile | undefined {
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) return undefined;
 
   const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
   const exercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
+  const stats: SyntheticLanguageProfile["stats"] = {
+    vocabularyItems: fixture?.vocabulary.length ?? 0,
+    grammarRules: fixture?.grammarRules.length ?? 0,
+    paradigms: fixture?.paradigms.length ?? 0,
+    dialectVariants: fixture?.dialectVariants.length ?? 0,
+    corpusPassages: state.corpus.filter((passage) => passage.languageId === languageId).length,
+    notes: state.notes.filter((note) => note.languageId === languageId).length,
+    exercises: exercises.length,
+    exerciseTypes: exercises.reduce<Partial<Record<Exercise["type"], number>>>((counts, exercise) => {
+      counts[exercise.type] = (counts[exercise.type] ?? 0) + 1;
+      return counts;
+    }, {})
+  };
 
   return {
     language,
@@ -452,19 +526,8 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
       evidencePassageIds: [...rule.evidencePassageIds]
     })) ?? [],
     fixtureMinimums: { ...SYNTHETIC_FIXTURE_MINIMUMS },
-    stats: {
-      vocabularyItems: fixture?.vocabulary.length ?? 0,
-      grammarRules: fixture?.grammarRules.length ?? 0,
-      paradigms: fixture?.paradigms.length ?? 0,
-      dialectVariants: fixture?.dialectVariants.length ?? 0,
-      corpusPassages: state.corpus.filter((passage) => passage.languageId === languageId).length,
-      notes: state.notes.filter((note) => note.languageId === languageId).length,
-      exercises: exercises.length,
-      exerciseTypes: exercises.reduce<Partial<Record<Exercise["type"], number>>>((counts, exercise) => {
-        counts[exercise.type] = (counts[exercise.type] ?? 0) + 1;
-        return counts;
-      }, {})
-    }
+    fixtureQuality: buildFixtureQuality(fixture, stats),
+    stats
   };
 }
 

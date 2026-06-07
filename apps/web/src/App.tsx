@@ -1541,7 +1541,7 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     grammarRules,
     vocabulary,
     morphemeInventory,
-    fixtureMinimums
+    fixtureQuality
   } = profileState.data;
 
   return (
@@ -1587,37 +1587,22 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
         <div className="record-topline">
           <div>
             <span className="detail-label">Synthetic fixture quality floor</span>
-            <h2>Published baseline</h2>
+            <h2>{fixtureQuality.passed ? "Baseline met" : "Needs work"}</h2>
           </div>
-          <span className="id-badge">minimums</span>
+          <span className="id-badge">{formatCount(fixtureQuality.checks.length, "check")}</span>
         </div>
-        <dl className="detail-grid">
-          <div>
-            <dt>Vocabulary</dt>
-            <dd>{formatCount(fixtureMinimums.vocabularyItems, "vocabulary entry", "vocabulary entries")}</dd>
-          </div>
-          <div>
-            <dt>Corpus</dt>
-            <dd>{formatCount(fixtureMinimums.corpusPassages, "corpus passage")}</dd>
-          </div>
-          <div>
-            <dt>Grammar</dt>
-            <dd>{formatCount(fixtureMinimums.grammarRules, "grammar rule")}</dd>
-          </div>
-          <div>
-            <dt>Notes</dt>
-            <dd>{formatCount(fixtureMinimums.noteAnswerKeys, "note answer key")}</dd>
-          </div>
-          <div>
-            <dt>Exercises</dt>
-            <dd>{formatCount(fixtureMinimums.exerciseAnswerKeys, "exercise answer key")}</dd>
-          </div>
-          <div>
-            <dt>Coverage structures</dt>
-            <dd>
-              {formatCount(fixtureMinimums.exerciseTypes, "exercise type")} / {formatCount(fixtureMinimums.paradigms, "paradigm table")} / {formatCount(fixtureMinimums.dialectVariants, "dialect variant")}
-            </dd>
-          </div>
+        <dl className="detail-grid quality-check-grid">
+          {fixtureQuality.checks.map((check) => (
+            <div className={check.passed ? "quality-check passed" : "quality-check missing"} key={check.id}>
+              <dt>{check.label}</dt>
+              <dd>
+                <span className="quality-ratio">{check.actual} / {check.minimum}</span>
+                <span className={check.passed ? "status-badge approved" : "status-badge contested"}>
+                  {check.passed ? "Met" : "Needs work"}
+                </span>
+              </dd>
+            </div>
+          ))}
         </dl>
       </section>
 

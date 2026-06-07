@@ -38,7 +38,7 @@ Do not treat prototype auth as production security.
 | `POST /auth/prototype-session` | Open a local HTTP-only prototype session for an allowed user. |
 | `GET /users/me` | Return the current prototype user. |
 | `GET /languages` | List synthetic languages. |
-| `GET /languages/:languageId/profile` | Return public linguistic profile data for one language, including phonology, vocabulary, grammar, paradigms, dialect variants, a derived morpheme inventory, and the shared synthetic fixture quality floor. |
+| `GET /languages/:languageId/profile` | Return public linguistic profile data for one language, including phonology, vocabulary, grammar, paradigms, dialect variants, a derived morpheme inventory, the shared synthetic fixture quality floor, and actual-vs-minimum quality checks. |
 | `GET /languages/:languageId/corpus` | Return corpus passages for one language. |
 | `POST /languages/:languageId/corpus` | Import a validated synthetic corpus passage. |
 | `GET /languages/:languageId/notes` | Return public review notes for one language. |
@@ -212,7 +212,7 @@ The persisted app-state schema also enforces one approval per language, note, an
 
 ## Sanitized Exports
 
-Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
+Language snapshots and evaluation artifacts include SHA-256 integrity manifests. Language snapshots carry the public profile's `fixtureMinimums` object and `fixtureQuality` summary so reviewers can compare exported data against the current synthetic depth floor without exposing answer keys. They omit private fields such as answer keys, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
 
 ## Evaluation Runs
 

@@ -58,6 +58,17 @@ const SYNTHETIC_FIXTURE_MINIMUMS = {
   paradigmRows: 3,
   dialectVariants: 2
 };
+const SYNTHETIC_FIXTURE_QUALITY = {
+  passed: false,
+  checks: [
+    { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
+    { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },
+    { id: "grammarRules", label: "Grammar rules", actual: 1, minimum: 6, passed: false },
+    { id: "noteAnswerKeys", label: "Public notes", actual: 2, minimum: 6, passed: false },
+    { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 2, minimum: 6, passed: false },
+    { id: "exerciseTypes", label: "Exercise types", actual: 2, minimum: 2, passed: true }
+  ]
+};
 
 function createDashboardData() {
   return {
@@ -328,7 +339,8 @@ function createLanguageProfile() {
       exercises: 2,
       exerciseTypes: { translate_to_target: 1, segment: 1 }
     },
-    fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS
+    fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
+    fixtureQuality: SYNTHETIC_FIXTURE_QUALITY
   };
 }
 
@@ -772,11 +784,13 @@ describe("App", () => {
     expect(screen.getByText("morphology/verb/tense-person-suffix-chain")).toBeInTheDocument();
     expect(screen.getByText("Avenik finite verbs use root + tense + person suffixes.")).toBeInTheDocument();
     const qualityFloor = screen.getByRole("region", { name: "Synthetic fixture quality floor" });
-    expect(within(qualityFloor).getByText("24 vocabulary entries")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("12 corpus passages")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("6 grammar rules")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("6 note answer keys")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("6 exercise answer keys")).toBeInTheDocument();
+    expect(within(qualityFloor).getAllByText("Needs work").length).toBeGreaterThan(0);
+    expect(within(qualityFloor).getByText("Vocabulary")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("2 / 24")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("1 / 12")).toBeInTheDocument();
+    expect(within(qualityFloor).getAllByText("2 / 6").length).toBeGreaterThan(0);
+    expect(within(qualityFloor).getByText("2 / 2")).toBeInTheDocument();
+    expect(within(qualityFloor).getByText("Met")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Phonology profile" })).toBeInTheDocument();
     expect(screen.getByText("word-initial")).toBeInTheDocument();
     expect(screen.getByText("Consonant clusters are disallowed inside native roots.")).toBeInTheDocument();
