@@ -10,6 +10,15 @@ Some routes can be called anonymously because they expose synthetic public data.
 
 Seeded local databases persist the same prototype users used by the API fallback: learner, Elder, reviewer, lead, programmer, and admin. The fallback remains for older local databases that were generated before users were written into `data/local-db.json`. During local JSON reads, restored users must keep nonblank IDs and names, and optional avatar URLs must be nonblank when present.
 
+The browser prototype flow is intentionally leadless. `POST /auth/prototype-session` accepts learner, Elder, reviewer, and programmer users for local UI workflows and rejects lead/admin users. Lead and admin users remain server-token actors for backend tests, administrative workflows, persisted policy authority, and future production-account modeling.
+
+The web app maps local UI actions to the narrowest useful prototype actor:
+
+- Learner practice and learner-mode AI sessions use the learner actor.
+- Corpus import, note review, exercise authoring, review-policy editing, review-disposition views, and review-disposition resolution use the reviewer actor.
+- Governance writes and elder-correction review/apply flows use the Elder actor.
+- Audit reads, evaluation artifact reads, programmer AI sessions, AI observability, and neural-map inspection use the programmer actor.
+
 Do not treat prototype auth as production security.
 
 ## Common Response Rules
@@ -192,6 +201,8 @@ Persisted review-disposition records must keep nonblank language and note IDs, r
 Approval can be controlled by per-language review policies. If a policy requires multiple approvals, the note remains `under_review` until the threshold is met.
 
 Review-policy updates require at least one assigned reviewer. Assigned reviewer IDs must be nonblank, unique, and must reference users with assignable review roles. When `requiresAssignedReviewer` is true, `approvalThreshold` cannot exceed assigned reviewers. When it is false, `approvalThreshold` cannot exceed the current assignable reviewer pool.
+
+Review-policy updates have a prototype-only reviewer exception so the leadless browser governance UI can edit assignments. Server-token calls still require lead/admin roles. When a prototype reviewer updates a policy, the audit event is attributed to the reviewer session, while persisted `updatedBy` remains the canonical lead/admin policy authority required by the database integrity rules.
 
 Stored approvals remain auditable after policy changes, but only reviewers eligible under the current policy count toward the active approval quorum.
 

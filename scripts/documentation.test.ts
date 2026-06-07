@@ -7,10 +7,12 @@ async function readProjectFile(path: string): Promise<string> {
 
 describe("project documentation", () => {
   it("keeps the root README concise while linking to detailed UI documentation", async () => {
-    const [rootReadme, docsHub, uiGuide] = await Promise.all([
+    const [rootReadme, docsHub, uiGuide, productGuide, apiGuide] = await Promise.all([
       readProjectFile("README.md"),
       readProjectFile("docs/README.md"),
-      readProjectFile("docs/ui-design.md")
+      readProjectFile("docs/ui-design.md"),
+      readProjectFile("docs/product-guide.md"),
+      readProjectFile("docs/api.md")
     ]);
 
     expect(rootReadme.split(/\r?\n/).length).toBeLessThanOrEqual(120);
@@ -20,5 +22,9 @@ describe("project documentation", () => {
     expect(uiGuide).toContain("Atlas layout");
     expect(uiGuide).toContain("night-sky");
     expect(uiGuide).toContain("synthetic-only");
+    expect(productGuide).toContain("leadless");
+    expect(productGuide).toContain("learner, Elder, reviewer, and programmer");
+    expect(apiGuide).toContain("Lead and admin users remain server-token actors");
+    expect(apiGuide).toContain("Review-policy updates have a prototype-only reviewer exception");
   });
 });

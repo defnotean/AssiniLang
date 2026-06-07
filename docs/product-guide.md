@@ -110,7 +110,7 @@ Supported provider modes include deterministic fallback, OpenAI-compatible local
 
 ## Local User Roles
 
-The local prototype includes role-aware users for:
+The local prototype keeps six role-aware identities in the local database:
 
 - Learners.
 - Elders.
@@ -118,6 +118,17 @@ The local prototype includes role-aware users for:
 - Leads.
 - Programmers.
 - Admins.
+
+The browser prototype flow is leadless on purpose. It opens HTTP-only local sessions only for learner, Elder, reviewer, and programmer actors, then calls the API with the narrowest actor that can exercise each workflow.
+
+The browser actor mapping is:
+
+- Learner: learner exercise submissions and learner-practice AI sessions.
+- Elder: synthetic governance records and elder-correction review/apply flows.
+- Reviewer: corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
+- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, AI observability, and neural-map inspection.
+
+Lead and admin identities still exist in the local state for backend authorization, persisted review-policy authority, audit integrity, and future production-account design. Review-policy edits from the browser are audited as reviewer activity, while the stored policy updater remains the canonical lead/admin authority required by local database validation.
 
 Prototype auth exists to test workflow permissions. Replace it before production use.
 

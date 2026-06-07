@@ -50,7 +50,7 @@ npm.cmd run dev
 - Four synthetic languages with 40 corpus passages, 20 notes, 20+ learner exercises, and immutable answer keys.
 - A Fastify API backed by a JSON local database.
 - A React web console for language profiles, corpus browsing/import, note review, learning exercises, evaluation, governance, elder corrections, and model setup.
-- Role-aware local prototype users for learners, Elders, reviewers, leads, programmers, and admins.
+- Leadless browser prototype sessions for learners, Elders, reviewers, and programmers, with lead/admin authority retained server-side for policy integrity.
 - Review policies, disposition ledgers, audit events, and sanitized snapshot/evaluation exports with SHA-256 integrity manifests.
 - A deterministic evaluation harness that currently scores all seeded synthetic languages at 100%.
 
