@@ -8,6 +8,7 @@ import {
   EXERCISE_SUBMISSION_ACTOR_ROLES,
   GOVERNANCE_APPROVER_ROLES,
   isReviewPolicyAssignableRole,
+  isReviewPolicyUpdaterRole,
   JsonStore,
   LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
@@ -138,6 +139,11 @@ type PrototypeSessionRecord = {
   createdAt: number;
 };
 
+type ResolvedActor = {
+  actor: User;
+  authMethod: "prototype-session" | "server-token";
+};
+
 type NeuralMapResponse = NeuralMap & {
   languageId: string;
 };
@@ -148,7 +154,7 @@ const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173
 const TEST_ONLY_AUTH_TOKEN = "test";
 const PROTOTYPE_SESSION_COOKIE = "assini_prototype_session";
 const PROTOTYPE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
-const PROTOTYPE_AUTH_ROLES: readonly UserRole[] = ["learner", "elder", "programmer", "reviewer", "lead"];
+const PROTOTYPE_AUTH_ROLES: readonly UserRole[] = ["learner", "elder", "programmer", "reviewer"];
 const REVIEW_DISPOSITION_STATUSES: readonly ReviewDispositionStatus[] = ["contested", "rejected", "deferred", "escalated"];
 const DEFAULT_RATE_LIMIT: RateLimitOptions = { max: 120, windowMs: 60_000 };
 const RATE_LIMITED_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
@@ -958,6 +964,11 @@ function actorById(state: AppState, userId: string | undefined): User | undefine
   return usersForState(state).find((user) => user.id === userId);
 }
 
+function reviewPolicyAuthorityActor(state: AppState, actor: User): User | undefined {
+  if (isReviewPolicyUpdaterRole(actor.role)) return actor;
+  return usersForState(state).find((user) => isReviewPolicyUpdaterRole(user.role));
+}
+
 function cookieValue(request: FastifyRequest, name: string): string | undefined {
   const cookieHeader = getHeaderValue(request, "cookie");
   if (!cookieHeader) return undefined;
@@ -997,12 +1008,12 @@ function pruneExpiredPrototypeSessions(
   });
 }
 
-function resolveActor(
+function resolveActorContext(
   state: AppState,
   request: FastifyRequest,
   authToken: string | undefined,
   prototypeSessions: Map<string, PrototypeSessionRecord>
-): User | undefined {
+): ResolvedActor | undefined {
   const sessionId = cookieValue(request, PROTOTYPE_SESSION_COOKIE);
   const prototypeSession = sessionId ? prototypeSessions.get(sessionId) : undefined;
   if (sessionId && prototypeSession) {
@@ -1010,7 +1021,7 @@ function resolveActor(
       prototypeSessions.delete(sessionId);
     } else {
       const sessionActor = actorById(state, prototypeSession.userId);
-      if (sessionActor) return sessionActor;
+      if (sessionActor) return { actor: sessionActor, authMethod: "prototype-session" };
     }
   }
 
@@ -1021,7 +1032,17 @@ function resolveActor(
     return undefined;
   }
 
-  return actorById(state, requestedUserId);
+  const tokenActor = actorById(state, requestedUserId);
+  return tokenActor ? { actor: tokenActor, authMethod: "server-token" } : undefined;
+}
+
+function resolveActor(
+  state: AppState,
+  request: FastifyRequest,
+  authToken: string | undefined,
+  prototypeSessions: Map<string, PrototypeSessionRecord>
+): User | undefined {
+  return resolveActorContext(state, request, authToken, prototypeSessions)?.actor;
 }
 
 function actorCan(actor: User, allowedRoles: readonly UserRole[]): boolean {
@@ -1050,15 +1071,20 @@ function requireActor(
   reply: FastifyReply,
   authToken: string | undefined,
   prototypeSessions: Map<string, PrototypeSessionRecord>,
-  allowedRoles?: readonly UserRole[]
+  allowedRoles?: readonly UserRole[],
+  prototypeSessionAdditionalRoles: readonly UserRole[] = []
 ): User | undefined {
-  const actor = resolveActor(state, request, authToken, prototypeSessions);
-  if (!actor) {
+  const resolved = resolveActorContext(state, request, authToken, prototypeSessions);
+  if (!resolved) {
     reply.code(401);
     return undefined;
   }
 
-  if (allowedRoles && !actorCan(actor, allowedRoles)) {
+  const { actor } = resolved;
+  const allowedByPrimaryRole = !allowedRoles || actorCan(actor, allowedRoles);
+  const allowedByPrototypeException = resolved.authMethod === "prototype-session"
+    && actorCan(actor, prototypeSessionAdditionalRoles);
+  if (!allowedByPrimaryRole && !allowedByPrototypeException) {
     reply.code(403);
     return undefined;
   }
@@ -1914,9 +1940,14 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES, ["reviewer"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const policyAuthority = reviewPolicyAuthorityActor(current, actor);
+    if (!policyAuthority) {
+      reply.code(403);
+      return { error: "Forbidden" };
+    }
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
@@ -1939,7 +1970,7 @@ export function createServer(options: ServerOptions = {}) {
         approvalThreshold: body.approvalThreshold,
         requiresAssignedReviewer: body.requiresAssignedReviewer,
         updatedAt,
-        updatedBy: actor.id
+        updatedBy: policyAuthority.id
       };
       const existingPolicy = state.reviewPolicies.some((item) => item.languageId === languageId);
       const reviewPolicies = existingPolicy

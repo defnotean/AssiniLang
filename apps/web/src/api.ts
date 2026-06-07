@@ -256,7 +256,7 @@ export type CreateAiSessionPayload = {
   contextPassageIds: string[];
 };
 
-type LocalActor = "learner" | "elder" | "programmer" | "reviewer" | "lead";
+type LocalActor = "learner" | "elder" | "programmer" | "reviewer";
 
 function jsonHeaders(json = false): HeadersInit {
   return json ? { "Content-Type": "application/json" } : {};
@@ -319,8 +319,6 @@ function prototypeActorId(actor: LocalActor): string {
       return "programmer-1";
     case "reviewer":
       return "reviewer-1";
-    case "lead":
-      return "lead-1";
   }
 }
 
@@ -368,7 +366,7 @@ export async function fetchGovernance(): Promise<GovernanceRecord[]> {
 export async function createGovernanceRecord(payload: GovernancePayload): Promise<GovernanceRecord> {
   const response = await fetch("/api/governance", {
     method: "POST",
-    ...(await actorRequest("lead", true)),
+    ...(await actorRequest("elder", true)),
     body: JSON.stringify(payload)
   });
 
@@ -378,7 +376,7 @@ export async function createGovernanceRecord(payload: GovernancePayload): Promis
 }
 
 export async function fetchAuditEvents(languageId: string): Promise<AuditEvent[]> {
-  return getJson<AuditEvent[]>(`/audit/events?languageId=${encodeURIComponent(languageId)}`, "lead");
+  return getJson<AuditEvent[]>(`/audit/events?languageId=${encodeURIComponent(languageId)}`, "programmer");
 }
 
 export async function fetchReviewPolicy(languageId: string): Promise<ReviewPolicy> {
@@ -388,7 +386,7 @@ export async function fetchReviewPolicy(languageId: string): Promise<ReviewPolic
 export async function updateReviewPolicy(languageId: string, payload: ReviewPolicyPayload): Promise<ReviewPolicy> {
   const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/review-policy`, {
     method: "PUT",
-    ...(await actorRequest("lead", true)),
+    ...(await actorRequest("reviewer", true)),
     body: JSON.stringify(payload)
   });
 
@@ -410,7 +408,7 @@ export async function resolveReviewDisposition(
 ): Promise<ReviewDisposition> {
   const response = await fetch(`/api/review-dispositions/${encodeURIComponent(dispositionId)}/resolve`, {
     method: "PATCH",
-    ...(await actorRequest("lead", true)),
+    ...(await actorRequest("reviewer", true)),
     body: JSON.stringify({ resolutionSummary })
   });
 
@@ -556,7 +554,7 @@ export async function reviewElderCorrection(
 ): Promise<ElderCorrection> {
   const response = await fetch(`/api/elder/corrections/${encodeURIComponent(correctionId)}/review`, {
     method: "PATCH",
-    ...(await actorRequest("lead", true)),
+    ...(await actorRequest("elder", true)),
     body: JSON.stringify({ status })
   });
 
@@ -571,7 +569,7 @@ export async function applyElderCorrection(
 ): Promise<ElderCorrectionApplyResult> {
   const response = await fetch(`/api/elder/corrections/${encodeURIComponent(correctionId)}/apply`, {
     method: "PATCH",
-    ...(await actorRequest("lead", true)),
+    ...(await actorRequest("elder", true)),
     body: JSON.stringify({ explanation })
   });
 

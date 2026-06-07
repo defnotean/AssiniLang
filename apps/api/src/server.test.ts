@@ -224,8 +224,7 @@ describe("api server", () => {
       url: "/auth/prototype-session",
       payload: { userId: "lead-1" }
     });
-    expect(leadSession.statusCode).toBe(200);
-    expect(leadSession.json()).toMatchObject({ id: "lead-1", role: "lead" });
+    expect(leadSession.statusCode).toBe(403);
 
     const adminSession = await enabled.inject({
       method: "POST",
@@ -854,6 +853,64 @@ describe("api server", () => {
           approvalCount: 2,
           approvalThreshold: 2
         })
+      })
+    ]));
+  });
+
+  it("lets prototype reviewers update review policies while preserving lead policy authority", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(stateWithAuthUsers());
+    const app = createServer({ store, enablePrototypeAuth: true });
+
+    const session = await app.inject({
+      method: "POST",
+      url: "/auth/prototype-session",
+      payload: { userId: "reviewer-1" }
+    });
+    expect(session.statusCode).toBe(200);
+    const setCookie = session.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+
+    const policy = await app.inject({
+      method: "PUT",
+      url: "/languages/avenik/review-policy",
+      headers: { cookie: cookieHeader?.split(";")[0] ?? "" },
+      payload: {
+        assignedReviewerIds: ["reviewer-1", "elder-1"],
+        approvalThreshold: 2,
+        requiresAssignedReviewer: true
+      }
+    });
+
+    expect(policy.statusCode).toBe(200);
+    expect(policy.json()).toMatchObject({
+      id: "review-policy-avenik",
+      languageId: "avenik",
+      assignedReviewerIds: ["reviewer-1", "elder-1"],
+      approvalThreshold: 2,
+      requiresAssignedReviewer: true,
+      updatedBy: "lead-1"
+    });
+
+    const persisted = await store.read();
+    expect(persisted.reviewPolicies.find((item) => item.languageId === "avenik")).toMatchObject({
+      updatedBy: "lead-1"
+    });
+
+    const audit = await app.inject({
+      method: "GET",
+      url: "/audit/events?languageId=avenik",
+      headers: authHeaders("lead-1")
+    });
+    expect(audit.statusCode).toBe(200);
+    expect(audit.json()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        actorId: "reviewer-1",
+        actorRole: "reviewer",
+        action: "review_policy.upserted",
+        entityType: "review_policy",
+        entityId: "review-policy-avenik"
       })
     ]));
   });

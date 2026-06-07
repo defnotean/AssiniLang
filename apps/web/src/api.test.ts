@@ -289,7 +289,7 @@ describe("fetchDashboardData", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("OPENAI_API_KEY");
   });
 
-  it("opens a lead prototype session before creating governance policy records", async () => {
+  it("opens an elder prototype session before creating governance policy records", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ id: "governance-1" })
@@ -305,7 +305,7 @@ describe("fetchDashboardData", () => {
     };
     await createGovernanceRecord(payload);
 
-    expectPrototypeSession(fetchMock, "lead-1");
+    expectPrototypeSession(fetchMock, "elder-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/governance", {
       method: "POST",
       ...jsonRequest,
@@ -335,7 +335,7 @@ describe("fetchDashboardData", () => {
       requiresAssignedReviewer: true
     };
     await updateReviewPolicy("avenik/test language", payload);
-    expectPrototypeSession(fetchMock, "lead-1", 2);
+    expectPrototypeSession(fetchMock, "reviewer-1", 2);
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/languages/avenik%2Ftest%20language/review-policy", {
       method: "PUT",
       ...jsonRequest,
@@ -343,7 +343,7 @@ describe("fetchDashboardData", () => {
     });
   });
 
-  it("fetches encoded audit events through lead prototype auth", async () => {
+  it("fetches encoded audit events through programmer prototype auth", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => []
@@ -353,7 +353,7 @@ describe("fetchDashboardData", () => {
 
     await fetchAuditEvents("avenik/test language");
 
-    expectPrototypeSession(fetchMock, "lead-1");
+    expectPrototypeSession(fetchMock, "programmer-1");
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       "/api/audit/events?languageId=avenik%2Ftest%20language",
@@ -378,7 +378,7 @@ describe("fetchDashboardData", () => {
     );
 
     await resolveReviewDisposition("review/disposition 1", "Resolved after Elder review.");
-    expectPrototypeSession(fetchMock, "lead-1", 2);
+    expectPrototypeSession(fetchMock, "reviewer-1", 2);
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/review-dispositions/review%2Fdisposition%201/resolve", {
       method: "PATCH",
       ...jsonRequest,
@@ -386,7 +386,7 @@ describe("fetchDashboardData", () => {
     });
   });
 
-  it("opens a lead prototype session before reviewing encoded elder corrections", async () => {
+  it("opens an elder prototype session before reviewing encoded elder corrections", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ id: "elder/correction 1", status: "accepted" })
@@ -396,7 +396,7 @@ describe("fetchDashboardData", () => {
 
     await reviewElderCorrection("elder/correction 1", "accepted");
 
-    expectPrototypeSession(fetchMock, "lead-1");
+    expectPrototypeSession(fetchMock, "elder-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/elder/corrections/elder%2Fcorrection%201/review", {
       method: "PATCH",
       ...jsonRequest,
@@ -404,7 +404,7 @@ describe("fetchDashboardData", () => {
     });
   });
 
-  it("opens a lead prototype session before applying encoded elder corrections", async () => {
+  it("opens an elder prototype session before applying encoded elder corrections", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ correction: { id: "elder/correction 1", status: "applied" }, note: { id: "note-1" } })
@@ -414,7 +414,7 @@ describe("fetchDashboardData", () => {
 
     await applyElderCorrection("elder/correction 1", "Updated note explanation.");
 
-    expectPrototypeSession(fetchMock, "lead-1");
+    expectPrototypeSession(fetchMock, "elder-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/elder/corrections/elder%2Fcorrection%201/apply", {
       method: "PATCH",
       ...jsonRequest,
