@@ -42,6 +42,8 @@ Each synthetic language should include:
 - Paradigm tables.
 - Dialect variants.
 
+The shared `SYNTHETIC_FIXTURE_MINIMUMS` export in `packages/synthetic-langs/src/validation.ts` is the source of truth for the current fixture depth floor; tests and docs should reference or mirror that contract when the baseline changes.
+
 Fixture loading validates cross-references, linguistic consistency, and fixture depth. It rejects broken evidence IDs, duplicate IDs, duplicate vocabulary IDs or forms, duplicate vocabulary tags, empty dialect labels, undersized phonology inventories, missing stress or syllable-template metadata, lexicons below 24 public vocabulary items, corpus/rule/note/exercise/paradigm/dialect sets below the synthetic milestone floor, grammar rules without note or learner-exercise coverage, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted answers or one another, note evidence-count drift, and note examples that no longer match their cited corpus passage.
 
 Validation rules live in `packages/synthetic-langs/src/validation.ts`; seed-state cloning and answer-key materialization live in `packages/synthetic-langs/src/loader.ts`.

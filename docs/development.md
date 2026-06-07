@@ -88,6 +88,8 @@ Useful smoke checks:
 
 Add fixture data in `packages/synthetic-langs/src/fixtures.ts`.
 
+The authoritative richness floor is `SYNTHETIC_FIXTURE_MINIMUMS` in `packages/synthetic-langs/src/validation.ts`. Update that exported contract first when raising fixture depth, then update docs and tests to match.
+
 Each language should include:
 
 - Language metadata.
