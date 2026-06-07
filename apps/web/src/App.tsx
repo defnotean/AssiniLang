@@ -207,6 +207,17 @@ function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): string 
   return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
 }
 
+function formatFixtureQualityLabel(fixtureQuality: LanguageSnapshot["linguisticProfile"]["fixtureQuality"]): string {
+  const totalChecks = fixtureQuality.checks.length;
+  if (totalChecks === 0) return "0 fixture checks available";
+
+  const passedChecks = fixtureQuality.checks.filter((check) => check.passed).length;
+  if (fixtureQuality.passed) return `${formatCount(totalChecks, "fixture check")} met`;
+
+  const missingChecks = totalChecks - passedChecks;
+  return `${passedChecks} of ${totalChecks} fixture checks met, ${formatCount(missingChecks, "fixture check")} need work`;
+}
+
 function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
   const safeLanguageId = snapshot.language.id.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "language";
   const summary = [
@@ -217,6 +228,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
     formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
     formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
+    formatFixtureQualityLabel(snapshot.linguisticProfile.fixtureQuality),
     formatIntegrityLabel(snapshot.integrity)
   ].join(", ");
 

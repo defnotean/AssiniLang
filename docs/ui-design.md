@@ -88,6 +88,7 @@ Governance and model setup are operational surfaces:
 
 - Keep policy records, dispositions, audit events, and exports data-forward.
 - Do not over-style these views; reliability and scanability matter most.
+- Snapshot export summaries should include fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness
@@ -111,4 +112,3 @@ For future UI changes:
 - Add or update React tests for navigation, mutation flows, redaction expectations, and error states.
 - Run `npm.cmd run verify` before committing.
 - Browser-smoke frontend changes after automated tests pass.
-

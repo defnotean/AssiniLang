@@ -136,7 +136,7 @@ Prototype auth exists to test workflow permissions. Replace it before production
 
 ## Export Surfaces
 
-Sanitized language snapshots include public language metadata, linguistic profile data, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries.
+Sanitized language snapshots include public language metadata, linguistic profile data, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries. The web download summary includes the fixture-quality pass count so reviewers can see baseline readiness before opening the JSON artifact.
 
 Exports intentionally omit:
 

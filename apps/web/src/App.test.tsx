@@ -555,6 +555,15 @@ describe("App", () => {
           notes: 2,
           exercises: 2,
           exerciseTypes: { translate_to_target: 1, segment: 1 }
+        },
+        fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
+        fixtureQuality: {
+          passed: false,
+          checks: [
+            { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
+            { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },
+            { id: "exerciseTypes", label: "Exercise types", actual: 2, minimum: 2, passed: true }
+          ]
         }
       },
       corpus: createDashboardData().corpus,
@@ -1086,7 +1095,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 dialect variant, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 dialect variant, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
