@@ -19,7 +19,7 @@ bash (macOS/Linux):
 ASSINI_LLM_PROVIDER=ollama ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1 npm run dev
 ```
 
-Variables apply to the process you start; there is no `.env` file loader.
+Variables apply to the process you start. You can also keep `ASSINI_*` settings in a repo-root `.env` file instead of re-exporting them every shell: the API calls Node's `process.loadEnvFile()` at startup (no dependency), so a `.env` at the repo root is loaded automatically when the API boots. The repo-root `.env` is git-ignored locally so secrets are never committed. The provider is resolved once at boot, so restart the API after editing `.env` (or any `ASSINI_*` variable) for the change to take effect.
 
 ## LLM provider
 
@@ -32,6 +32,8 @@ Read by `apps/api/src/llmProvider.ts`. The same provider drives ingestion extrac
 | `ASSINI_LLM_MODEL` | `gpt-4o-mini` in remote mode; required in local mode | model name string | Model sent in completion requests. Falls back to `OPENAI_MODEL` when unset. |
 | `ASSINI_LLM_API_KEY` | unset | secret string | Bearer token for the LLM endpoint. Required in remote mode. `OPENAI_API_KEY` is accepted as an alias. |
 | `ASSINI_LLM_TIMEOUT_MS` | `30000` | positive integer | Per-request completion timeout in milliseconds. Invalid values fall back to the default with a warning. |
+| `ASSINI_LLM_MAX_TOKENS` | `4096` | positive integer | Caps `max_tokens` on each model request. Unset or invalid values fall back to the default. Raise it if extractions are getting truncated. |
+| `ASSINI_LLM_JSON_MODE` | unset (off) | `1` or `true` | When enabled, sends `response_format: { type: "json_object" }` on extraction (`completeChat`) requests only - never on AI chat sessions. Off by default because some local servers reject the field; turn it on with capable servers (recent llama.cpp or OpenAI) to make extraction JSON more reliable. |
 
 Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local OpenAI-compatible mode; an API key alone means remote OpenAI mode; nothing configured means the deterministic fallback (no model calls, offline heuristics for ingestion).
 
@@ -80,6 +82,8 @@ $env:ASSINI_LLM_MODEL="llama3.1"
 npm.cmd run dev
 ```
 
+The explicit `/v1` base URL above is still correct. With the `ollama` alias a bare host (for example `http://127.0.0.1:11434`) now also works: the base URL is auto-normalized to end in `/v1`.
+
 For image sources, pick a vision-capable model such as `llava`.
 
 ### LM Studio
@@ -99,6 +103,10 @@ $env:ASSINI_LLM_BASE_URL="http://127.0.0.1:8080/v1"
 $env:ASSINI_LLM_MODEL="<served model name>"
 # Optional, if the server requires a key:
 $env:ASSINI_LLM_API_KEY="<key>"
+# Optional, on servers that accept it, to make extraction JSON more reliable:
+$env:ASSINI_LLM_JSON_MODE="1"
+# Optional, raise if extractions are getting truncated:
+$env:ASSINI_LLM_MAX_TOKENS="8192"
 npm.cmd run dev
 ```
 

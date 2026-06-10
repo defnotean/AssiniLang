@@ -2753,4 +2753,72 @@ describe("JsonStore", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
+
+  it("round-trips a source asset with extraction warnings through the store", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.sourceAssets = [{
+        id: "source-asset-warned",
+        languageId: "avenik",
+        kind: "text",
+        title: "Warned source",
+        rawText: "mira talo",
+        status: "processed",
+        warnings: [
+          "No model configured (deterministic mode); used offline heuristic parsing.",
+          "Model output was not valid extraction JSON; fell back to offline heuristics."
+        ],
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z",
+        processedAt: "2026-06-06T00:01:00.000Z"
+      }];
+
+      await store.write(state);
+      const loaded = await store.read();
+      const raw = JSON.parse(await readFile(dbPath, "utf8"));
+
+      expect(loaded.sourceAssets).toHaveLength(1);
+      expect(loaded.sourceAssets[0]?.warnings).toEqual([
+        "No model configured (deterministic mode); used offline heuristic parsing.",
+        "Model output was not valid extraction JSON; fell back to offline heuristics."
+      ]);
+      expect(raw.sourceAssets[0]?.warnings).toHaveLength(2);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses a source asset without warnings for back-compat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.sourceAssets = [{
+        id: "source-asset-plain",
+        languageId: "avenik",
+        kind: "text",
+        title: "Plain source",
+        rawText: "mira talo",
+        status: "pending",
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      }];
+
+      await store.write(state);
+      const loaded = await store.read();
+
+      expect(loaded.sourceAssets).toHaveLength(1);
+      expect(loaded.sourceAssets[0]?.warnings).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 });

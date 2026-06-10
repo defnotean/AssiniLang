@@ -111,6 +111,7 @@ export const sourceAssetSchema = z.object({
   status: sourceAssetStatusSchema,
   error: z.string().optional(),
   summary: z.string().optional(),
+  warnings: z.array(z.string()).optional(),
   createdBy: z.string().min(1),
   createdAt: z.string().min(1),
   processedAt: z.string().min(1).optional()

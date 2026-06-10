@@ -1821,6 +1821,27 @@ label,
   color: var(--danger);
 }
 
+.result-notice.warning {
+  border-color: color-mix(in srgb, var(--warning) 64%, transparent);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.source-warnings {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.25rem;
+  color: var(--warning);
+  font-size: 0.85rem;
+}
+
 .evaluation-view {
   display: flex;
   flex-direction: column;

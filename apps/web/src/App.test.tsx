@@ -6,6 +6,7 @@ import { App, getInitialTheme } from "./App";
 const apiMock = vi.hoisted(() => ({
   acceptExtractionDraft: vi.fn(),
   applyElderCorrection: vi.fn(),
+  checkLlmReachability: vi.fn(),
   createAiSession: vi.fn(),
   createLanguage: vi.fn(),
   fetchExtractionDrafts: vi.fn(),
@@ -328,6 +329,50 @@ function createAudioSource() {
   };
 }
 
+function createDeterministicLlmStatus() {
+  return {
+    provider: "deterministic",
+    mode: "deterministic",
+    configured: true,
+    activeProviderName: "deterministic",
+    timeoutMs: 30000,
+    apiKey: { required: false, configured: false, acceptedVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"] },
+    environment: {
+      providerVariable: "ASSINI_LLM_PROVIDER",
+      baseUrlVariable: "ASSINI_LLM_BASE_URL",
+      modelVariable: "ASSINI_LLM_MODEL",
+      apiKeyVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"],
+      timeoutVariable: "ASSINI_LLM_TIMEOUT_MS"
+    },
+    setup: {
+      localExamples: ["ASSINI_LLM_PROVIDER=openai-compatible ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1"],
+      remoteExamples: ["ASSINI_LLM_PROVIDER=openai ASSINI_LLM_MODEL=gpt-4o-mini ASSINI_LLM_API_KEY=<server-side-key>"]
+    },
+    warnings: ["No LLM provider configured; using deterministic fallback for safe local development."]
+  };
+}
+
+function createRealLlmStatus() {
+  return {
+    ...createDeterministicLlmStatus(),
+    provider: "openai-compatible",
+    mode: "local-openai-compatible",
+    activeProviderName: "local-openai-compatible",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    model: "llama3.1",
+    warnings: []
+  };
+}
+
+function createTextSourceWithWarnings() {
+  return {
+    ...createTextSource(),
+    status: "processed",
+    processedAt: "2026-06-08T00:20:00.000Z",
+    warnings: ["Processing fell back to offline heuristics; review extracted drafts carefully."]
+  };
+}
+
 function createLexemeDraft() {
   return {
     id: "draft-1",
@@ -375,29 +420,16 @@ describe("App", () => {
     apiMock.fetchExerciseSubmissions.mockResolvedValue([]);
     apiMock.fetchSources.mockResolvedValue([]);
     apiMock.fetchExtractionDrafts.mockResolvedValue([]);
-    apiMock.fetchLlmStatus.mockResolvedValue({
-      provider: "deterministic",
-      mode: "deterministic",
-      configured: true,
-      activeProviderName: "deterministic",
-      timeoutMs: 30000,
-      apiKey: { required: false, configured: false, acceptedVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"] },
-      environment: {
-        providerVariable: "ASSINI_LLM_PROVIDER",
-        baseUrlVariable: "ASSINI_LLM_BASE_URL",
-        modelVariable: "ASSINI_LLM_MODEL",
-        apiKeyVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"],
-        timeoutVariable: "ASSINI_LLM_TIMEOUT_MS"
-      },
-      setup: {
-        localExamples: ["ASSINI_LLM_PROVIDER=openai-compatible ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1"],
-        remoteExamples: ["ASSINI_LLM_PROVIDER=openai ASSINI_LLM_MODEL=gpt-4o-mini ASSINI_LLM_API_KEY=<server-side-key>"]
-      },
-      warnings: ["No LLM provider configured; using deterministic fallback for safe local development."]
+    apiMock.fetchLlmStatus.mockResolvedValue(createDeterministicLlmStatus());
+    apiMock.checkLlmReachability.mockResolvedValue({
+      reachable: false,
+      checked: false,
+      mode: "deterministic"
     });
     apiMock.fetchLanguageProfile.mockResolvedValue(createLanguageProfile());
     apiMock.createAiSession.mockResolvedValue({
-      messages: [{ role: "assistant", content: "Safe practice prompt from provider." }]
+      messages: [{ role: "assistant", content: "Safe practice prompt from provider." }],
+      trace: []
     });
     apiMock.fetchObservability.mockResolvedValue({
       totals: {
@@ -844,6 +876,29 @@ describe("App", () => {
     expect(within(draftQueue).getByText("medium confidence")).toBeInTheDocument();
   });
 
+  it("renders per-source processing warnings only for sources that carry them", async () => {
+    apiMock.fetchSources.mockResolvedValue([createTextSourceWithWarnings(), createAudioSource()]);
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    const sourcesRegion = await screen.findByRole("region", { name: "Registered sources" });
+    await waitFor(() => expect(apiMock.fetchSources).toHaveBeenCalledWith("avenik"));
+
+    const warnedSource = within(sourcesRegion).getByRole("list", {
+      name: "Processing warnings for Field notebook page"
+    });
+    expect(
+      within(warnedSource).getByText(
+        "Processing fell back to offline heuristics; review extracted drafts carefully."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      within(sourcesRegion).queryByRole("list", { name: "Processing warnings for Elder recording" })
+    ).not.toBeInTheDocument();
+  });
+
   it("registers a text source from the intake form and refreshes the source list", async () => {
     apiMock.fetchSources
       .mockResolvedValueOnce([])
@@ -1102,6 +1157,76 @@ describe("App", () => {
       contextPassageIds: ["avn-c001"]
     }));
     expect(await screen.findByText("Safe practice prompt from provider.")).toBeInTheDocument();
+  });
+
+  it("flags the smoke-test result as an offline placeholder in deterministic mode", async () => {
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Run provider smoke test" }));
+
+    expect(await screen.findByText("Safe practice prompt from provider.")).toBeInTheDocument();
+    expect(await screen.findByText(/Offline placeholder/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/no model is configured, so this is a canned response, not a real model reply/)
+    ).toBeInTheDocument();
+  });
+
+  it("treats the smoke-test result as a real model reply when a provider is configured", async () => {
+    apiMock.fetchLlmStatus.mockResolvedValue(createRealLlmStatus());
+    apiMock.createAiSession.mockResolvedValue({
+      messages: [{ role: "assistant", content: "Genuine model practice prompt." }],
+      trace: []
+    });
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Run provider smoke test" }));
+
+    expect(await screen.findByText("Genuine model practice prompt.")).toBeInTheDocument();
+    expect(screen.queryByText(/Offline placeholder/)).not.toBeInTheDocument();
+  });
+
+  it("checks LLM reachability and reports a not-configured provider", async () => {
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => expect(apiMock.checkLlmReachability).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("No external provider configured.")).toBeInTheDocument();
+  });
+
+  it("checks LLM reachability and reports a reachable provider with mode and latency", async () => {
+    apiMock.checkLlmReachability.mockResolvedValue({
+      reachable: true,
+      checked: true,
+      mode: "local-openai-compatible",
+      status: 200,
+      latencyMs: 142
+    });
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Test connection" }));
+
+    await waitFor(() => expect(apiMock.checkLlmReachability).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("Reachable (local openai compatible, 142 ms)")).toBeInTheDocument();
+  });
+
+  it("checks LLM reachability and reports an unreachable provider with the sanitized detail", async () => {
+    apiMock.checkLlmReachability.mockResolvedValue({
+      reachable: false,
+      checked: true,
+      mode: "local-openai-compatible",
+      detail: "Connection refused"
+    });
+    await renderReady();
+
+    fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Test connection" }));
+
+    expect(await screen.findByText("Unreachable: Connection refused")).toBeInTheDocument();
   });
 
   it("refreshes model observability after a failed provider smoke test", async () => {

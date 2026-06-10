@@ -205,6 +205,15 @@ export type LlmStatus = {
   warnings: string[];
 };
 
+export type LlmReachability = {
+  reachable: boolean;
+  checked: boolean;
+  mode: string;
+  status?: number;
+  detail?: string;
+  latencyMs?: number;
+};
+
 export type ElderCorrectionPayload = {
   languageId: string;
   noteId?: string;
@@ -459,6 +468,17 @@ export async function fetchCurrentUser(): Promise<User> {
 
 export async function fetchLlmStatus(): Promise<LlmStatus> {
   return getJson<LlmStatus>("/llm/status");
+}
+
+export async function checkLlmReachability(): Promise<LlmReachability> {
+  const response = await fetch("/api/llm/health-check", {
+    method: "POST",
+    ...(await actorRequest("programmer"))
+  });
+
+  await assertOk(response, "LLM reachability check failed");
+
+  return response.json() as Promise<LlmReachability>;
 }
 
 export async function fetchDashboardData(languageId?: string): Promise<DashboardData> {

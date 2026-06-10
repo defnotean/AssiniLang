@@ -37,6 +37,7 @@ The intake workspace captures raw materials and turns them into reviewable draft
 - Review proposed drafts one by one. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision.
 - Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
 - Failed processing marks the source `failed` with a sanitized error so it can be fixed and retried.
+- Processing warnings are shown under the source (for example "used offline heuristic parsing" or "fell back to offline heuristics"), so you can see when extraction fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts.
 
 Nothing extracted by a model enters the workspace without an explicit human accept.
 
@@ -110,6 +111,8 @@ The Elder workspace shows public note/corpus context and correction records for 
 The model setup view reports server-side LLM provider readiness, transcription readiness, and AI session observability. Browser code never receives provider API keys.
 
 Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics. See the [Configuration Reference](configuration.md) for setup recipes.
+
+The provider smoke test shows an "offline placeholder" notice when no real model is configured, so a canned deterministic reply is never mistaken for a model response. A Test connection button actively probes the configured provider endpoint (`POST /llm/health-check`) and reports whether it is reachable, unreachable, or not configured - distinct from the static readiness report, which only checks configuration shape.
 
 ## Local user roles
 

@@ -50,6 +50,7 @@ import {
   buildLlmGenerationInputFromState,
   createLlmProviderFromEnv,
   describeLlmProviderFromEnv,
+  probeLlmProviderReachability,
   type LlmGenerationResult,
   type LlmProvider
 } from "./llmProvider";
@@ -292,6 +293,7 @@ function applySourceProcessCompletion(
     error: undefined,
     summary: extraction.summary,
     transcript: extraction.transcript ?? stored.transcript,
+    warnings: extraction.warnings.length > 0 ? extraction.warnings : undefined,
     processedAt
   };
 
@@ -1811,6 +1813,15 @@ export function createServer(options: ServerOptions = {}) {
   });
 
   app.get("/llm/status", async () => describeLlmProviderFromEnv());
+
+  app.post("/llm/health-check", async (request, reply) => {
+    const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    return probeLlmProviderReachability({ env: process.env, fetchFn: ingestionFetch });
+  });
 
   app.get("/languages", async () => {
     const state = await readState();

@@ -51,6 +51,14 @@ describe("api server", () => {
     return notes.json().find((item: { id: string }) => item.id === reviewedNoteId);
   }
 
+  function restoreEnv(key: string, value: string | undefined) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+
   it("resolves the runtime database path from the repository root with an env override", () => {
     const indexUrl = pathToFileURL(join(repoRoot, "apps", "api", "src", "index.ts")).href;
     const overridePath = join(repoRoot, "tmp", "override-db.json");
@@ -85,6 +93,105 @@ describe("api server", () => {
     expect(exercises.json()[0]).not.toHaveProperty("gradingExplanation");
     expect(exercises.json()[0]).not.toHaveProperty("adversarialAnswers");
     expect(JSON.stringify(exercises.json())).not.toContain("first-person singular subjects");
+  });
+
+  describe("POST /llm/health-check", () => {
+    it("returns a deterministic not-checked result when no provider is configured", async () => {
+      const previous = {
+        provider: process.env.ASSINI_LLM_PROVIDER,
+        baseUrl: process.env.ASSINI_LLM_BASE_URL,
+        model: process.env.ASSINI_LLM_MODEL,
+        apiKey: process.env.ASSINI_LLM_API_KEY,
+        openAiKey: process.env.OPENAI_API_KEY
+      };
+      delete process.env.ASSINI_LLM_PROVIDER;
+      delete process.env.ASSINI_LLM_BASE_URL;
+      delete process.env.ASSINI_LLM_MODEL;
+      delete process.env.ASSINI_LLM_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+
+      let fetchCalls = 0;
+      const fetchStub: typeof fetch = async () => {
+        fetchCalls += 1;
+        return new Response("{}", { status: 200 });
+      };
+
+      try {
+        const app = createServer({ initialState: buildTestWorkspaceState(), ingestionFetch: fetchStub });
+        const response = await app.inject({
+          method: "POST",
+          url: "/llm/health-check",
+          headers: authHeaders("programmer-1")
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({ checked: false, reachable: false, mode: "deterministic" });
+        expect(fetchCalls).toBe(0);
+      } finally {
+        restoreEnv("ASSINI_LLM_PROVIDER", previous.provider);
+        restoreEnv("ASSINI_LLM_BASE_URL", previous.baseUrl);
+        restoreEnv("ASSINI_LLM_MODEL", previous.model);
+        restoreEnv("ASSINI_LLM_API_KEY", previous.apiKey);
+        restoreEnv("OPENAI_API_KEY", previous.openAiKey);
+      }
+    });
+
+    it("shells out to the injected fetch and maps a reachable provider", async () => {
+      const previous = {
+        provider: process.env.ASSINI_LLM_PROVIDER,
+        baseUrl: process.env.ASSINI_LLM_BASE_URL,
+        model: process.env.ASSINI_LLM_MODEL
+      };
+      process.env.ASSINI_LLM_PROVIDER = "openai-compatible";
+      process.env.ASSINI_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
+      process.env.ASSINI_LLM_MODEL = "test-model";
+
+      let fetchCalls = 0;
+      const fetchStub: typeof fetch = async () => {
+        fetchCalls += 1;
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      };
+
+      try {
+        const app = createServer({ initialState: buildTestWorkspaceState(), ingestionFetch: fetchStub });
+        const response = await app.inject({
+          method: "POST",
+          url: "/llm/health-check",
+          headers: authHeaders("programmer-1")
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toMatchObject({
+          checked: true,
+          reachable: true,
+          mode: "local-openai-compatible",
+          status: 200
+        });
+        expect(fetchCalls).toBeGreaterThanOrEqual(1);
+      } finally {
+        restoreEnv("ASSINI_LLM_PROVIDER", previous.provider);
+        restoreEnv("ASSINI_LLM_BASE_URL", previous.baseUrl);
+        restoreEnv("ASSINI_LLM_MODEL", previous.model);
+      }
+    });
+
+    it("forbids roles outside the diagnostic allow-list, like sibling observability routes", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+
+      const forbidden = await app.inject({
+        method: "POST",
+        url: "/llm/health-check",
+        headers: authHeaders("learner-1")
+      });
+      expect(forbidden.statusCode).toBe(403);
+      expect(forbidden.json()).toEqual({ error: "Forbidden" });
+
+      const unauthorized = await app.inject({ method: "POST", url: "/llm/health-check" });
+      expect(unauthorized.statusCode).toBe(401);
+    });
   });
 
   it("returns a rich language profile without answer-key fields", async () => {
@@ -3114,6 +3221,71 @@ describe("api server", () => {
       expect(processed.json().asset).toMatchObject({ id: sourceId, status: "processed" });
       expect(processed.json().drafts.length).toBeGreaterThanOrEqual(2);
       expect(Array.isArray(processed.json().warnings)).toBe(true);
+    });
+
+    it("persists deterministic-mode warnings onto the source asset (sync path)", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Deterministic word list");
+
+      const processed = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(processed.statusCode).toBe(200);
+      expect(processed.json().warnings.some((warning: string) => warning.includes("deterministic mode"))).toBe(true);
+
+      const stored = await fetchStoredSource(app, sourceId);
+      expect(Array.isArray(stored.warnings)).toBe(true);
+      expect(stored.warnings.some((warning: string) => warning.includes("deterministic mode"))).toBe(true);
+    });
+
+    it("persists deterministic-mode warnings onto the source asset (async path)", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Async deterministic word list");
+
+      const accepted = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(accepted.statusCode).toBe(202);
+
+      await vi.waitFor(async () => {
+        const stored = await fetchStoredSource(app, sourceId);
+        expect(stored.status).toBe("processed");
+      });
+
+      const stored = await fetchStoredSource(app, sourceId);
+      expect(Array.isArray(stored.warnings)).toBe(true);
+      expect(stored.warnings.some((warning: string) => warning.includes("deterministic mode"))).toBe(true);
+    });
+
+    it("leaves the warnings array unset when processing yields no warnings", async () => {
+      const llmProvider: LlmProvider = {
+        name: "clean-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          return JSON.stringify({ summary: "Clean extraction.", lexemes: [{ form: "mira", gloss: "river" }] });
+        }
+      };
+      const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
+      const sourceId = await registerWordlistSource(app, "Clean word list");
+
+      const processed = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(processed.statusCode).toBe(200);
+      expect(processed.json().warnings).toEqual([]);
+
+      const stored = await fetchStoredSource(app, sourceId);
+      expect(stored.status).toBe("processed");
+      expect(stored.warnings).toBeUndefined();
     });
   });
 });

@@ -5,7 +5,8 @@ import {
   createDeterministicLlmProvider,
   createLlmProviderFromEnv,
   createOpenAiCompatibleLlmProvider,
-  describeLlmProviderFromEnv
+  describeLlmProviderFromEnv,
+  probeLlmProviderReachability
 } from "./llmProvider";
 
 describe("llm provider", () => {
@@ -128,11 +129,46 @@ describe("llm provider", () => {
     ]);
   });
 
-  it("fails fast for incomplete OpenAI-compatible configuration", () => {
+  it("fails fast for incomplete OpenAI-compatible construction config", () => {
     expect(() => createOpenAiCompatibleLlmProvider({ baseUrl: "http://127.0.0.1:1234/v1", model: " " })).toThrow(
       "ASSINI_LLM_MODEL"
     );
-    expect(() => createLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "openai" })).toThrow("OPENAI_API_KEY");
+  });
+
+  it("never throws on misconfiguration: remote provider without an API key degrades to deterministic", () => {
+    const provider = createLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "openai" });
+    expect(provider.name).toBe("deterministic");
+    expect(provider.completeChat).toBeUndefined();
+
+    const status = describeLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "openai" });
+    expect(status.mode).toBe("remote-api");
+    expect(status.configured).toBe(false);
+    expect(status.warnings).toContain(
+      "Remote API mode requires ASSINI_LLM_API_KEY or OPENAI_API_KEY on the API server."
+    );
+  });
+
+  it("never throws on misconfiguration: local provider without base URL/model degrades to deterministic", () => {
+    const provider = createLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "openai-compatible" });
+    expect(provider.name).toBe("deterministic");
+    expect(provider.completeChat).toBeUndefined();
+
+    const status = describeLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "openai-compatible" });
+    expect(status.mode).toBe("local-openai-compatible");
+    expect(status.configured).toBe(false);
+    expect(status.warnings).toContain("Local/OpenAI-compatible mode requires ASSINI_LLM_BASE_URL.");
+    expect(status.warnings).toContain("Local/OpenAI-compatible mode requires ASSINI_LLM_MODEL.");
+  });
+
+  it("never throws on misconfiguration: unknown provider value degrades to deterministic and reports invalid mode", () => {
+    const provider = createLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "totally-made-up" });
+    expect(provider.name).toBe("deterministic");
+    expect(provider.completeChat).toBeUndefined();
+
+    const status = describeLlmProviderFromEnv({ ASSINI_LLM_PROVIDER: "totally-made-up" });
+    expect(status.mode).toBe("invalid");
+    expect(status.configured).toBe(false);
+    expect(status.warnings).toContain("Unknown ASSINI_LLM_PROVIDER: totally-made-up");
   });
 
   it("describes LLM readiness without exposing API key values", () => {
@@ -250,5 +286,289 @@ describe("llm provider", () => {
       "LLM provider request failed with status 429: Rate limit exceeded for [redacted-secret]"
     );
     await expect(result).rejects.not.toThrow("sk-provider-secret");
+  });
+
+  it("sends a default max_tokens on every request and never a response_format on the chat path", async () => {
+    const { calls, fetchFn } = captureFetch("Chat response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1",
+      ASSINI_LLM_JSON_MODE: "true"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    const body = JSON.parse(calls[0].init?.body as string);
+    expect(body.max_tokens).toBe(4096);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it("honors ASSINI_LLM_MAX_TOKENS and sends json mode only on the extraction path", async () => {
+    const { calls, fetchFn } = captureFetch('{"ok":true}');
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1",
+      ASSINI_LLM_MAX_TOKENS: "256",
+      ASSINI_LLM_JSON_MODE: "1"
+    }, fetchFn);
+
+    await provider.completeChat?.([{ role: "user", content: "mira = river" }]);
+
+    const body = JSON.parse(calls[0].init?.body as string);
+    expect(body.max_tokens).toBe(256);
+    expect(body.temperature).toBe(0.1);
+    expect(body.response_format).toEqual({ type: "json_object" });
+  });
+
+  it("ignores invalid ASSINI_LLM_MAX_TOKENS and falls back to the default", async () => {
+    const { calls, fetchFn } = captureFetch("Chat response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1",
+      ASSINI_LLM_MAX_TOKENS: "not-a-number"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    const body = JSON.parse(calls[0].init?.body as string);
+    expect(body.max_tokens).toBe(4096);
+  });
+
+  it("does NOT send json mode on completeChat unless ASSINI_LLM_JSON_MODE is enabled", async () => {
+    const { calls, fetchFn } = captureFetch('{"ok":true}');
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1"
+    }, fetchFn);
+
+    await provider.completeChat?.([{ role: "user", content: "extract" }]);
+
+    const body = JSON.parse(calls[0].init?.body as string);
+    expect(body.response_format).toBeUndefined();
+  });
+
+  it("normalizes a bare ollama base URL to include /v1 before posting", async () => {
+    const { calls, fetchFn } = captureFetch("Ollama response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "ollama",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434",
+      ASSINI_LLM_MODEL: "llama3.1"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
+  });
+
+  it("does not double-append /v1 when an ollama base URL already includes it", async () => {
+    const { calls, fetchFn } = captureFetch("Ollama response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "ollama",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
+  });
+
+  it("does not forward the OPENAI_API_KEY fallback to a local endpoint", async () => {
+    const { calls, fetchFn } = captureFetch("Local response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "ollama",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1",
+      OPENAI_API_KEY: "sk-remote-secret"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it("forwards an explicit ASSINI_LLM_API_KEY to a local endpoint", async () => {
+    const { calls, fetchFn } = captureFetch("Local response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_LLM_MODEL: "llama3.1",
+      ASSINI_LLM_API_KEY: "explicit-local-key"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer explicit-local-key");
+  });
+
+  it("still forwards the OPENAI_API_KEY fallback to a remote endpoint", async () => {
+    const { calls, fetchFn } = captureFetch("Remote response");
+    const provider = createLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai",
+      ASSINI_LLM_MODEL: "gpt-test",
+      OPENAI_API_KEY: "sk-remote-secret"
+    }, fetchFn);
+
+    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer sk-remote-secret");
+  });
+
+  it("reports reachability as unchecked for the deterministic fallback without any network call", async () => {
+    let called = false;
+    const fetchFn: typeof fetch = async () => {
+      called = true;
+      return new Response("", { status: 200 });
+    };
+
+    const result = await probeLlmProviderReachability({ env: {}, fetchFn });
+
+    expect(called).toBe(false);
+    expect(result).toMatchObject({
+      checked: false,
+      reachable: false,
+      mode: "deterministic",
+      detail: "No external provider is configured."
+    });
+  });
+
+  it("reports a configured provider as reachable when the models endpoint returns 200", async () => {
+    const calls: string[] = [];
+    const fetchFn: typeof fetch = async (input) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push(url);
+      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1"
+      },
+      fetchFn
+    });
+
+    expect(calls).toEqual(["http://127.0.0.1:11434/v1/models"]);
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: true,
+      mode: "local-openai-compatible",
+      status: 200
+    });
+    expect(typeof result.latencyMs).toBe("number");
+  });
+
+  it("falls back to a tiny chat completion when the models endpoint is unsupported", async () => {
+    const calls: Array<{ url: string; method?: string }> = [];
+    const fetchFn: typeof fetch = async (input, init) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push({ url, method: init?.method });
+      if (url.endsWith("/models")) {
+        return new Response("not found", { status: 404 });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
+        ASSINI_LLM_MODEL: "local-model"
+      },
+      fetchFn
+    });
+
+    expect(calls).toEqual([
+      { url: "http://127.0.0.1:1234/v1/models", method: "GET" },
+      { url: "http://127.0.0.1:1234/v1/chat/completions", method: "POST" }
+    ]);
+    expect(result).toMatchObject({ checked: true, reachable: true, status: 200 });
+  });
+
+  it("reports a configured provider as unreachable when the network throws", async () => {
+    const fetchFn: typeof fetch = async () => {
+      throw new Error("connect ECONNREFUSED 127.0.0.1:11434");
+    };
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1"
+      },
+      fetchFn
+    });
+
+    expect(result).toMatchObject({ checked: true, reachable: false, mode: "local-openai-compatible" });
+    expect(result.detail).toContain("ECONNREFUSED");
+  });
+
+  it("redacts secrets from reachability failure detail", async () => {
+    const fetchFn: typeof fetch = async () => {
+      throw new Error("auth failed using sk-super-secret-token");
+    };
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai",
+        ASSINI_LLM_MODEL: "gpt-test",
+        ASSINI_LLM_API_KEY: "sk-super-secret-token"
+      },
+      fetchFn
+    });
+
+    expect(result.reachable).toBe(false);
+    expect(result.detail).not.toContain("sk-super-secret-token");
+    expect(result.detail).toContain("[redacted-secret]");
   });
 });

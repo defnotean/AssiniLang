@@ -86,6 +86,17 @@ export type OpenAiCompatibleConfig = {
   model: string;
   apiKey?: string;
   timeoutMs?: number;
+  maxTokens?: number;
+  jsonMode?: boolean;
+};
+
+export type LlmReachability = {
+  reachable: boolean;
+  checked: boolean;
+  mode: string;
+  status?: number;
+  detail?: string;
+  latencyMs?: number;
 };
 
 export type LlmProviderReadiness = {
@@ -133,6 +144,8 @@ type OpenAiChatCompletionResponse = {
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_REMOTE_OPENAI_MODEL = "gpt-4o-mini";
 const DEFAULT_LLM_TIMEOUT_MS = 30_000;
+const DEFAULT_LLM_MAX_TOKENS = 4096;
+const DEFAULT_REACHABILITY_TIMEOUT_MS = 8_000;
 const MAX_CONTEXT_ITEMS = 8;
 const MAX_TEXT_CHARS = 1_200;
 const MAX_PREVIOUS_MESSAGES = 8;
@@ -163,8 +176,26 @@ function parsePositiveInteger(value: string | undefined, fallback: number): { va
   };
 }
 
+function parseOptionalPositiveInteger(value: string | undefined): number | undefined {
+  const trimmed = trimValue(value);
+  if (!trimmed) return undefined;
+
+  const parsed = Number(trimmed);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function parseBooleanFlag(value: string | undefined): boolean {
+  const trimmed = trimValue(value)?.toLowerCase();
+  return trimmed === "1" || trimmed === "true";
+}
+
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, "");
+}
+
+function ensureV1BaseUrl(baseUrl: string): string {
+  const normalized = normalizeBaseUrl(baseUrl);
+  return /\/v1$/.test(normalized) ? normalized : `${normalized}/v1`;
 }
 
 function parseHttpBaseUrl(baseUrl: string | undefined): URL | undefined {
@@ -200,6 +231,10 @@ function baseUrlWarnings(baseUrl: string | undefined, missingMessage: string): s
 
 function completionUrl(baseUrl: string): string {
   return `${normalizeBaseUrl(baseUrl)}/chat/completions`;
+}
+
+function modelsUrl(baseUrl: string): string {
+  return `${normalizeBaseUrl(baseUrl)}/models`;
 }
 
 function safeNote(note: Note): LlmContextNote {
@@ -576,8 +611,16 @@ export function createOpenAiCompatibleLlmProvider(
   const timeoutMs = Number.isInteger(config.timeoutMs) && (config.timeoutMs ?? 0) > 0
     ? config.timeoutMs as number
     : DEFAULT_LLM_TIMEOUT_MS;
+  const maxTokens = Number.isInteger(config.maxTokens) && (config.maxTokens ?? 0) > 0
+    ? config.maxTokens as number
+    : DEFAULT_LLM_MAX_TOKENS;
+  const jsonModeEnabled = config.jsonMode === true;
 
-  async function requestCompletion(messages: LlmChatMessage[], temperature: number): Promise<string> {
+  async function requestCompletion(
+    messages: LlmChatMessage[],
+    temperature: number,
+    options: { jsonMode?: boolean } = {}
+  ): Promise<string> {
     const controller = new AbortController();
     let timedOut = false;
     const timeout = setTimeout(() => {
@@ -590,16 +633,22 @@ export function createOpenAiCompatibleLlmProvider(
         headers.Authorization = `Bearer ${apiKey}`;
       }
 
+      const body: Record<string, unknown> = {
+        model,
+        messages,
+        temperature,
+        stream: false,
+        max_tokens: maxTokens
+      };
+      if (options.jsonMode) {
+        body.response_format = { type: "json_object" };
+      }
+
       const response = await fetchFn(completionUrl(resolvedBaseUrl), {
         method: "POST",
         headers,
         signal: controller.signal,
-        body: JSON.stringify({
-          model,
-          messages,
-          temperature,
-          stream: false
-        })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) {
@@ -635,7 +684,7 @@ export function createOpenAiCompatibleLlmProvider(
       return { content, warnings: [] };
     },
     async completeChat(messages) {
-      return requestCompletion(messages, 0.1);
+      return requestCompletion(messages, 0.1, { jsonMode: jsonModeEnabled });
     }
   };
 }
@@ -647,48 +696,207 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
     return createDeterministicLlmProvider();
   }
 
-  const apiKey = trimValue(env.ASSINI_LLM_API_KEY) ?? trimValue(env.OPENAI_API_KEY);
+  // Explicit key only (no remote fallback): a remote OPENAI_API_KEY must never
+  // be forwarded toward a local endpoint such as localhost.
+  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
+  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
   const baseUrl = trimValue(env.ASSINI_LLM_BASE_URL);
   const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
   const timeoutMs = parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS).value;
+  const maxTokens = parseOptionalPositiveInteger(env.ASSINI_LLM_MAX_TOKENS);
+  const jsonMode = parseBooleanFlag(env.ASSINI_LLM_JSON_MODE);
+
+  // Construction-time validation inside createOpenAiCompatibleLlmProvider may
+  // still throw on missing baseUrl/model; never let env misconfiguration crash
+  // boot. describeLlmProviderFromEnv surfaces the problem via GET /llm/status.
+  const buildOrFallback = (config: OpenAiCompatibleConfig): LlmProvider => {
+    try {
+      return createOpenAiCompatibleLlmProvider(config, fetchFn);
+    } catch {
+      return createDeterministicLlmProvider();
+    }
+  };
 
   if (provider === "openai" || provider === "remote") {
-    if (!apiKey) {
-      throw new Error("ASSINI_LLM_API_KEY or OPENAI_API_KEY is required when ASSINI_LLM_PROVIDER=openai");
+    if (!remoteApiKey) {
+      return createDeterministicLlmProvider();
     }
-    return createOpenAiCompatibleLlmProvider({
+    return buildOrFallback({
       baseUrl: baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL,
       model: model ?? DEFAULT_REMOTE_OPENAI_MODEL,
-      apiKey,
-      timeoutMs
-    }, fetchFn);
+      apiKey: remoteApiKey,
+      timeoutMs,
+      maxTokens,
+      jsonMode
+    });
   }
 
   if (provider === "openai-compatible" || provider === "local" || provider === "ollama" || provider === "lm-studio") {
-    return createOpenAiCompatibleLlmProvider({
-      baseUrl: baseUrl ?? "",
+    const localBaseUrl = baseUrl && provider === "ollama" ? ensureV1BaseUrl(baseUrl) : baseUrl;
+    return buildOrFallback({
+      baseUrl: localBaseUrl ?? "",
       model: model ?? "",
-      apiKey,
-      timeoutMs
-    }, fetchFn);
+      apiKey: explicitApiKey,
+      timeoutMs,
+      maxTokens,
+      jsonMode
+    });
   }
 
   if (provider) {
-    throw new Error(`Unknown ASSINI_LLM_PROVIDER: ${provider}`);
+    // Unknown ASSINI_LLM_PROVIDER value: degrade gracefully instead of throwing.
+    return createDeterministicLlmProvider();
   }
 
   if (baseUrl && model) {
-    return createOpenAiCompatibleLlmProvider({ baseUrl, model, apiKey, timeoutMs }, fetchFn);
+    return buildOrFallback({ baseUrl, model, apiKey: explicitApiKey, timeoutMs, maxTokens, jsonMode });
   }
 
-  if (apiKey) {
-    return createOpenAiCompatibleLlmProvider({
+  if (remoteApiKey) {
+    return buildOrFallback({
       baseUrl: baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL,
       model: model ?? DEFAULT_REMOTE_OPENAI_MODEL,
-      apiKey,
-      timeoutMs
-    }, fetchFn);
+      apiKey: remoteApiKey,
+      timeoutMs,
+      maxTokens,
+      jsonMode
+    });
   }
 
   return createDeterministicLlmProvider();
+}
+
+type ResolvedProbeTarget = { baseUrl: string; apiKey?: string };
+
+/**
+ * Resolve the real (un-sanitized) base URL and API key that a configured
+ * provider would use, mirroring createLlmProviderFromEnv's precedence,
+ * including ollama /v1 normalization and local-mode API key hygiene.
+ */
+function resolveProbeTarget(env: Env): ResolvedProbeTarget | undefined {
+  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
+  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
+  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
+  const baseUrl = trimValue(env.ASSINI_LLM_BASE_URL);
+  const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
+
+  if (provider === "openai" || provider === "remote") {
+    return { baseUrl: baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL, apiKey: remoteApiKey };
+  }
+
+  if (provider === "openai-compatible" || provider === "local" || provider === "ollama" || provider === "lm-studio") {
+    if (!baseUrl) return undefined;
+    return { baseUrl: provider === "ollama" ? ensureV1BaseUrl(baseUrl) : baseUrl, apiKey: explicitApiKey };
+  }
+
+  if (provider) return undefined;
+
+  if (baseUrl && model) {
+    return { baseUrl, apiKey: explicitApiKey };
+  }
+
+  if (remoteApiKey) {
+    return { baseUrl: baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL, apiKey: remoteApiKey };
+  }
+
+  return undefined;
+}
+
+function sanitizeReachabilityError(error: unknown, apiKey?: string): string {
+  const message = error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : "Failed to reach the configured LLM provider.";
+  return sanitizeProviderErrorDetail(message, apiKey);
+}
+
+function looksLikeUnsupportedEndpoint(status: number): boolean {
+  return status === 404 || status === 405;
+}
+
+/**
+ * Issue a single minimal request to confirm the configured provider is
+ * reachable. Never throws: network/timeout failures resolve to
+ * { reachable: false }. Deterministic/unconfigured/invalid configurations
+ * skip the network entirely. Secrets are redacted from any returned detail.
+ */
+export async function probeLlmProviderReachability(
+  options: { env?: Env; fetchFn?: FetchFn; timeoutMs?: number } = {}
+): Promise<LlmReachability> {
+  const env = options.env ?? process.env;
+  const fetchFn = options.fetchFn ?? globalThis.fetch;
+  const readiness = describeLlmProviderFromEnv(env);
+  const mode = readiness.mode;
+
+  const target = mode === "deterministic" || mode === "invalid" || !readiness.configured
+    ? undefined
+    : resolveProbeTarget(env);
+
+  if (!target) {
+    return {
+      checked: false,
+      reachable: false,
+      mode,
+      detail: "No external provider is configured."
+    };
+  }
+
+  const timeoutMs = Number.isInteger(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
+    ? options.timeoutMs as number
+    : DEFAULT_REACHABILITY_TIMEOUT_MS;
+  const { baseUrl, apiKey } = target;
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const controller = new AbortController();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+  const startedAt = Date.now();
+
+  try {
+    let response = await fetchFn(modelsUrl(baseUrl), {
+      method: "GET",
+      headers,
+      signal: controller.signal
+    });
+
+    if (!response.ok && looksLikeUnsupportedEndpoint(response.status)) {
+      response = await fetchFn(completionUrl(baseUrl), {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: readiness.model ?? DEFAULT_REMOTE_OPENAI_MODEL,
+          messages: [{ role: "user", content: "ping" }],
+          max_tokens: 1,
+          stream: false
+        })
+      });
+    }
+
+    const latencyMs = Date.now() - startedAt;
+    const result: LlmReachability = {
+      checked: true,
+      reachable: response.ok,
+      mode,
+      status: response.status,
+      latencyMs
+    };
+    if (!response.ok) {
+      const detail = await readProviderErrorDetail(response, apiKey);
+      if (detail) result.detail = detail;
+    }
+    return result;
+  } catch (error) {
+    const detail = timedOut || isAbortError(error)
+      ? `Reachability probe timed out after ${timeoutMs}ms.`
+      : sanitizeReachabilityError(error, apiKey);
+    return { checked: true, reachable: false, mode, detail };
+  } finally {
+    clearTimeout(timeout);
+  }
 }

@@ -11,6 +11,7 @@ Every route in `server.ts`. "Public" means no auth required; role lists mean the
 | GET | `/health` | Public | Health check. |
 | POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. |
 | GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
+| POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
 | GET | `/users/me` | Any actor | Current prototype user. |
 | GET | `/languages` | Public | List languages. |
 | POST | `/languages` | reviewer, lead, admin | Create a language. |
@@ -252,7 +253,9 @@ The persisted app-state schema enforces the same ledger invariants during local 
 
 ## LLM status and sessions
 
-`GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. See the [Configuration Reference](configuration.md) for every variable.
+`GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. It is a static, no-network read of the environment: it checks configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
+
+`POST /llm/health-check` (roles: programmer, lead, admin) actively probes the configured provider endpoint with a real network request and returns `{ reachable, checked, mode, status?, detail?, latencyMs? }`. In deterministic or unconfigured mode it makes no network call and returns `checked: false`. Use it to confirm reachability when `/llm/status` reports a configured provider but ingestion or chat still fails - `/llm/status` only checks config shape, while this route verifies the endpoint answers.
 
 AI session routes use public language context and store sanitized observability records. Failed provider calls preserve safe diagnostics without exposing provider secrets.
 

@@ -703,7 +703,9 @@ export async function extractCandidatesForAsset(
       const content = await provider.completeChat(messages);
       const parsed = parseExtractionResponse(content);
       if (!parsed) {
-        throw new Error("The model response could not be parsed as extraction JSON. Try again or use a larger model.");
+        throw new Error(
+          "The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset."
+        );
       }
       return { ...parsed, warnings };
     }

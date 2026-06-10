@@ -62,6 +62,7 @@ The intake workspace is the front door for raw materials:
 - Registration and upload controls stay compact; the source list with status chips (`pending`, `processing`, `processed`, `failed`) is the main surface.
 - Background processing keeps the view responsive: a processing source shows its in-flight state and the list polls until it settles.
 - Failed sources surface their sanitized error inline so the fix is obvious before retrying.
+- Processed sources surface their persisted processing warnings under the source (for example "used offline heuristic parsing" or "fell back to offline heuristics"), so a reviewer can see when processing fell back to a heuristic or OCR.
 - Proposed drafts render with kind, payload, confidence, rationale, and duplicate badges ("Duplicate of existing entry", "Same form, different gloss", "Duplicate topic", "Duplicates another pending draft"). Badges warn; they never disable the accept/reject actions.
 - Accept/reject actions stay adjacent to each draft for high-volume triage.
 
@@ -110,6 +111,8 @@ Governance and model setup are operational surfaces:
 - Do not over-style these views; reliability and scanability matter most.
 - Snapshot export summaries should surface the profile-derived counts (vocabulary, morphemes, grammar rules, corpus, source assets, pending drafts) so reviewers can identify gaps before opening JSON artifacts.
 - Model setup reports provider readiness, transcription readiness, and observability without exposing secrets.
+- The provider smoke test flags its result as an "offline placeholder" when no real model is configured, so a deterministic canned reply is never read as a model response.
+- A Test connection button actively probes the configured provider endpoint and reports reachable, unreachable, or not-configured, distinct from the static config-shape readiness report.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness

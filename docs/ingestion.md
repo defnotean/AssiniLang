@@ -126,6 +126,7 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL ...` | 422 | No transcription server configured | Configure a whisper-style server; see [configuration](configuration.md#transcription-audio-sources). |
 | `Transcription request failed with status N.` / `Transcription endpoint returned no text.` | 422 | Transcription server error or empty result | Check the server, model name, and audio file. |
 | `Local OCR could not read the image: ... Configure a vision-capable model via ASSINI_LLM_PROVIDER ...` | 422 | OCR failed (often `OCR found no readable text in the image.`) | Provide a clearer image or configure a vision model such as llava. |
+| `The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset.` | 422 | An image source was sent to a configured but non-vision model | Either configure a vision model (for example `llava`) in `ASSINI_LLM_MODEL`, or leave the model unset so the image falls back to local OCR. |
 | `The model response could not be parsed as extraction JSON. Try again or use a larger model.` | 422 | A vision model replied with non-JSON output | Retry, or use a model that follows JSON instructions. |
 | `The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Scanned/image-only PDF | Convert pages to images and upload those, or OCR externally. |
 | `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
@@ -133,7 +134,7 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Text source asset has no content.` / `... has no stored file.` / `URL source asset has no URL.` | 422 | The asset record is incomplete (usually hand-edited state) | Re-register or re-upload the source. |
 | `Source contains no readable text.` | 422 | Resolved text was empty after normalization | Check the source content. |
 
-Warnings (extraction still succeeds, result is flagged):
+Warnings (extraction still succeeds, result is flagged). Processing warnings are persisted on the source asset (`warnings`) and surfaced in the Sources & intake view under the source, so a user can see when processing fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts:
 
 | Warning | Meaning |
 | --- | --- |

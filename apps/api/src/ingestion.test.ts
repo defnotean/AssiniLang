@@ -674,6 +674,27 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
     expect(ocrStub.recognizedImages).toHaveLength(0);
   });
 
+  it("throws an image-specific vision error when a configured model returns unparseable text", async () => {
+    ocrStub.reset("should not be used");
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-"));
+    await writeFile(join(dataDir, "photo.png"), Buffer.from([1, 2, 3, 4]));
+
+    const attempt = extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: "photo.png", mimeType: "image/png" }),
+      language,
+      provider: providerWithChat("Sorry, I cannot read images."),
+      dataDir
+    });
+
+    await expect(attempt).rejects.toThrow(/may not be vision-capable/);
+    await attempt.catch((error: Error) => {
+      expect(error.message).toContain("ASSINI_LLM_MODEL");
+      expect(error.message).toContain("rely on the local OCR fallback by leaving the model unset");
+    });
+    expect(ocrStub.createWorkerCalls).toBe(0);
+    expect(ocrStub.recognizedImages).toHaveLength(0);
+  });
+
   it("surfaces both remedies when OCR itself fails in deterministic mode", async () => {
     ocrStub.reset("unused");
     ocrStub.error = new Error("could not decode image");

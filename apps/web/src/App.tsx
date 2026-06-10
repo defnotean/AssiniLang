@@ -14,6 +14,7 @@ import type {
   LanguageCreatePayload,
   LanguageProfile,
   LanguageSnapshot,
+  LlmReachability,
   LlmStatus,
   ObservabilityData,
   PublicExerciseSubmission,
@@ -25,6 +26,7 @@ import type {
 import {
   acceptExtractionDraft,
   applyElderCorrection,
+  checkLlmReachability,
   createAiSession,
   createExercise,
   createGovernanceRecord,
@@ -201,6 +203,29 @@ function formatMode(mode: LlmStatus["mode"]): string {
   return mode.replace(/-/g, " ");
 }
 
+/**
+ * A real model reply only comes from a configured provider whose mode is a
+ * genuine backend. Deterministic and invalid modes return canned offline text,
+ * so the smoke-test result must be flagged as a placeholder rather than a model
+ * answer.
+ */
+function isRealModelProvider(status: LlmStatus): boolean {
+  if (!status.configured) return false;
+  return status.mode === "local-openai-compatible" || status.mode === "remote-api";
+}
+
+function formatReachability(result: LlmReachability): string {
+  if (!result.checked) {
+    return "No external provider configured.";
+  }
+  if (result.reachable) {
+    const latency = typeof result.latencyMs === "number" ? `, ${result.latencyMs} ms` : "";
+    return `Reachable (${result.mode.replace(/-/g, " ")}${latency})`;
+  }
+  const detail = result.detail ? `: ${result.detail}` : "";
+  return `Unreachable${detail}`;
+}
+
 function formatOrthographyMeta(value?: string): string {
   if (!value) return "Latin orthography";
   if (value.length > 34) return "Latin morphology hyphenation";
@@ -287,6 +312,21 @@ function buildEvaluationArtifactDownload(artifact: EvaluationArtifact): Snapshot
 function latestAssistantMessage(session: AiSession): string {
   const assistant = session.messages.slice().reverse().find((message) => message.role === "assistant");
   return assistant?.content ?? "Session created, but no assistant message was returned.";
+}
+
+/**
+ * Detects whether an AI session was answered by the deterministic offline
+ * fallback rather than a real provider, by inspecting the trace warnings the
+ * session exposes (e.g. "deterministic"/"offline" fallback notices).
+ */
+function sessionUsedDeterministicFallback(session: AiSession): boolean {
+  const trace = session.trace ?? [];
+  return trace.some((step) =>
+    (step.warnings ?? []).some((warning) => {
+      const text = warning.toLowerCase();
+      return text.includes("deterministic") || text.includes("offline fallback");
+    })
+  );
 }
 
 function countFailedSessions(observability: ObservabilityData): number {
@@ -599,6 +639,10 @@ export function App() {
   const [observabilityState, setObservabilityState] = useState<AsyncState<ObservabilityData>>({ status: "idle" });
   const [isTestingModel, setIsTestingModel] = useState(false);
   const [modelTestResult, setModelTestResult] = useState<string | null>(null);
+  const [modelTestIsPlaceholder, setModelTestIsPlaceholder] = useState(false);
+  const [isCheckingReachability, setIsCheckingReachability] = useState(false);
+  const [reachabilityResult, setReachabilityResult] = useState<LlmReachability | null>(null);
+  const [reachabilityError, setReachabilityError] = useState<string | null>(null);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -1290,6 +1334,7 @@ export function App() {
     }
     setIsTestingModel(true);
     setModelTestResult(null);
+    setModelTestIsPlaceholder(false);
     try {
       const session = await createAiSession({
         languageId: selectedLanguageId,
@@ -1299,14 +1344,34 @@ export function App() {
         contextPassageIds: data.corpus.slice(0, 2).map((passage) => passage.id)
       });
       setModelTestResult(latestAssistantMessage(session));
-      setLlmState({ status: "ready", data: await fetchLlmStatus() });
+      const refreshedStatus = await fetchLlmStatus();
+      setLlmState({ status: "ready", data: refreshedStatus });
+      // The reply is a genuine model answer only when a real provider is
+      // configured. Deterministic/invalid modes return a canned offline string,
+      // and the session trace may flag the deterministic fallback as well.
+      setModelTestIsPlaceholder(!isRealModelProvider(refreshedStatus) || sessionUsedDeterministicFallback(session));
       await refreshModelObservability();
     } catch (error) {
       const message = error instanceof Error ? error.message : "Model smoke test failed";
       setModelTestResult(message);
+      setModelTestIsPlaceholder(false);
       await refreshModelObservability();
     } finally {
       setIsTestingModel(false);
+    }
+  }
+
+  async function handleTestConnection() {
+    setIsCheckingReachability(true);
+    setReachabilityError(null);
+    setReachabilityResult(null);
+    try {
+      setReachabilityResult(await checkLlmReachability());
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "LLM reachability check failed";
+      setReachabilityError(message);
+    } finally {
+      setIsCheckingReachability(false);
     }
   }
 
@@ -1606,7 +1671,12 @@ export function App() {
                   observabilityState={observabilityState}
                   isTestingModel={isTestingModel}
                   modelTestResult={modelTestResult}
+                  modelTestIsPlaceholder={modelTestIsPlaceholder}
                   onSmokeTest={handleModelSmokeTest}
+                  isCheckingReachability={isCheckingReachability}
+                  reachabilityResult={reachabilityResult}
+                  reachabilityError={reachabilityError}
+                  onTestConnection={handleTestConnection}
                 />
               )}
             </>
@@ -2263,6 +2333,13 @@ function IngestView({ languageId }: { languageId: string }) {
                   </div>
                   <small className="muted">Added by {source.createdBy} at {source.createdAt}</small>
                   {source.error && <p className="result-notice error">{source.error}</p>}
+                  {source.warnings && source.warnings.length > 0 && (
+                    <ul className="source-warnings" aria-label={`Processing warnings for ${source.title}`}>
+                      {source.warnings.map((warning) => (
+                        <li key={warning}>{warning}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -3683,13 +3760,23 @@ function ModelSetupView({
   observabilityState,
   isTestingModel,
   modelTestResult,
-  onSmokeTest
+  modelTestIsPlaceholder,
+  onSmokeTest,
+  isCheckingReachability,
+  reachabilityResult,
+  reachabilityError,
+  onTestConnection
 }: {
   llmState: AsyncState<LlmStatus>;
   observabilityState: AsyncState<ObservabilityData>;
   isTestingModel: boolean;
   modelTestResult: string | null;
+  modelTestIsPlaceholder: boolean;
   onSmokeTest: () => void;
+  isCheckingReachability: boolean;
+  reachabilityResult: LlmReachability | null;
+  reachabilityError: string | null;
+  onTestConnection: () => void;
 }) {
   if (llmState.status === "loading" || llmState.status === "idle") {
     return (
@@ -3759,12 +3846,35 @@ function ModelSetupView({
             ))}
           </div>
         )}
-        <button type="button" onClick={onSmokeTest} disabled={isTestingModel}>
-          {isTestingModel ? "Testing provider..." : "Run provider smoke test"}
-        </button>
+        <div className="model-actions">
+          <button type="button" onClick={onSmokeTest} disabled={isTestingModel}>
+            {isTestingModel ? "Testing provider..." : "Run provider smoke test"}
+          </button>
+          <button type="button" className="secondary" onClick={onTestConnection} disabled={isCheckingReachability}>
+            {isCheckingReachability ? "Testing…" : "Test connection"}
+          </button>
+        </div>
         {modelTestResult && (
+          <>
+            {modelTestIsPlaceholder && (
+              <p className="result-notice warning" role="status" aria-live="polite">
+                Offline placeholder — no model is configured, so this is a canned response, not a real model reply.
+                Configure a provider in the variables below and restart the API.
+              </p>
+            )}
+            <p className="result-notice" role="status" aria-live="polite">
+              {modelTestResult}
+            </p>
+          </>
+        )}
+        {reachabilityError && (
+          <p className="result-notice error" role="alert">
+            {reachabilityError}
+          </p>
+        )}
+        {reachabilityResult && (
           <p className="result-notice" role="status" aria-live="polite">
-            {modelTestResult}
+            {formatReachability(reachabilityResult)}
           </p>
         )}
       </section>
