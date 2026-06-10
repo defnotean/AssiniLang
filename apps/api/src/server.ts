@@ -45,6 +45,13 @@ import {
   type UserRole
 } from "@assini/db";
 import { draftNotesForLanguage, gradeExerciseAnswer, runEvaluationForState } from "@assini/eval";
+import {
+  generateModelDraftNotes,
+  generateModelExercise,
+  ModelRequiredError,
+  type GeneratedExerciseDraft,
+  type GeneratedNoteDraft
+} from "./generation";
 import { extractCandidatesForAsset, type SourceExtractionResult } from "./ingestion";
 import {
   buildLlmGenerationInputFromState,
@@ -169,6 +176,8 @@ type NeuralMapResponse = NeuralMap & {
 
 const STUDY_LOOP_DRAFT_AUTHOR = "deterministic-study-loop";
 const STUDY_LOOP_DRAFT_ACTION = "drafted";
+const MODEL_REQUIRED_MESSAGE =
+  "A configured model is required to generate draft notes. Set ASSINI_LLM_* (see the configuration reference) and retry.";
 const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 const TEST_ONLY_AUTH_TOKEN = "test";
 const PROTOTYPE_SESSION_COOKIE = "assini_prototype_session";
@@ -439,6 +448,16 @@ function parseStudyLoopDraftBody(input: unknown): StudyLoopDraftBody | undefined
 
   const languageId = body.languageId.trim();
   return languageId.length > 0 ? { languageId } : undefined;
+}
+
+function parseExerciseGenerationType(input: unknown): Exercise["type"] | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+  const { type } = input as Record<string, unknown>;
+  return typeof type === "string" && EXERCISE_TYPES.includes(type as Exercise["type"])
+    ? (type as Exercise["type"])
+    : undefined;
 }
 
 function parsePrototypeSessionBody(input: unknown): PrototypeSessionBody | undefined {
@@ -3169,6 +3188,129 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     return toPublicNotes(nextNotes);
+  });
+
+  app.post("/languages/:languageId/study-loop/model-draft", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const language = current.languages.find((item) => item.id === languageId);
+    if (!language) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const corpus = current.corpus.filter((passage) => passage.languageId === languageId);
+    const lexemes = current.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+    const existingNotes = current.notes.filter((note) => note.languageId === languageId);
+
+    let generation: { notes: GeneratedNoteDraft[]; warnings: string[] };
+    try {
+      generation = await generateModelDraftNotes({ language, corpus, lexemes, existingNotes, provider: llmProvider });
+    } catch (error) {
+      if (error instanceof ModelRequiredError) {
+        reply.code(400);
+        return { error: MODEL_REQUIRED_MESSAGE };
+      }
+      reply.code(422);
+      return { error: redactErrorSecrets(error instanceof Error ? error.message : "Draft note generation failed.") };
+    }
+
+    const passagesById = new Map(corpus.map((passage) => [passage.id, passage]));
+    const generatedAt = new Date().toISOString();
+    const createdNotes: Note[] = generation.notes.map((draft, index) => ({
+      id: `model-draft-${languageId}-${index + 1}-${randomUUID()}`,
+      languageId,
+      topic: draft.topic,
+      explanation: draft.explanation,
+      examples: draft.evidencePassageIds
+        .map((passageId) => passagesById.get(passageId))
+        .filter((passage): passage is CorpusPassage => passage !== undefined)
+        .map((passage) => ({
+          passageId: passage.id,
+          target: passage.textTarget,
+          translation: passage.textTranslation
+        })),
+      evidencePassageIds: [...draft.evidencePassageIds],
+      evidenceCount: draft.evidencePassageIds.length,
+      confidence: draft.confidence,
+      status: "draft",
+      reviewer: {
+        lastReviewedBy: null,
+        lastReviewedAt: null,
+        comments: ["Model-backed draft generated from approved corpus and lexicon."]
+      },
+      dialectScope: "general",
+      editHistory: [
+        {
+          at: generatedAt,
+          by: STUDY_LOOP_DRAFT_AUTHOR,
+          action: STUDY_LOOP_DRAFT_ACTION,
+          summary: `Generated model-backed draft note for ${draft.topic}.`
+        }
+      ]
+    }));
+
+    if (createdNotes.length > 0) {
+      await updateState((state) => appendAuditEvents({
+        ...state,
+        notes: [...state.notes, ...createdNotes]
+      }, createdNotes.map((note) => ({
+        actor,
+        at: generatedAt,
+        action: "note.draft_generated",
+        entityType: "note",
+        entityId: note.id,
+        languageId: note.languageId,
+        summary: `Generated model-backed draft note for ${note.topic}.`,
+        metadata: {
+          topic: note.topic,
+          status: note.status,
+          confidence: note.confidence
+        }
+      }))));
+    }
+
+    return { notes: createdNotes, warnings: generation.warnings, generated: createdNotes.length };
+  });
+
+  app.post("/languages/:languageId/exercises/generate", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const language = current.languages.find((item) => item.id === languageId);
+    if (!language) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const requestedType = parseExerciseGenerationType(request.body);
+
+    const corpus = current.corpus.filter((passage) => passage.languageId === languageId);
+    const lexemes = current.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+    const notes = current.notes.filter((note) => note.languageId === languageId);
+
+    let generation: { exercise: GeneratedExerciseDraft; warnings: string[] };
+    try {
+      generation = await generateModelExercise({ language, lexemes, notes, corpus, type: requestedType, provider: llmProvider });
+    } catch (error) {
+      if (error instanceof ModelRequiredError) {
+        reply.code(400);
+        return { error: MODEL_REQUIRED_MESSAGE };
+      }
+      reply.code(422);
+      return { error: redactErrorSecrets(error instanceof Error ? error.message : "Exercise generation failed.") };
+    }
+
+    return { exercise: generation.exercise, warnings: generation.warnings };
   });
 
   app.patch("/notes/:noteId/review", async (request, reply) => {

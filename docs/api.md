@@ -30,8 +30,10 @@ Every route in `server.ts`. "Public" means no auth required; role lists mean the
 | GET | `/languages/:languageId/notes` | Public | Public review notes. |
 | PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. |
+| POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
 | POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. |
+| POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
 | GET | `/exercises/:exerciseId/submissions` | Public | Sanitized submission history. |
 | POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
 | GET | `/evaluations` | Public | Previous evaluation runs. |
@@ -188,6 +190,18 @@ Important validation:
 - At least two adversarial answers are required.
 - Adversarial answers and reasons must be nonblank, and adversarial answers must not duplicate accepted answers or another adversarial probe.
 - Translate-to-target expected answers must be present in same-language corpus text; choose-particle answers must be inside the exercise's allowed vocabulary.
+
+## Model-backed generation
+
+Both generation routes are model-only: they reuse the same configured LLM provider as ingestion (the OpenAI-compatible chat/completions endpoint), so the same `ASSINI_LLM_*` configuration that enables ingestion enables them. Unlike ingestion, there is no offline heuristic fallback - in deterministic / no-model mode each route returns `400` with setup guidance instead of degrading. Both are grounded against the language's approved data so the model cannot introduce hallucinated forms, evidence, or rule references.
+
+`POST /languages/:languageId/study-loop/model-draft` (roles: reviewer, lead, admin, elder)
+
+Generates draft grammar notes from the language's approved corpus, lexicon, and existing notes. Each generated note is kept only if it is grounded: it must cite at least one real corpus passage id as evidence, carry a non-empty topic that is not a duplicate of an existing or already-generated note (case- and whitespace-insensitive), and provide a substantive explanation. Ungrounded or hallucinated notes are dropped and reported in `warnings`. Surviving notes are inserted as `draft` notes into the normal review queue - they are not auto-approved and must still be reviewed like any other draft. The response is `{ notes, warnings, generated }`, where `generated` is the count of drafts actually persisted.
+
+`POST /languages/:languageId/exercises/generate` (roles: reviewer, lead, admin)
+
+Generates a single draft exercise grounded in the approved lexicon and notes. `allowedVocabulary` is filtered to real lexeme forms, `allowedRuleIds` is filtered to existing note ids, and the draft is rejected (`422`) if grounding leaves it unusable (no expected answers, no grounded vocabulary, or no prompt). The optional body `{ type? }` requests one of the four exercise types; an unrecognized type falls back to a default with a warning. This route does not persist anything: it returns `{ exercise, warnings }` as a preview that the author reviews and edits, then saves through `POST /languages/:languageId/exercises`. Answer keys stay human-controlled - the model draft is reviewed before save, never auto-committed.
 
 ## Exercise submissions
 

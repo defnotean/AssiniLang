@@ -701,6 +701,12 @@ label,
   white-space: nowrap;
 }
 
+.header-actions .header-notice {
+  flex-basis: 100%;
+  margin: 0;
+  text-align: right;
+}
+
 .stat-strip {
   display: grid;
   flex: 0 0 auto;

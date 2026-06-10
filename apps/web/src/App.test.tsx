@@ -30,6 +30,8 @@ const apiMock = vi.hoisted(() => ({
   fetchReviewDispositions: vi.fn(),
   fetchReviewPolicy: vi.fn(),
   generateDraftNotes: vi.fn(),
+  generateModelDraftNotes: vi.fn(),
+  generateModelExercise: vi.fn(),
   importCorpusPassage: vi.fn(),
   resolveReviewDisposition: vi.fn(),
   reviewElderCorrection: vi.fn(),
@@ -601,6 +603,19 @@ describe("App", () => {
       evaluations: createDashboardData().evaluations
     });
     apiMock.generateDraftNotes.mockResolvedValue([]);
+    apiMock.generateModelDraftNotes.mockResolvedValue({ notes: [], warnings: [], generated: 0 });
+    apiMock.generateModelExercise.mockResolvedValue({
+      exercise: {
+        type: "translate_to_target",
+        prompt: "",
+        allowedVocabulary: [],
+        allowedRuleIds: [],
+        expectedAnswers: [],
+        adversarialAnswers: [],
+        gradingExplanation: ""
+      },
+      warnings: []
+    });
     apiMock.runEvaluation.mockResolvedValue([]);
     apiMock.reviewNote.mockResolvedValue({});
     apiMock.submitExerciseAnswer.mockResolvedValue({
@@ -1527,6 +1542,48 @@ describe("App", () => {
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
   });
 
+  it("drafts notes with the model and refreshes the review queue", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.generateModelDraftNotes.mockResolvedValue({
+      notes: [],
+      warnings: ["Model returned fewer notes than requested."],
+      generated: 2
+    });
+
+    render(<App />);
+
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Note Review Queue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Draft notes with model" }));
+
+    await waitFor(() => expect(apiMock.generateModelDraftNotes).toHaveBeenCalledWith("avenik"));
+    expect(
+      await screen.findByText(
+        "Generated 2 model-backed draft notes. Model returned fewer notes than requested."
+      )
+    ).toBeInTheDocument();
+    expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
+  });
+
+  it("shows the no-model error inline when drafting notes with the model fails", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.generateModelDraftNotes.mockRejectedValue(
+      new Error("Model draft generation failed (400): No model is configured.")
+    );
+
+    render(<App />);
+
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Note Review Queue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Draft notes with model" }));
+
+    await waitFor(() => expect(apiMock.generateModelDraftNotes).toHaveBeenCalledWith("avenik"));
+    expect(
+      await screen.findByText("Model draft generation failed (400): No model is configured.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Draft notes with model" })).toBeEnabled();
+  });
+
   it("runs evaluation from the eval view and disables language switching while refresh is in flight", async () => {
     const evaluationRun = createDeferred<unknown[]>();
     apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
@@ -1962,6 +2019,68 @@ describe("App", () => {
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
     expect(await screen.findByText("Exercise authored.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Translate into Avenik: I walk by the river./ })).toBeInTheDocument();
+  });
+
+  it("pre-fills the authoring form from a model-generated exercise draft without auto-creating it", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.generateModelExercise.mockResolvedValue({
+      exercise: {
+        type: "translate_to_target",
+        prompt: "Translate into Avenik: The child sleeps.",
+        allowedVocabulary: ["nemi", "lo", "-ki"],
+        allowedRuleIds: ["avn-rule-verb-chain"],
+        expectedAnswers: ["nemi lo-ki"],
+        adversarialAnswers: [
+          { answer: "lo-ki nemi", reason: "Fronts the verb ahead of the subject noun." },
+          { answer: "nemi-ki lo", reason: "Attaches the tense suffix to the wrong stem." }
+        ],
+        gradingExplanation: "Use nemi for child and lo for sleep with the -ki present suffix."
+      },
+      warnings: ["Review the allowed vocabulary before saving."]
+    });
+
+    render(<App />);
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate with model" }));
+
+    await waitFor(() => expect(apiMock.generateModelExercise).toHaveBeenCalledWith("avenik", {
+      type: "translate_to_target"
+    }));
+
+    expect(await screen.findByLabelText("Exercise prompt")).toHaveValue("Translate into Avenik: The child sleeps.");
+    expect(screen.getByLabelText("Allowed vocabulary")).toHaveValue("nemi, lo, -ki");
+    expect(screen.getByLabelText("Expected answers")).toHaveValue("nemi lo-ki");
+    expect(screen.getByLabelText("Adversarial answer 1")).toHaveValue("lo-ki nemi");
+    expect(screen.getByLabelText("Grading explanation")).toHaveValue(
+      "Use nemi for child and lo for sleep with the -ki present suffix."
+    );
+    expect(
+      screen.getByText("Draft generated — review before saving. Review the allowed vocabulary before saving.")
+    ).toBeInTheDocument();
+    expect(apiMock.createExercise).not.toHaveBeenCalled();
+  });
+
+  it("shows the no-model error inline when generating an exercise with the model fails", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.generateModelExercise.mockRejectedValue(
+      new Error("Model exercise generation failed (400): No model is configured.")
+    );
+
+    render(<App />);
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Generate with model" }));
+
+    await waitFor(() => expect(apiMock.generateModelExercise).toHaveBeenCalledWith("avenik", {
+      type: "translate_to_target"
+    }));
+    expect(
+      await screen.findByText("Model exercise generation failed (400): No model is configured.")
+    ).toBeInTheDocument();
+    expect(apiMock.createExercise).not.toHaveBeenCalled();
   });
 
   it("switches learner exercise selection and loads that exercise history", async () => {

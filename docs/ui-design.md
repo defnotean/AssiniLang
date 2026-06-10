@@ -84,6 +84,7 @@ The review queue should support high-volume triage:
 - Show topic, status, confidence, evidence count, and action buttons without forcing navigation away.
 - Keep selected-note detail alongside the table on desktop.
 - Require clear comments for contested, rejected, deferred, and escalated states through API validation.
+- A "Draft notes with model" action generates grounded draft notes into the queue. Keep it secondary to the review controls and frame its output as drafts: the generated notes enter the queue as ordinary `draft` notes for review, never auto-approved. Surface dropped/ungrounded-note warnings so reviewers see what the grounding rejected. The action is model-only and should report a clear error when no model is configured.
 
 ### Learning lab
 
@@ -93,6 +94,7 @@ Learner exercises are functional previews, not answer-key displays:
 - The browser submits answers to the API for grading.
 - Submission history stays sanitized and must not reveal learner answers.
 - Authoring controls belong in this workspace but should stay visually secondary to exercise preview and grading.
+- A "Generate with model" action pre-fills the authoring form with a grounded draft exercise for the author to review and edit before saving. Frame it as a preview, not a saved exercise: the draft only populates the existing authoring fields, the author still saves through the normal authoring flow, and answer keys stay human-controlled. The action is model-only and should report a clear error when no model is configured.
 
 ### Evaluation dashboard
 

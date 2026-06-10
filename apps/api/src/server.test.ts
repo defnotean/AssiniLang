@@ -1971,6 +1971,221 @@ describe("api server", () => {
     expect(notes.filter((note) => note.id === reviewedGeneratedDraft.id)).toHaveLength(1);
   });
 
+  describe("POST /languages/:languageId/study-loop/model-draft", () => {
+    function noteProvider(content: string): LlmProvider {
+      return {
+        name: "fake-note-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          return content;
+        }
+      };
+    }
+
+    const groundedNoteJson = JSON.stringify({
+      notes: [
+        {
+          topic: "morphology/verb/third-person",
+          explanation: "The suffix -ki marks a third-person singular subject on the verb form.",
+          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c003`],
+          confidence: "medium"
+        }
+      ]
+    });
+
+    it("inserts model-backed draft notes and emits an audit event", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: noteProvider(groundedNoteJson)
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/study-loop/model-draft`,
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { notes: Note[]; warnings: string[]; generated: number };
+      expect(body.generated).toBe(1);
+      expect(body.notes).toHaveLength(1);
+      expect(Array.isArray(body.warnings)).toBe(true);
+      const [created] = body.notes;
+      expect(created.status).toBe("draft");
+      expect(created.topic).toBe("morphology/verb/third-person");
+      expect(created.evidencePassageIds).toEqual([`${TEST_LANGUAGE_ID}-c003`]);
+      expect(created.evidenceCount).toBe(1);
+      expect(created.reviewer).toMatchObject({ lastReviewedBy: null, lastReviewedAt: null });
+      expect(created.editHistory[0]).toMatchObject({ by: "deterministic-study-loop", action: "drafted" });
+
+      const notesResponse = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
+      const notes = notesResponse.json() as Note[];
+      expect(notes.find((note) => note.id === created.id)).toMatchObject({ status: "draft" });
+
+      const audit = await app.inject({
+        method: "GET",
+        url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+        headers: authHeaders("lead-1")
+      });
+      const actions = (audit.json() as Array<{ action: string }>).map((event) => event.action);
+      expect(actions).toContain("note.draft_generated");
+    });
+
+    it("returns 400 when the configured provider cannot generate (no completeChat)", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/study-loop/model-draft`,
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toContain("A configured model is required");
+
+      const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
+      expect(after.json()).toEqual(before.json());
+    });
+
+    it("returns 404 for an unknown language", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: noteProvider(groundedNoteJson)
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/languages/not-a-language/study-loop/model-draft",
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    });
+
+    it("forbids learners from generating model-backed draft notes", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: noteProvider(groundedNoteJson)
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/study-loop/model-draft`,
+        headers: authHeaders("learner-1")
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Forbidden" });
+    });
+  });
+
+  describe("POST /languages/:languageId/exercises/generate", () => {
+    function exerciseProvider(content: string): LlmProvider {
+      return {
+        name: "fake-exercise-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          return content;
+        }
+      };
+    }
+
+    const groundedExerciseJson = JSON.stringify({
+      exercise: {
+        type: "translate_to_target",
+        prompt: "Translate to the target language: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: [`${TEST_LANGUAGE_ID}-note-basic-order`],
+        expectedAnswers: ["saku talo-ki"],
+        adversarialAnswers: [
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." },
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." }
+        ],
+        gradingExplanation: "Subject saku precedes the verb talo with the third-person suffix -ki."
+      }
+    });
+
+    it("returns a grounded exercise draft without persisting anything", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: exerciseProvider(groundedExerciseJson)
+      });
+
+      const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+      const beforeCount = (before.json() as unknown[]).length;
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/exercises/generate`,
+        headers: authHeaders("reviewer-1"),
+        payload: { type: "translate_to_target" }
+      });
+
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { exercise: Record<string, unknown>; warnings: string[] };
+      expect(body.exercise).toMatchObject({
+        type: "translate_to_target",
+        expectedAnswers: ["saku talo-ki"],
+        allowedVocabulary: ["saku", "talo", "-ki"]
+      });
+      expect(Array.isArray(body.warnings)).toBe(true);
+
+      const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+      expect((after.json() as unknown[]).length).toBe(beforeCount);
+    });
+
+    it("returns 400 when the configured provider cannot generate (no completeChat)", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/exercises/generate`,
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error).toContain("A configured model is required");
+    });
+
+    it("returns 404 for an unknown language", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: exerciseProvider(groundedExerciseJson)
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: "/languages/not-a-language/exercises/generate",
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    });
+
+    it("forbids learners from generating exercises", async () => {
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider: exerciseProvider(groundedExerciseJson)
+      });
+
+      const response = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/exercises/generate`,
+        headers: authHeaders("learner-1")
+      });
+
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: "Forbidden" });
+    });
+  });
+
   it("updates note review details", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 

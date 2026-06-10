@@ -57,6 +57,8 @@ The review queue shows draft notes beside their status, confidence, evidence cou
 - Contest, reject, defer, or escalate notes with required comments.
 - Edit a note explanation through server-side substantive-explanation validation.
 
+A "Draft notes with model" action generates grounded draft notes straight into the queue. It asks the configured model to describe patterns from the language's approved corpus, lexicon, and existing notes, then keeps only notes that cite real corpus evidence and do not duplicate an existing topic; anything ungrounded is dropped and reported. The surviving notes land as ordinary `draft` notes for the same review workflow - they are never auto-approved. This is a model-only action: without a configured model it returns a clear error rather than falling back to a heuristic.
+
 Per-language review policies can require assigned reviewers and approval thresholds. When a threshold is greater than one, a note remains `under_review` until enough approvals are recorded. Assigned-reviewer policies bound the threshold to assigned reviewers; open-reviewer policies bound it to the current assignable reviewer pool.
 
 If assignments change mid-review, earlier approvals stay in the audit trail but no longer satisfy quorum unless the reviewer is still eligible under the current policy.
@@ -75,6 +77,8 @@ Reviewers can author compact exercises from the web UI. Exercise authoring is va
 - Non-empty expected answers that are unique after whitespace normalization.
 - At least two private adversarial answer probes that do not duplicate expected answers or one another.
 - Substantive prompts and grading explanations.
+
+A "Generate with model" action pre-fills the authoring form with a grounded draft exercise. The model draws only on the approved lexicon and notes: invented vocabulary and unknown rule references are stripped out, and a draft that cannot be grounded is rejected rather than shown. The result is a preview, not a saved exercise - the author reviews and edits the pre-filled fields and then saves through the normal authoring flow, so answer keys stay human-controlled and nothing is auto-saved. Like draft-note generation, it is model-only and returns a clear error in deterministic mode.
 
 ### Evaluation dashboard
 

@@ -37,7 +37,7 @@ The pipeline handles six source kinds with fallbacks, but honest gaps remain:
 
 ## 4. Better authoring tools
 
-The web app supports compact corpus import and exercise authoring, but authoring still needs:
+The web app supports compact corpus import and exercise authoring, and authoring now includes model-assisted exercise drafting that pre-fills the form with a grounded draft for the author to review and edit before saving (answer keys stay human-controlled). Authoring still needs:
 
 - A richer note editor beyond explanation edits.
 - Better multi-probe exercise authoring.
@@ -47,14 +47,14 @@ The web app supports compact corpus import and exercise authoring, but authoring
 
 ## 5. Real study loop
 
-The deterministic study loop is intentional for the current milestone. It proves evaluation without depending on a model.
+Model-backed draft generation now exists: reviewers can generate grounded draft grammar notes (`POST /languages/:languageId/study-loop/model-draft`) and a grounded draft exercise (`POST /languages/:languageId/exercises/generate`). Both are grounded against the language's approved lexicon and corpus, so hallucinated forms and ungrounded evidence are rejected before anything reaches the review queue, and the drafts enter the normal human review/save path rather than being auto-approved.
+
+The deterministic evaluation harness still scores drafted notes against the immutable answer keys; it does not yet score these model drafts as a graded study loop.
 
 Next steps:
 
-- Add model-backed draft generation.
-- Compare model drafts against immutable answer keys.
-- Track uncertainty and failure reasons.
-- Prevent hallucinated forms from entering approved notes.
+- Score the new model drafts against immutable answer keys as a closed study loop, not just human review.
+- Track uncertainty and failure reasons per draft.
 - Evaluate provider regressions across retained baselines.
 
 ## 6. Stronger evaluation

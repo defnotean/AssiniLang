@@ -147,3 +147,7 @@ Warnings (extraction still succeeds, result is flagged). Processing warnings are
 ## After extraction
 
 Extraction output is never committed directly. Accepting a draft (`POST /extraction-drafts/:draftId/accept`) commits a lexeme, a corpus passage with consent `pending-review` and a derived private answer key (incomplete segmentation falls back to honest token-level "unanalyzed" morphemes), or a `draft` grammar note that enters the normal review queue. See the [API reference](api.md#extraction-drafts) for validation details.
+
+## Shared provider with model-backed generation
+
+The model-backed generation features - grounded draft notes (`POST /languages/:languageId/study-loop/model-draft`) and a grounded draft exercise (`POST /languages/:languageId/exercises/generate`) - reuse the same configured LLM provider as ingestion (the OpenAI-compatible chat/completions endpoint), so the same `ASSINI_LLM_*` configuration enables them. Unlike ingestion, they have no offline heuristic fallback: in deterministic / no-model mode each generation route returns `400` instead of degrading. See the [API reference](api.md#model-backed-generation) for the grounding rules.

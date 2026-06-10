@@ -277,6 +277,16 @@ export type ExerciseAuthoringPayload = Pick<
   Exercise,
   "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
 >;
+
+export type GeneratedExerciseDraft = {
+  type: string;
+  prompt: string;
+  allowedVocabulary: string[];
+  allowedRuleIds: string[];
+  expectedAnswers: string[];
+  adversarialAnswers: { answer: string; reason: string }[];
+  gradingExplanation: string;
+};
 export type ReviewNotePayload = Partial<Pick<Note, "status" | "explanation">> & {
   reviewerComment?: string;
   dispositionAssigneeId?: string;
@@ -460,6 +470,17 @@ export async function generateDraftNotes(languageId: string): Promise<Note[]> {
   });
   await assertOk(response, "Draft generation failed");
   return response.json() as Promise<Note[]>;
+}
+
+export async function generateModelDraftNotes(
+  languageId: string
+): Promise<{ notes: Note[]; warnings: string[]; generated: number }> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/study-loop/model-draft`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true))
+  });
+  await assertOk(response, "Model draft generation failed");
+  return response.json() as Promise<{ notes: Note[]; warnings: string[]; generated: number }>;
 }
 
 export async function fetchCurrentUser(): Promise<User> {
@@ -692,6 +713,22 @@ export async function createExercise(
   await assertOk(response, "Exercise authoring failed");
 
   return response.json() as Promise<PublicExercise>;
+}
+
+export async function generateModelExercise(
+  languageId: string,
+  options?: { type?: string }
+): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
+  const requestedType = options?.type?.trim();
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/exercises/generate`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(requestedType ? { type: requestedType } : {})
+  });
+
+  await assertOk(response, "Model exercise generation failed");
+
+  return response.json() as Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
 }
 
 export async function importCorpusPassage(

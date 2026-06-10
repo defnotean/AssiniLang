@@ -6,6 +6,7 @@ import type {
   ElderCorrectionPayload,
   EvaluationArtifact,
   ExerciseAuthoringPayload,
+  GeneratedExerciseDraft,
   ExtractionDraft,
   ExtractionDraftDuplicate,
   ExtractionDraftView,
@@ -47,6 +48,8 @@ import {
   fetchReviewPolicy,
   fetchSources,
   generateDraftNotes,
+  generateModelDraftNotes,
+  generateModelExercise,
   importCorpusPassage,
   processSource,
   registerSource,
@@ -582,6 +585,9 @@ export function App() {
 
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
+  const [isModelDrafting, setIsModelDrafting] = useState(false);
+  const [modelDraftMessage, setModelDraftMessage] = useState<string | null>(null);
+  const [modelDraftError, setModelDraftError] = useState<string | null>(null);
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
@@ -760,6 +766,7 @@ export function App() {
   const activeView = VIEW_CONFIG[view];
   const isWorkflowBusy = isEvaluating
     || isDrafting
+    || isModelDrafting
     || reviewingNoteId !== null
     || isGrading
     || isSubmittingCorrection
@@ -984,6 +991,24 @@ export function App() {
     }
   }
 
+  async function handleGenerateModelDrafts() {
+    if (!selectedLanguageId) return;
+    setIsModelDrafting(true);
+    setModelDraftMessage(null);
+    setModelDraftError(null);
+    try {
+      const { generated, warnings } = await generateModelDraftNotes(selectedLanguageId);
+      await refreshDashboard();
+      const summary = `Generated ${generated} model-backed draft note${generated === 1 ? "" : "s"}.`;
+      setModelDraftMessage(warnings.length > 0 ? `${summary} ${warnings.join(" ")}` : summary);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Model draft generation failed";
+      setModelDraftError(message);
+    } finally {
+      setIsModelDrafting(false);
+    }
+  }
+
   async function handleReview(status: ReviewStatus) {
     if (!selectedNote) return;
     setReviewingNoteId(selectedNote.id);
@@ -1047,6 +1072,15 @@ export function App() {
     setExerciseAnswer("");
     setExerciseResult(null);
     setSubmissionHistory([]);
+  }
+
+  async function handleGenerateExercise(
+    options?: { type?: string }
+  ): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
+    if (!selectedLanguageId) {
+      throw new Error("Select or create a language first.");
+    }
+    return generateModelExercise(selectedLanguageId, options);
   }
 
   async function handleImportCorpusPassage(payload: CorpusImportPayload) {
@@ -1502,9 +1536,24 @@ export function App() {
               {isElderMode ? "Back to dashboard" : "Elder workspace"}
             </button>
             {!isElderMode && view === "review" && (
-              <button type="button" onClick={handleGenerateDrafts} disabled={isWorkflowBusy}>
-                {isDrafting ? "Drafting..." : "Generate AI Drafts"}
-              </button>
+              <>
+                <button type="button" onClick={handleGenerateDrafts} disabled={isWorkflowBusy}>
+                  {isDrafting ? "Drafting..." : "Generate AI Drafts"}
+                </button>
+                <button type="button" onClick={handleGenerateModelDrafts} disabled={isWorkflowBusy}>
+                  {isModelDrafting ? "Drafting with model..." : "Draft notes with model"}
+                </button>
+                {modelDraftMessage && (
+                  <p className="result-notice header-notice" role="status" aria-live="polite">
+                    {modelDraftMessage}
+                  </p>
+                )}
+                {modelDraftError && (
+                  <p className="result-notice error header-notice" role="alert">
+                    {modelDraftError}
+                  </p>
+                )}
+              </>
             )}
             {!isElderMode && view === "eval" && (
               <button type="button" onClick={handleRunEval} disabled={isWorkflowBusy}>
@@ -1609,6 +1658,7 @@ export function App() {
                   onAnswerChange={setExerciseAnswer}
                   onGrade={handleGrade}
                   onCreateExercise={handleCreateExercise}
+                  onGenerateExercise={handleGenerateExercise}
                 />
               )}
               {view === "eval" && (
@@ -3054,7 +3104,8 @@ function LearnerView({
   onSelectExercise,
   onAnswerChange,
   onGrade,
-  onCreateExercise
+  onCreateExercise,
+  onGenerateExercise
 }: {
   exercises: PublicExercise[];
   selectedExercise: PublicExercise | null;
@@ -3069,6 +3120,9 @@ function LearnerView({
   onAnswerChange: (answer: string) => void;
   onGrade: () => void;
   onCreateExercise: (payload: ExerciseAuthoringPayload) => Promise<void>;
+  onGenerateExercise: (
+    options?: { type?: string }
+  ) => Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
 }) {
   const [authoringType, setAuthoringType] = useState<PublicExercise["type"]>("translate_to_target");
   const [authoringPrompt, setAuthoringPrompt] = useState("");
@@ -3083,6 +3137,7 @@ function LearnerView({
   const [authoringMessage, setAuthoringMessage] = useState<string | null>(null);
   const [authoringError, setAuthoringError] = useState<string | null>(null);
   const [isCreatingExercise, setIsCreatingExercise] = useState(false);
+  const [isGeneratingExercise, setIsGeneratingExercise] = useState(false);
   const hasTwoAdversarialProbes = authoringAdversarialAnswerOne.trim().length > 0
     && authoringAdversarialReasonOne.trim().length > 0
     && authoringAdversarialAnswerTwo.trim().length > 0
@@ -3129,6 +3184,38 @@ function LearnerView({
       setAuthoringError(message);
     } finally {
       setIsCreatingExercise(false);
+    }
+  }
+
+  async function handleGenerateWithModel() {
+    if (isWorkflowBusy || isCreatingExercise || isGeneratingExercise) return;
+
+    setIsGeneratingExercise(true);
+    setAuthoringMessage(null);
+    setAuthoringError(null);
+    try {
+      const { exercise, warnings } = await onGenerateExercise({ type: authoringType });
+
+      if (exercise.type in EXERCISE_TYPE_LABELS) {
+        setAuthoringType(exercise.type as PublicExercise["type"]);
+      }
+      setAuthoringPrompt(exercise.prompt);
+      setAuthoringVocabulary(exercise.allowedVocabulary.join(", "));
+      setAuthoringRules(exercise.allowedRuleIds.join(", "));
+      setAuthoringAnswers(exercise.expectedAnswers.join(", "));
+      setAuthoringAdversarialAnswerOne(exercise.adversarialAnswers[0]?.answer ?? "");
+      setAuthoringAdversarialReasonOne(exercise.adversarialAnswers[0]?.reason ?? "");
+      setAuthoringAdversarialAnswerTwo(exercise.adversarialAnswers[1]?.answer ?? "");
+      setAuthoringAdversarialReasonTwo(exercise.adversarialAnswers[1]?.reason ?? "");
+      setAuthoringExplanation(exercise.gradingExplanation);
+
+      const base = "Draft generated — review before saving.";
+      setAuthoringMessage(warnings.length > 0 ? `${base} ${warnings.join(" ")}` : base);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Model exercise generation failed";
+      setAuthoringError(message);
+    } finally {
+      setIsGeneratingExercise(false);
     }
   }
 
@@ -3341,9 +3428,19 @@ function LearnerView({
               }}
             />
           </div>
-          <button type="submit" className="secondary" disabled={!canCreateExercise}>
-            {isCreatingExercise ? "Creating..." : "Create exercise"}
-          </button>
+          <div className="model-actions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={handleGenerateWithModel}
+              disabled={isWorkflowBusy || isCreatingExercise || isGeneratingExercise}
+            >
+              {isGeneratingExercise ? "Generating..." : "Generate with model"}
+            </button>
+            <button type="submit" className="secondary" disabled={!canCreateExercise}>
+              {isCreatingExercise ? "Creating..." : "Create exercise"}
+            </button>
+          </div>
           {authoringMessage && <p className="result-notice" role="status" aria-live="polite">{authoringMessage}</p>}
           {authoringError && <p className="result-notice error" role="alert">{authoringError}</p>}
         </form>
