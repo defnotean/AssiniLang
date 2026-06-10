@@ -2721,7 +2721,7 @@ export function createServer(options: ServerOptions = {}) {
         languageId: exercise.languageId,
         answer: body.answer,
         accepted: graded.accepted,
-        explanation: graded.accepted ? graded.explanation : "Answer did not match the exercise answer key.",
+        explanation: graded.accepted ? "Submission accepted." : "Answer did not match the exercise answer key.",
         submittedAt,
         learnerId: actor.id
       };

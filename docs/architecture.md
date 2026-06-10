@@ -43,10 +43,12 @@ The persisted app state (schemaVersion 8) keeps these collections beside the exi
 Source processing lives in `apps/api/src/ingestion.ts` and is driven by the server-side LLM provider:
 
 - `text` and `wordlist` sources go to LLM extraction. When no real model is configured (deterministic mode), an offline heuristic parses delimited lines (`=`, `-`, tab, pipe) into low-confidence lexeme or passage drafts instead.
-- `url` sources are fetched server-side (http/https only, size-capped), converted from HTML to text, then extracted.
+- `url` sources are fetched server-side (http/https only, size-capped), converted from HTML to text, then extracted. An SSRF guard blocks URLs that point at private or local networks: `localhost`/`*.localhost`/`*.local` hostnames, private/reserved IPv4 literals (10/8, 172.16/12, 192.168/16, 127/8, 169.254/16, 0/8), loopback/link-local/unique-local IPv6 literals (`::1`, fe80::/10, fc00::/7), and public-looking hostnames whose DNS lookup resolves to one of those ranges. Set `ASSINI_ALLOW_PRIVATE_URLS=1` (or `true`) to skip these checks in a trusted local setup.
 - `image` sources require a vision-capable OpenAI-compatible model; the image is sent as base64 content.
 - `audio` sources are transcribed through an OpenAI-compatible `/audio/transcriptions` endpoint (`ASSINI_TRANSCRIBE_BASE_URL`), then the transcript goes through LLM extraction.
-- `document` sources are limited to plain-text formats (txt, md, csv, tsv, json) for now.
+- `document` sources accept plain-text formats (txt, md, csv, tsv, json) plus PDF (parsed with `unpdf`) and DOCX (parsed with `mammoth`). PDF/DOCX files with no extractable text (for example scanned images) fail with a clear error; OCR is not supported yet.
+
+Long sources are no longer truncated. Normalized text is split into chunks of roughly 12,000 characters on paragraph/line boundaries, and up to 8 chunks are processed sequentially through the model (each user message carries a "part N of M" note). Per-chunk results are merged: candidates are deduplicated (lexemes by case-insensitive form+gloss, corpus passages by target text, grammar notes by topic+explanation), capped at 100 per kind overall, and chunk summaries are combined into one short summary. Text beyond 8 chunks is skipped with a warning that reports how many characters were left unprocessed. A chunk whose model output cannot be parsed adds a warning and is skipped; if every chunk fails, the offline heuristic runs on the full text. The offline heuristic path always runs on the full untruncated text.
 
 Extraction output is never committed directly. Accepting a draft commits a lexeme, a corpus passage (with a derived private answer key; missing or incomplete segmentation falls back to honest token-level "unanalyzed" morphemes), or a grammar note that enters the normal review workflow as a `draft`. Uploaded files are stored under `data/assets/` with a 25 MB cap per file.
 
@@ -156,6 +158,7 @@ Useful environment variables:
 - `ASSINI_LLM_TIMEOUT_MS`: positive integer timeout.
 - `ASSINI_TRANSCRIBE_BASE_URL`: OpenAI-compatible `/audio/transcriptions` server for audio sources (for example a local whisper server).
 - `ASSINI_TRANSCRIBE_MODEL` and `ASSINI_TRANSCRIBE_API_KEY`: transcription model name and optional key.
+- `ASSINI_ALLOW_PRIVATE_URLS`: set to `1` or `true` to let URL sources fetch from private/local network addresses (the SSRF guard is skipped). Leave unset in any shared deployment.
 
 `GET /llm/status` reports provider readiness and transcription readiness without exposing keys. Provider errors are sanitized before returning to clients or storing observable session records.
 

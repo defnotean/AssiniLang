@@ -1,3 +1,4 @@
+import { lookup as dnsLookup } from "node:dns/promises";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
@@ -6,6 +7,7 @@ import type { LlmChatMessage, LlmProvider } from "./llmProvider";
 
 type Env = Record<string, string | undefined>;
 type FetchFn = typeof fetch;
+type LookupFn = (hostname: string) => Promise<{ address: string; family: number }>;
 
 export type ExtractionCandidate = {
   kind: ExtractionDraftKind;
@@ -21,9 +23,11 @@ export type SourceExtractionResult = {
   transcript?: string;
 };
 
-const MAX_SOURCE_TEXT_CHARS = 16_000;
+const CHUNK_TARGET_CHARS = 12_000;
+const MAX_CHUNKS_PER_SOURCE = 8;
 const MAX_CANDIDATES_PER_KIND = 100;
 const MAX_URL_CONTENT_BYTES = 2_000_000;
+const MAX_MERGED_SUMMARY_CHARS = 300;
 
 const TEXT_DOCUMENT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "text"]);
 
@@ -60,12 +64,37 @@ const llmExtractionSchema = z.object({
   })).optional()
 });
 
-function clampText(text: string, maxChars = MAX_SOURCE_TEXT_CHARS): { text: string; truncated: boolean } {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
-  if (normalized.length <= maxChars) {
-    return { text: normalized, truncated: false };
+function normalizeSourceText(text: string): string {
+  return text.replace(/\r\n/g, "\n").trim();
+}
+
+/**
+ * Splits normalized text into chunks of at most `maxChars` characters on
+ * paragraph/line boundaries. A single line longer than `maxChars` (no
+ * usable boundary) is hard-split as a last resort.
+ */
+export function splitTextIntoChunks(text: string, maxChars = CHUNK_TARGET_CHARS): string[] {
+  if (text.length <= maxChars) return [text];
+
+  const chunks: string[] = [];
+  let current = "";
+  for (const line of text.split("\n")) {
+    const pieces = line.length > maxChars
+      ? line.match(new RegExp(`[\\s\\S]{1,${maxChars}}`, "g")) ?? []
+      : [line];
+    for (const piece of pieces) {
+      if (current.length > 0 && current.length + piece.length + 1 > maxChars) {
+        chunks.push(current);
+        current = piece;
+      } else {
+        current = current.length > 0 ? `${current}\n${piece}` : piece;
+      }
+    }
   }
-  return { text: normalized.slice(0, maxChars), truncated: true };
+  if (current.trim().length > 0) {
+    chunks.push(current);
+  }
+  return chunks;
 }
 
 function dedupeTags(tags: string[] | undefined, fallback: string): string[] {
@@ -100,7 +129,65 @@ export function htmlToText(html: string): string {
     .join("\n");
 }
 
-export async function fetchUrlText(url: string, fetchFn: FetchFn = globalThis.fetch): Promise<string> {
+function privateUrlsAllowed(env: Env): boolean {
+  const value = env.ASSINI_ALLOW_PRIVATE_URLS?.trim().toLowerCase();
+  return value === "1" || value === "true";
+}
+
+function isIpv4Literal(host: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+}
+
+function isPrivateIpv4(address: string): boolean {
+  const octets = address.split(".").map(Number);
+  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
+    return false;
+  }
+  const [first, second] = [octets[0] ?? -1, octets[1] ?? -1];
+  return first === 0
+    || first === 10
+    || first === 127
+    || (first === 169 && second === 254)
+    || (first === 172 && second >= 16 && second <= 31)
+    || (first === 192 && second === 168);
+}
+
+function isPrivateIpv6(address: string): boolean {
+  const normalized = (address.toLowerCase().replace(/^\[|\]$/g, "").split("%")[0] ?? "");
+  if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
+  if (/^f[cd]/.test(normalized)) return true; // fc00::/7 unique-local
+  if (/^fe[89ab]/.test(normalized)) return true; // fe80::/10 link-local
+  const mapped = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mapped?.[1]) return isPrivateIpv4(mapped[1]);
+  return false;
+}
+
+function isPrivateAddress(address: string): boolean {
+  return isIpv4Literal(address) ? isPrivateIpv4(address) : isPrivateIpv6(address);
+}
+
+function isPrivateHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
+  if (isIpv4Literal(host)) return isPrivateIpv4(host);
+  if (host.includes(":") || host.startsWith("[")) return isPrivateIpv6(host);
+  return false;
+}
+
+/**
+ * Fetches a source URL and converts it to plain text. To keep the server
+ * from being used as a proxy into the local network, URLs that point at
+ * private/reserved addresses (localhost, 10/8, 172.16/12, 192.168/16,
+ * 127/8, 169.254/16, 0/8, ::1, fe80::/10, fc00::/7) are rejected, and
+ * public-looking hostnames are DNS-resolved and checked against the same
+ * ranges. Set ASSINI_ALLOW_PRIVATE_URLS=1 to skip these checks in trusted
+ * local setups.
+ */
+export async function fetchUrlText(
+  url: string,
+  fetchFn: FetchFn = globalThis.fetch,
+  options: { env?: Env; lookupFn?: LookupFn } = {}
+): Promise<string> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -109,6 +196,30 @@ export async function fetchUrlText(url: string, fetchFn: FetchFn = globalThis.fe
   }
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     throw new Error("Source URLs must use http or https.");
+  }
+
+  const env = options.env ?? process.env;
+  if (!privateUrlsAllowed(env)) {
+    if (isPrivateHostname(parsed.hostname)) {
+      throw new Error(
+        `Source URL points at a private or local network (${parsed.hostname}) and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
+      );
+    }
+    const isIpLiteral = isIpv4Literal(parsed.hostname) || parsed.hostname.includes(":") || parsed.hostname.startsWith("[");
+    if (!isIpLiteral) {
+      const lookupFn = options.lookupFn ?? ((hostname: string) => dnsLookup(hostname));
+      let resolvedAddress: string | undefined;
+      try {
+        resolvedAddress = (await lookupFn(parsed.hostname)).address;
+      } catch {
+        // Unresolvable hostnames fall through so fetch reports its own error.
+      }
+      if (resolvedAddress !== undefined && isPrivateAddress(resolvedAddress)) {
+        throw new Error(
+          `Source URL hostname ${parsed.hostname} resolves to a private or local network address and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
+        );
+      }
+    }
   }
 
   const response = await fetchFn(parsed.toString(), {
@@ -209,10 +320,16 @@ function extractionInstructions(language: Language, sourceKind: SourceAsset["kin
   ].join("\n\n");
 }
 
-export function buildTextExtractionMessages(language: Language, sourceKind: SourceAsset["kind"], text: string): LlmChatMessage[] {
+export function buildTextExtractionMessages(
+  language: Language,
+  sourceKind: SourceAsset["kind"],
+  text: string,
+  part?: { index: number; total: number }
+): LlmChatMessage[] {
+  const partNote = part && part.total > 1 ? ` (part ${part.index} of ${part.total} of a longer source)` : "";
   return [
     { role: "system", content: extractionInstructions(language, sourceKind) },
-    { role: "user", content: `Content to analyze:\n\n${text}` }
+    { role: "user", content: `Content to analyze${partNote}:\n\n${text}` }
   ];
 }
 
@@ -346,6 +463,47 @@ export function parseExtractionResponse(content: string): { candidates: Extracti
   };
 }
 
+function candidateDedupeKey(candidate: ExtractionCandidate): string {
+  const payload = candidate.payload;
+  if (candidate.kind === "lexeme") {
+    return `lexeme:${(payload.form ?? "").toLowerCase()} ${(payload.gloss ?? "").toLowerCase()}`;
+  }
+  if (candidate.kind === "corpus_passage") {
+    return `corpus_passage:${payload.textTarget ?? ""}`;
+  }
+  return `grammar_note:${payload.topic ?? ""} ${payload.explanation ?? ""}`;
+}
+
+function mergeChunkExtractions(
+  parts: { candidates: ExtractionCandidate[]; summary: string }[]
+): { candidates: ExtractionCandidate[]; summary: string } {
+  const seen = new Set<string>();
+  const perKindCounts = new Map<ExtractionDraftKind, number>();
+  const candidates: ExtractionCandidate[] = [];
+
+  for (const part of parts) {
+    for (const candidate of part.candidates) {
+      const key = candidateDedupeKey(candidate);
+      if (seen.has(key)) continue;
+      const count = perKindCounts.get(candidate.kind) ?? 0;
+      if (count >= MAX_CANDIDATES_PER_KIND) continue;
+      seen.add(key);
+      perKindCounts.set(candidate.kind, count + 1);
+      candidates.push(candidate);
+    }
+  }
+
+  const distinctSummaries = [...new Set(parts.map((part) => part.summary.trim()).filter((summary) => summary.length > 0))];
+  const combined = distinctSummaries.join(" ");
+  const summary = combined.length === 0
+    ? `Extracted ${candidates.length} candidate items from ${parts.length} parts.`
+    : combined.length > MAX_MERGED_SUMMARY_CHARS
+      ? `${combined.slice(0, MAX_MERGED_SUMMARY_CHARS - 3)}...`
+      : combined;
+
+  return { candidates, summary };
+}
+
 /**
  * Offline fallback used when no real model is configured. Understands
  * simple "target = translation", "target - translation", tab- and
@@ -419,13 +577,14 @@ async function resolveAssetText(
   asset: SourceAsset,
   dataDir: string,
   env: Env,
-  fetchFn: FetchFn
+  fetchFn: FetchFn,
+  lookupFn?: LookupFn
 ): Promise<{ text: string; transcript?: string; warnings: string[] }> {
   const warnings: string[] = [];
 
   if (asset.kind === "url") {
     if (!asset.url) throw new Error("URL source asset has no URL.");
-    return { text: await fetchUrlText(asset.url, fetchFn), warnings };
+    return { text: await fetchUrlText(asset.url, fetchFn, { env, lookupFn }), warnings };
   }
 
   if (asset.kind === "audio") {
@@ -453,12 +612,34 @@ async function resolveAssetText(
   if (asset.kind === "document") {
     if (!asset.filePath) throw new Error("Document source asset has no stored file.");
     const extension = documentExtension(asset);
+    const absolutePath = resolve(dataDir, asset.filePath);
+
+    if (extension === "pdf") {
+      const { extractText } = await import("unpdf");
+      const data = await readFile(absolutePath);
+      const { text } = await extractText(new Uint8Array(data), { mergePages: true });
+      if (text.trim().length === 0) {
+        throw new Error("The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.");
+      }
+      return { text, warnings };
+    }
+
+    if (extension === "docx") {
+      const mammoth = (await import("mammoth")).default;
+      const data = await readFile(absolutePath);
+      const { value } = await mammoth.extractRawText({ buffer: data });
+      if (value.trim().length === 0) {
+        throw new Error("The document contains no extractable text — it may be a scanned image; OCR is not supported yet.");
+      }
+      return { text: value, warnings };
+    }
+
     if (!TEXT_DOCUMENT_EXTENSIONS.has(extension)) {
       throw new Error(
-        `Document type .${extension || "unknown"} is not supported yet. Convert it to plain text, Markdown, or CSV first.`
+        `Document type .${extension || "unknown"} is not supported yet. Upload a PDF, DOCX, plain-text, Markdown, or CSV file, or convert it first.`
       );
     }
-    return { text: await readFile(resolve(dataDir, asset.filePath), "utf8"), warnings };
+    return { text: await readFile(absolutePath, "utf8"), warnings };
   }
 
   throw new Error(`Unsupported source kind for text extraction: ${asset.kind}`);
@@ -472,6 +653,7 @@ export async function extractCandidatesForAsset(
     dataDir: string;
     env?: Env;
     fetchFn?: FetchFn;
+    lookupFn?: LookupFn;
   }
 ): Promise<SourceExtractionResult> {
   const env = params.env ?? process.env;
@@ -496,28 +678,52 @@ export async function extractCandidatesForAsset(
     return { ...parsed, warnings };
   }
 
-  const resolved = await resolveAssetText(asset, params.dataDir, env, fetchFn);
+  const resolved = await resolveAssetText(asset, params.dataDir, env, fetchFn, params.lookupFn);
   warnings.push(...resolved.warnings);
-  const clamped = clampText(resolved.text);
-  if (clamped.truncated) {
-    warnings.push(`Source text was truncated to ${MAX_SOURCE_TEXT_CHARS} characters for processing.`);
-  }
-  if (clamped.text.trim().length === 0) {
+  const text = normalizeSourceText(resolved.text);
+  if (text.length === 0) {
     throw new Error("Source contains no readable text.");
   }
 
   if (provider.completeChat) {
-    const messages = buildTextExtractionMessages(language, asset.kind, clamped.text);
-    const content = await provider.completeChat(messages);
-    const parsed = parseExtractionResponse(content);
-    if (parsed) {
-      return { ...parsed, warnings, transcript: resolved.transcript };
+    const chunks = splitTextIntoChunks(text);
+    const processable = chunks.slice(0, MAX_CHUNKS_PER_SOURCE);
+    if (chunks.length > MAX_CHUNKS_PER_SOURCE) {
+      const skippedChars = chunks
+        .slice(MAX_CHUNKS_PER_SOURCE)
+        .reduce((total, chunk) => total + chunk.length, 0);
+      warnings.push(
+        `Source text is very long; only the first ${MAX_CHUNKS_PER_SOURCE} parts were processed and ${skippedChars} characters were skipped.`
+      );
+    }
+
+    const parsedParts: { candidates: ExtractionCandidate[]; summary: string }[] = [];
+    for (const [index, chunk] of processable.entries()) {
+      const messages = buildTextExtractionMessages(language, asset.kind, chunk, {
+        index: index + 1,
+        total: processable.length
+      });
+      const content = await provider.completeChat(messages);
+      const parsed = parseExtractionResponse(content);
+      if (parsed) {
+        parsedParts.push(parsed);
+      } else if (processable.length > 1) {
+        warnings.push(`Model output for part ${index + 1} of ${processable.length} was not valid extraction JSON; that part was skipped.`);
+      }
+    }
+
+    const firstParsed = parsedParts[0];
+    if (processable.length === 1 && firstParsed) {
+      return { ...firstParsed, warnings, transcript: resolved.transcript };
+    }
+    if (parsedParts.length > 0) {
+      return { ...mergeChunkExtractions(parsedParts), warnings, transcript: resolved.transcript };
     }
     warnings.push("Model output was not valid extraction JSON; fell back to offline heuristics.");
   } else {
     warnings.push("No model configured (deterministic mode); used offline heuristic parsing.");
   }
 
-  const heuristic = heuristicExtractFromText(clamped.text);
+  const heuristic = heuristicExtractFromText(text);
   return { ...heuristic, warnings, transcript: resolved.transcript };
 }

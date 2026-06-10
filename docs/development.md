@@ -81,12 +81,14 @@ Extraction quality depends on the configured local model. All provider configura
 - `ASSINI_TRANSCRIBE_BASE_URL`: OpenAI-compatible `/audio/transcriptions` server for audio sources (for example a local whisper server). Required before audio sources can be processed.
 - `ASSINI_TRANSCRIBE_MODEL`: transcription model name (defaults to `whisper-1`).
 - `ASSINI_TRANSCRIBE_API_KEY`: optional transcription key.
+- `ASSINI_ALLOW_PRIVATE_URLS`: set to `1` or `true` to allow URL sources that point at private/local network addresses (localhost, 10/8, 192.168/16, and similar reserved ranges are blocked by default). Only enable this in a trusted local setup.
 
 Behavior by configuration:
 
 - `deterministic` (the default) has no real model. Text and word-list sources fall back to offline heuristic parsing of delimited lines; image sources are rejected with a setup hint.
 - Image sources need a vision-capable OpenAI-compatible model (for example llava via Ollama).
 - Audio sources need `ASSINI_TRANSCRIBE_BASE_URL`; the transcript then flows through normal text extraction.
+- Document sources accept plain text, Markdown, CSV/TSV, JSON, PDF, and DOCX files. Long sources are processed in chunks of roughly 12,000 characters (up to 8 chunks) and the per-chunk results are merged and deduplicated.
 
 ## Browser Verification
 
