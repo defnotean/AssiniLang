@@ -14,7 +14,7 @@ The chosen design is the `Atlas layout`:
 - A dark night-sky visual system with warm gold accents.
 - Subtle geometric dividers and glyphs used as interface texture, not decoration-heavy branding.
 
-The design remains `synthetic-only`. It should communicate care, preservation, and review discipline while making clear that no real community language data belongs in the app yet.
+The design remains local-first. It should communicate care, preservation, and review discipline, and make clear that every ingested source carries provenance and consent records and is processed on the user's machine.
 
 ## Visual System
 
@@ -37,7 +37,7 @@ The main shell should preserve the Atlas structure:
 
 - Sidebar first: the language is the primary context.
 - Section nav second: each workspace belongs to the selected language.
-- Synthetic notice always visible near the top.
+- Local-prototype notice always visible near the top.
 - Header shows the selected language, current workspace, metadata chips, and primary actions.
 - Stat strip summarizes corpus, notes, exercises, and latest score for the active language.
 
@@ -47,7 +47,7 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 
 ### Language Profile
 
-The profile view should make the synthetic language system inspectable:
+The profile view should make each documented language inspectable:
 
 - Keep phonology, grammar inventory, paradigms, semantic domains, register profiles, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
 - Show semantic domains as compact cards with a label, short description, vocabulary ID chips, corpus evidence chips, and usage notes.
@@ -119,7 +119,7 @@ When changing layout CSS, smoke test at desktop, tablet, and narrow mobile width
 For future UI changes:
 
 - Keep the root README short; add detailed notes here or in topic-specific docs.
-- Preserve synthetic-only messaging.
+- Preserve local-first, consent-aware messaging.
 - Keep API-backed workflows functional rather than replacing them with static mock data.
 - Add or update React tests for navigation, mutation flows, redaction expectations, and error states.
 - Run `npm.cmd run verify` before committing.

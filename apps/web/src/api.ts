@@ -7,14 +7,20 @@ import type {
   EvaluationRun,
   Exercise,
   ExerciseSubmission,
+  ExtractionDraft,
   GovernanceRecord,
   Language,
+  LanguagePhonology,
+  Lexeme,
   NeuralMap,
   Note,
   ReviewDisposition,
   ReviewPolicy,
+  SourceAsset,
   User
 } from "@assini/db";
+
+export type { ExtractionDraft, Language, LanguagePhonology, Lexeme, SourceAsset };
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
 export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer" | "learnerId">;
@@ -34,182 +40,55 @@ export type DashboardData = {
   evaluations: EvaluationRun[];
 };
 
-export type FixtureMinimums = {
-  consonants: number;
-  vowels: number;
-  phonotacticNotes: number;
+export type PublicVocabularyItem = {
+  id: string;
+  form: string;
+  gloss: string;
+  partOfSpeech: string;
+  tags: string[];
+};
+
+export type PublicGrammarRule = {
+  id: string;
+  topic: string;
+  explanation: string;
+  evidencePassageIds: string[];
+  confidence: Note["confidence"];
+  status: Note["status"];
+};
+
+export type MorphemeInventoryItem = {
+  surface: string;
+  lemma: string;
+  glosses: string[];
+  features: string[];
+  occurrenceCount: number;
+  passageIds: string[];
+  vocabulary: PublicVocabularyItem | null;
+};
+
+export type LanguageProfileStats = {
   vocabularyItems: number;
-  corpusPassages: number;
   grammarRules: number;
-  noteAnswerKeys: number;
-  exerciseAnswerKeys: number;
-  exerciseTypes: number;
-  paradigms: number;
-  paradigmRows: number;
-  semanticDomains: number;
-  semanticDomainVocabulary: number;
-  registerProfiles: number;
-  dialectVariants: number;
-  dialectHistoryEvents: number;
-  discourseExamples: number;
-  teachingSequences: number;
-};
-
-export type FixtureQualityCheck = {
-  id: keyof FixtureMinimums;
-  label: string;
-  actual: number;
-  minimum: number;
-  passed: boolean;
-};
-
-export type FixtureQualityCounters = {
-  passed: boolean;
-  totalChecks: number;
-  passedChecks: number;
-  failedChecks: number;
-};
-
-export type FixtureQualitySummary = FixtureQualityCounters & {
-  checks: FixtureQualityCheck[];
-};
-
-export type EvaluationFixtureQualitySummary = FixtureQualityCounters & {
-  languages: number;
-  passedLanguages: number;
-  failedLanguages: number;
+  corpusPassages: number;
+  notes: number;
+  exercises: number;
+  sourceAssets: number;
+  pendingExtractionDrafts: number;
+  exerciseTypes: Partial<Record<Exercise["type"], number>>;
 };
 
 export type LanguageProfile = {
   language: Language;
-  phonology: {
-    consonants: string[];
-    vowels: string[];
-    syllableTemplate: string;
-    stress: string;
-    phonotactics: string[];
-  };
-  paradigms: Array<{
-    id: string;
-    title: string;
-    description: string;
-    rows: Array<{
-      label: string;
-      form: string;
-      gloss: string;
-      morphemes: string[];
-    }>;
-  }>;
-  semanticDomains: Array<{
-    id: string;
-    label: string;
-    description: string;
-    coreVocabularyIds: string[];
-    evidencePassageIds: string[];
-    usageNotes: string[];
-  }>;
-  registerProfiles: Array<{
-    id: string;
-    label: string;
-    context: string;
-    styleLabel: string;
-    semanticDomainIds: string[];
-    discourseExampleIds: string[];
-    teachingSequenceIds: string[];
-    evidencePassageIds: string[];
-    usageNotes: string[];
-  }>;
-  dialectVariants: Array<{
-    id: string;
-    name: string;
-    regionLabel: string;
-    phonologyNotes: string[];
-    lexicalNotes: string[];
-    grammarNotes: string[];
-    history: {
-      summary: string;
-      events: Array<{
-        period: string;
-        description: string;
-        evidencePassageIds: string[];
-      }>;
-    };
-    examplePhrases: Array<{
-      standard: string;
-      variant: string;
-      translation: string;
-    }>;
-  }>;
-  discourseExamples: Array<{
-    id: string;
-    functionLabel: string;
-    context: string;
-    target: string;
-    translation: string;
-    notes: string[];
-  }>;
-  teachingSequences: Array<{
-    id: string;
-    title: string;
-    objective: string;
-    level: "intro" | "practice" | "review";
-    ruleIds: string[];
-    corpusPassageIds: string[];
-    exerciseIds: string[];
-    steps: Array<{
-      label: string;
-      prompt: string;
-    }>;
-  }>;
-  vocabulary: Array<{
-    id: string;
-    form: string;
-    gloss: string;
-    partOfSpeech: string;
-    tags: string[];
-  }>;
-  morphemeInventory: Array<{
-    surface: string;
-    lemma: string;
-    glosses: string[];
-    features: string[];
-    occurrenceCount: number;
-    passageIds: string[];
-    vocabulary: {
-      id: string;
-      form: string;
-      gloss: string;
-      partOfSpeech: string;
-      tags: string[];
-    } | null;
-  }>;
-  grammarRules: Array<{
-    id: string;
-    topic: string;
-    explanation: string;
-    evidencePassageIds: string[];
-    confidence: Note["confidence"];
-  }>;
-  stats: {
-    vocabularyItems: number;
-    grammarRules: number;
-    paradigms: number;
-    semanticDomains: number;
-    registerProfiles: number;
-    dialectVariants: number;
-    discourseExamples: number;
-    teachingSequences: number;
-    corpusPassages: number;
-    notes: number;
-    exercises: number;
-    exerciseTypes: Partial<Record<Exercise["type"], number>>;
-  };
-  fixtureMinimums: FixtureMinimums;
-  fixtureQuality: FixtureQualitySummary;
+  phonology: LanguagePhonology | null;
+  vocabulary: PublicVocabularyItem[];
+  morphemeInventory: MorphemeInventoryItem[];
+  grammarRules: PublicGrammarRule[];
+  stats: LanguageProfileStats;
 };
 
 export type LanguageSnapshot = {
-  exportVersion: "synthetic-language-snapshot-v1";
+  exportVersion: "language-snapshot-v2";
   exportedAt: string;
   integrity: ExportIntegrity;
   language: Language;
@@ -222,7 +101,7 @@ export type LanguageSnapshot = {
 };
 
 export type EvaluationArtifact = {
-  exportVersion: "synthetic-evaluation-artifact-v1";
+  exportVersion: "evaluation-artifact-v2";
   exportedAt: string;
   integrity: ExportIntegrity;
   summary: {
@@ -237,7 +116,6 @@ export type EvaluationArtifact = {
     averageLatestScore: number;
     passed: boolean;
     failureCount: number;
-    fixtureQuality: EvaluationFixtureQualitySummary;
   };
   latestRuns: EvaluationRun[];
   runsByLanguage: Record<string, string[]>;
@@ -313,6 +191,13 @@ export type LlmStatus = {
     apiKeyVariables: string[];
     timeoutVariable: string;
   };
+  transcription: {
+    configured: boolean;
+    baseUrl?: string;
+    model?: string;
+    baseUrlVariable: string;
+    modelVariable: string;
+  };
   setup: {
     localExamples: string[];
     remoteExamples: string[];
@@ -334,6 +219,34 @@ export type ElderCorrectionReviewStatus = Extract<ElderCorrection["status"], "ac
 export type ElderCorrectionApplyResult = {
   correction: ElderCorrection;
   note: Note;
+};
+
+export type LanguageCreatePayload = {
+  name: string;
+  description: string;
+  orthography: string;
+  typology?: Language["typology"];
+  phonology?: LanguagePhonology;
+};
+
+export type LanguagePatchPayload = Partial<LanguageCreatePayload>;
+
+export type SourceRegistrationPayload = {
+  kind: Extract<SourceAsset["kind"], "text" | "wordlist" | "url">;
+  title: string;
+  rawText?: string;
+  url?: string;
+};
+
+export type ProcessSourceResult = {
+  asset: SourceAsset;
+  drafts: ExtractionDraft[];
+  warnings: string[];
+};
+
+export type AcceptExtractionDraftResult = {
+  draft: ExtractionDraft;
+  entity: Lexeme | CorpusPassage | Note;
 };
 
 export type GovernancePayload = Pick<GovernanceRecord, "languageId" | "policyType" | "content" | "effectiveDate">;
@@ -536,7 +449,28 @@ export async function fetchLlmStatus(): Promise<LlmStatus> {
   return getJson<LlmStatus>("/llm/status");
 }
 
-export async function fetchDashboardData(languageId = "avenik"): Promise<DashboardData> {
+export async function fetchDashboardData(languageId?: string): Promise<DashboardData> {
+  if (!languageId) {
+    const [languages, evaluations] = await Promise.all([
+      getJson<Language[]>("/languages"),
+      getJson<EvaluationRun[]>("/evaluations")
+    ]);
+
+    const firstLanguageId = languages[0]?.id;
+    if (!firstLanguageId) {
+      return { languages, corpus: [], notes: [], exercises: [], evaluations };
+    }
+
+    const encodedFirstLanguageId = encodeURIComponent(firstLanguageId);
+    const [corpus, notes, exercises] = await Promise.all([
+      getJson<CorpusPassage[]>(`/languages/${encodedFirstLanguageId}/corpus`),
+      getJson<Note[]>(`/languages/${encodedFirstLanguageId}/notes`),
+      getJson<PublicExercise[]>(`/languages/${encodedFirstLanguageId}/exercises`)
+    ]);
+
+    return { languages, corpus, notes, exercises, evaluations };
+  }
+
   const encodedLanguageId = encodeURIComponent(languageId);
   const [languages, corpus, notes, exercises, evaluations] = await Promise.all([
     getJson<Language[]>("/languages"),
@@ -547,6 +481,111 @@ export async function fetchDashboardData(languageId = "avenik"): Promise<Dashboa
   ]);
 
   return { languages, corpus, notes, exercises, evaluations };
+}
+
+export async function createLanguage(payload: LanguageCreatePayload): Promise<Language> {
+  const response = await fetch("/api/languages", {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Language creation failed");
+
+  return response.json() as Promise<Language>;
+}
+
+export async function updateLanguage(languageId: string, patch: LanguagePatchPayload): Promise<Language> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}`, {
+    method: "PATCH",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(patch)
+  });
+
+  await assertOk(response, "Language update failed");
+
+  return response.json() as Promise<Language>;
+}
+
+export async function fetchLexicon(languageId: string): Promise<Lexeme[]> {
+  return getJson<Lexeme[]>(`/languages/${encodeURIComponent(languageId)}/lexicon`);
+}
+
+export async function fetchSources(languageId: string): Promise<SourceAsset[]> {
+  return getJson<SourceAsset[]>(`/languages/${encodeURIComponent(languageId)}/sources`);
+}
+
+export async function registerSource(languageId: string, payload: SourceRegistrationPayload): Promise<SourceAsset> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/sources`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Source registration failed");
+
+  return response.json() as Promise<SourceAsset>;
+}
+
+export async function uploadSourceFile(languageId: string, file: File, title?: string): Promise<SourceAsset> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const trimmedTitle = title?.trim();
+  if (trimmedTitle) {
+    formData.append("title", trimmedTitle);
+  }
+
+  // No manual Content-Type header: the browser sets the multipart boundary itself.
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/sources/upload`, {
+    method: "POST",
+    ...(await actorRequest("reviewer")),
+    body: formData
+  });
+
+  await assertOk(response, "Source upload failed");
+
+  return response.json() as Promise<SourceAsset>;
+}
+
+export async function processSource(sourceId: string): Promise<ProcessSourceResult> {
+  const response = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/process`, {
+    method: "POST",
+    ...(await actorRequest("reviewer"))
+  });
+
+  await assertOk(response, "Source processing failed");
+
+  return response.json() as Promise<ProcessSourceResult>;
+}
+
+export async function fetchExtractionDrafts(
+  languageId: string,
+  status?: ExtractionDraft["status"]
+): Promise<ExtractionDraft[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return getJson<ExtractionDraft[]>(`/languages/${encodeURIComponent(languageId)}/extraction-drafts${query}`);
+}
+
+export async function acceptExtractionDraft(draftId: string): Promise<AcceptExtractionDraftResult> {
+  const response = await fetch(`/api/extraction-drafts/${encodeURIComponent(draftId)}/accept`, {
+    method: "POST",
+    ...(await actorRequest("reviewer"))
+  });
+
+  await assertOk(response, "Extraction draft accept failed");
+
+  return response.json() as Promise<AcceptExtractionDraftResult>;
+}
+
+export async function rejectExtractionDraft(draftId: string): Promise<ExtractionDraft> {
+  const response = await fetch(`/api/extraction-drafts/${encodeURIComponent(draftId)}/reject`, {
+    method: "POST",
+    ...(await actorRequest("reviewer"))
+  });
+
+  await assertOk(response, "Extraction draft reject failed");
+
+  return response.json() as Promise<ExtractionDraft>;
 }
 
 export async function fetchLanguageProfile(languageId: string): Promise<LanguageProfile> {

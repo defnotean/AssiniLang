@@ -6,27 +6,34 @@ import type {
   ElderCorrectionPayload,
   EvaluationArtifact,
   ExerciseAuthoringPayload,
+  ExtractionDraft,
   CorpusImportPayload,
   GovernancePayload,
+  LanguageCreatePayload,
   LanguageProfile,
   LanguageSnapshot,
   LlmStatus,
   ObservabilityData,
   PublicExerciseSubmission,
   ElderCorrectionReviewStatus,
-  ReviewPolicyPayload
+  ReviewPolicyPayload,
+  SourceAsset,
+  SourceRegistrationPayload
 } from "./api";
 import {
+  acceptExtractionDraft,
   applyElderCorrection,
   createAiSession,
   createExercise,
   createGovernanceRecord,
+  createLanguage,
   fetchAuditEvents,
   fetchCurrentUser,
   fetchDashboardData,
   fetchElderContext,
   fetchEvaluationArtifact,
   fetchExerciseSubmissions,
+  fetchExtractionDrafts,
   fetchGovernance,
   fetchLanguageProfile,
   fetchLanguageSnapshot,
@@ -34,25 +41,31 @@ import {
   fetchObservability,
   fetchReviewDispositions,
   fetchReviewPolicy,
+  fetchSources,
   generateDraftNotes,
   importCorpusPassage,
+  processSource,
+  registerSource,
+  rejectExtractionDraft,
   resolveReviewDisposition,
   reviewElderCorrection,
   reviewNote,
   runEvaluation,
   submitElderCorrection,
   submitExerciseAnswer,
-  updateReviewPolicy
+  updateReviewPolicy,
+  uploadSourceFile
 } from "./api";
 import {
   buildCorpusImportPayload,
   canSubmitCorpusImportDraft,
+  CORPUS_CONSENT_USE_VALUES,
   EMPTY_CORPUS_IMPORT_DRAFT,
   type CorpusImportDraft
 } from "./corpusImport";
 import "./styles.css";
 
-type ViewMode = "profile" | "corpus" | "review" | "learner" | "eval" | "governance" | "model";
+type ViewMode = "profile" | "ingest" | "corpus" | "review" | "learner" | "eval" | "governance" | "model";
 type ReviewStatus = Extract<Note["status"], "approved" | "contested" | "rejected" | "deferred" | "escalated">;
 type ReviewFilter = "all" | "pending" | "contested" | "rejected" | "deferred" | "escalated" | "approved";
 type AsyncState<T> =
@@ -93,6 +106,7 @@ type SnapshotDownload = {
 
 const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebrow: string }> = {
   profile: { label: "Language Profile", title: "Language Profile", eyebrow: "Linguistic profile" },
+  ingest: { label: "Sources & intake", title: "Sources & Intake", eyebrow: "Source ingestion" },
   corpus: { label: "Corpus Browser", title: "Corpus Browser", eyebrow: "Source library" },
   review: { label: "Note Review Queue", title: "Note Review Queue", eyebrow: "Human review" },
   learner: { label: "Learning Lab", title: "Learner Exercise Preview", eyebrow: "Practice" },
@@ -101,7 +115,24 @@ const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebrow: str
   model: { label: "Model Setup", title: "Model Setup", eyebrow: "Local LLM readiness" }
 };
 
-const VIEW_ORDER: ViewMode[] = ["profile", "corpus", "review", "learner", "eval", "governance", "model"];
+const VIEW_ORDER: ViewMode[] = ["profile", "ingest", "corpus", "review", "learner", "eval", "governance", "model"];
+
+const LANGUAGE_TYPOLOGY_OPTIONS: Language["typology"][] = [
+  "unknown",
+  "agglutinative",
+  "isolating",
+  "fusional",
+  "polysynthetic-lite",
+  "polysynthetic",
+  "analytic",
+  "mixed"
+];
+
+const EXTRACTION_DRAFT_KIND_LABELS: Record<ExtractionDraft["kind"], string> = {
+  lexeme: "Lexeme",
+  corpus_passage: "Corpus passage",
+  grammar_note: "Grammar note"
+};
 const REVIEWER_COMMENTS: Record<ReviewStatus, string> = {
   approved: "Approved in local prototype.",
   contested: "Contested in local prototype.",
@@ -207,20 +238,6 @@ function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): string 
   return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
 }
 
-type FixtureQualityCounters = Pick<
-  LanguageSnapshot["linguisticProfile"]["fixtureQuality"],
-  "passed" | "totalChecks" | "passedChecks" | "failedChecks"
->;
-
-function formatFixtureQualityLabel(fixtureQuality: FixtureQualityCounters): string {
-  const totalChecks = fixtureQuality.totalChecks;
-  if (totalChecks === 0) return "0 fixture checks available";
-
-  if (fixtureQuality.passed) return `${formatCount(totalChecks, "fixture check")} met`;
-
-  return `${fixtureQuality.passedChecks} of ${totalChecks} fixture checks met, ${formatCount(fixtureQuality.failedChecks, "fixture check")} need work`;
-}
-
 function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
   const safeLanguageId = snapshot.language.id.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "language";
   const summary = [
@@ -229,13 +246,7 @@ function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
     formatCount(snapshot.exercises.length, "exercise"),
     formatCount(snapshot.linguisticProfile.stats.vocabularyItems, "vocabulary item"),
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
-    formatCount(snapshot.linguisticProfile.stats.paradigms, "paradigm table"),
-    formatCount(snapshot.linguisticProfile.stats.semanticDomains, "semantic domain"),
-    formatCount(snapshot.linguisticProfile.stats.registerProfiles, "register profile"),
-    formatCount(snapshot.linguisticProfile.stats.dialectVariants, "dialect variant"),
-    formatCount(snapshot.linguisticProfile.stats.discourseExamples, "discourse example"),
-    formatCount(snapshot.linguisticProfile.stats.teachingSequences, "teaching sequence"),
-    formatFixtureQualityLabel(snapshot.linguisticProfile.fixtureQuality),
+    formatCount(snapshot.linguisticProfile.stats.sourceAssets, "source asset"),
     formatIntegrityLabel(snapshot.integrity)
   ].join(", ");
 
@@ -254,7 +265,6 @@ function buildEvaluationArtifactDownload(artifact: EvaluationArtifact): Snapshot
     formatCount(artifact.summary.regressedLatestRuns, "regressed latest run"),
     formatCount(artifact.summary.failureCount, "failure line"),
     `${Math.round(artifact.summary.averageLatestScore * 100)}% average latest score`,
-    formatFixtureQualityLabel(artifact.summary.fixtureQuality),
     formatIntegrityLabel(artifact.integrity)
   ].join(", ");
 
@@ -516,7 +526,7 @@ function ScoreBar({ metric, score }: { metric: string; score: number }) {
 
 export function App() {
   const [view, setView] = useState<ViewMode>("corpus");
-  const [selectedLanguageId, setSelectedLanguageId] = useState("avenik");
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<DashboardLoadState>({ status: "loading" });
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -614,7 +624,7 @@ export function App() {
     setSelectedNoteId(null);
     setSubmissionHistory([]);
 
-    fetchDashboardData(selectedLanguageId)
+    fetchDashboardData(selectedLanguageId ?? undefined)
       .then((data) => {
         if (isCurrent) setLoadState({ status: "ready", data });
       })
@@ -629,7 +639,7 @@ export function App() {
 
   useEffect(() => {
     let isCurrent = true;
-    if (view !== "profile") {
+    if (view !== "profile" || !selectedLanguageId) {
       setProfileState({ status: "idle" });
       return () => {
         isCurrent = false;
@@ -652,7 +662,7 @@ export function App() {
 
   useEffect(() => {
     let isCurrent = true;
-    if (!isElderMode) {
+    if (!isElderMode || !selectedLanguageId) {
       setElderContext(null);
       return () => {
         isCurrent = false;
@@ -781,7 +791,7 @@ export function App() {
 
   useEffect(() => {
     let isCurrent = true;
-    if (view !== "governance") {
+    if (view !== "governance" || !selectedLanguageId) {
       return () => {
         isCurrent = false;
       };
@@ -863,7 +873,7 @@ export function App() {
   }, [selectedLanguageId]);
 
   async function refreshDashboard() {
-    const refreshed = await fetchDashboardData(selectedLanguageId);
+    const refreshed = await fetchDashboardData(selectedLanguageId ?? undefined);
     setLoadState({ status: "ready", data: refreshed });
   }
 
@@ -881,6 +891,13 @@ export function App() {
     setIsElderMode(false);
     setView("corpus");
     setSelectedLanguageId(languageId);
+  }
+
+  async function handleCreateLanguage(payload: LanguageCreatePayload) {
+    const created = await createLanguage(payload);
+    setIsElderMode(false);
+    setView("corpus");
+    setSelectedLanguageId(created.id);
   }
 
   function handleViewSelect(mode: ViewMode) {
@@ -902,6 +919,7 @@ export function App() {
   }
 
   async function handleGenerateDrafts() {
+    if (!selectedLanguageId) return;
     setIsDrafting(true);
     try {
       await generateDraftNotes(selectedLanguageId);
@@ -968,6 +986,9 @@ export function App() {
   }
 
   async function handleCreateExercise(payload: ExerciseAuthoringPayload) {
+    if (!selectedLanguageId) {
+      throw new Error("Select or create a language first.");
+    }
     const created = await createExercise(selectedLanguageId, payload);
     await refreshDashboard();
     setSelectedExerciseId(created.id);
@@ -977,6 +998,9 @@ export function App() {
   }
 
   async function handleImportCorpusPassage(payload: CorpusImportPayload) {
+    if (!selectedLanguageId) {
+      throw new Error("Select or create a language first.");
+    }
     await importCorpusPassage(selectedLanguageId, payload);
     await refreshDashboard();
   }
@@ -990,6 +1014,11 @@ export function App() {
 
     if (!formNoteId && !formPassageId && !formContextText.trim()) {
       setCorrectionError("Linguistic Rule: You must bind the correction to at least one context indicator (choose a Note, choose a Passage, or provide a Custom Context snippet).");
+      return;
+    }
+
+    if (!selectedLanguageId) {
+      setCorrectionError("Select or create a language first.");
       return;
     }
 
@@ -1026,6 +1055,7 @@ export function App() {
   }
 
   async function handleReviewCorrection(correctionId: string, status: ElderCorrectionReviewStatus) {
+    if (!selectedLanguageId) return;
     setReviewingCorrectionId(correctionId);
     setCorrectionSuccess(null);
     setCorrectionError(null);
@@ -1047,6 +1077,12 @@ export function App() {
     if (!revisedExplanation) {
       setCorrectionSuccess(null);
       setCorrectionError("Please provide a revised explanation before applying the correction.");
+      return;
+    }
+
+    if (!selectedLanguageId) {
+      setCorrectionSuccess(null);
+      setCorrectionError("Select or create a language first.");
       return;
     }
 
@@ -1079,6 +1115,12 @@ export function App() {
     if (!content || !effectiveDate) {
       setGovernanceSuccess(null);
       setGovernanceError("Please provide policy content and an effective date.");
+      return;
+    }
+
+    if (!selectedLanguageId) {
+      setGovernanceSuccess(null);
+      setGovernanceError("Select or create a language first.");
       return;
     }
 
@@ -1129,6 +1171,12 @@ export function App() {
       return;
     }
 
+    if (!selectedLanguageId) {
+      setReviewPolicySuccess(null);
+      setReviewPolicyError("Select or create a language first.");
+      return;
+    }
+
     const payload: ReviewPolicyPayload = {
       assignedReviewerIds,
       approvalThreshold,
@@ -1162,6 +1210,12 @@ export function App() {
       return;
     }
 
+    if (!selectedLanguageId) {
+      setReviewDispositionSuccess(null);
+      setReviewDispositionError("Select or create a language first.");
+      return;
+    }
+
     setResolvingReviewDispositionId(dispositionId);
     setReviewDispositionSuccess(null);
     setReviewDispositionError(null);
@@ -1183,6 +1237,12 @@ export function App() {
   }
 
   async function handleExportSnapshot() {
+    if (!selectedLanguageId) {
+      setSnapshotDownload(null);
+      setSnapshotError("Select or create a language first.");
+      return;
+    }
+
     setIsExportingSnapshot(true);
     setSnapshotDownload(null);
     setSnapshotError(null);
@@ -1216,13 +1276,17 @@ export function App() {
 
   async function handleModelSmokeTest() {
     if (!data) return;
+    if (!selectedLanguageId) {
+      setModelTestResult("Select or create a language first.");
+      return;
+    }
     setIsTestingModel(true);
     setModelTestResult(null);
     try {
       const session = await createAiSession({
         languageId: selectedLanguageId,
         mode: "learner_practice",
-        seedPrompt: "Create one concise, safe practice prompt using only the provided public synthetic context.",
+        seedPrompt: "Create one concise, safe practice prompt using only the provided public workspace context.",
         contextNoteIds: data.notes.slice(0, 2).map((note) => note.id),
         contextPassageIds: data.corpus.slice(0, 2).map((passage) => passage.id)
       });
@@ -1239,7 +1303,7 @@ export function App() {
   }
 
   if (loadState.status === "loading") {
-    return <StatusScreen kind="loading" message="Loading synthetic data..." />;
+    return <StatusScreen kind="loading" message="Loading workspace..." />;
   }
 
   if (loadState.status === "error") {
@@ -1247,7 +1311,7 @@ export function App() {
   }
 
   if (!data) {
-    return <StatusScreen kind="error" message="Synthetic data is unavailable." />;
+    return <StatusScreen kind="error" message="Workspace data is unavailable." />;
   }
 
   const currentTitle = isElderMode ? "Elder Workspace" : activeView.title;
@@ -1286,6 +1350,9 @@ export function App() {
 
         <div className="sidebar-section-label">Languages</div>
         <nav className="language-nav" aria-label="Languages">
+          {data.languages.length === 0 && (
+            <p className="empty-state">No languages yet. Use New language below to start a workspace.</p>
+          )}
           {data.languages.map((language) => {
             const isActive = language.id === selectedLanguageId;
             return (
@@ -1330,6 +1397,7 @@ export function App() {
         </nav>
 
         <div className="sidebar-footer">
+          <CreateLanguageForm isWorkflowBusy={isWorkflowBusy} onCreate={handleCreateLanguage} />
           <div className="user-card">
             <span>Signed in</span>
             <strong>{currentUser?.name ?? "Local User"}</strong>
@@ -1339,8 +1407,8 @@ export function App() {
 
       <main className="main-content">
         <div className="prototype-notice">
-          <strong>Synthetic prototype</strong>
-          <span>no real community language data</span>
+          <strong>Local prototype</strong>
+          <span>all data stays on this machine</span>
         </div>
 
         <section className="workspace-header" aria-label="Workspace overview">
@@ -1350,9 +1418,9 @@ export function App() {
             <p className="eyebrow">{currentEyebrow}</p>
             <h1>{currentTitle}</h1>
             <div className="language-metadata" aria-label="Selected language metadata">
-              <span>{selectedLanguage?.typology ?? "synthetic"}</span>
+              <span>{selectedLanguage?.typology ?? "unknown"}</span>
               <span>{formatOrthographyMeta(selectedLanguage?.orthography)}</span>
-              <span>{selectedLanguage?.status ?? "synthetic"} data only</span>
+              <span>{selectedLanguage?.status ?? "draft"} workspace</span>
             </div>
           </div>
 
@@ -1429,7 +1497,12 @@ export function App() {
             />
           ) : (
             <>
-              {view === "profile" && <LanguageProfileView profileState={profileState} />}
+              {view === "profile" && (
+                selectedLanguageId ? <LanguageProfileView profileState={profileState} /> : <NoLanguageNotice />
+              )}
+              {view === "ingest" && (
+                selectedLanguageId ? <IngestView languageId={selectedLanguageId} /> : <NoLanguageNotice />
+              )}
               {view === "corpus" && (
                 <CorpusView
                   corpus={data.corpus}
@@ -1477,7 +1550,8 @@ export function App() {
                   onExportArtifact={handleExportEvaluationArtifact}
                 />
               )}
-              {view === "governance" && (
+              {view === "governance" && !selectedLanguageId && <NoLanguageNotice />}
+              {view === "governance" && selectedLanguageId && (
                 <GovernanceView
                   selectedLanguageId={selectedLanguageId}
                   governanceState={governanceState}
@@ -1552,28 +1626,14 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
     );
   }
 
-  const {
-    language,
-    stats,
-    phonology,
-    paradigms,
-    semanticDomains,
-    registerProfiles,
-    dialectVariants,
-    discourseExamples,
-    teachingSequences,
-    grammarRules,
-    vocabulary,
-    morphemeInventory,
-    fixtureQuality
-  } = profileState.data;
+  const { language, stats, phonology, grammarRules, vocabulary, morphemeInventory } = profileState.data;
 
   return (
     <div className="profile-view">
       <section className="panel-card profile-summary" aria-label="Language profile summary">
         <div className="record-topline">
           <div>
-            <span className="detail-label">Synthetic language</span>
+            <span className="detail-label">Language profile</span>
             <h2>{language.name}</h2>
           </div>
           <span className="id-badge">{language.id}</span>
@@ -1597,79 +1657,64 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
             <dd>{Object.keys(stats.exerciseTypes).length}</dd>
           </div>
           <div>
-            <dt>Paradigms</dt>
-            <dd>{stats.paradigms}</dd>
+            <dt>Corpus passages</dt>
+            <dd>{stats.corpusPassages}</dd>
           </div>
           <div>
-            <dt>Semantic domains</dt>
-            <dd>{stats.semanticDomains}</dd>
+            <dt>Notes</dt>
+            <dd>{stats.notes}</dd>
           </div>
           <div>
-            <dt>Registers</dt>
-            <dd>{stats.registerProfiles}</dd>
+            <dt>Exercises</dt>
+            <dd>{stats.exercises}</dd>
           </div>
           <div>
-            <dt>Dialects</dt>
-            <dd>{stats.dialectVariants}</dd>
+            <dt>Source assets</dt>
+            <dd>{stats.sourceAssets}</dd>
           </div>
           <div>
-            <dt>Discourse examples</dt>
-            <dd>{stats.discourseExamples}</dd>
-          </div>
-          <div>
-            <dt>Teaching sequences</dt>
-            <dd>{stats.teachingSequences}</dd>
+            <dt>Pending extraction drafts</dt>
+            <dd>{stats.pendingExtractionDrafts}</dd>
           </div>
         </dl>
       </section>
 
-      <section className="panel-card fixture-floor-panel" aria-label="Synthetic fixture quality floor">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Synthetic fixture quality floor</span>
-            <h2>{fixtureQuality.passed ? "Baseline met" : "Needs work"}</h2>
-          </div>
-          <span className="id-badge">{formatCount(fixtureQuality.checks.length, "check")}</span>
-        </div>
-        <dl className="detail-grid quality-check-grid">
-          {fixtureQuality.checks.map((check) => (
-            <div className={check.passed ? "quality-check passed" : "quality-check missing"} key={check.id}>
-              <dt>{check.label}</dt>
-              <dd>
-                <span className="quality-ratio">{check.actual} / {check.minimum}</span>
-                <span className={check.passed ? "status-badge approved" : "status-badge contested"}>
-                  {check.passed ? "Met" : "Needs work"}
-                </span>
-              </dd>
+      {phonology ? (
+        <section className="panel-card phonology-panel" aria-label="Phonology profile">
+          <div className="record-topline">
+            <div>
+              <span className="detail-label">Phonology profile</span>
+              <h2>{phonology.syllableTemplate ?? "Syllable template not set"}</h2>
             </div>
-          ))}
-        </dl>
-      </section>
-
-      <section className="panel-card phonology-panel" aria-label="Phonology profile">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Phonology profile</span>
-            <h2>{phonology.syllableTemplate}</h2>
+            {phonology.stress && <span className="id-badge">{phonology.stress}</span>}
           </div>
-          <span className="id-badge">{phonology.stress}</span>
-        </div>
-        <dl className="detail-grid">
-          <div>
-            <dt>Consonants</dt>
-            <dd>{phonology.consonants.join(" ")}</dd>
+          <dl className="detail-grid">
+            <div>
+              <dt>Consonants</dt>
+              <dd>{phonology.consonants.length > 0 ? phonology.consonants.join(" ") : "None recorded"}</dd>
+            </div>
+            <div>
+              <dt>Vowels</dt>
+              <dd>{phonology.vowels.length > 0 ? phonology.vowels.join(" ") : "None recorded"}</dd>
+            </div>
+          </dl>
+          <div className="detail-list">
+            {phonology.notes.map((note) => (
+              <p className="detail-row" key={note}>{note}</p>
+            ))}
           </div>
-          <div>
-            <dt>Vowels</dt>
-            <dd>{phonology.vowels.join(" ")}</dd>
+        </section>
+      ) : (
+        <section className="panel-card phonology-panel" aria-label="Phonology profile">
+          <div className="record-topline">
+            <div>
+              <span className="detail-label">Phonology profile</span>
+              <h2>No phonology declared yet</h2>
+            </div>
           </div>
-        </dl>
-        <div className="detail-list">
-          {phonology.phonotactics.map((rule) => (
-            <p className="detail-row" key={rule}>{rule}</p>
-          ))}
-        </div>
-      </section>
+          <p className="empty-state">Add phonology details to the language record to populate this panel.</p>
+        </section>
+      )}
 
       <section className="panel-card grammar-panel" aria-label="Grammar inventory">
         <div className="record-topline">
@@ -1691,293 +1736,6 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
                   <span className="pill" key={passageId}>{passageId}</span>
                 ))}
               </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card paradigm-panel" aria-label="Paradigm tables">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Paradigm tables</span>
-            <h2>{formatCount(paradigms.length, "table")}</h2>
-          </div>
-        </div>
-        <div className="paradigm-grid">
-          {paradigms.map((paradigm) => (
-            <article className="paradigm-card" key={paradigm.id}>
-              <div>
-                <h3>{paradigm.title}</h3>
-                <p>{paradigm.description}</p>
-              </div>
-              <div className="paradigm-rows">
-                {paradigm.rows.map((row) => (
-                  <div className="paradigm-row" key={`${paradigm.id}-${row.label}`}>
-                    <span>{row.label}</span>
-                    <code>{row.form}</code>
-                    <strong>{row.gloss}</strong>
-                    <small>{row.morphemes.join(" + ")}</small>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card semantic-domain-panel" aria-label="Semantic domains">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Semantic domains</span>
-            <h2>{formatCount(semanticDomains.length, "domain")}</h2>
-          </div>
-        </div>
-        <div className="semantic-domain-grid">
-          {semanticDomains.map((domain) => (
-            <article className="semantic-domain-card" key={domain.id}>
-              <div className="record-topline">
-                <div>
-                  <h3>{domain.label}</h3>
-                  <p>{domain.description}</p>
-                </div>
-                <span className="id-badge">{domain.id}</span>
-              </div>
-              <div className="domain-reference-grid">
-                <div>
-                  <strong>Vocabulary</strong>
-                  <div className="pill-row">
-                    {domain.coreVocabularyIds.map((vocabularyId) => (
-                      <span className="pill" key={`${domain.id}-${vocabularyId}`}>{vocabularyId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Evidence</strong>
-                  <div className="pill-row">
-                    {domain.evidencePassageIds.map((passageId) => (
-                      <span className="pill" key={`${domain.id}-${passageId}`}>{passageId}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="domain-note-list">
-                {domain.usageNotes.map((note) => (
-                  <p key={`${domain.id}-${note}`}>{note}</p>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card register-profile-panel" aria-label="Register profiles">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Register profiles</span>
-            <h2>{formatCount(registerProfiles.length, "register profile")}</h2>
-          </div>
-        </div>
-        <div className="register-profile-grid">
-          {registerProfiles.map((register) => (
-            <article className="register-profile-card" key={register.id}>
-              <div className="record-topline">
-                <div>
-                  <h3>{register.label}</h3>
-                  <p>{register.context}</p>
-                </div>
-                <span className="id-badge">{register.styleLabel}</span>
-              </div>
-              <div className="register-reference-grid">
-                <div>
-                  <strong>Domains</strong>
-                  <div className="pill-row">
-                    {register.semanticDomainIds.map((domainId) => (
-                      <span className="pill" key={`${register.id}-${domainId}`}>{domainId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Discourse</strong>
-                  <div className="pill-row">
-                    {register.discourseExampleIds.map((exampleId) => (
-                      <span className="pill" key={`${register.id}-${exampleId}`}>{exampleId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Teaching</strong>
-                  <div className="pill-row">
-                    {register.teachingSequenceIds.map((sequenceId) => (
-                      <span className="pill" key={`${register.id}-${sequenceId}`}>{sequenceId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Evidence</strong>
-                  <div className="pill-row">
-                    {register.evidencePassageIds.map((passageId) => (
-                      <span className="pill" key={`${register.id}-${passageId}`}>{passageId}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="register-note-list">
-                {register.usageNotes.map((note) => (
-                  <p key={`${register.id}-${note}`}>{note}</p>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card dialect-panel" aria-label="Dialect variants">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Dialect variants</span>
-            <h2>{formatCount(dialectVariants.length, "variant")}</h2>
-          </div>
-        </div>
-        <div className="dialect-grid">
-          {dialectVariants.map((dialect) => (
-            <article className="dialect-card" key={dialect.id}>
-              <div className="record-topline">
-                <div>
-                  <h3>{dialect.name}</h3>
-                  <p>{dialect.regionLabel}</p>
-                </div>
-                <span className="id-badge">{dialect.id}</span>
-              </div>
-              <div className="dialect-note-grid">
-                <div>
-                  <strong>Phonology</strong>
-                  {dialect.phonologyNotes.map((note) => (
-                    <p key={note}>{note}</p>
-                  ))}
-                </div>
-                <div>
-                  <strong>Lexicon</strong>
-                  {dialect.lexicalNotes.map((note) => (
-                    <p key={note}>{note}</p>
-                  ))}
-                </div>
-                <div>
-                  <strong>Grammar</strong>
-                  {dialect.grammarNotes.map((note) => (
-                    <p key={note}>{note}</p>
-                  ))}
-                </div>
-              </div>
-              <div className="dialect-history">
-                <strong>History</strong>
-                <p>{dialect.history.summary}</p>
-                <div className="dialect-history-events">
-                  {dialect.history.events.map((event) => (
-                    <div className="dialect-history-event" key={`${dialect.id}-${event.period}`}>
-                      <div>
-                        <span>{event.period}</span>
-                        <p>{event.description}</p>
-                      </div>
-                      <div className="pill-row">
-                        {event.evidencePassageIds.map((passageId) => (
-                          <span className="pill" key={`${dialect.id}-${event.period}-${passageId}`}>{passageId}</span>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="dialect-example-list">
-                {dialect.examplePhrases.map((example) => (
-                  <div className="dialect-example" key={`${dialect.id}-${example.standard}-${example.variant}`}>
-                    <code>{example.standard}</code>
-                    <code>{example.variant}</code>
-                    <span>{example.translation}</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card discourse-panel" aria-label="Discourse examples">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Discourse examples</span>
-            <h2>{formatCount(discourseExamples.length, "example")}</h2>
-          </div>
-        </div>
-        <div className="detail-list">
-          {discourseExamples.map((example) => (
-            <article className="detail-row discourse-example-row" key={example.id}>
-              <div>
-                <strong>{example.functionLabel}</strong>
-                <p>{example.context}</p>
-              </div>
-              <code>{example.target}</code>
-              <span>{example.translation}</span>
-              <div className="pill-row">
-                {example.notes.map((note) => (
-                  <span className="pill" key={`${example.id}-${note}`}>{note}</span>
-                ))}
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="panel-card teaching-sequence-panel" aria-label="Teaching sequences">
-        <div className="record-topline">
-          <div>
-            <span className="detail-label">Teaching sequences</span>
-            <h2>{formatCount(teachingSequences.length, "sequence")}</h2>
-          </div>
-        </div>
-        <div className="teaching-sequence-grid">
-          {teachingSequences.map((sequence) => (
-            <article className="teaching-sequence-card" key={sequence.id}>
-              <div className="record-topline">
-                <div>
-                  <h3>{sequence.title}</h3>
-                  <p>{sequence.objective}</p>
-                </div>
-                <span className="id-badge">{sequence.level}</span>
-              </div>
-              <div className="sequence-reference-grid">
-                <div>
-                  <strong>Rules</strong>
-                  <div className="pill-row">
-                    {sequence.ruleIds.map((ruleId) => (
-                      <span className="pill" key={`${sequence.id}-${ruleId}`}>{ruleId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Corpus</strong>
-                  <div className="pill-row">
-                    {sequence.corpusPassageIds.map((passageId) => (
-                      <span className="pill" key={`${sequence.id}-${passageId}`}>{passageId}</span>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <strong>Exercises</strong>
-                  <div className="pill-row">
-                    {sequence.exerciseIds.map((exerciseId) => (
-                      <span className="pill" key={`${sequence.id}-${exerciseId}`}>{exerciseId}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <ol className="sequence-step-list">
-                {sequence.steps.map((step) => (
-                  <li key={`${sequence.id}-${step.label}-${step.prompt}`}>
-                    <strong>{step.label}</strong>
-                    <span>{step.prompt}</span>
-                  </li>
-                ))}
-              </ol>
             </article>
           ))}
         </div>
@@ -2038,6 +1796,477 @@ function LanguageProfileView({ profileState }: { profileState: AsyncState<Langua
             </article>
           ))}
         </div>
+      </section>
+    </div>
+  );
+}
+
+function NoLanguageNotice() {
+  return <p className="empty-state panel-card">Select or create a language first.</p>;
+}
+
+function CreateLanguageForm({
+  isWorkflowBusy,
+  onCreate
+}: {
+  isWorkflowBusy: boolean;
+  onCreate: (payload: LanguageCreatePayload) => Promise<void>;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [orthography, setOrthography] = useState("");
+  const [typology, setTypology] = useState<Language["typology"]>("unknown");
+  const [isCreating, setIsCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || !description.trim() || !orthography.trim()) {
+      setCreateError("Name, description, and orthography are required.");
+      return;
+    }
+
+    setIsCreating(true);
+    setCreateError(null);
+    try {
+      await onCreate({
+        name: name.trim(),
+        description: description.trim(),
+        orthography: orthography.trim(),
+        typology
+      });
+      setName("");
+      setDescription("");
+      setOrthography("");
+      setTypology("unknown");
+      setIsOpen(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Language creation failed";
+      setCreateError(message);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  if (!isOpen) {
+    return (
+      <button type="button" className="secondary new-language-toggle" disabled={isWorkflowBusy} onClick={() => setIsOpen(true)}>
+        New language
+      </button>
+    );
+  }
+
+  return (
+    <form className="form-panel compact new-language-form" aria-label="Create language" onSubmit={handleSubmit}>
+      <div>
+        <span className="detail-label">Workspace setup</span>
+        <h3>New language</h3>
+      </div>
+      {createError && <p className="result-notice error" role="alert">{createError}</p>}
+      <div className="form-group">
+        <label htmlFor="new-language-name">Language name</label>
+        <input id="new-language-name" value={name} onChange={(event) => setName(event.target.value)} />
+      </div>
+      <div className="form-group">
+        <label htmlFor="new-language-description">Description</label>
+        <textarea
+          id="new-language-description"
+          value={description}
+          onChange={(event) => setDescription(event.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label htmlFor="new-language-orthography">Orthography</label>
+        <input id="new-language-orthography" value={orthography} onChange={(event) => setOrthography(event.target.value)} />
+      </div>
+      <div className="form-group">
+        <label htmlFor="new-language-typology">Typology</label>
+        <select
+          id="new-language-typology"
+          value={typology}
+          onChange={(event) => setTypology(event.target.value as Language["typology"])}
+        >
+          {LANGUAGE_TYPOLOGY_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+      <button type="submit" disabled={isWorkflowBusy || isCreating}>
+        {isCreating ? "Creating..." : "Create language"}
+      </button>
+      <button type="button" className="secondary" disabled={isCreating} onClick={() => setIsOpen(false)}>
+        Cancel
+      </button>
+    </form>
+  );
+}
+
+function extractionDraftSummary(draft: ExtractionDraft): string {
+  if (draft.kind === "lexeme") {
+    return `${draft.payload.form ?? "(no form)"} — ${draft.payload.gloss ?? "(no gloss)"}`;
+  }
+  if (draft.kind === "corpus_passage") {
+    return `${draft.payload.textTarget ?? "(no target text)"} — ${draft.payload.textTranslation ?? "(no translation)"}`;
+  }
+  return `${draft.payload.topic ?? "(no topic)"} — ${draft.payload.explanation ?? "(no explanation)"}`;
+}
+
+function IngestView({ languageId }: { languageId: string }) {
+  const [sources, setSources] = useState<SourceAsset[]>([]);
+  const [drafts, setDrafts] = useState<ExtractionDraft[]>([]);
+  const [isLoadingIntake, setIsLoadingIntake] = useState(true);
+  const [intakeError, setIntakeError] = useState<string | null>(null);
+
+  const [registerKind, setRegisterKind] = useState<SourceRegistrationPayload["kind"]>("text");
+  const [registerTitle, setRegisterTitle] = useState("");
+  const [registerText, setRegisterText] = useState("");
+  const [registerUrl, setRegisterUrl] = useState("");
+  const [registerNotice, setRegisterNotice] = useState<string | null>(null);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [isRegisteringSource, setIsRegisteringSource] = useState(false);
+
+  const [uploadTitle, setUploadTitle] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isUploadingSource, setIsUploadingSource] = useState(false);
+
+  const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
+  const [processNotice, setProcessNotice] = useState<string | null>(null);
+  const [processError, setProcessError] = useState<string | null>(null);
+  const [processWarnings, setProcessWarnings] = useState<string[]>([]);
+
+  const [reviewingDraftId, setReviewingDraftId] = useState<string | null>(null);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+  const [draftError, setDraftError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isCurrent = true;
+    setIsLoadingIntake(true);
+    setIntakeError(null);
+    setRegisterNotice(null);
+    setRegisterError(null);
+    setProcessNotice(null);
+    setProcessError(null);
+    setProcessWarnings([]);
+    setDraftNotice(null);
+    setDraftError(null);
+
+    Promise.all([fetchSources(languageId), fetchExtractionDrafts(languageId, "proposed")])
+      .then(([loadedSources, loadedDrafts]) => {
+        if (!isCurrent) return;
+        setSources(loadedSources);
+        setDrafts(loadedDrafts);
+      })
+      .catch((error: Error) => {
+        if (isCurrent) setIntakeError(error.message);
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingIntake(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [languageId]);
+
+  async function refreshIntake() {
+    const [loadedSources, loadedDrafts] = await Promise.all([
+      fetchSources(languageId),
+      fetchExtractionDrafts(languageId, "proposed")
+    ]);
+    setSources(loadedSources);
+    setDrafts(loadedDrafts);
+  }
+
+  async function handleRegisterSource(event: FormEvent) {
+    event.preventDefault();
+    const title = registerTitle.trim();
+    const rawText = registerText.trim();
+    const url = registerUrl.trim();
+
+    if (!title) {
+      setRegisterNotice(null);
+      setRegisterError("Please provide a source title.");
+      return;
+    }
+
+    if (registerKind === "url" ? !url : !rawText) {
+      setRegisterNotice(null);
+      setRegisterError(registerKind === "url" ? "Please provide the source URL." : "Please paste the source text.");
+      return;
+    }
+
+    const payload: SourceRegistrationPayload = registerKind === "url"
+      ? { kind: registerKind, title, url }
+      : { kind: registerKind, title, rawText };
+
+    setIsRegisteringSource(true);
+    setRegisterNotice(null);
+    setRegisterError(null);
+    try {
+      const registered = await registerSource(languageId, payload);
+      setRegisterTitle("");
+      setRegisterText("");
+      setRegisterUrl("");
+      setRegisterNotice(`Source registered: ${registered.title}.`);
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Source registration failed";
+      setRegisterError(message);
+    } finally {
+      setIsRegisteringSource(false);
+    }
+  }
+
+  async function handleUploadSource(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!uploadFile) {
+      setRegisterNotice(null);
+      setRegisterError("Choose a file to upload.");
+      return;
+    }
+
+    setIsUploadingSource(true);
+    setRegisterNotice(null);
+    setRegisterError(null);
+    try {
+      const uploaded = await uploadSourceFile(languageId, uploadFile, uploadTitle.trim() || undefined);
+      setUploadFile(null);
+      setUploadTitle("");
+      form.reset();
+      setRegisterNotice(`File uploaded as ${uploaded.kind} source: ${uploaded.title}.`);
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Source upload failed";
+      setRegisterError(message);
+    } finally {
+      setIsUploadingSource(false);
+    }
+  }
+
+  async function handleProcessSource(sourceId: string) {
+    setProcessingSourceId(sourceId);
+    setProcessNotice(null);
+    setProcessError(null);
+    setProcessWarnings([]);
+    try {
+      const result = await processSource(sourceId);
+      setProcessNotice(`Processed ${result.asset.title}: ${formatCount(result.drafts.length, "extraction draft")} proposed.`);
+      setProcessWarnings(result.warnings);
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Source processing failed";
+      setProcessError(message);
+    } finally {
+      setProcessingSourceId(null);
+    }
+  }
+
+  async function handleDraftDecision(draftId: string, decision: "accept" | "reject") {
+    setReviewingDraftId(draftId);
+    setDraftNotice(null);
+    setDraftError(null);
+    try {
+      if (decision === "accept") {
+        const result = await acceptExtractionDraft(draftId);
+        setDraftNotice(`Draft accepted: ${EXTRACTION_DRAFT_KIND_LABELS[result.draft.kind]} committed.`);
+      } else {
+        const rejected = await rejectExtractionDraft(draftId);
+        setDraftNotice(`Draft rejected: ${EXTRACTION_DRAFT_KIND_LABELS[rejected.kind]}.`);
+      }
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Extraction draft review failed";
+      setDraftError(message);
+    } finally {
+      setReviewingDraftId(null);
+    }
+  }
+
+  if (isLoadingIntake) {
+    return (
+      <div className="panel-card" role="status" aria-live="polite">
+        Loading sources and intake queue...
+      </div>
+    );
+  }
+
+  if (intakeError) {
+    return (
+      <div className="panel-card error" role="alert">
+        {intakeError}
+      </div>
+    );
+  }
+
+  return (
+    <div className="ingest-view">
+      <form className="record-card form-panel compact" aria-label="Register source" onSubmit={handleRegisterSource}>
+        <div>
+          <span className="detail-label">Source intake</span>
+          <h3>Add source</h3>
+        </div>
+        {registerNotice && <p className="result-notice" role="status" aria-live="polite">{registerNotice}</p>}
+        {registerError && <p className="result-notice error" role="alert">{registerError}</p>}
+        <div className="form-group">
+          <label htmlFor="ingest-source-kind">Source kind</label>
+          <select
+            id="ingest-source-kind"
+            value={registerKind}
+            onChange={(event) => setRegisterKind(event.target.value as SourceRegistrationPayload["kind"])}
+          >
+            <option value="text">Text</option>
+            <option value="wordlist">Word list</option>
+            <option value="url">URL</option>
+          </select>
+        </div>
+        <div className="form-group">
+          <label htmlFor="ingest-source-title">Source title</label>
+          <input id="ingest-source-title" value={registerTitle} onChange={(event) => setRegisterTitle(event.target.value)} />
+        </div>
+        {registerKind === "url" ? (
+          <div className="form-group">
+            <label htmlFor="ingest-source-url">Source URL</label>
+            <input
+              id="ingest-source-url"
+              type="url"
+              value={registerUrl}
+              onChange={(event) => setRegisterUrl(event.target.value)}
+              placeholder="https://example.org/wordlist"
+            />
+          </div>
+        ) : (
+          <div className="form-group">
+            <label htmlFor="ingest-source-text">Raw text</label>
+            <textarea
+              id="ingest-source-text"
+              value={registerText}
+              onChange={(event) => setRegisterText(event.target.value)}
+              placeholder="Paste raw text or word list lines"
+            />
+          </div>
+        )}
+        <button type="submit" className="secondary" disabled={isRegisteringSource}>
+          {isRegisteringSource ? "Registering..." : "Register source"}
+        </button>
+      </form>
+
+      <form className="record-card form-panel compact" aria-label="Upload source file" onSubmit={handleUploadSource}>
+        <div>
+          <span className="detail-label">File intake</span>
+          <h3>Upload image, audio, or document</h3>
+        </div>
+        <div className="form-group">
+          <label htmlFor="ingest-upload-title">Upload title (optional)</label>
+          <input id="ingest-upload-title" value={uploadTitle} onChange={(event) => setUploadTitle(event.target.value)} />
+        </div>
+        <div className="form-group">
+          <label htmlFor="ingest-upload-file">Source file</label>
+          <input
+            id="ingest-upload-file"
+            type="file"
+            onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
+          />
+        </div>
+        <button type="submit" className="secondary" disabled={isUploadingSource || !uploadFile}>
+          {isUploadingSource ? "Uploading..." : "Upload source file"}
+        </button>
+      </form>
+
+      <section className="panel-card" aria-label="Registered sources">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Registered sources</span>
+            <h2>{formatCount(sources.length, "source")}</h2>
+          </div>
+        </div>
+        {processNotice && <p className="result-notice" role="status" aria-live="polite">{processNotice}</p>}
+        {processError && <p className="result-notice error" role="alert">{processError}</p>}
+        {processWarnings.length > 0 && (
+          <div className="warning-list">
+            {processWarnings.map((warning) => (
+              <p key={warning}>{warning}</p>
+            ))}
+          </div>
+        )}
+        {sources.length === 0 ? (
+          <p className="empty-state">No sources registered yet. Add raw text, a word list, a URL, or upload a file.</p>
+        ) : (
+          <div className="detail-list">
+            {sources.map((source) => (
+              <article className="detail-row source-row" key={source.id} aria-label={`Source ${source.title}`}>
+                <div>
+                  <strong>{source.title}</strong>
+                  <div className="pill-row">
+                    <span className="pill">{source.kind}</span>
+                    <StatusBadge status={source.status} />
+                    {source.kind === "audio" && (
+                      <span className="pill">{source.transcript ? "transcript ready" : "no transcript yet"}</span>
+                    )}
+                  </div>
+                  <small className="muted">Added by {source.createdBy} at {source.createdAt}</small>
+                  {source.error && <p className="result-notice error">{source.error}</p>}
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={processingSourceId !== null}
+                  onClick={() => handleProcessSource(source.id)}
+                >
+                  {processingSourceId === source.id ? "Processing..." : `Process ${source.title}`}
+                </button>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel-card" aria-label="Extraction draft queue">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Extraction drafts</span>
+            <h2>{formatCount(drafts.length, "proposed draft")}</h2>
+          </div>
+        </div>
+        {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}
+        {draftError && <p className="result-notice error" role="alert">{draftError}</p>}
+        {drafts.length === 0 ? (
+          <p className="empty-state">No proposed extraction drafts. Process a source to propose lexemes, passages, and grammar notes.</p>
+        ) : (
+          <div className="detail-list">
+            {drafts.map((draft) => (
+              <article className="detail-row draft-row" key={draft.id} aria-label={`Extraction draft ${draft.id}`}>
+                <div>
+                  <div className="pill-row">
+                    <span className="pill">{EXTRACTION_DRAFT_KIND_LABELS[draft.kind]}</span>
+                    <ConfidenceBadge confidence={draft.confidence} />
+                  </div>
+                  <strong>{extractionDraftSummary(draft)}</strong>
+                  {draft.rationale && <p>{draft.rationale}</p>}
+                </div>
+                <div className="correction-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={reviewingDraftId !== null}
+                    onClick={() => handleDraftDecision(draft.id, "accept")}
+                  >
+                    {reviewingDraftId === draft.id ? "Reviewing..." : `Accept draft ${draft.id}`}
+                  </button>
+                  <button
+                    type="button"
+                    className="contest"
+                    disabled={reviewingDraftId !== null}
+                    onClick={() => handleDraftDecision(draft.id, "reject")}
+                  >
+                    Reject draft {draft.id}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );
@@ -2117,7 +2346,7 @@ function CorpusView({
       <form className="record-card form-panel compact corpus-import-form" aria-label="Corpus import" onSubmit={handleImportCorpus}>
         <div>
           <span className="detail-label">Corpus import</span>
-          <h3>Add synthetic source passage</h3>
+          <h3>Add source passage</h3>
         </div>
         <div className="corpus-import-grid">
           <div className="form-group wide">
@@ -2543,14 +2772,14 @@ function EvaluationView({
 }: {
   evaluations: EvaluationRun[];
   languages: Language[];
-  selectedLanguageId: string;
+  selectedLanguageId: string | null;
   isWorkflowBusy: boolean;
   artifactDownload: SnapshotDownload | null;
   artifactError: string | null;
   isExportingArtifact: boolean;
   onExportArtifact: () => void;
 }) {
-  const [activeLanguageId, setActiveLanguageId] = useState(selectedLanguageId);
+  const [activeLanguageId, setActiveLanguageId] = useState<string | null>(selectedLanguageId);
   useEffect(() => {
     setActiveLanguageId(selectedLanguageId);
   }, [selectedLanguageId]);
@@ -2558,7 +2787,7 @@ function EvaluationView({
   const latestByLanguage = useMemo(() => latestRunsByLanguage(evaluations), [evaluations]);
   const trends = useMemo(() => evaluationTrendsForRuns(evaluations), [evaluations]);
   const comparableTrends = trends.filter((trend) => trend.previousRunId !== null);
-  const activeRun = latestByLanguage[activeLanguageId] ?? evaluations[0] ?? null;
+  const activeRun = (activeLanguageId ? latestByLanguage[activeLanguageId] : undefined) ?? evaluations[0] ?? null;
   const activeLanguage = languages.find((language) => language.id === (activeRun?.languageId ?? activeLanguageId));
 
   if (evaluations.length === 0) {
@@ -3074,10 +3303,11 @@ function GovernanceView({
     <div className="governance-view">
       <section className="policy-card">
         <p className="eyebrow">Deployment policy</p>
-        <h2>Synthetic-Only Policy</h2>
+        <h2>Data Stewardship Policy</h2>
         <p>
-          This platform operates under a <strong>Synthetic-Only Policy</strong>. No community data has been ingested, and all
-          model outputs must remain reviewable by authorized local users before teaching content is promoted.
+          This platform operates under a <strong>Local Data Stewardship Policy</strong>. Every source is ingested with
+          provenance and consent records, processing happens on this machine, and all model outputs must remain
+          reviewable by authorized local users before teaching content is promoted.
         </p>
       </section>
 
@@ -3120,7 +3350,7 @@ function GovernanceView({
               id="policy-content"
               value={policyContent}
               onChange={(event) => onContentChange(event.target.value)}
-              placeholder="Write a synthetic consent, access, or generation rule"
+              placeholder="Write a consent, access, or generation rule"
             />
           </div>
 

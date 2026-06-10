@@ -3,9 +3,16 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createEmptyState, JsonStore, type AppState, type EvaluationRun, type Note } from "@assini/db";
+import {
+  buildTestWorkspaceState,
+  createEmptyState,
+  JsonStore,
+  TEST_LANGUAGE_ID,
+  type AppState,
+  type EvaluationRun,
+  type Note
+} from "@assini/db";
 import { draftNotesForLanguage } from "@assini/eval";
-import { buildSeedState } from "@assini/synthetic-langs";
 import { resolveRuntimeDbPath } from "./runtimePath";
 import { createServer } from "./server";
 import type { LlmProvider } from "./llmProvider";
@@ -22,7 +29,8 @@ const EXPORT_REDACTION_POLICY = [
 
 describe("api server", () => {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-  const reviewedNoteId = "avn-rule-verb-chain-note";
+  const reviewedNoteId = "testlang-note-basic-order";
+  const submissionExerciseId = "testlang-ex-002";
   const existingRun: EvaluationRun = {
     id: "existing-run",
     languageId: "archived-language",
@@ -33,25 +41,13 @@ describe("api server", () => {
     failures: [],
     summary: "Existing evaluation run."
   };
-  const authUsers: AppState["users"] = [
-    { id: "learner-1", name: "Learner One", role: "learner" },
-    { id: "elder-1", name: "Elder One", role: "elder" },
-    { id: "reviewer-1", name: "Reviewer One", role: "reviewer" },
-    { id: "lead-1", name: "Lead One", role: "lead" },
-    { id: "programmer-1", name: "Programmer One", role: "programmer" },
-    { id: "admin-1", name: "Admin One", role: "admin" }
-  ];
-
-  function stateWithAuthUsers(): AppState {
-    return { ...buildSeedState(), users: [...authUsers] };
-  }
 
   function authHeaders(userId: string) {
     return { "x-assini-user-id": userId, "x-assini-dev-token": "test" };
   }
 
   async function fetchReviewedNote(app: ReturnType<typeof createServer>) {
-    const notes = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const notes = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     return notes.json().find((item: { id: string }) => item.id === reviewedNoteId);
   }
 
@@ -64,7 +60,7 @@ describe("api server", () => {
   });
 
   it("returns health, notes, and exercises", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const health = await app.inject({ method: "GET", url: "/health" });
     expect(health.statusCode).toBe(200);
@@ -76,109 +72,66 @@ describe("api server", () => {
     expect(llmStatus.json().apiKey).not.toHaveProperty("value");
     expect(llmStatus.json().apiKey).not.toHaveProperty("redactedValue");
 
-    const notes = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const notes = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(notes.statusCode).toBe(200);
-    expect(notes.json()[0].languageId).toBe("avenik");
+    expect(notes.json()[0].languageId).toBe(TEST_LANGUAGE_ID);
     expect(JSON.stringify(notes.json())).not.toContain("answer key");
-    expect(JSON.stringify(notes.json())).not.toContain("synthetic fixture evaluation");
-    expect(JSON.stringify(notes.json())).not.toContain("fixture grammar rule");
+    expect(JSON.stringify(notes.json())).not.toContain("test-generator");
 
-    const exercises = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const exercises = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(exercises.statusCode).toBe(200);
-    expect(exercises.json()[0].languageId).toBe("avenik");
+    expect(exercises.json()[0].languageId).toBe(TEST_LANGUAGE_ID);
     expect(exercises.json()[0]).not.toHaveProperty("expectedAnswers");
     expect(exercises.json()[0]).not.toHaveProperty("gradingExplanation");
     expect(exercises.json()[0]).not.toHaveProperty("adversarialAnswers");
-    expect(JSON.stringify(exercises.json())).not.toContain("Use mira for river");
+    expect(JSON.stringify(exercises.json())).not.toContain("first-person singular subjects");
   });
 
-  it("returns a rich synthetic language profile without answer-key fields", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+  it("returns a rich language profile without answer-key fields", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
-    const profile = await app.inject({ method: "GET", url: "/languages/avenik/profile" });
+    const profile = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/profile` });
 
     expect(profile.statusCode).toBe(200);
     expect(profile.json()).toMatchObject({
-      language: { id: "avenik", name: "Avenik", typology: "agglutinative" },
+      language: { id: TEST_LANGUAGE_ID, name: "Testlang", typology: "agglutinative" },
       stats: {
-        corpusPassages: 12,
-        grammarRules: 6,
-        notes: 6,
-        exercises: 6,
-        vocabularyItems: 24,
-        semanticDomains: 3,
-        registerProfiles: 2,
-        dialectVariants: 2
+        vocabularyItems: 7,
+        grammarRules: 2,
+        corpusPassages: 3,
+        notes: 2,
+        exercises: 3,
+        sourceAssets: 0,
+        pendingExtractionDrafts: 0
       }
     });
     expect(profile.json().grammarRules[0]).toMatchObject({
-      id: "avn-rule-verb-chain",
-      topic: "morphology/verb/tense-person-suffix-chain",
-      evidencePassageIds: ["avn-c001", "avn-c002", "avn-c003"]
+      id: "testlang-note-basic-order",
+      topic: "syntax/basic-order",
+      evidencePassageIds: ["testlang-c001", "testlang-c002"]
     });
     expect(profile.json().phonology).toMatchObject({
       syllableTemplate: "CV",
       stress: "word-initial"
     });
-    expect(profile.json().phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
-    expect(profile.json().paradigms[0]).toMatchObject({
-      id: "avn-paradigm-verb-chain",
-      title: "Finite verb chain"
-    });
-    expect(profile.json().paradigms[0].rows[0]).toMatchObject({
-      label: "present first singular",
-      form: "talo-mi-na",
-      morphemes: ["talo", "-mi", "-na"]
-    });
-    expect(profile.json().dialectVariants[0]).toMatchObject({
-      id: "avn-dialect-river",
-      name: "River teaching register",
-      regionLabel: "river-side workshop register",
-      history: {
-        summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
-        events: expect.arrayContaining([
-          expect.objectContaining({
-            period: "early workshop",
-            evidencePassageIds: ["avn-c001", "avn-c005"]
-          })
-        ])
-      }
-    });
-    expect(profile.json().dialectVariants[0].examplePhrases[0]).toMatchObject({
-      standard: "mira talo-mi-na",
-      variant: "mira talo-mi-nena",
-      translation: "I walk by the river."
-    });
-    expect(profile.json().semanticDomains[0]).toMatchObject({
-      id: "avn-domain-motion",
-      label: "Motion and route teaching",
-      coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
-      evidencePassageIds: ["avn-c001", "avn-c005"]
-    });
-    expect(profile.json().registerProfiles[0]).toMatchObject({
-      id: "avn-register-careful-teaching",
-      label: "Careful teaching register",
-      semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
-      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
-      evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"]
-    });
-    expect(profile.json().vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
-      gloss: "present tense",
+    expect(profile.json().phonology.notes).toContain("No consonant clusters in native roots.");
+    expect(profile.json().vocabulary.find((item: { form: string }) => item.form === "-na")).toMatchObject({
+      gloss: "first person singular",
       partOfSpeech: "suffix"
     });
-    expect(profile.json().morphemeInventory.find((item: { surface: string }) => item.surface === "mira")).toMatchObject({
-      lemma: "mira",
-      glosses: ["river"],
+    expect(profile.json().morphemeInventory.find((item: { surface: string }) => item.surface === "saku")).toMatchObject({
+      lemma: "saku",
+      glosses: ["child"],
       features: ["noun"],
-      occurrenceCount: expect.any(Number),
-      passageIds: expect.arrayContaining(["avn-c001"]),
+      occurrenceCount: 2,
+      passageIds: expect.arrayContaining(["testlang-c002", "testlang-c003"]),
       vocabulary: expect.objectContaining({
-        form: "mira",
+        form: "saku",
         partOfSpeech: "noun"
       })
     });
     expect(profile.json().stats.exerciseTypes).toMatchObject({
-      translate_to_target: 4,
+      translate_to_target: 1,
       segment: 1,
       choose_particle: 1
     });
@@ -191,7 +144,7 @@ describe("api server", () => {
   });
 
   it("restricts browser CORS to configured local development origins", async () => {
-    const app = createServer({ initialState: buildSeedState(), allowedOrigins: ["http://localhost:5173"] });
+    const app = createServer({ initialState: buildTestWorkspaceState(), allowedOrigins: ["http://localhost:5173"] });
 
     const allowed = await app.inject({
       method: "GET",
@@ -209,7 +162,7 @@ describe("api server", () => {
   });
 
   it("keeps prototype session auth explicit, cookie scoped, and non-admin", async () => {
-    const disabled = createServer({ initialState: stateWithAuthUsers() });
+    const disabled = createServer({ initialState: buildTestWorkspaceState() });
 
     const disabledResponse = await disabled.inject({
       method: "POST",
@@ -219,7 +172,7 @@ describe("api server", () => {
     expect(disabledResponse.statusCode).toBe(404);
     expect(disabledResponse.json()).toEqual({ error: "Prototype auth is disabled" });
 
-    const enabled = createServer({ initialState: stateWithAuthUsers(), enablePrototypeAuth: true });
+    const enabled = createServer({ initialState: buildTestWorkspaceState(), enablePrototypeAuth: true });
     const session = await enabled.inject({
       method: "POST",
       url: "/auth/prototype-session",
@@ -259,45 +212,45 @@ describe("api server", () => {
   });
 
   it("returns languages and corpus", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const languages = await app.inject({ method: "GET", url: "/languages" });
     expect(languages.statusCode).toBe(200);
-    expect(languages.json()).toHaveLength(4);
+    expect(languages.json()).toHaveLength(1);
 
-    const corpus = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const corpus = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(corpus.statusCode).toBe(200);
-    expect(corpus.json()[0].languageId).toBe("avenik");
+    expect(corpus.json()[0].languageId).toBe(TEST_LANGUAGE_ID);
   });
 
   it("imports validated corpus passages with provenance and audit metadata", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
     const store = new JsonStore(join(tempDir, "local-db.json"));
-    await store.write(stateWithAuthUsers());
+    await store.write(buildTestWorkspaceState());
     const app = createServer({ store });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "mira lumo-ke talo-mi-na",
-        textTranslation: "I walk by the river at the practice mat.",
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
         morphologicalSegmentation: [
-          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
-          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ],
-        topicTags: ["motion", "place", "imported"],
+        topicTags: ["learning", "imported"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: ["local prototype import"]
         }
       }
@@ -305,21 +258,21 @@ describe("api server", () => {
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
-      languageId: "avenik",
-      source: "synthetic-import",
-      textTarget: "mira lumo-ke talo-mi-na",
-      textTranslation: "I walk by the river at the practice mat.",
-      topicTags: ["motion", "place", "imported"],
-      consentStatus: { use: "synthetic-testing-only" }
+      languageId: TEST_LANGUAGE_ID,
+      source: "local-import",
+      textTarget: "saku nemi-na",
+      textTranslation: "The child teaches me.",
+      topicTags: ["learning", "imported"],
+      consentStatus: { use: "testing-only" }
     });
-    expect(response.json().id).toMatch(/^imported-corpus-avenik-/);
+    expect(response.json().id).toMatch(/^imported-corpus-testlang-/);
 
-    const corpus = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const corpus = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(corpus.statusCode).toBe(200);
     expect(corpus.json()).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: response.json().id,
-        textTarget: "mira lumo-ke talo-mi-na"
+        textTarget: "saku nemi-na"
       })
     ]));
 
@@ -327,20 +280,20 @@ describe("api server", () => {
     expect(persisted.corpusAnswerKeys).toEqual(expect.arrayContaining([
       expect.objectContaining({
         passageId: response.json().id,
-        languageId: "avenik",
-        textTarget: "mira lumo-ke talo-mi-na",
-        textTranslation: "I walk by the river at the practice mat.",
+        languageId: TEST_LANGUAGE_ID,
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
         morphologicalSegmentation: [
-          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
-          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ]
       })
     ]));
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
@@ -350,39 +303,39 @@ describe("api server", () => {
         entityType: "corpus",
         entityId: response.json().id,
         metadata: expect.objectContaining({
-          source: "synthetic-import",
+          source: "local-import",
           morphemeCount: 3,
-          tagCount: 3,
-          consentUse: "synthetic-testing-only"
+          tagCount: 2,
+          consentUse: "testing-only"
         })
       })
     ]));
   });
 
   it("rejects invalid corpus segmentation imports without mutating corpus", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "mira lumo-ke talo-mi-na",
-        textTranslation: "I walk by the river at the practice mat.",
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
         morphologicalSegmentation: [
           { surface: "ghost", lemma: "ghost", gloss: "ghost", features: ["noun"] }
         ],
-        topicTags: ["motion"],
+        topicTags: ["learning"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
@@ -391,118 +344,120 @@ describe("api server", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Corpus segmentation surface is not present in target text: ghost" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("rejects corpus imports when segmentation omits a target token", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "mira lumo-ke talo-mi-na",
-        textTranslation: "I walk by the river at the practice mat.",
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
         morphologicalSegmentation: [
-          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] }
         ],
-        topicTags: ["motion", "place"],
+        topicTags: ["learning"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus segmentation does not cover target token: lumo-ke" });
+    expect(response.json()).toEqual({ error: "Corpus segmentation does not cover target token: nemi-na" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
   });
 
-  it("rejects corpus imports with morphemes outside the selected language vocabulary", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+  it("rejects corpus imports with morphemes outside the selected language lexicon", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "noru talo-mi-na",
+        textTarget: "noru talo-na",
         textTranslation: "I walk near the invented token.",
         morphologicalSegmentation: [
           { surface: "noru", lemma: "noru", gloss: "invented-token", features: ["noun"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "talo", lemma: "talo", gloss: "walk", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ],
         topicTags: ["motion"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in Avenik vocabulary: noru" });
+    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in the Testlang lexicon: noru" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("rejects corpus imports with target text outside the selected language phonology", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "mira-z talo-mi-na",
+        textTarget: "mira-z talo-na",
         textTranslation: "I walk by the altered river.",
         morphologicalSegmentation: [
           { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "talo", lemma: "talo", gloss: "walk", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ],
         topicTags: ["motion"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus target text uses z outside Avenik phonology inventory: mira-z talo-mi-na" });
+    expect(response.json()).toEqual({ error: "Corpus target text uses z outside Testlang phonology inventory: mira-z talo-na" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
   });
 
@@ -510,48 +465,48 @@ describe("api server", () => {
     [
       "topic tags",
       {
-        topicTags: ["motion", "place", "motion"],
+        topicTags: ["learning", "imported", "learning"],
         morphologicalSegmentation: [
-          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
-          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ]
       },
-      "Corpus topic tag is duplicated: motion"
+      "Corpus topic tag is duplicated: learning"
     ],
     [
       "morpheme features",
       {
-        topicTags: ["motion", "place"],
+        topicTags: ["learning", "imported"],
         morphologicalSegmentation: [
-          { surface: "mira", lemma: "mira", gloss: "river", features: ["noun", "noun"] },
-          { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
-          { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun", "noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
         ]
       },
-      "Corpus morpheme feature is duplicated for mira: noun"
+      "Corpus morpheme feature is duplicated for saku: noun"
     ]
   ])("rejects corpus imports with duplicate %s without mutating corpus", async (_, overrides, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/corpus",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        source: "synthetic-import",
+        source: "local-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "local-test-data",
+          consentRecord: "local import consent"
         },
-        textTarget: "mira lumo-ke talo-mi-na",
-        textTranslation: "I walk by the river at the practice mat.",
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
         ...overrides,
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
@@ -560,12 +515,12 @@ describe("api server", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/corpus" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
   });
 
   it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({ method: "GET", url: `/languages/not-a-language/${resource}` });
 
@@ -574,15 +529,15 @@ describe("api server", () => {
   });
 
   it("runs evaluations and appends them to state", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({ method: "POST", url: "/evaluations/run", headers: authHeaders("reviewer-1") });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toHaveLength(4);
+    expect(response.json()).toHaveLength(1);
 
     const evaluations = await app.inject({ method: "GET", url: "/evaluations" });
     expect(evaluations.statusCode).toBe(200);
-    expect(evaluations.json()).toHaveLength(4);
+    expect(evaluations.json()).toHaveLength(1);
   });
 
   it("returns a client error for evaluations without languages and preserves prior runs", async () => {
@@ -604,45 +559,45 @@ describe("api server", () => {
   it("reads and writes evaluation state through a provided JsonStore", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
     const store = new JsonStore(join(tempDir, "local-db.json"));
-    await store.write(buildSeedState());
+    await store.write(buildTestWorkspaceState());
     const app = createServer({ store });
 
     const languages = await app.inject({ method: "GET", url: "/languages" });
     expect(languages.statusCode).toBe(200);
-    expect(languages.json()).toHaveLength(4);
+    expect(languages.json()).toHaveLength(1);
 
     const response = await app.inject({ method: "POST", url: "/evaluations/run", headers: authHeaders("reviewer-1") });
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toHaveLength(4);
+    expect(response.json()).toHaveLength(1);
 
     const persisted = await store.read();
-    expect(persisted.evaluationRuns).toHaveLength(4);
+    expect(persisted.evaluationRuns).toHaveLength(1);
   });
 
   it("lets leads create auditable governance records for an existing language", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
       url: "/governance",
       headers: authHeaders("lead-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         policyType: "generation",
-        content: "Synthetic Avenik outputs must cite reviewed notes before learner use.",
+        content: "Generated Testlang outputs must cite reviewed notes before learner use.",
         effectiveDate: "2026-06-05"
       }
     });
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       policyType: "generation",
-      content: "Synthetic Avenik outputs must cite reviewed notes before learner use.",
+      content: "Generated Testlang outputs must cite reviewed notes before learner use.",
       effectiveDate: "2026-06-05",
       approvedBy: "lead-1"
     });
-    expect(response.json().id).toMatch(/^governance-avenik-generation-/);
+    expect(response.json().id).toMatch(/^governance-testlang-generation-/);
 
     const governance = await app.inject({ method: "GET", url: "/governance" });
     expect(governance.statusCode).toBe(200);
@@ -650,16 +605,16 @@ describe("api server", () => {
   });
 
   it("records protected data mutations in a role-gated audit trail", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const governance = await app.inject({
       method: "POST",
       url: "/governance",
       headers: authHeaders("lead-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         policyType: "generation",
-        content: "Synthetic outputs must cite reviewed notes.",
+        content: "Generated outputs must cite reviewed notes.",
         effectiveDate: "2026-06-06"
       }
     });
@@ -678,9 +633,9 @@ describe("api server", () => {
 
     const submission = await app.inject({
       method: "POST",
-      url: "/exercises/avn-ex001/submissions",
+      url: `/exercises/${submissionExerciseId}/submissions`,
       headers: authHeaders("learner-1"),
-      payload: { answer: "mira talo-mi-na" }
+      payload: { answer: "saku talo-ki" }
     });
     expect(submission.statusCode).toBe(200);
 
@@ -693,7 +648,7 @@ describe("api server", () => {
 
     const learnerAudit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("learner-1")
     });
     expect(learnerAudit.statusCode).toBe(403);
@@ -701,7 +656,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
 
@@ -719,7 +674,7 @@ describe("api server", () => {
     }>;
     expect(new Set(events.map((event) => event.id)).size).toBe(events.length);
     expect(events.every((event) => Date.parse(event.at) > 0)).toBe(true);
-    expect(events.every((event) => event.languageId === "avenik")).toBe(true);
+    expect(events.every((event) => event.languageId === TEST_LANGUAGE_ID)).toBe(true);
     expect(events).toEqual(expect.arrayContaining([
       expect.objectContaining({
         actorId: "lead-1",
@@ -727,7 +682,7 @@ describe("api server", () => {
         action: "governance_record.created",
         entityType: "governance_record",
         entityId: governance.json().id,
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         metadata: expect.objectContaining({ policyType: "generation" })
       }),
       expect.objectContaining({
@@ -736,7 +691,7 @@ describe("api server", () => {
         action: "note.reviewed",
         entityType: "note",
         entityId: reviewedNoteId,
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         metadata: expect.objectContaining({
           requestedStatus: "approved",
           status: "under_review",
@@ -749,26 +704,26 @@ describe("api server", () => {
         actorRole: "learner",
         action: "exercise_submission.created",
         entityType: "exercise_submission",
-        languageId: "avenik",
-        metadata: expect.objectContaining({ accepted: true, exerciseId: "avn-ex001" })
+        languageId: TEST_LANGUAGE_ID,
+        metadata: expect.objectContaining({ accepted: true, exerciseId: submissionExerciseId })
       }),
       expect.objectContaining({
         actorId: "programmer-1",
         actorRole: "programmer",
         action: "evaluation_run.created",
         entityType: "evaluation_run",
-        languageId: "avenik"
+        languageId: TEST_LANGUAGE_ID
       })
     ]));
-    expect(JSON.stringify(events)).not.toContain("mira talo-mi-na");
+    expect(JSON.stringify(events)).not.toContain("saku talo-ki");
   });
 
   it("enforces per-language review policy assignments and approval thresholds", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const policy = await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1"),
       payload: {
         assignedReviewerIds: ["reviewer-1", "elder-1"],
@@ -779,8 +734,8 @@ describe("api server", () => {
 
     expect(policy.statusCode).toBe(200);
     expect(policy.json()).toMatchObject({
-      id: "review-policy-avenik",
-      languageId: "avenik",
+      id: "review-policy-testlang",
+      languageId: TEST_LANGUAGE_ID,
       assignedReviewerIds: ["reviewer-1", "elder-1"],
       approvalThreshold: 2,
       requiresAssignedReviewer: true,
@@ -789,7 +744,7 @@ describe("api server", () => {
 
     const fetchedPolicy = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("reviewer-1")
     });
     expect(fetchedPolicy.statusCode).toBe(200);
@@ -823,7 +778,7 @@ describe("api server", () => {
     });
     expect(unassignedApproval.statusCode).toBe(403);
     expect(unassignedApproval.json()).toEqual({
-      error: "Reviewer is not assigned to approve notes for language: avenik"
+      error: `Reviewer is not assigned to approve notes for language: ${TEST_LANGUAGE_ID}`
     });
 
     const finalApproval = await app.inject({
@@ -845,7 +800,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
@@ -853,7 +808,7 @@ describe("api server", () => {
       expect.objectContaining({
         action: "review_policy.upserted",
         entityType: "review_policy",
-        entityId: "review-policy-avenik",
+        entityId: "review-policy-testlang",
         metadata: expect.objectContaining({ approvalThreshold: 2 })
       }),
       expect.objectContaining({
@@ -884,7 +839,7 @@ describe("api server", () => {
   it("lets prototype reviewers update review policies while preserving lead policy authority", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
     const store = new JsonStore(join(tempDir, "local-db.json"));
-    await store.write(stateWithAuthUsers());
+    await store.write(buildTestWorkspaceState());
     const app = createServer({ store, enablePrototypeAuth: true });
 
     const session = await app.inject({
@@ -898,7 +853,7 @@ describe("api server", () => {
 
     const policy = await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: { cookie: cookieHeader?.split(";")[0] ?? "" },
       payload: {
         assignedReviewerIds: ["reviewer-1", "elder-1"],
@@ -909,8 +864,8 @@ describe("api server", () => {
 
     expect(policy.statusCode).toBe(200);
     expect(policy.json()).toMatchObject({
-      id: "review-policy-avenik",
-      languageId: "avenik",
+      id: "review-policy-testlang",
+      languageId: TEST_LANGUAGE_ID,
       assignedReviewerIds: ["reviewer-1", "elder-1"],
       approvalThreshold: 2,
       requiresAssignedReviewer: true,
@@ -918,13 +873,13 @@ describe("api server", () => {
     });
 
     const persisted = await store.read();
-    expect(persisted.reviewPolicies.find((item) => item.languageId === "avenik")).toMatchObject({
+    expect(persisted.reviewPolicies.find((item) => item.languageId === TEST_LANGUAGE_ID)).toMatchObject({
       updatedBy: "lead-1"
     });
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
@@ -934,26 +889,26 @@ describe("api server", () => {
         actorRole: "reviewer",
         action: "review_policy.upserted",
         entityType: "review_policy",
-        entityId: "review-policy-avenik"
+        entityId: "review-policy-testlang"
       })
     ]));
   });
 
   it("rejects review policies with impossible open reviewer quorum thresholds without mutation", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1")
     });
 
     const response = await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1"),
       payload: {
         assignedReviewerIds: ["reviewer-1"],
-        approvalThreshold: 5,
+        approvalThreshold: 10,
         requiresAssignedReviewer: false
       }
     });
@@ -963,18 +918,18 @@ describe("api server", () => {
 
     const after = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1")
     });
     expect(after.json()).toEqual(before.json());
   });
 
   it("does not count stale approvals after review policy assignments change", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const originalPolicy = await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1"),
       payload: {
         assignedReviewerIds: ["reviewer-1", "elder-1"],
@@ -998,7 +953,7 @@ describe("api server", () => {
 
     const reassignedPolicy = await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1"),
       payload: {
         assignedReviewerIds: ["elder-1", "lead-1"],
@@ -1034,11 +989,11 @@ describe("api server", () => {
   });
 
   it("clears pending approval quorum when a note is deferred", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     await app.inject({
       method: "PUT",
-      url: "/languages/avenik/review-policy",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
       headers: authHeaders("lead-1"),
       payload: {
         assignedReviewerIds: ["reviewer-1", "elder-1"],
@@ -1085,7 +1040,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.json()).toEqual(expect.arrayContaining([
@@ -1106,16 +1061,16 @@ describe("api server", () => {
     ["learners", "learner-1", 403, "Forbidden"],
     ["unknown users", "missing-user", 401, "Unauthorized"]
   ])("rejects governance writes from %s", async (_, userId, statusCode, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
       url: "/governance",
       headers: authHeaders(userId),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         policyType: "access",
-        content: "Only reviewers may approve synthetic lesson notes.",
+        content: "Only reviewers may approve lesson notes.",
         effectiveDate: "2026-06-05"
       }
     });
@@ -1128,12 +1083,12 @@ describe("api server", () => {
   });
 
   it.each([
-    ["missing content", { languageId: "avenik", policyType: "consent", effectiveDate: "2026-06-05" }, "Invalid governance body"],
-    ["invalid policy type", { languageId: "avenik", policyType: "retention", content: "Policy.", effectiveDate: "2026-06-05" }, "Invalid governance body"],
-    ["unparseable effective date", { languageId: "avenik", policyType: "consent", content: "Policy.", effectiveDate: "not-a-date" }, "Invalid governance body"],
+    ["missing content", { languageId: TEST_LANGUAGE_ID, policyType: "consent", effectiveDate: "2026-06-05" }, "Invalid governance body"],
+    ["invalid policy type", { languageId: TEST_LANGUAGE_ID, policyType: "retention", content: "Policy.", effectiveDate: "2026-06-05" }, "Invalid governance body"],
+    ["unparseable effective date", { languageId: TEST_LANGUAGE_ID, policyType: "consent", content: "Policy.", effectiveDate: "not-a-date" }, "Invalid governance body"],
     ["unknown language", { languageId: "not-a-language", policyType: "consent", content: "Policy.", effectiveDate: "2026-06-05" }, "Language not found: not-a-language"]
   ])("rejects %s governance writes without mutating records", async (_, payload, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
@@ -1150,18 +1105,18 @@ describe("api server", () => {
   });
 
   it("exports a role-gated sanitized language snapshot without hidden answer or learner data", async () => {
-    const seeded = stateWithAuthUsers();
-    const avenikRun: EvaluationRun = {
+    const seeded = buildTestWorkspaceState();
+    const testlangRun: EvaluationRun = {
       ...existingRun,
-      id: "avenik-run",
-      languageId: "avenik",
-      summary: "Avenik synthetic snapshot evaluation."
+      id: "testlang-run",
+      languageId: TEST_LANGUAGE_ID,
+      summary: "Testlang snapshot evaluation."
     };
-    const solariRun: EvaluationRun = {
+    const otherRun: EvaluationRun = {
       ...existingRun,
-      id: "solari-run",
-      languageId: "solari",
-      summary: "Solari synthetic snapshot evaluation."
+      id: "otherlang-run",
+      languageId: "otherlang",
+      summary: "Otherlang snapshot evaluation."
     };
     const initialState: AppState = {
       ...seeded,
@@ -1169,8 +1124,8 @@ describe("api server", () => {
         ...seeded.exerciseSubmissions,
         {
           id: "private-submission",
-          exerciseId: "avn-ex001",
-          languageId: "avenik",
+          exerciseId: submissionExerciseId,
+          languageId: TEST_LANGUAGE_ID,
           answer: "private learner answer",
           accepted: false,
           explanation: "private grading explanation",
@@ -1178,21 +1133,21 @@ describe("api server", () => {
           learnerId: "learner-1"
         }
       ],
-      evaluationRuns: [...seeded.evaluationRuns, avenikRun, solariRun],
+      evaluationRuns: [...seeded.evaluationRuns, testlangRun, otherRun],
       governance: [
         {
-          id: "gov-avenik-access",
-          languageId: "avenik",
+          id: "gov-testlang-access",
+          languageId: TEST_LANGUAGE_ID,
           policyType: "access",
-          content: "Snapshot exports stay inside synthetic review.",
+          content: "Snapshot exports stay inside local review.",
           effectiveDate: "2026-06-05",
           approvedBy: "lead-1"
         },
         {
-          id: "gov-solari-access",
-          languageId: "solari",
+          id: "gov-otherlang-access",
+          languageId: "otherlang",
           policyType: "access",
-          content: "Solari exports require a separate review packet.",
+          content: "Otherlang exports require a separate review packet.",
           effectiveDate: "2026-06-05",
           approvedBy: "lead-1"
         }
@@ -1202,15 +1157,15 @@ describe("api server", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: "/exports/languages/avenik/snapshot",
+      url: `/exports/languages/${TEST_LANGUAGE_ID}/snapshot`,
       headers: authHeaders("lead-1")
     });
 
     expect(response.statusCode).toBe(200);
     const snapshot = response.json();
     expect(snapshot).toMatchObject({
-      exportVersion: "synthetic-language-snapshot-v1",
-      language: { id: "avenik", status: "synthetic" },
+      exportVersion: "language-snapshot-v2",
+      language: { id: TEST_LANGUAGE_ID, status: "active" },
       integrity: {
         algorithm: "sha256",
         generatedBy: "assini-local-export-v1",
@@ -1219,58 +1174,40 @@ describe("api server", () => {
     });
     expect(snapshot.integrity.contentHash).toMatch(SHA_256_HEX);
     expect(Date.parse(snapshot.exportedAt)).not.toBeNaN();
-    expect(snapshot.corpus).toHaveLength(12);
+    expect(snapshot.corpus).toHaveLength(3);
     expect(snapshot.linguisticProfile).toMatchObject({
       phonology: {
         syllableTemplate: "CV",
         stress: "word-initial"
       },
       stats: {
-        vocabularyItems: 24,
-        grammarRules: 6,
-        paradigms: 2,
-        semanticDomains: 3,
-        registerProfiles: 2,
-        dialectVariants: 2
+        vocabularyItems: 7,
+        grammarRules: 2,
+        corpusPassages: 3,
+        notes: 2,
+        exercises: 3,
+        sourceAssets: 0,
+        pendingExtractionDrafts: 0
       }
     });
-    expect(snapshot.linguisticProfile.paradigms[0]).toMatchObject({
-      id: "avn-paradigm-verb-chain",
-      title: "Finite verb chain"
-    });
-    expect(snapshot.linguisticProfile.dialectVariants[0]).toMatchObject({
-      id: "avn-dialect-river",
-      name: "River teaching register",
-      history: {
-        events: expect.arrayContaining([
-          expect.objectContaining({
-            period: "early workshop",
-            evidencePassageIds: ["avn-c001", "avn-c005"]
-          })
-        ])
-      }
-    });
-    expect(snapshot.linguisticProfile.semanticDomains[0]).toMatchObject({
-      id: "avn-domain-motion",
-      evidencePassageIds: ["avn-c001", "avn-c005"]
-    });
-    expect(snapshot.linguisticProfile.registerProfiles[0]).toMatchObject({
-      id: "avn-register-careful-teaching",
-      teachingSequenceIds: ["avn-teach-verb-chain"]
-    });
-    expect(snapshot.linguisticProfile.vocabulary.find((item: { form: string }) => item.form === "-mi")).toMatchObject({
-      gloss: "present tense",
+    expect(snapshot.linguisticProfile.vocabulary.find((item: { form: string }) => item.form === "-na")).toMatchObject({
+      gloss: "first person singular",
       partOfSpeech: "suffix"
     });
     expect(snapshot.linguisticProfile.grammarRules[0]).toMatchObject({
-      id: "avn-rule-verb-chain",
-      evidencePassageIds: ["avn-c001", "avn-c002", "avn-c003"]
+      id: "testlang-note-basic-order",
+      evidencePassageIds: ["testlang-c001", "testlang-c002"]
     });
-    expect(snapshot.corpus.every((passage: { languageId: string }) => passage.languageId === "avenik")).toBe(true);
-    expect(snapshot.notes.every((note: { languageId: string }) => note.languageId === "avenik")).toBe(true);
-    expect(snapshot.exercises.every((exercise: { languageId: string }) => exercise.languageId === "avenik")).toBe(true);
+    expect(snapshot.linguisticProfile.morphemeInventory.find((item: { surface: string }) => item.surface === "saku")).toMatchObject({
+      lemma: "saku",
+      occurrenceCount: 2,
+      passageIds: expect.arrayContaining(["testlang-c002"])
+    });
+    expect(snapshot.corpus.every((passage: { languageId: string }) => passage.languageId === TEST_LANGUAGE_ID)).toBe(true);
+    expect(snapshot.notes.every((note: { languageId: string }) => note.languageId === TEST_LANGUAGE_ID)).toBe(true);
+    expect(snapshot.exercises.every((exercise: { languageId: string }) => exercise.languageId === TEST_LANGUAGE_ID)).toBe(true);
     expect(snapshot.governance).toEqual([initialState.governance[0]]);
-    expect(snapshot.evaluations).toEqual([avenikRun]);
+    expect(snapshot.evaluations).toEqual([testlangRun]);
     expect(snapshot).not.toHaveProperty("exerciseSubmissions");
     expect(snapshot).not.toHaveProperty("noteAnswerKeys");
     expect(snapshot).not.toHaveProperty("corpusAnswerKeys");
@@ -1281,7 +1218,7 @@ describe("api server", () => {
     expect(snapshot.exercises[0]).not.toHaveProperty("adversarialAnswers");
     expect(JSON.stringify(snapshot)).not.toContain("private learner answer");
     expect(JSON.stringify(snapshot)).not.toContain("private grading explanation");
-    expect(JSON.stringify(snapshot)).not.toContain("synthetic fixture evaluation");
+    expect(JSON.stringify(snapshot)).not.toContain("test-generator");
     expect(JSON.stringify(snapshot)).not.toContain("answer key");
   });
 
@@ -1289,11 +1226,11 @@ describe("api server", () => {
     ["learners", "learner-1", 403, "Forbidden"],
     ["unknown users", "missing-user", 401, "Unauthorized"]
   ])("rejects language snapshot exports from %s", async (_, userId, statusCode, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "GET",
-      url: "/exports/languages/avenik/snapshot",
+      url: `/exports/languages/${TEST_LANGUAGE_ID}/snapshot`,
       headers: authHeaders(userId)
     });
 
@@ -1302,23 +1239,23 @@ describe("api server", () => {
   });
 
   it("exports a role-gated sanitized evaluation artifact", async () => {
-    const seeded = stateWithAuthUsers();
+    const seeded = buildTestWorkspaceState();
     const latestRun: EvaluationRun = {
-      id: "eval-avenik-latest",
-      languageId: "avenik",
+      id: "eval-testlang-latest",
+      languageId: TEST_LANGUAGE_ID,
       createdAt: "2026-06-06T00:00:00.000Z",
       systemVersion: "deterministic-study-loop-v1",
-      fixtureVersion: "synthetic-fixtures-2026-06-03",
+      fixtureVersion: "workspace-corpus-v1",
       scores: { noteAccuracy: 1, corpusCoverage: 0.75 },
       failures: [
         {
           category: "corpusCoverage",
-          languageId: "avenik",
-          itemId: "avn-c999",
-          message: "Missing synthetic passage coverage."
+          languageId: TEST_LANGUAGE_ID,
+          itemId: "testlang-c999",
+          message: "Missing passage coverage."
         }
       ],
-      summary: "Avenik: 87.5% average score across 2 categories."
+      summary: "Testlang: 87.5% average score across 2 categories."
     };
     const initialState: AppState = {
       ...seeded,
@@ -1326,8 +1263,8 @@ describe("api server", () => {
       exerciseSubmissions: [
         {
           id: "private-submission",
-          exerciseId: "avn-ex001",
-          languageId: "avenik",
+          exerciseId: submissionExerciseId,
+          languageId: TEST_LANGUAGE_ID,
           answer: "private learner answer",
           accepted: false,
           explanation: "private grading explanation",
@@ -1346,9 +1283,9 @@ describe("api server", () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      exportVersion: "synthetic-evaluation-artifact-v1",
+      exportVersion: "evaluation-artifact-v2",
       summary: {
-        languages: 4,
+        languages: 1,
         totalRuns: 2,
         latestRuns: 2,
         failedLatestRuns: 1,
@@ -1361,11 +1298,11 @@ describe("api server", () => {
       },
       latestRuns: [
         expect.objectContaining({ id: "existing-run" }),
-        expect.objectContaining({ id: "eval-avenik-latest" })
+        expect.objectContaining({ id: "eval-testlang-latest" })
       ],
       failureLines: [
-        "Avenik corpusCoverage avn-c999: Missing synthetic passage coverage.",
-        "Avenik corpusCoverage threshold: score 75.0% is below required 96.0%."
+        "Testlang corpusCoverage testlang-c999: Missing passage coverage.",
+        "Testlang corpusCoverage threshold: score 75.0% is below required 96.0%."
       ],
       integrity: {
         algorithm: "sha256",
@@ -1380,8 +1317,8 @@ describe("api server", () => {
           status: "single-run"
         }),
         expect.objectContaining({
-          languageId: "avenik",
-          latestRunId: "eval-avenik-latest",
+          languageId: TEST_LANGUAGE_ID,
+          latestRunId: "eval-testlang-latest",
           previousRunId: null,
           status: "single-run",
           categoryDeltas: {
@@ -1406,7 +1343,7 @@ describe("api server", () => {
     ["learners", "learner-1", 403, "Forbidden"],
     ["unknown users", "missing-user", 401, "Unauthorized"]
   ])("rejects evaluation artifact exports from %s", async (_, userId, statusCode, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "GET",
@@ -1419,7 +1356,7 @@ describe("api server", () => {
   });
 
   it("returns a not-found error for unknown language snapshot exports", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "GET",
@@ -1432,54 +1369,54 @@ describe("api server", () => {
   });
 
   it("authors validated exercises without exposing answer keys", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain"],
-        expectedAnswers: ["mira talo-mi-na"],
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order"],
+        expectedAnswers: ["saku talo-ki"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
-          { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(201);
     expect(response.json()).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       type: "translate_to_target",
-      prompt: "Translate into Avenik: I walk by the river.",
-      allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-      allowedRuleIds: ["avn-rule-verb-chain"]
+      prompt: "Translate into Testlang: The child walks.",
+      allowedVocabulary: ["saku", "talo", "-ki"],
+      allowedRuleIds: ["testlang-note-basic-order"]
     });
-    expect(response.json().id).toMatch(/^authored-exercise-avenik-/);
+    expect(response.json().id).toMatch(/^authored-exercise-testlang-/);
     expect(response.json()).not.toHaveProperty("expectedAnswers");
     expect(response.json()).not.toHaveProperty("gradingExplanation");
     expect(response.json()).not.toHaveProperty("adversarialAnswers");
-    expect(JSON.stringify(response.json())).not.toContain("Use mira for river");
+    expect(JSON.stringify(response.json())).not.toContain("Use saku for child");
 
-    const exercises = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const exercises = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(exercises.statusCode).toBe(200);
     expect(exercises.json()).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: response.json().id,
-        prompt: "Translate into Avenik: I walk by the river."
+        prompt: "Translate into Testlang: The child walks."
       })
     ]));
     expect(JSON.stringify(exercises.json())).not.toContain("expectedAnswers");
-    expect(JSON.stringify(exercises.json())).not.toContain("Use mira for river");
+    expect(JSON.stringify(exercises.json())).not.toContain("Use saku for child");
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
@@ -1498,58 +1435,59 @@ describe("api server", () => {
   });
 
   it("rejects invalid exercise authoring references without mutating exercises", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
         allowedRuleIds: ["missing-rule"],
-        expectedAnswers: ["mira talo-mi-na"],
+        expectedAnswers: ["saku talo-ki"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Exercise references unknown rule: missing-rule" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("rejects exercise authoring with fewer than two adversarial probes without mutating exercises", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain"],
-        expectedAnswers: ["mira talo-mi-na"],
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order"],
+        expectedAnswers: ["saku talo-ki"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Exercise authoring requires at least two adversarial probes." });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
   });
 
@@ -1557,130 +1495,130 @@ describe("api server", () => {
     [
       "allowed vocabulary",
       {
-        allowedVocabulary: ["mira", "talo", "mira", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain"]
+        allowedVocabulary: ["saku", "talo", "saku", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order"]
       },
-      "Exercise allowed vocabulary is duplicated: mira"
+      "Exercise allowed vocabulary is duplicated: saku"
     ],
     [
       "allowed rule IDs",
       {
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain", "avn-rule-verb-chain"]
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order", "testlang-note-basic-order"]
       },
-      "Exercise allowed rule is duplicated: avn-rule-verb-chain"
+      "Exercise allowed rule is duplicated: testlang-note-basic-order"
     ]
   ])("rejects duplicate exercise authoring %s without mutating exercises", async (_, overrides, error) => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
+        prompt: "Translate into Testlang: The child walks.",
         ...overrides,
-        expectedAnswers: ["mira talo-mi-na"],
+        expectedAnswers: ["saku talo-ki"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
-          { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("rejects duplicate expected exercise answers without mutating exercises", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain"],
-        expectedAnswers: ["mira talo-mi-na", "  mira   talo-mi-na  "],
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order"],
+        expectedAnswers: ["saku talo-ki", "  saku   talo-ki  "],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
-          { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise expected answer is duplicated: mira talo-mi-na" });
+    expect(response.json()).toEqual({ error: "Exercise expected answer is duplicated: saku talo-ki" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("rejects duplicate adversarial exercise probes without mutating exercises", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
 
     const response = await app.inject({
       method: "POST",
-      url: "/languages/avenik/exercises",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
       headers: authHeaders("reviewer-1"),
       payload: {
         type: "translate_to_target",
-        prompt: "Translate into Avenik: I walk by the river.",
-        allowedVocabulary: ["mira", "talo", "-mi", "-na"],
-        allowedRuleIds: ["avn-rule-verb-chain"],
-        expectedAnswers: ["mira talo-mi-na"],
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["testlang-note-basic-order"],
+        expectedAnswers: ["saku talo-ki"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
-          { answer: "  talo-mi-na   mira  ", reason: "Repeats the same word order probe with extra whitespace." }
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "  talo   saku-ki  ", reason: "Repeats the same word order probe with extra whitespace." }
         ],
-        gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
       }
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise adversarial answer is duplicated: talo-mi-na mira" });
+    expect(response.json()).toEqual({ error: "Exercise adversarial answer is duplicated: talo saku-ki" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/exercises" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("grades and persists correct exercise submissions server-side", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
-      url: "/exercises/avn-ex001/submissions",
+      url: `/exercises/${submissionExerciseId}/submissions`,
       headers: authHeaders("learner-1"),
-      payload: { answer: "mira talo-mi-na" }
+      payload: { answer: "saku talo-ki" }
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      exerciseId: "avn-ex001",
-      languageId: "avenik",
+      exerciseId: submissionExerciseId,
+      languageId: TEST_LANGUAGE_ID,
       accepted: true,
-      explanation: "Accepted synthetic exercise submission."
+      explanation: "Submission accepted."
     });
     expect(response.json()).not.toHaveProperty("answer");
     expect(response.json()).not.toHaveProperty("learnerId");
 
-    const submissions = await app.inject({ method: "GET", url: "/exercises/avn-ex001/submissions" });
+    const submissions = await app.inject({ method: "GET", url: `/exercises/${submissionExerciseId}/submissions` });
     expect(submissions.statusCode).toBe(200);
     expect(submissions.json()).toHaveLength(1);
     expect(submissions.json()[0]).toMatchObject({
-      exerciseId: "avn-ex001",
+      exerciseId: submissionExerciseId,
       accepted: true
     });
     expect(submissions.json()[0]).not.toHaveProperty("learnerId");
@@ -1689,16 +1627,16 @@ describe("api server", () => {
   it("preserves concurrent exercise submissions through a provided JsonStore", async () => {
     const tempDir = await mkdtemp(join(tmpdir(), "assini-api-submissions-"));
     const store = new JsonStore(join(tempDir, "local-db.json"));
-    await store.write(buildSeedState());
+    await store.write(buildTestWorkspaceState());
     const app = createServer({ store });
 
     const responses = await Promise.all(
       Array.from({ length: 20 }, async (_, index) =>
         app.inject({
           method: "POST",
-          url: "/exercises/avn-ex001/submissions",
+          url: `/exercises/${submissionExerciseId}/submissions`,
           headers: authHeaders("learner-1"),
-          payload: { answer: index % 2 === 0 ? "mira talo-mi-na" : "talo mira" }
+          payload: { answer: index % 2 === 0 ? "saku talo-ki" : "talo saku" }
         })
       )
     );
@@ -1706,62 +1644,62 @@ describe("api server", () => {
     expect(responses.every((response) => response.statusCode === 200)).toBe(true);
 
     const persisted = await store.read();
-    const submissions = persisted.exerciseSubmissions.filter((submission) => submission.exerciseId === "avn-ex001");
+    const submissions = persisted.exerciseSubmissions.filter((submission) => submission.exerciseId === submissionExerciseId);
 
     expect(submissions).toHaveLength(20);
     expect(new Set(submissions.map((submission) => submission.id)).size).toBe(20);
   });
 
   it("returns sanitized exercise submission history without learner answers", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     await app.inject({
       method: "POST",
-      url: "/exercises/avn-ex001/submissions",
+      url: `/exercises/${submissionExerciseId}/submissions`,
       headers: authHeaders("learner-1"),
-      payload: { answer: "mira talo-mi-na" }
+      payload: { answer: "saku talo-ki" }
     });
 
-    const submissions = await app.inject({ method: "GET", url: "/exercises/avn-ex001/submissions" });
+    const submissions = await app.inject({ method: "GET", url: `/exercises/${submissionExerciseId}/submissions` });
 
     expect(submissions.statusCode).toBe(200);
     expect(submissions.json()[0]).toMatchObject({
-      exerciseId: "avn-ex001",
+      exerciseId: submissionExerciseId,
       accepted: true,
-      explanation: "Accepted synthetic exercise submission."
+      explanation: "Submission accepted."
     });
     expect(submissions.json()[0]).not.toHaveProperty("answer");
     expect(submissions.json()[0]).not.toHaveProperty("learnerId");
-    expect(JSON.stringify(submissions.json())).not.toContain("mira talo-mi-na");
+    expect(JSON.stringify(submissions.json())).not.toContain("saku talo-ki");
   });
 
   it("grades incorrect exercise submissions without exposing answer keys", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
-      url: "/exercises/avn-ex001/submissions",
+      url: `/exercises/${submissionExerciseId}/submissions`,
       headers: authHeaders("learner-1"),
-      payload: { answer: "talo mira" }
+      payload: { answer: "talo saku" }
     });
 
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({
-      exerciseId: "avn-ex001",
+      exerciseId: submissionExerciseId,
       accepted: false,
-      explanation: "Answer did not match the synthetic exercise key."
+      explanation: "Answer did not match the exercise answer key."
     });
-    expect(JSON.stringify(response.json())).not.toContain("mira talo-mi-na");
+    expect(JSON.stringify(response.json())).not.toContain("saku talo-ki");
     expect(response.json()).not.toHaveProperty("answer");
     expect(response.json()).not.toHaveProperty("learnerId");
   });
 
   it.each([
-    ["missing exercise", "/exercises/missing-exercise/submissions", { answer: "mira talo-mi-na" }, 404],
-    ["empty answer", "/exercises/avn-ex001/submissions", { answer: " " }, 400],
-    ["missing payload", "/exercises/avn-ex001/submissions", undefined, 400]
+    ["missing exercise", "/exercises/missing-exercise/submissions", { answer: "saku talo-ki" }, 404],
+    ["empty answer", `/exercises/${submissionExerciseId}/submissions`, { answer: " " }, 400],
+    ["missing payload", `/exercises/${submissionExerciseId}/submissions`, undefined, 400]
   ])("returns a client error for %s submissions", async (_, url, payload, statusCode) => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "POST",
@@ -1780,8 +1718,8 @@ describe("api server", () => {
     ["non-string languageId", { languageId: 42 }],
     ["array payload", []]
   ])("returns 400 for a %s study-loop draft body and preserves notes", async (_, payload) => {
-    const app = createServer({ initialState: buildSeedState() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
 
     const response = await app.inject({
       method: "POST",
@@ -1793,13 +1731,13 @@ describe("api server", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Missing languageId" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("returns 404 for study-loop drafts for an unknown language and preserves notes", async () => {
-    const app = createServer({ initialState: buildSeedState() });
-    const before = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
 
     const response = await app.inject({
       method: "POST",
@@ -1811,12 +1749,12 @@ describe("api server", () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
 
-    const after = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(after.json()).toEqual(before.json());
   });
 
   it("adds generated study-loop drafts without removing reviewed notes", async () => {
-    const initialState = buildSeedState();
+    const initialState = buildTestWorkspaceState();
     const reviewedNote = initialState.notes.find((note) => note.id === reviewedNoteId);
     if (!reviewedNote) throw new Error("Missing reviewed note");
 
@@ -1844,18 +1782,18 @@ describe("api server", () => {
       method: "POST",
       url: "/study-loop/draft",
       headers: authHeaders("reviewer-1"),
-      payload: { languageId: "avenik" }
+      payload: { languageId: TEST_LANGUAGE_ID }
     });
 
     expect(response.statusCode).toBe(200);
-    expect((response.json() as Note[]).map((note) => note.id)).toContain("avn-rule-verb-chain-draft");
+    expect((response.json() as Note[]).map((note) => note.id)).toContain("testlang-draft-basic-order");
 
-    const notesResponse = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const notesResponse = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     const notes = notesResponse.json() as Note[];
 
     const expectedReviewedAndGeneratedNotes =
-      initialState.notes.filter((note) => note.languageId === "avenik").length +
-      draftNotesForLanguage("avenik", initialState).length;
+      initialState.notes.filter((note) => note.languageId === TEST_LANGUAGE_ID).length +
+      draftNotesForLanguage(TEST_LANGUAGE_ID, initialState).length;
 
     expect(notes).toHaveLength(expectedReviewedAndGeneratedNotes);
     expect(new Set(notes.map((note) => note.id)).size).toBe(notes.length);
@@ -1864,15 +1802,15 @@ describe("api server", () => {
       explanation: "Reviewer-approved wording.",
       reviewer: expect.objectContaining({ lastReviewedBy: "local-reviewer" })
     });
-    expect(notes.find((note) => note.id === "avn-rule-verb-chain-draft")).toMatchObject({
+    expect(notes.find((note) => note.id === "testlang-draft-basic-order")).toMatchObject({
       status: "draft",
       reviewer: expect.objectContaining({ lastReviewedBy: null, lastReviewedAt: null })
     });
   });
 
   it("refreshes only unreviewed generated drafts on repeated study-loop drafts", async () => {
-    const initialState = buildSeedState();
-    const [generatedDraft, reviewedGeneratedDraft] = draftNotesForLanguage("avenik", initialState);
+    const initialState = buildTestWorkspaceState();
+    const [generatedDraft, reviewedGeneratedDraft] = draftNotesForLanguage(TEST_LANGUAGE_ID, initialState);
     if (!generatedDraft || !reviewedGeneratedDraft) throw new Error("Missing generated drafts");
 
     const staleDraft: Note = {
@@ -1906,12 +1844,12 @@ describe("api server", () => {
       method: "POST",
       url: "/study-loop/draft",
       headers: authHeaders("reviewer-1"),
-      payload: { languageId: "avenik" }
+      payload: { languageId: TEST_LANGUAGE_ID }
     });
 
     expect(response.statusCode).toBe(200);
 
-    const notesResponse = await app.inject({ method: "GET", url: "/languages/avenik/notes" });
+    const notesResponse = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     const notes = notesResponse.json() as Note[];
     const refreshed = notes.find((note) => note.id === generatedDraft.id);
     const preserved = notes.find((note) => note.id === reviewedGeneratedDraft.id);
@@ -1927,7 +1865,7 @@ describe("api server", () => {
   });
 
   it("updates note review details", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "PATCH",
@@ -1954,7 +1892,7 @@ describe("api server", () => {
   });
 
   it("rejects underspecified note explanation edits without mutating the note", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
     const response = await app.inject({
@@ -1982,7 +1920,7 @@ describe("api server", () => {
     ["deferred", "Defer until an Elder checks the dialect scope."],
     ["escalated", "Escalate for language-lead review before release."]
   ] as const)("records %s note dispositions with comments and audit metadata", async (status, reviewerComment) => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "PATCH",
@@ -2003,7 +1941,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
@@ -2022,7 +1960,7 @@ describe("api server", () => {
   });
 
   it("tracks assigned review dispositions with due dates and resolution workflow", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const opened = await app.inject({
       method: "PATCH",
@@ -2040,13 +1978,13 @@ describe("api server", () => {
 
     const dispositions = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-dispositions",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-dispositions`,
       headers: authHeaders("reviewer-1")
     });
     expect(dispositions.statusCode).toBe(200);
     expect(dispositions.json()).toHaveLength(1);
     expect(dispositions.json()[0]).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       noteId: reviewedNoteId,
       disposition: "escalated",
       status: "open",
@@ -2093,7 +2031,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.json()).toEqual(expect.arrayContaining([
@@ -2120,7 +2058,7 @@ describe("api server", () => {
   });
 
   it("updates an existing open review disposition instead of creating duplicate open work", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const firstDeferral = await app.inject({
       method: "PATCH",
@@ -2137,7 +2075,7 @@ describe("api server", () => {
 
     const opened = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-dispositions",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-dispositions`,
       headers: authHeaders("lead-1")
     });
     expect(opened.statusCode).toBe(200);
@@ -2159,7 +2097,7 @@ describe("api server", () => {
 
     const dispositions = await app.inject({
       method: "GET",
-      url: "/languages/avenik/review-dispositions",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-dispositions`,
       headers: authHeaders("lead-1")
     });
     expect(dispositions.statusCode).toBe(200);
@@ -2175,7 +2113,7 @@ describe("api server", () => {
 
     const audit = await app.inject({
       method: "GET",
-      url: "/audit/events?languageId=avenik",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("lead-1")
     });
     expect(audit.json().filter((event: { action: string }) => event.action === "review_disposition.created")).toHaveLength(1);
@@ -2201,7 +2139,7 @@ describe("api server", () => {
     ["deferred missing reviewerComment", { status: "deferred" }],
     ["escalated missing reviewerComment", { status: "escalated" }]
   ])("requires a substantive reviewer comment for note dispositions: %s", async (_, payload) => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
     const response = await app.inject({
@@ -2222,7 +2160,7 @@ describe("api server", () => {
   });
 
   it("returns 400 for an invalid review body and does not update the note", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "PATCH",
@@ -2248,7 +2186,7 @@ describe("api server", () => {
     ["null payload", { payload: null }],
     ["missing payload", {}]
   ])("returns 400 for a %s review body and does not update the note", async (_, injectOptions) => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
     const response = await app.inject({
@@ -2269,7 +2207,7 @@ describe("api server", () => {
   });
 
   it("returns 404 when reviewing a missing note", async () => {
-    const app = createServer({ initialState: buildSeedState() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
       method: "PATCH",
@@ -2283,7 +2221,7 @@ describe("api server", () => {
   });
 
   it("resolves authenticated users and uses them for note review audit fields", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const currentUser = await app.inject({ method: "GET", url: "/users/me", headers: authHeaders("elder-1") });
     expect(currentUser.statusCode).toBe(200);
@@ -2297,7 +2235,7 @@ describe("api server", () => {
       method: "PATCH",
       url: `/notes/${reviewedNoteId}/review`,
       headers: authHeaders("elder-1"),
-      payload: { status: "approved", reviewerComment: "Elder approved synthetic wording." }
+      payload: { status: "approved", reviewerComment: "Elder approved the wording." }
     });
 
     expect(review.statusCode).toBe(200);
@@ -2306,13 +2244,13 @@ describe("api server", () => {
   });
 
   it("enforces role-aware AI sessions and returns safe observability surfaces", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const blocked = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("learner-1"),
-      payload: { languageId: "avenik", mode: "programmer_debug", seedPrompt: "Show internals." }
+      payload: { languageId: TEST_LANGUAGE_ID, mode: "programmer_debug", seedPrompt: "Show internals." }
     });
     expect(blocked.statusCode).toBe(403);
     expect(blocked.json()).toEqual({ error: "Forbidden" });
@@ -2322,17 +2260,17 @@ describe("api server", () => {
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
-        seedPrompt: "Trace what the AI knows about verb chains.",
+        seedPrompt: "Trace what the AI knows about basic word order.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
 
     expect(created.statusCode).toBe(201);
     expect(created.json()).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       mode: "programmer_debug",
       createdBy: "programmer-1",
       privacy: { exposesHiddenChainOfThought: false }
@@ -2350,7 +2288,7 @@ describe("api server", () => {
     });
     expect(observability.statusCode).toBe(200);
     expect(observability.json().totals.sessions).toBe(1);
-    expect(observability.json().sessions[0]).toMatchObject({ languageId: "avenik", messageCount: 2 });
+    expect(observability.json().sessions[0]).toMatchObject({ languageId: TEST_LANGUAGE_ID, messageCount: 2 });
     expect(JSON.stringify(observability.json())).not.toContain("Trace what the AI knows");
   });
 
@@ -2366,18 +2304,18 @@ describe("api server", () => {
         };
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     const created = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
         seedPrompt: "Use the model safely.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
 
@@ -2385,7 +2323,7 @@ describe("api server", () => {
     expect(created.json().messages[1]).toMatchObject({
       role: "assistant",
       content: "Provider response 1: Use the model safely.",
-      createdBy: "synthetic-ai"
+      createdBy: "local-ai"
     });
     expect(created.json().trace.at(-1).warnings).toContain("test-provider");
 
@@ -2400,7 +2338,7 @@ describe("api server", () => {
     expect(followUp.json().messages.at(-1)).toMatchObject({
       role: "assistant",
       content: "Provider response 2: Follow up safely.",
-      createdBy: "synthetic-ai"
+      createdBy: "local-ai"
     });
     expect(providerInputs).toHaveLength(2);
     expect(JSON.stringify(providerInputs)).not.toContain("noteAnswerKeys");
@@ -2416,18 +2354,18 @@ describe("api server", () => {
         throw new Error("LLM provider request failed with status 429: Rate limit for sk-route-secret");
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     const response = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
         seedPrompt: "Use the model safely.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
 
@@ -2445,18 +2383,18 @@ describe("api server", () => {
         throw new Error("LLM provider request failed with status 429: Rate limit for sk-route-secret");
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     const response = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
         seedPrompt: "Use the model safely.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
 
@@ -2470,13 +2408,13 @@ describe("api server", () => {
     expect(observability.statusCode).toBe(200);
     expect(observability.json().totals).toMatchObject({ sessions: 1, activeSessions: 0 });
     expect(observability.json().sessions[0]).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       mode: "programmer_debug",
       status: "failed",
       createdBy: "programmer-1",
       messageCount: 1,
       contextNoteIds: [reviewedNoteId],
-      contextPassageIds: ["avn-c001"]
+      contextPassageIds: ["testlang-c001"]
     });
 
     const sessionId = observability.json().sessions[0].id;
@@ -2505,7 +2443,7 @@ describe("api server", () => {
         throw new Error("LLM provider request failed with status 500: plain-provider-secret");
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     try {
       const response = await app.inject({
@@ -2513,11 +2451,11 @@ describe("api server", () => {
         url: "/ai/sessions",
         headers: authHeaders("programmer-1"),
         payload: {
-          languageId: "avenik",
+          languageId: TEST_LANGUAGE_ID,
           mode: "programmer_debug",
           seedPrompt: "Use the model safely.",
           contextNoteIds: [reviewedNoteId],
-          contextPassageIds: ["avn-c001"]
+          contextPassageIds: ["testlang-c001"]
         }
       });
 
@@ -2559,18 +2497,18 @@ describe("api server", () => {
         throw new Error("LLM provider request timed out after 25ms");
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     const created = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
         seedPrompt: "Start safely.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
     expect(created.statusCode).toBe(201);
@@ -2600,18 +2538,18 @@ describe("api server", () => {
         throw new Error("LLM provider request failed with status 500: Retry with sk-followup-secret");
       }
     };
-    const app = createServer({ initialState: stateWithAuthUsers(), llmProvider });
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
 
     const created = await app.inject({
       method: "POST",
       url: "/ai/sessions",
       headers: authHeaders("programmer-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         mode: "programmer_debug",
         seedPrompt: "Start safely.",
         contextNoteIds: [reviewedNoteId],
-        contextPassageIds: ["avn-c001"]
+        contextPassageIds: ["testlang-c001"]
       }
     });
     expect(created.statusCode).toBe(201);
@@ -2648,7 +2586,7 @@ describe("api server", () => {
   });
 
   it("lets Elders add pending correction/context records without mutating notes", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
     const correction = await app.inject({
@@ -2656,18 +2594,18 @@ describe("api server", () => {
       url: "/elder/corrections",
       headers: authHeaders("elder-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         noteId: reviewedNoteId,
         correction: "Mention suffix order before approval.",
         rationale: "Elder review found the explanation underspecified.",
         severity: "major",
-        contextText: "Keep this synthetic-only until governance approval."
+        contextText: "Keep this local-only until governance approval."
       }
     });
 
     expect(correction.statusCode).toBe(201);
     expect(correction.json()).toMatchObject({
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       noteId: reviewedNoteId,
       status: "pending_review",
       proposedBy: "elder-1",
@@ -2680,7 +2618,7 @@ describe("api server", () => {
 
     const context = await app.inject({
       method: "GET",
-      url: "/languages/avenik/elder-context",
+      url: `/languages/${TEST_LANGUAGE_ID}/elder-context`,
       headers: authHeaders("elder-1")
     });
     expect(context.statusCode).toBe(200);
@@ -2690,7 +2628,7 @@ describe("api server", () => {
   });
 
   it("lets leads review elder corrections with audit attribution", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
     const created = await app.inject({
@@ -2698,7 +2636,7 @@ describe("api server", () => {
       url: "/elder/corrections",
       headers: authHeaders("elder-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         noteId: reviewedNoteId,
         correction: "Mention suffix order before approval.",
         rationale: "Elder review found the explanation underspecified.",
@@ -2732,7 +2670,7 @@ describe("api server", () => {
 
     const context = await app.inject({
       method: "GET",
-      url: "/languages/avenik/elder-context",
+      url: `/languages/${TEST_LANGUAGE_ID}/elder-context`,
       headers: authHeaders("elder-1")
     });
     expect(context.json().corrections[0]).toMatchObject({
@@ -2747,14 +2685,14 @@ describe("api server", () => {
   });
 
   it("rejects review attempts for elder corrections that are no longer pending", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const created = await app.inject({
       method: "POST",
       url: "/elder/corrections",
       headers: authHeaders("elder-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         noteId: reviewedNoteId,
         correction: "Mention suffix order before approval.",
         rationale: "Elder review found the explanation underspecified.",
@@ -2785,7 +2723,7 @@ describe("api server", () => {
 
     const context = await app.inject({
       method: "GET",
-      url: "/languages/avenik/elder-context",
+      url: `/languages/${TEST_LANGUAGE_ID}/elder-context`,
       headers: authHeaders("elder-1")
     });
     expect(context.json().corrections[0]).toMatchObject({
@@ -2796,7 +2734,7 @@ describe("api server", () => {
   });
 
   it("applies accepted note-linked elder corrections as auditable note edits", async () => {
-    const app = createServer({ initialState: stateWithAuthUsers() });
+    const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
     const revisedExplanation = `${before.explanation} Accepted elder correction: mention suffix order before approval.`;
 
@@ -2805,7 +2743,7 @@ describe("api server", () => {
       url: "/elder/corrections",
       headers: authHeaders("elder-1"),
       payload: {
-        languageId: "avenik",
+        languageId: TEST_LANGUAGE_ID,
         noteId: reviewedNoteId,
         correction: "Mention suffix order before approval.",
         rationale: "Elder review found the explanation underspecified.",
@@ -2851,7 +2789,7 @@ describe("api server", () => {
 
     const context = await app.inject({
       method: "GET",
-      url: "/languages/avenik/elder-context",
+      url: `/languages/${TEST_LANGUAGE_ID}/elder-context`,
       headers: authHeaders("elder-1")
     });
     expect(context.json().corrections[0]).toMatchObject({
@@ -2867,25 +2805,25 @@ describe("api server", () => {
   it("returns a programmer-only neural map and rate limits protected writes", async () => {
     let now = 1_000;
     const app = createServer({
-      initialState: stateWithAuthUsers(),
+      initialState: buildTestWorkspaceState(),
       rateLimit: { max: 2, windowMs: 60_000, now: () => now }
     });
 
     const neuralMap = await app.inject({
       method: "GET",
-      url: "/observability/neural-map?languageId=avenik",
+      url: `/observability/neural-map?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("programmer-1")
     });
     expect(neuralMap.statusCode).toBe(200);
     expect(neuralMap.json().nodes).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "language:avenik", type: "language" }),
+        expect.objectContaining({ id: `language:${TEST_LANGUAGE_ID}`, type: "language" }),
         expect.objectContaining({ id: `note:${reviewedNoteId}`, type: "note" })
       ])
     );
     expect(JSON.stringify(neuralMap.json())).not.toContain("expectedAnswers");
 
-    const payload = { languageId: "avenik", mode: "learner_practice", seedPrompt: "Practice safely." };
+    const payload = { languageId: TEST_LANGUAGE_ID, mode: "learner_practice", seedPrompt: "Practice safely." };
     const first = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });
     const second = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });
     const third = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });

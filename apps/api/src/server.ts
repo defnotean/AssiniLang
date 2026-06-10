@@ -1,15 +1,22 @@
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join, resolve as resolvePath } from "node:path";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import {
   AI_SESSION_MODE_ROLES,
+  CONSENT_USE_VALUES,
   corpusPassageToAnswerKey,
   ELDER_CORRECTION_MUTATION_ROLES,
   EXERCISE_SUBMISSION_ACTOR_ROLES,
+  findInvalidOrthographySymbols,
+  findUncoveredCorpusTargetTokens,
   GOVERNANCE_APPROVER_ROLES,
   isReviewPolicyAssignableRole,
   isReviewPolicyUpdaterRole,
   JsonStore,
+  languageTypologySchema,
   LOCAL_PROTOTYPE_USERS,
   noteStatusSchema,
   REVIEW_POLICY_UPDATER_ROLES,
@@ -18,21 +25,27 @@ import {
   type AiSession,
   type AiSessionMode,
   type AppState,
+  type ConsentUse,
   type CorpusPassage,
   type ElderCorrection,
   type Exercise,
   type ExerciseSubmission,
+  type ExtractionDraft,
   type GovernanceRecord,
+  type Language,
+  type Lexeme,
   type NeuralMap,
   type Note,
   type ReviewApproval,
   type ReviewDisposition,
   type ReviewPolicy,
+  type SourceAsset,
+  type SourceAssetKind,
   type User,
   type UserRole
 } from "@assini/db";
 import { draftNotesForLanguage, gradeExerciseAnswer, runEvaluationForState } from "@assini/eval";
-import { findInvalidOrthographySymbols, findUncoveredCorpusTargetTokens, syntheticLanguageFixtures } from "@assini/synthetic-langs";
+import { extractCandidatesForAsset, type SourceExtractionResult } from "./ingestion";
 import {
   buildLlmGenerationInputFromState,
   createLlmProviderFromEnv,
@@ -41,7 +54,7 @@ import {
   type LlmProvider
 } from "./llmProvider";
 import {
-  buildSyntheticLanguageProfile,
+  buildLanguageProfile,
   toPublicExercise,
   toPublicEvaluationArtifact,
   toPublicExerciseSubmission,
@@ -66,6 +79,10 @@ type ServerOptions = {
   authToken?: string;
   enablePrototypeAuth?: boolean;
   llmProvider?: LlmProvider;
+  /** Directory where uploaded source-asset files are stored. Defaults to ./data next to the local database. */
+  dataDir?: string;
+  /** Fetch implementation used for URL sources and transcription; overridable in tests. */
+  ingestionFetch?: typeof fetch;
 };
 
 type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
@@ -279,7 +296,7 @@ function toPublicAiSession(session: AiSession, actor: User): PublicAiSession {
     messages: session.messages.map((message) => ({
       ...message,
       content: canSeeActorIds || message.role !== "user" ? message.content : "[redacted user input]",
-      createdBy: canSeeActorIds || message.createdBy === "synthetic-ai" ? message.createdBy : "redacted"
+      createdBy: canSeeActorIds || message.createdBy === "local-ai" ? message.createdBy : "redacted"
     })),
     neuralMap: sanitizeNeuralMapForActor(session.neuralMap, actor),
     privacy: {
@@ -388,7 +405,10 @@ function parseCorpusImportBody(input: unknown): CorpusImportBody | undefined {
   const restrictions = parseStringArray(consentStatus?.restrictions);
 
   if (!source || !sourceMetadata || !textTarget || !textTranslation || !morphologicalSegmentation) return undefined;
-  if (!topicTags || topicTags.length === 0 || !restrictions || consentStatus?.use !== "synthetic-testing-only") return undefined;
+  const consentUse = typeof consentStatus?.use === "string" && (CONSENT_USE_VALUES as readonly string[]).includes(consentStatus.use)
+    ? consentStatus.use as ConsentUse
+    : undefined;
+  if (!topicTags || topicTags.length === 0 || !restrictions || !consentUse) return undefined;
 
   return {
     source,
@@ -398,10 +418,179 @@ function parseCorpusImportBody(input: unknown): CorpusImportBody | undefined {
     morphologicalSegmentation,
     topicTags,
     consentStatus: {
-      use: "synthetic-testing-only",
+      use: consentUse,
       restrictions
     }
   };
+}
+
+type LanguageCreateBody = {
+  name: string;
+  description: string;
+  orthography: string;
+  typology: Language["typology"];
+  phonology?: Language["phonology"];
+};
+
+type LanguagePatchBody = Partial<LanguageCreateBody>;
+
+type SourceRegistrationBody = {
+  kind: Extract<SourceAssetKind, "text" | "wordlist" | "url">;
+  title: string;
+  rawText?: string;
+  url?: string;
+};
+
+function slugifyLanguageName(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+}
+
+function parseLanguagePhonology(value: unknown): Language["phonology"] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) return undefined;
+  const record = value as Record<string, unknown>;
+  const consonants = parseStringArray(record.consonants);
+  const vowels = parseStringArray(record.vowels);
+  const notes = parseStringArray(record.notes);
+  if (!consonants || !vowels || !notes) return undefined;
+  const syllableTemplate = typeof record.syllableTemplate === "string" ? record.syllableTemplate.trim() : undefined;
+  const stress = typeof record.stress === "string" ? record.stress.trim() : undefined;
+  return {
+    consonants,
+    vowels,
+    notes,
+    syllableTemplate: syllableTemplate || undefined,
+    stress: stress || undefined
+  };
+}
+
+function parseLanguageCreateBody(input: unknown): LanguageCreateBody | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const body = input as Record<string, unknown>;
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const description = typeof body.description === "string" ? body.description.trim() : "";
+  const orthography = typeof body.orthography === "string" ? body.orthography.trim() : "";
+  const typologyResult = languageTypologySchema.safeParse(body.typology ?? "unknown");
+  const phonologyProvided = body.phonology !== undefined && body.phonology !== null;
+  const phonology = parseLanguagePhonology(body.phonology);
+
+  if (!name || !description || !orthography || !typologyResult.success) return undefined;
+  if (phonologyProvided && !phonology) return undefined;
+
+  return { name, description, orthography, typology: typologyResult.data, phonology };
+}
+
+function parseLanguagePatchBody(input: unknown): LanguagePatchBody | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const body = input as Record<string, unknown>;
+  const patch: LanguagePatchBody = {};
+  let hasField = false;
+
+  if ("name" in body) {
+    if (typeof body.name !== "string" || body.name.trim().length === 0) return undefined;
+    patch.name = body.name.trim();
+    hasField = true;
+  }
+  if ("description" in body) {
+    if (typeof body.description !== "string" || body.description.trim().length === 0) return undefined;
+    patch.description = body.description.trim();
+    hasField = true;
+  }
+  if ("orthography" in body) {
+    if (typeof body.orthography !== "string" || body.orthography.trim().length === 0) return undefined;
+    patch.orthography = body.orthography.trim();
+    hasField = true;
+  }
+  if ("typology" in body) {
+    const typologyResult = languageTypologySchema.safeParse(body.typology);
+    if (!typologyResult.success) return undefined;
+    patch.typology = typologyResult.data;
+    hasField = true;
+  }
+  if ("phonology" in body) {
+    const phonology = parseLanguagePhonology(body.phonology);
+    if (body.phonology !== null && body.phonology !== undefined && !phonology) return undefined;
+    patch.phonology = phonology;
+    hasField = true;
+  }
+
+  return hasField ? patch : undefined;
+}
+
+function parseSourceRegistrationBody(input: unknown): SourceRegistrationBody | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
+  const body = input as Record<string, unknown>;
+  const kind = body.kind === "text" || body.kind === "wordlist" || body.kind === "url" ? body.kind : undefined;
+  const title = typeof body.title === "string" ? body.title.trim() : "";
+  const rawText = typeof body.rawText === "string" ? body.rawText : undefined;
+  const url = typeof body.url === "string" ? body.url.trim() : undefined;
+
+  if (!kind || !title) return undefined;
+  if (kind === "url") {
+    if (!url) return undefined;
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
+    } catch {
+      return undefined;
+    }
+    return { kind, title, url };
+  }
+
+  if (rawText === undefined || rawText.trim().length === 0) return undefined;
+  return { kind, title, rawText };
+}
+
+function sanitizeStoredFileName(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  return cleaned.length > 0 ? cleaned.slice(0, 80) : "upload";
+}
+
+function sourceKindForUpload(mimeType: string, fileName: string): SourceAssetKind {
+  if (mimeType.startsWith("image/")) return "image";
+  if (mimeType.startsWith("audio/") || mimeType === "video/webm") return "audio";
+  const extension = fileName.split(".").pop()?.toLowerCase() ?? "";
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp"].includes(extension)) return "image";
+  if (["mp3", "wav", "m4a", "ogg", "flac", "webm", "aac"].includes(extension)) return "audio";
+  return "document";
+}
+
+/**
+ * Ensures a corpus passage accepted from an extraction draft always has
+ * full segmentation coverage: when the proposed morphemes do not cover
+ * the target text, fall back to honest token-level "unanalyzed" pieces.
+ */
+function ensureCorpusDraftSegmentation(
+  textTarget: string,
+  proposed: CorpusPassage["morphologicalSegmentation"]
+): CorpusPassage["morphologicalSegmentation"] {
+  const usable = proposed.filter((morpheme) =>
+    morpheme.surface.trim().length > 0
+    && morpheme.lemma.trim().length > 0
+    && morpheme.gloss.trim().length > 0
+  );
+  if (usable.length > 0 && findUncoveredCorpusTargetTokens(textTarget, usable).length === 0) {
+    const coveredInText = usable.every((morpheme) => corpusTargetContainsSurface(textTarget, morpheme.surface));
+    if (coveredInText) {
+      return usable;
+    }
+  }
+
+  return textTarget
+    .split(/\s+/)
+    .filter((token) => token.length > 0)
+    .map((token) => ({
+      surface: token,
+      lemma: token,
+      gloss: "unanalyzed",
+      features: ["unanalyzed"]
+    }));
 }
 
 function parseAdversarialAnswers(value: unknown): Exercise["adversarialAnswers"] | undefined {
@@ -467,7 +656,7 @@ function parseAiSessionBody(input: unknown): AiSessionBody | undefined {
     : undefined;
   const seedPrompt = typeof body.seedPrompt === "string" && body.seedPrompt.trim().length > 0
     ? body.seedPrompt.trim()
-    : "Start a synthetic AI knowledge session.";
+    : "Start a local AI knowledge session.";
   const contextNoteIds = parseStringArray(body.contextNoteIds);
   const contextPassageIds = parseStringArray(body.contextPassageIds);
 
@@ -666,18 +855,27 @@ function corpusTargetContainsSurface(textTarget: string, surface: string): boole
     });
 }
 
-function corpusMorphemeGroundingError(languageId: string, body: CorpusImportBody): string | undefined {
-  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
-  if (!fixture) {
-    return `Corpus import fixture metadata not found for language: ${languageId}`;
+function corpusMorphemeGroundingError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
+  const language = state.languages.find((item) => item.id === languageId);
+  if (!language) {
+    return `Corpus import language not found: ${languageId}`;
   }
 
-  const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form.toLowerCase()));
+  const lexemes = state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+  if (lexemes.length === 0) {
+    // No lexicon exists yet for this language, so morpheme grounding
+    // cannot be enforced. Imports still pass segmentation/coverage checks.
+    return undefined;
+  }
+
+  const knownGlossedForms = new Set(["unanalyzed"]);
+  const vocabularyForms = new Set(lexemes.map((item) => item.form.toLowerCase()));
   for (const morpheme of body.morphologicalSegmentation) {
     const surface = morpheme.surface.toLowerCase();
     const lemma = morpheme.lemma.toLowerCase();
+    if (knownGlossedForms.has(morpheme.gloss.toLowerCase())) continue;
     if (!vocabularyForms.has(surface) && !vocabularyForms.has(lemma)) {
-      return `Corpus morpheme is not grounded in ${fixture.language.name} vocabulary: ${morpheme.surface}`;
+      return `Corpus morpheme is not grounded in the ${language.name} lexicon: ${morpheme.surface}`;
     }
   }
 
@@ -700,15 +898,22 @@ function corpusListValidationError(body: CorpusImportBody): string | undefined {
   return undefined;
 }
 
-function corpusPhonologyValidationError(languageId: string, body: CorpusImportBody): string | undefined {
-  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
-  if (!fixture) {
-    return `Corpus import fixture metadata not found for language: ${languageId}`;
+function corpusPhonologyValidationError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
+  const language = state.languages.find((item) => item.id === languageId);
+  if (!language) {
+    return `Corpus import language not found: ${languageId}`;
   }
 
-  const invalidTargetSymbols = findInvalidOrthographySymbols(body.textTarget, fixture);
+  const phonology = language.phonology;
+  if (!phonology || (phonology.consonants.length === 0 && phonology.vowels.length === 0)) {
+    // The language has not declared a phonology inventory, so the
+    // orthography scan is skipped instead of rejecting unknown symbols.
+    return undefined;
+  }
+
+  const invalidTargetSymbols = findInvalidOrthographySymbols(body.textTarget, phonology);
   if (invalidTargetSymbols.length > 0) {
-    return `Corpus target text uses ${invalidTargetSymbols.join(", ")} outside ${fixture.language.name} phonology inventory: ${body.textTarget}`;
+    return `Corpus target text uses ${invalidTargetSymbols.join(", ")} outside ${language.name} phonology inventory: ${body.textTarget}`;
   }
 
   return undefined;
@@ -736,7 +941,7 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
     return listError;
   }
 
-  const phonologyError = corpusPhonologyValidationError(languageId, body);
+  const phonologyError = corpusPhonologyValidationError(state, languageId, body);
   if (phonologyError) {
     return phonologyError;
   }
@@ -746,7 +951,7 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
     return `Corpus segmentation does not cover target token: ${uncoveredTargetToken}`;
   }
 
-  const groundingError = corpusMorphemeGroundingError(languageId, body);
+  const groundingError = corpusMorphemeGroundingError(state, languageId, body);
   if (groundingError) {
     return groundingError;
   }
@@ -754,15 +959,23 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
   return undefined;
 }
 
-function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuthoringBody): string | undefined {
-  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
-  if (!fixture) {
-    return `Exercise authoring fixture metadata not found for language: ${languageId}`;
+function exerciseAuthoringValidationError(state: AppState, languageId: string, body: ExerciseAuthoringBody): string | undefined {
+  const language = state.languages.find((item) => item.id === languageId);
+  if (!language) {
+    return `Exercise authoring language not found: ${languageId}`;
   }
 
-  const ruleIds = new Set(fixture.grammarRules.map((rule) => rule.id));
-  const vocabularyForms = new Set(fixture.vocabulary.map((item) => item.form));
-  const corpusTargets = new Set(fixture.corpus.map((passage) => normalizeAuthoredAnswer(passage.textTarget)));
+  const ruleIds = new Set([
+    ...state.notes.filter((note) => note.languageId === languageId).map((note) => note.id),
+    ...state.noteAnswerKeys.filter((note) => note.languageId === languageId).map((note) => note.id)
+  ]);
+  const languageLexemes = state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+  const vocabularyForms = new Set(languageLexemes.map((item) => item.form));
+  const corpusTargets = new Set(
+    state.corpus
+      .filter((passage) => passage.languageId === languageId)
+      .map((passage) => normalizeAuthoredAnswer(passage.textTarget))
+  );
 
   for (const ruleId of body.allowedRuleIds) {
     if (!ruleIds.has(ruleId)) {
@@ -770,9 +983,13 @@ function exerciseAuthoringValidationError(languageId: string, body: ExerciseAuth
     }
   }
 
-  for (const form of body.allowedVocabulary) {
-    if (!vocabularyForms.has(form)) {
-      return `Exercise references unknown vocabulary form: ${form}`;
+  // Vocabulary existence is only enforceable once the language has a
+  // lexicon; early-stage languages can author exercises freely.
+  if (languageLexemes.length > 0) {
+    for (const form of body.allowedVocabulary) {
+      if (!vocabularyForms.has(form)) {
+        return `Exercise references unknown vocabulary form: ${form}`;
+      }
     }
   }
 
@@ -1154,7 +1371,7 @@ function buildThinkingSummary(state: AppState, languageId: string, mode: AiSessi
   const corpusCount = state.corpus.filter((passage) => passage.languageId === languageId).length;
   const exerciseCount = state.exercises.filter((exercise) => exercise.languageId === languageId).length;
   const approvedCount = notes.filter((note) => note.status === "approved").length;
-  return `Safe reasoning summary: ${mode.replace(/_/g, " ")} used ${corpusCount} synthetic corpus passages, ${notes.length} notes (${approvedCount} approved), and ${exerciseCount} exercises. This is an observable trace, not hidden chain-of-thought.`;
+  return `Safe reasoning summary: ${mode.replace(/_/g, " ")} used ${corpusCount} corpus passages, ${notes.length} notes (${approvedCount} approved), and ${exerciseCount} exercises. This is an observable trace, not hidden chain-of-thought.`;
 }
 
 function buildTraceWarnings(baseWarning: string, generationWarnings: string[]): string[] {
@@ -1204,7 +1421,7 @@ function buildAiSession(
       role: "assistant",
       content: generation.content,
       createdAt: now,
-      createdBy: "synthetic-ai"
+      createdBy: "local-ai"
     }
   ];
 
@@ -1225,7 +1442,7 @@ function buildAiSession(
         id: `${sessionId}-trace-input`,
         kind: "input",
         label: "Input",
-        summary: "Captured the user's synthetic-only input prompt.",
+        summary: "Captured the user's input prompt.",
         referencedIds: [],
         warnings: []
       },
@@ -1241,7 +1458,7 @@ function buildAiSession(
         id: `${sessionId}-trace-output`,
         kind: "output",
         label: "Output",
-        summary: "Generated a safe synthetic response and redacted hidden chain-of-thought.",
+        summary: "Generated a safe response and redacted hidden chain-of-thought.",
         referencedIds: firstNote ? [firstNote.id] : [],
         warnings: buildTraceWarnings("Hidden chain-of-thought is not exposed.", generation.warnings)
       }
@@ -1285,7 +1502,7 @@ function buildFailedAiSession(
         id: `${sessionId}-trace-input`,
         kind: "input",
         label: "Input",
-        summary: "Captured the user's synthetic-only input prompt.",
+        summary: "Captured the user's input prompt.",
         referencedIds: [],
         warnings: []
       },
@@ -1380,6 +1597,8 @@ export function createServer(options: ServerOptions = {}) {
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
   const prototypeSessions = new Map<string, PrototypeSessionRecord>();
   const llmProvider = options.llmProvider ?? createLlmProviderFromEnv();
+  const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
+  const ingestionFetch = options.ingestionFetch ?? globalThis.fetch;
   const rateLimitBuckets = new Map<string, number[]>();
   let memoryState = options.initialState;
   const usesMemoryState = options.initialState !== undefined;
@@ -1456,6 +1675,12 @@ export function createServer(options: ServerOptions = {}) {
       callback(null, isCorsOriginAllowed(origin, allowedOrigins));
     }
   });
+  app.register(multipart, {
+    limits: {
+      fileSize: 25 * 1024 * 1024,
+      files: 1
+    }
+  });
 
   app.get("/health", async () => ({ ok: true }));
 
@@ -1492,10 +1717,752 @@ export function createServer(options: ServerOptions = {}) {
     return state.languages;
   });
 
+  app.post("/languages", async (request, reply) => {
+    const body = parseLanguageCreateBody(request.body ?? {});
+    if (!body) {
+      reply.code(400);
+      return { error: "Invalid language body: name, description, and orthography are required" };
+    }
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let created: Language | undefined;
+
+    await updateState((state) => {
+      const slug = slugifyLanguageName(body.name);
+      const baseId = slug.length > 0 ? slug : `language-${randomUUID().slice(0, 8)}`;
+      const id = state.languages.some((language) => language.id === baseId)
+        ? `${baseId}-${randomUUID().slice(0, 8)}`
+        : baseId;
+      const createdAt = new Date().toISOString();
+
+      created = {
+        id,
+        name: body.name,
+        typology: body.typology,
+        description: body.description,
+        orthography: body.orthography,
+        status: "active",
+        phonology: body.phonology,
+        createdBy: actor.id,
+        createdAt
+      };
+
+      const assignableReviewerIds = state.users
+        .filter((user) => isReviewPolicyAssignableRole(user.role))
+        .map((user) => user.id);
+      const assignedReviewerIds = assignableReviewerIds.slice(0, 2);
+      const reviewPolicy: ReviewPolicy | undefined = assignedReviewerIds.length > 0
+        ? {
+            id: `review-policy-${id}`,
+            languageId: id,
+            assignedReviewerIds,
+            approvalThreshold: Math.min(2, assignedReviewerIds.length),
+            requiresAssignedReviewer: true,
+            updatedAt: createdAt,
+            updatedBy: "system-seed"
+          }
+        : undefined;
+
+      return appendAuditEvent({
+        ...state,
+        languages: [...state.languages, created],
+        reviewPolicies: reviewPolicy ? [...state.reviewPolicies, reviewPolicy] : state.reviewPolicies
+      }, {
+        actor,
+        at: createdAt,
+        action: "language.created",
+        entityType: "language",
+        entityId: id,
+        languageId: id,
+        summary: `Created language ${body.name}.`,
+        metadata: {
+          typology: body.typology,
+          hasPhonology: Boolean(body.phonology)
+        }
+      });
+    });
+
+    if (!created) {
+      reply.code(500);
+      return { error: "Language could not be created" };
+    }
+
+    reply.code(201);
+    return created;
+  });
+
+  app.patch("/languages/:languageId", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const body = parseLanguagePatchBody(request.body ?? {});
+    if (!body) {
+      reply.code(400);
+      return { error: "Invalid language patch body" };
+    }
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let updated: Language | undefined;
+    let languageMissing = false;
+
+    await updateState((state) => {
+      const existing = state.languages.find((language) => language.id === languageId);
+      if (!existing) {
+        languageMissing = true;
+        return state;
+      }
+
+      updated = {
+        ...existing,
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.orthography !== undefined ? { orthography: body.orthography } : {}),
+        ...(body.typology !== undefined ? { typology: body.typology } : {}),
+        ...("phonology" in body ? { phonology: body.phonology } : {})
+      };
+
+      return appendAuditEvent({
+        ...state,
+        languages: state.languages.map((language) => (language.id === languageId ? updated as Language : language))
+      }, {
+        actor,
+        at: new Date().toISOString(),
+        action: "language.updated",
+        entityType: "language",
+        entityId: languageId,
+        languageId,
+        summary: `Updated language metadata for ${updated.name}.`,
+        metadata: { fields: Object.keys(body) }
+      });
+    });
+
+    if (languageMissing) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    if (!updated) {
+      reply.code(500);
+      return { error: "Language could not be updated" };
+    }
+
+    return updated;
+  });
+
+  app.get("/languages/:languageId/lexicon", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+    return state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+  });
+
+  app.get("/languages/:languageId/sources", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+    return state.sourceAssets.filter((asset) => asset.languageId === languageId);
+  });
+
+  app.post("/languages/:languageId/sources", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const body = parseSourceRegistrationBody(request.body ?? {});
+    if (!body) {
+      reply.code(400);
+      return { error: "Invalid source body: provide kind (text|wordlist|url), title, and rawText or url" };
+    }
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let languageMissing = false;
+    let asset: SourceAsset | undefined;
+
+    await updateState((state) => {
+      if (!state.languages.some((language) => language.id === languageId)) {
+        languageMissing = true;
+        return state;
+      }
+
+      const createdAt = new Date().toISOString();
+      asset = {
+        id: `source-${randomUUID()}`,
+        languageId,
+        kind: body.kind,
+        title: body.title,
+        url: body.url,
+        rawText: body.rawText,
+        status: "pending",
+        createdBy: actor.id,
+        createdAt
+      };
+
+      return appendAuditEvent({
+        ...state,
+        sourceAssets: [...state.sourceAssets, asset]
+      }, {
+        actor,
+        at: createdAt,
+        action: "source_asset.registered",
+        entityType: "source_asset",
+        entityId: asset.id,
+        languageId,
+        summary: `Registered ${body.kind} source "${body.title}".`,
+        metadata: {
+          kind: body.kind,
+          hasUrl: Boolean(body.url),
+          textLength: body.rawText?.length ?? 0
+        }
+      });
+    });
+
+    if (languageMissing) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    if (!asset) {
+      reply.code(500);
+      return { error: "Source could not be registered" };
+    }
+
+    reply.code(201);
+    return asset;
+  });
+
+  app.post("/languages/:languageId/sources/upload", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    if (!current.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const file = await request.file();
+    if (!file) {
+      reply.code(400);
+      return { error: "Upload requires a multipart file field" };
+    }
+
+    const buffer = await file.toBuffer();
+    if (buffer.length === 0) {
+      reply.code(400);
+      return { error: "Uploaded file is empty" };
+    }
+
+    const originalName = sanitizeStoredFileName(file.filename ?? "upload");
+    const assetId = `source-${randomUUID()}`;
+    const relativePath = join("assets", languageId, `${assetId}__${originalName}`);
+    const absolutePath = resolvePath(dataDir, relativePath);
+    await mkdir(dirname(absolutePath), { recursive: true });
+    await writeFile(absolutePath, buffer);
+
+    const mimeType = file.mimetype || "application/octet-stream";
+    const kind = sourceKindForUpload(mimeType, originalName);
+    const titleField = file.fields?.title;
+    const titleValue = titleField && "value" in (titleField as object)
+      ? String((titleField as { value: unknown }).value ?? "").trim()
+      : "";
+
+    let asset: SourceAsset | undefined;
+
+    await updateState((state) => {
+      const createdAt = new Date().toISOString();
+      asset = {
+        id: assetId,
+        languageId,
+        kind,
+        title: titleValue || originalName,
+        originalName,
+        mimeType,
+        filePath: relativePath.split("\\").join("/"),
+        status: "pending",
+        createdBy: actor.id,
+        createdAt
+      };
+
+      return appendAuditEvent({
+        ...state,
+        sourceAssets: [...state.sourceAssets, asset]
+      }, {
+        actor,
+        at: createdAt,
+        action: "source_asset.uploaded",
+        entityType: "source_asset",
+        entityId: asset.id,
+        languageId,
+        summary: `Uploaded ${kind} source "${asset.title}".`,
+        metadata: {
+          kind,
+          mimeType,
+          byteSize: buffer.length
+        }
+      });
+    });
+
+    if (!asset) {
+      reply.code(500);
+      return { error: "Source could not be stored" };
+    }
+
+    reply.code(201);
+    return asset;
+  });
+
+  app.post("/sources/:sourceId/process", async (request, reply) => {
+    const { sourceId } = request.params as { sourceId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const asset = current.sourceAssets.find((item) => item.id === sourceId);
+    if (!asset) {
+      reply.code(404);
+      return { error: `Source not found: ${sourceId}` };
+    }
+
+    const language = current.languages.find((item) => item.id === asset.languageId);
+    if (!language) {
+      reply.code(404);
+      return { error: `Language not found: ${asset.languageId}` };
+    }
+
+    let extraction: SourceExtractionResult | undefined;
+    let extractionError: string | undefined;
+    try {
+      extraction = await extractCandidatesForAsset({
+        asset,
+        language,
+        provider: llmProvider,
+        dataDir,
+        fetchFn: ingestionFetch
+      });
+    } catch (error) {
+      extractionError = redactErrorSecrets(error instanceof Error ? error.message : "Source processing failed.");
+    }
+
+    const processedAt = new Date().toISOString();
+    let drafts: ExtractionDraft[] = [];
+    let updatedAsset: SourceAsset | undefined;
+
+    await updateState((state) => {
+      const stored = state.sourceAssets.find((item) => item.id === sourceId);
+      if (!stored) return state;
+
+      if (!extraction) {
+        updatedAsset = {
+          ...stored,
+          status: "failed",
+          error: extractionError ?? "Source processing failed.",
+          processedAt
+        };
+        return appendAuditEvent({
+          ...state,
+          sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? updatedAsset as SourceAsset : item))
+        }, {
+          actor,
+          at: processedAt,
+          action: "source_asset.process_failed",
+          entityType: "source_asset",
+          entityId: sourceId,
+          languageId: stored.languageId,
+          summary: `Processing failed for source "${stored.title}".`,
+          metadata: { reason: extractionError ?? "unknown" }
+        });
+      }
+
+      drafts = extraction.candidates.map((candidate) => ({
+        id: `draft-${randomUUID()}`,
+        languageId: stored.languageId,
+        sourceAssetId: stored.id,
+        kind: candidate.kind,
+        payload: candidate.payload,
+        confidence: candidate.confidence,
+        rationale: candidate.rationale,
+        status: "proposed" as const,
+        createdAt: processedAt
+      }));
+
+      updatedAsset = {
+        ...stored,
+        status: "processed",
+        error: undefined,
+        summary: extraction.summary,
+        transcript: extraction.transcript ?? stored.transcript,
+        processedAt
+      };
+
+      return appendAuditEvent({
+        ...state,
+        sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? updatedAsset as SourceAsset : item)),
+        extractionDrafts: [...state.extractionDrafts, ...drafts]
+      }, {
+        actor,
+        at: processedAt,
+        action: "source_asset.processed",
+        entityType: "source_asset",
+        entityId: sourceId,
+        languageId: stored.languageId,
+        summary: `Processed source "${stored.title}" into ${drafts.length} extraction drafts.`,
+        metadata: {
+          draftCount: drafts.length,
+          warningCount: extraction.warnings.length
+        }
+      });
+    });
+
+    if (!updatedAsset) {
+      reply.code(500);
+      return { error: "Source could not be processed" };
+    }
+
+    if (!extraction) {
+      reply.code(422);
+      return { error: extractionError ?? "Source processing failed.", asset: updatedAsset };
+    }
+
+    return {
+      asset: updatedAsset,
+      drafts,
+      warnings: extraction.warnings
+    };
+  });
+
+  app.get("/languages/:languageId/extraction-drafts", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const { status } = request.query as { status?: string };
+    const state = await readState();
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const drafts = state.extractionDrafts.filter((draft) => draft.languageId === languageId);
+    if (status === "proposed" || status === "accepted" || status === "rejected") {
+      return drafts.filter((draft) => draft.status === status);
+    }
+    return drafts;
+  });
+
+  app.post("/extraction-drafts/:draftId/accept", async (request, reply) => {
+    const { draftId } = request.params as { draftId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let draftMissing = false;
+    let validationError: string | undefined;
+    let committed: { draft: ExtractionDraft; entity: Lexeme | CorpusPassage | Note } | undefined;
+
+    await updateState((state) => {
+      const draft = state.extractionDrafts.find((item) => item.id === draftId);
+      if (!draft) {
+        draftMissing = true;
+        return state;
+      }
+
+      if (draft.status !== "proposed") {
+        validationError = `Extraction draft is already ${draft.status}.`;
+        return state;
+      }
+
+      const reviewedAt = new Date().toISOString();
+
+      if (draft.kind === "lexeme") {
+        const form = draft.payload.form?.trim() ?? "";
+        const gloss = draft.payload.gloss?.trim() ?? "";
+        if (!form || !gloss) {
+          validationError = "Lexeme draft is missing form or gloss.";
+          return state;
+        }
+
+        const duplicate = state.lexemes.some((lexeme) =>
+          lexeme.languageId === draft.languageId
+          && lexeme.form.trim().toLowerCase() === form.toLowerCase()
+          && lexeme.gloss.trim().toLowerCase() === gloss.toLowerCase()
+        );
+        if (duplicate) {
+          validationError = `Lexeme already exists: ${form} (${gloss})`;
+          return state;
+        }
+
+        const lexeme: Lexeme = {
+          id: `lex-${randomUUID()}`,
+          languageId: draft.languageId,
+          form,
+          gloss,
+          partOfSpeech: draft.payload.partOfSpeech?.trim() || "unknown",
+          tags: draft.payload.tags,
+          sourceAssetIds: [draft.sourceAssetId],
+          createdBy: actor.id,
+          createdAt: reviewedAt
+        };
+
+        const updatedDraft: ExtractionDraft = {
+          ...draft,
+          status: "accepted",
+          reviewedBy: actor.id,
+          reviewedAt,
+          committedEntityId: lexeme.id
+        };
+        committed = { draft: updatedDraft, entity: lexeme };
+
+        return appendAuditEvent({
+          ...state,
+          lexemes: [...state.lexemes, lexeme],
+          extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+        }, {
+          actor,
+          at: reviewedAt,
+          action: "extraction_draft.accepted",
+          entityType: "lexeme",
+          entityId: lexeme.id,
+          languageId: draft.languageId,
+          summary: `Accepted lexeme draft ${form}.`,
+          metadata: { draftId, kind: draft.kind }
+        });
+      }
+
+      if (draft.kind === "corpus_passage") {
+        const textTarget = draft.payload.textTarget?.trim().replace(/\s+/g, " ") ?? "";
+        const textTranslation = draft.payload.textTranslation?.trim().replace(/\s+/g, " ") ?? "";
+        if (!textTarget || !textTranslation) {
+          validationError = "Corpus draft is missing target text or translation.";
+          return state;
+        }
+
+        const normalizedTarget = textTarget.toLowerCase();
+        const duplicate = state.corpus.some((passage) =>
+          passage.languageId === draft.languageId
+          && passage.textTarget.trim().replace(/\s+/g, " ").toLowerCase() === normalizedTarget
+        );
+        if (duplicate) {
+          validationError = `Corpus passage already exists for target text: ${textTarget}`;
+          return state;
+        }
+
+        const sourceAsset = state.sourceAssets.find((item) => item.id === draft.sourceAssetId);
+        const segmentation = ensureCorpusDraftSegmentation(textTarget, draft.payload.morphologicalSegmentation);
+        const passage: CorpusPassage = {
+          id: `ingested-corpus-${draft.languageId}-${randomUUID()}`,
+          languageId: draft.languageId,
+          source: sourceAsset ? `source-asset:${sourceAsset.title}` : "ingested-source",
+          sourceMetadata: {
+            author: sourceAsset?.createdBy ?? actor.id,
+            year: new Date(reviewedAt).getUTCFullYear(),
+            license: "user-provided-source",
+            consentRecord: `source-asset:${draft.sourceAssetId}`
+          },
+          textTarget,
+          textTranslation,
+          morphologicalSegmentation: segmentation,
+          topicTags: draft.payload.topicTags.length > 0 ? draft.payload.topicTags : ["imported"],
+          consentStatus: {
+            use: "pending-review",
+            restrictions: ["ingested-from-raw-source"]
+          },
+          sourceAssetId: draft.sourceAssetId
+        };
+
+        const phonologyError = corpusPhonologyValidationError(state, draft.languageId, passage);
+        if (phonologyError) {
+          validationError = phonologyError;
+          return state;
+        }
+
+        const updatedDraft: ExtractionDraft = {
+          ...draft,
+          status: "accepted",
+          reviewedBy: actor.id,
+          reviewedAt,
+          committedEntityId: passage.id
+        };
+        committed = { draft: updatedDraft, entity: passage };
+
+        return appendAuditEvent({
+          ...state,
+          corpus: [...state.corpus, passage],
+          corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)],
+          extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+        }, {
+          actor,
+          at: reviewedAt,
+          action: "extraction_draft.accepted",
+          entityType: "corpus",
+          entityId: passage.id,
+          languageId: draft.languageId,
+          summary: `Accepted corpus draft into passage ${passage.id}.`,
+          metadata: { draftId, kind: draft.kind, morphemeCount: passage.morphologicalSegmentation.length }
+        });
+      }
+
+      const topic = draft.payload.topic?.trim() ?? "";
+      const explanation = draft.payload.explanation?.trim() ?? "";
+      if (!topic || !explanation) {
+        validationError = "Grammar note draft is missing topic or explanation.";
+        return state;
+      }
+
+      const note: Note = {
+        id: `note-${draft.languageId}-${randomUUID()}`,
+        languageId: draft.languageId,
+        topic,
+        explanation,
+        examples: [],
+        evidencePassageIds: [],
+        evidenceCount: 0,
+        confidence: draft.confidence,
+        status: "draft",
+        reviewer: {
+          lastReviewedBy: null,
+          lastReviewedAt: null,
+          comments: []
+        },
+        dialectScope: "general",
+        editHistory: [
+          {
+            at: reviewedAt,
+            by: actor.id,
+            action: "created",
+            summary: `Accepted grammar-note extraction draft ${draftId}.`
+          }
+        ]
+      };
+
+      const updatedDraft: ExtractionDraft = {
+        ...draft,
+        status: "accepted",
+        reviewedBy: actor.id,
+        reviewedAt,
+        committedEntityId: note.id
+      };
+      committed = { draft: updatedDraft, entity: note };
+
+      return appendAuditEvent({
+        ...state,
+        notes: [...state.notes, note],
+        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+      }, {
+        actor,
+        at: reviewedAt,
+        action: "extraction_draft.accepted",
+        entityType: "note",
+        entityId: note.id,
+        languageId: draft.languageId,
+        summary: `Accepted grammar-note draft into note ${note.id}.`,
+        metadata: { draftId, kind: draft.kind }
+      });
+    });
+
+    if (draftMissing) {
+      reply.code(404);
+      return { error: `Extraction draft not found: ${draftId}` };
+    }
+
+    if (validationError) {
+      reply.code(400);
+      return { error: validationError };
+    }
+
+    if (!committed) {
+      reply.code(500);
+      return { error: "Extraction draft could not be accepted" };
+    }
+
+    return committed;
+  });
+
+  app.post("/extraction-drafts/:draftId/reject", async (request, reply) => {
+    const { draftId } = request.params as { draftId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let draftMissing = false;
+    let validationError: string | undefined;
+    let rejected: ExtractionDraft | undefined;
+
+    await updateState((state) => {
+      const draft = state.extractionDrafts.find((item) => item.id === draftId);
+      if (!draft) {
+        draftMissing = true;
+        return state;
+      }
+
+      if (draft.status !== "proposed") {
+        validationError = `Extraction draft is already ${draft.status}.`;
+        return state;
+      }
+
+      const reviewedAt = new Date().toISOString();
+      rejected = {
+        ...draft,
+        status: "rejected",
+        reviewedBy: actor.id,
+        reviewedAt
+      };
+
+      return appendAuditEvent({
+        ...state,
+        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? rejected as ExtractionDraft : item))
+      }, {
+        actor,
+        at: reviewedAt,
+        action: "extraction_draft.rejected",
+        entityType: "extraction_draft",
+        entityId: draftId,
+        languageId: draft.languageId,
+        summary: `Rejected extraction draft ${draftId}.`,
+        metadata: { kind: draft.kind }
+      });
+    });
+
+    if (draftMissing) {
+      reply.code(404);
+      return { error: `Extraction draft not found: ${draftId}` };
+    }
+
+    if (validationError) {
+      reply.code(400);
+      return { error: validationError };
+    }
+
+    if (!rejected) {
+      reply.code(500);
+      return { error: "Extraction draft could not be rejected" };
+    }
+
+    return rejected;
+  });
+
   app.get("/languages/:languageId/profile", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
-    const profile = buildSyntheticLanguageProfile(state, languageId);
+    const profile = buildLanguageProfile(state, languageId);
     if (!profile) {
       reply.code(404);
       return { error: `Language not found: ${languageId}` };
@@ -1559,7 +2526,7 @@ export function createServer(options: ServerOptions = {}) {
         entityType: "corpus",
         entityId: passage.id,
         languageId,
-        summary: `Imported synthetic corpus passage ${passage.id}.`,
+        summary: `Imported corpus passage ${passage.id}.`,
         metadata: {
           source: passage.source,
           morphemeCount: passage.morphologicalSegmentation.length,
@@ -1632,7 +2599,7 @@ export function createServer(options: ServerOptions = {}) {
         return state;
       }
 
-      validationError = exerciseAuthoringValidationError(languageId, body);
+      validationError = exerciseAuthoringValidationError(state, languageId, body);
       if (validationError) {
         return state;
       }
@@ -1654,7 +2621,7 @@ export function createServer(options: ServerOptions = {}) {
         entityType: "exercise",
         entityId: exercise.id,
         languageId,
-        summary: `Created synthetic exercise ${exercise.id}.`,
+        summary: `Created exercise ${exercise.id}.`,
         metadata: {
           exerciseType: exercise.type,
           allowedRuleCount: exercise.allowedRuleIds.length,
@@ -1754,7 +2721,7 @@ export function createServer(options: ServerOptions = {}) {
         languageId: exercise.languageId,
         answer: body.answer,
         accepted: graded.accepted,
-        explanation: graded.accepted ? graded.explanation : "Answer did not match the synthetic exercise key.",
+        explanation: graded.accepted ? graded.explanation : "Answer did not match the exercise answer key.",
         submittedAt,
         learnerId: actor.id
       };
@@ -1769,7 +2736,7 @@ export function createServer(options: ServerOptions = {}) {
         entityType: "exercise_submission",
         entityId: submission.id,
         languageId: exercise.languageId,
-        summary: `Graded synthetic exercise submission for ${exercise.id}.`,
+        summary: `Graded exercise submission for ${exercise.id}.`,
         metadata: {
           exerciseId: exercise.id,
           exerciseType: exercise.type,
@@ -2234,7 +3201,7 @@ export function createServer(options: ServerOptions = {}) {
         entityType: "note",
         entityId: noteId,
         languageId: existing.languageId,
-        summary: `Reviewed synthetic note ${noteId}.`,
+        summary: `Reviewed note ${noteId}.`,
         metadata: {
           requestedStatus,
           status: nextStatus,
@@ -2578,7 +3545,7 @@ export function createServer(options: ServerOptions = {}) {
           role: "assistant",
           content: generation.content,
           createdAt: now,
-          createdBy: "synthetic-ai"
+          createdBy: "local-ai"
         }
       ];
 
@@ -2592,7 +3559,7 @@ export function createServer(options: ServerOptions = {}) {
             id: `${session.id}-trace-message-${nextMessages.length}`,
             kind: "generation",
             label: "Follow-up response",
-            summary: "Appended a new user input and safe synthetic output.",
+            summary: "Appended a new user input and safe model output.",
             referencedIds: [],
             warnings: buildTraceWarnings("No hidden chain-of-thought exposed.", generation.warnings)
           }

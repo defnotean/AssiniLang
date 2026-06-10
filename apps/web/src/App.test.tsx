@@ -4,8 +4,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, getInitialTheme } from "./App";
 
 const apiMock = vi.hoisted(() => ({
+  acceptExtractionDraft: vi.fn(),
   applyElderCorrection: vi.fn(),
   createAiSession: vi.fn(),
+  createLanguage: vi.fn(),
+  fetchExtractionDrafts: vi.fn(),
+  fetchSources: vi.fn(),
+  processSource: vi.fn(),
+  registerSource: vi.fn(),
+  rejectExtractionDraft: vi.fn(),
+  uploadSourceFile: vi.fn(),
   fetchAuditEvents: vi.fn(),
   createGovernanceRecord: vi.fn(),
   createExercise: vi.fn(),
@@ -44,41 +52,6 @@ const EXPORT_REDACTION_POLICY = [
   "ai-sessions-omitted",
   "local-users-omitted"
 ];
-const SYNTHETIC_FIXTURE_MINIMUMS = {
-  consonants: 6,
-  vowels: 3,
-  phonotacticNotes: 2,
-  vocabularyItems: 24,
-  corpusPassages: 12,
-  grammarRules: 6,
-  noteAnswerKeys: 6,
-  exerciseAnswerKeys: 6,
-  exerciseTypes: 2,
-  paradigms: 2,
-  paradigmRows: 3,
-  dialectVariants: 2,
-  dialectHistoryEvents: 2,
-  semanticDomains: 3,
-  semanticDomainVocabulary: 3,
-  registerProfiles: 2,
-  discourseExamples: 3,
-  teachingSequences: 2
-};
-const SYNTHETIC_FIXTURE_QUALITY = {
-  passed: false,
-  totalChecks: 6,
-  passedChecks: 1,
-  failedChecks: 5,
-  checks: [
-    { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
-    { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },
-    { id: "grammarRules", label: "Grammar rules", actual: 1, minimum: 6, passed: false },
-    { id: "noteAnswerKeys", label: "Public notes", actual: 2, minimum: 6, passed: false },
-    { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 2, minimum: 6, passed: false },
-    { id: "exerciseTypes", label: "Exercise types", actual: 2, minimum: 2, passed: true }
-  ]
-};
-
 function createDashboardData() {
   return {
     languages: [
@@ -86,31 +59,29 @@ function createDashboardData() {
         id: "avenik",
         name: "Avenik",
         typology: "agglutinative",
-        description: "Synthetic agglutinative language.",
+        description: "Agglutinative test language.",
         orthography: "Latin",
-        status: "synthetic",
-        fixtureSource: "test"
+        status: "active"
       },
       {
         id: "solari",
         name: "Solari",
         typology: "isolating",
-        description: "Synthetic isolating language.",
+        description: "Isolating test language.",
         orthography: "Latin",
-        status: "synthetic",
-        fixtureSource: "test"
+        status: "active"
       }
     ],
     corpus: [
       {
         id: "avn-c001",
         languageId: "avenik",
-        source: "synthetic-fixture",
+        source: "field-recording",
         sourceMetadata: {
           author: "fixture-author",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "synthetic"
+          license: "cc-by",
+          consentRecord: "community-consent-001"
         },
         textTarget: "mira talo-mi-na",
         textTranslation: "I walk by the river.",
@@ -120,7 +91,7 @@ function createDashboardData() {
         ],
         topicTags: ["movement"],
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: []
         }
       }
@@ -147,7 +118,7 @@ function createDashboardData() {
           lastReviewedAt: "2026-06-02T15:30:00.000Z",
           comments: ["Check suffix boundaries before approval."]
         },
-        dialectScope: "synthetic baseline",
+        dialectScope: "baseline",
         editHistory: [
           {
             at: "2026-06-01T12:00:00.000Z",
@@ -178,7 +149,7 @@ function createDashboardData() {
           lastReviewedAt: null,
           comments: []
         },
-        dialectScope: "synthetic baseline",
+        dialectScope: "baseline",
         editHistory: [
           {
             at: "2026-06-01T13:00:00.000Z",
@@ -219,7 +190,7 @@ function createDashboardData() {
           noteQuality: 0.8
         },
         failures: [],
-        summary: "Avenik synthetic evaluation completed."
+        summary: "Avenik evaluation completed."
       }
     ]
   };
@@ -236,10 +207,16 @@ function createDeferred<T>() {
   return { promise, resolve, reject };
 }
 
+async function selectAvenik() {
+  await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+  fireEvent.click(screen.getByRole("button", { name: /Avenik.*agglutinative/i }));
+  await screen.findByText("Avenik / Corpus Browser");
+}
+
 async function renderReady() {
   apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
   render(<App />);
-  await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+  await selectAvenik();
 }
 
 function createLanguageProfile() {
@@ -248,10 +225,9 @@ function createLanguageProfile() {
       id: "avenik",
       name: "Avenik",
       typology: "agglutinative",
-      description: "Synthetic agglutinative language.",
+      description: "Agglutinative test language.",
       orthography: "Latin",
-      status: "synthetic",
-      fixtureSource: "test"
+      status: "active"
     },
     vocabulary: [
       { id: "avn-v-001", form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"] },
@@ -262,116 +238,19 @@ function createLanguageProfile() {
       vowels: ["a", "i", "o", "u"],
       syllableTemplate: "CV",
       stress: "word-initial",
-      phonotactics: [
+      notes: [
         "Consonant clusters are disallowed inside native roots.",
         "Suffixes attach with explicit hyphen boundaries."
       ]
     },
-    paradigms: [
-      {
-        id: "avn-paradigm-verb-chain",
-        title: "Finite verb chain",
-        description: "Transparent Avenik finite verbs combine root + tense suffix + person suffix.",
-        rows: [
-          {
-            label: "present first singular",
-            form: "talo-mi-na",
-            gloss: "walk-present-1sg",
-            morphemes: ["talo", "-mi", "-na"]
-          }
-        ]
-      }
-    ],
-    dialectVariants: [
-      {
-        id: "avn-dialect-river",
-        name: "River teaching register",
-        regionLabel: "river-side workshop register",
-        phonologyNotes: ["First-person endings may lengthen in careful teaching speech."],
-        lexicalNotes: ["mira remains the preferred public form for river."],
-        grammarNotes: ["Person suffixes stay transparent after tense markers."],
-        history: {
-          summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
-          events: [
-            {
-              period: "early workshop",
-              description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
-              evidencePassageIds: ["avn-c001", "avn-c005"]
-            },
-            {
-              period: "review circle",
-              description: "Learners kept the river noun stable while comparing careful and everyday suffix rhythm.",
-              evidencePassageIds: ["avn-c004"]
-            }
-          ]
-        },
-        examplePhrases: [
-          {
-            standard: "mira talo-mi-na",
-            variant: "mira talo-mi-nena",
-            translation: "I walk by the river."
-          }
-        ]
-      }
-    ],
-    semanticDomains: [
-      {
-        id: "avn-domain-motion",
-        label: "Motion and route teaching",
-        description: "Movement roots and place nouns used to teach transparent route clauses.",
-        coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
-        evidencePassageIds: ["avn-c001", "avn-c005"],
-        usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
-      }
-    ],
-    registerProfiles: [
-      {
-        id: "avn-register-careful-teaching",
-        label: "Careful teaching register",
-        context: "Used when instructors slow suffix chains for first-pass learner explanation.",
-        styleLabel: "careful suffix demonstration",
-        semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
-        discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
-        teachingSequenceIds: ["avn-teach-verb-chain"],
-        evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
-        usageNotes: ["Lengthened endings are teaching emphasis, not new person categories."]
-      }
-    ],
-    discourseExamples: [
-      {
-        id: "avn-discourse-opening",
-        functionLabel: "Opening a teaching turn",
-        context: "Used when the instructor starts a careful review sequence.",
-        target: "kilo-ke saku-ra nemi-mi-na",
-        translation: "At the first step, I teach the child.",
-        notes: [
-          "The locative frame comes first.",
-          "The teaching verb keeps tense before person."
-        ]
-      }
-    ],
-    teachingSequences: [
-      {
-        id: "avn-teach-verb-chain",
-        title: "Build a transparent verb chain",
-        objective: "Recognize and produce root-tense-person chains in short Avenik clauses.",
-        level: "intro",
-        ruleIds: ["avn-rule-verb-chain"],
-        corpusPassageIds: ["avn-c001", "avn-c002"],
-        exerciseIds: ["avn-ex001", "avn-ex002"],
-        steps: [
-          { label: "Observe", prompt: "Read mira talo-mi-na and identify the verb chain." },
-          { label: "Practice", prompt: "Translate a new first-person present clause." }
-        ]
-      }
-    ],
     grammarRules: [
       {
         id: "avn-rule-verb-chain",
         topic: "morphology/verb/tense-person-suffix-chain",
         explanation: "Avenik finite verbs use root + tense + person suffixes.",
         evidencePassageIds: ["avn-c001", "avn-c002"],
-        confidence: "high"
+        confidence: "high",
+        status: "approved"
       }
     ],
     morphemeInventory: [
@@ -383,6 +262,7 @@ function createLanguageProfile() {
         occurrenceCount: 3,
         passageIds: ["avn-c001", "avn-c004", "avn-c005"],
         vocabulary: {
+          id: "avn-n-001",
           form: "mira",
           gloss: "river",
           partOfSpeech: "noun",
@@ -397,6 +277,7 @@ function createLanguageProfile() {
         occurrenceCount: 1,
         passageIds: ["avn-c001"],
         vocabulary: {
+          id: "avn-v-001",
           form: "talo",
           gloss: "walk",
           partOfSpeech: "verb",
@@ -407,19 +288,84 @@ function createLanguageProfile() {
     stats: {
       vocabularyItems: 2,
       grammarRules: 1,
-      paradigms: 1,
-      semanticDomains: 1,
-      registerProfiles: 1,
-      dialectVariants: 1,
-      discourseExamples: 1,
-      teachingSequences: 1,
       corpusPassages: 1,
       notes: 2,
       exercises: 2,
+      sourceAssets: 1,
+      pendingExtractionDrafts: 3,
       exerciseTypes: { translate_to_target: 1, segment: 1 }
+    }
+  };
+}
+
+function createTextSource() {
+  return {
+    id: "src-1",
+    languageId: "avenik",
+    kind: "text",
+    title: "Field notebook page",
+    rawText: "tala = water",
+    status: "pending",
+    createdBy: "reviewer-1",
+    createdAt: "2026-06-08T00:00:00.000Z"
+  };
+}
+
+function createAudioSource() {
+  return {
+    id: "src-2",
+    languageId: "avenik",
+    kind: "audio",
+    title: "Elder recording",
+    originalName: "elder.mp3",
+    mimeType: "audio/mpeg",
+    filePath: "uploads/elder.mp3",
+    transcript: "tala mira",
+    status: "processed",
+    createdBy: "reviewer-1",
+    createdAt: "2026-06-08T00:05:00.000Z",
+    processedAt: "2026-06-08T00:10:00.000Z"
+  };
+}
+
+function createLexemeDraft() {
+  return {
+    id: "draft-1",
+    languageId: "avenik",
+    sourceAssetId: "src-1",
+    kind: "lexeme",
+    payload: {
+      form: "tala",
+      gloss: "water",
+      partOfSpeech: "noun",
+      tags: [],
+      morphologicalSegmentation: [],
+      topicTags: []
     },
-    fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
-    fixtureQuality: SYNTHETIC_FIXTURE_QUALITY
+    confidence: "high",
+    rationale: "Equals sign indicates a gloss pair.",
+    status: "proposed",
+    createdAt: "2026-06-08T00:15:00.000Z"
+  };
+}
+
+function createGrammarDraft() {
+  return {
+    id: "draft-2",
+    languageId: "avenik",
+    sourceAssetId: "src-2",
+    kind: "grammar_note",
+    payload: {
+      tags: [],
+      morphologicalSegmentation: [],
+      topicTags: [],
+      topic: "noun phrases",
+      explanation: "Nouns precede their modifiers in elicited speech."
+    },
+    confidence: "medium",
+    rationale: "Pattern repeats across transcript lines.",
+    status: "proposed",
+    createdAt: "2026-06-08T00:16:00.000Z"
   };
 }
 
@@ -427,6 +373,8 @@ describe("App", () => {
   beforeEach(() => {
     apiMock.fetchCurrentUser.mockResolvedValue({ id: "local-reviewer", name: "Local Reviewer", role: "reviewer" });
     apiMock.fetchExerciseSubmissions.mockResolvedValue([]);
+    apiMock.fetchSources.mockResolvedValue([]);
+    apiMock.fetchExtractionDrafts.mockResolvedValue([]);
     apiMock.fetchLlmStatus.mockResolvedValue({
       provider: "deterministic",
       mode: "deterministic",
@@ -465,7 +413,7 @@ describe("App", () => {
         id: "governance-1",
         languageId: "avenik",
         policyType: "access",
-        content: "Only reviewers may approve synthetic notes.",
+        content: "Only reviewers may approve community notes.",
         effectiveDate: "2026-06-05",
         approvedBy: "lead-1"
       }
@@ -509,12 +457,12 @@ describe("App", () => {
       id: "governance-2",
       languageId: "avenik",
       policyType: "generation",
-      content: "Synthetic outputs must cite reviewed notes.",
+      content: "Generated outputs must cite reviewed notes.",
       effectiveDate: "2026-06-06",
       approvedBy: "lead-1"
     });
     apiMock.fetchEvaluationArtifact.mockResolvedValue({
-      exportVersion: "synthetic-evaluation-artifact-v1",
+      exportVersion: "evaluation-artifact-v2",
       exportedAt: "2026-06-06T00:00:00.000Z",
       integrity: {
         algorithm: "sha256",
@@ -533,16 +481,7 @@ describe("App", () => {
         singleRunLanguages: 1,
         averageLatestScore: 0.85,
         passed: true,
-        failureCount: 0,
-        fixtureQuality: {
-          languages: 2,
-          passedLanguages: 2,
-          failedLanguages: 0,
-          totalChecks: 36,
-          passedChecks: 36,
-          failedChecks: 0,
-          passed: true
-        }
+        failureCount: 0
       },
       latestRuns: createDashboardData().evaluations,
       runsByLanguage: { avenik: ["eval-1"] },
@@ -564,7 +503,7 @@ describe("App", () => {
       failureLines: []
     });
     apiMock.fetchLanguageSnapshot.mockResolvedValue({
-      exportVersion: "synthetic-language-snapshot-v1",
+      exportVersion: "language-snapshot-v2",
       exportedAt: "2026-06-06T00:00:00.000Z",
       integrity: {
         algorithm: "sha256",
@@ -576,10 +515,9 @@ describe("App", () => {
         id: "avenik",
         name: "Avenik",
         typology: "agglutinative",
-        description: "Synthetic agglutinative language.",
+        description: "Agglutinative test language.",
         orthography: "Latin",
-        status: "synthetic",
-        fixtureSource: "test"
+        status: "active"
       },
       linguisticProfile: {
         phonology: {
@@ -587,144 +525,32 @@ describe("App", () => {
           vowels: ["a", "i", "o"],
           syllableTemplate: "CV",
           stress: "word-initial",
-          phonotactics: ["Consonant clusters are disallowed inside native roots."]
+          notes: ["Consonant clusters are disallowed inside native roots."]
         },
-        paradigms: [
-          {
-            id: "avn-paradigm-verb-chain",
-            title: "Finite verb chain",
-            description: "Transparent Avenik finite verbs combine root + tense suffix + person suffix.",
-            rows: [
-              {
-                label: "present first singular",
-                form: "talo-mi-na",
-                gloss: "walk-present-1sg",
-                morphemes: ["talo", "-mi", "-na"]
-              }
-            ]
-          }
-        ],
-        dialectVariants: [
-          {
-            id: "avn-dialect-river",
-            name: "River teaching register",
-            regionLabel: "river-side workshop register",
-            phonologyNotes: ["First-person endings may lengthen in careful teaching speech."],
-            lexicalNotes: ["mira remains the preferred public form for river."],
-            grammarNotes: ["Person suffixes stay transparent after tense markers."],
-            history: {
-              summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
-              events: [
-                {
-                  period: "early workshop",
-                  description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
-                  evidencePassageIds: ["avn-c001", "avn-c005"]
-                },
-                {
-                  period: "review circle",
-                  description: "Learners kept the river noun stable while comparing careful and everyday suffix rhythm.",
-                  evidencePassageIds: ["avn-c004"]
-                }
-              ]
-            },
-            examplePhrases: [
-              {
-                standard: "mira talo-mi-na",
-                variant: "mira talo-mi-nena",
-                translation: "I walk by the river."
-              }
-            ]
-          }
-        ],
-        semanticDomains: [
-          {
-            id: "avn-domain-motion",
-            label: "Motion and route teaching",
-            description: "Movement roots and place nouns used to teach transparent route clauses.",
-            coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
-            evidencePassageIds: ["avn-c001", "avn-c005"],
-            usageNotes: ["Route nouns pair with transparent motion verbs before tense-person suffixes."]
-          }
-        ],
-        registerProfiles: [
-          {
-            id: "avn-register-careful-teaching",
-            label: "Careful teaching register",
-            context: "Used when instructors slow suffix chains for first-pass learner explanation.",
-            styleLabel: "careful suffix demonstration",
-            semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
-            discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
-            teachingSequenceIds: ["avn-teach-verb-chain"],
-            evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
-            usageNotes: ["Lengthened endings are teaching emphasis, not new person categories."]
-          }
-        ],
-        discourseExamples: [
-          {
-            id: "avn-discourse-opening",
-            functionLabel: "Opening a teaching turn",
-            context: "Used when the instructor starts a careful review sequence.",
-            target: "kilo-ke saku-ra nemi-mi-na",
-            translation: "At the first step, I teach the child.",
-            notes: [
-              "The locative frame comes first.",
-              "The teaching verb keeps tense before person."
-            ]
-          }
-        ],
-        teachingSequences: [
-          {
-            id: "avn-teach-verb-chain",
-            title: "Build a transparent verb chain",
-            objective: "Recognize and produce root-tense-person chains in short Avenik clauses.",
-            level: "intro",
-            ruleIds: ["avn-rule-verb-chain"],
-            corpusPassageIds: ["avn-c001", "avn-c002"],
-            exerciseIds: ["avn-ex001", "avn-ex002"],
-            steps: [
-              { label: "Observe", prompt: "Read mira talo-mi-na and identify the verb chain." },
-              { label: "Practice", prompt: "Translate a new first-person present clause." }
-            ]
-          }
-        ],
         vocabulary: [
           { id: "avn-s-001", form: "-mi", gloss: "present tense", partOfSpeech: "suffix", tags: ["tense"] },
           { id: "avn-v-001", form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"] }
         ],
+        morphemeInventory: [],
         grammarRules: [
           {
             id: "avn-rule-verb-chain",
             topic: "morphology/verb/tense-person-suffix-chain",
             explanation: "Avenik finite verbs use root + tense + person suffixes.",
             evidencePassageIds: ["avn-c001"],
-            confidence: "high"
+            confidence: "high",
+            status: "approved"
           }
         ],
         stats: {
           vocabularyItems: 2,
           grammarRules: 1,
-          paradigms: 1,
-          semanticDomains: 1,
-          registerProfiles: 1,
-          dialectVariants: 1,
-          discourseExamples: 1,
-          teachingSequences: 1,
           corpusPassages: 1,
           notes: 2,
           exercises: 2,
+          sourceAssets: 1,
+          pendingExtractionDrafts: 0,
           exerciseTypes: { translate_to_target: 1, segment: 1 }
-        },
-        fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
-        fixtureQuality: {
-          passed: false,
-          totalChecks: 3,
-          passedChecks: 1,
-          failedChecks: 2,
-          checks: [
-            { id: "vocabularyItems", label: "Vocabulary", actual: 2, minimum: 24, passed: false },
-            { id: "corpusPassages", label: "Corpus passages", actual: 1, minimum: 12, passed: false },
-            { id: "exerciseTypes", label: "Exercise types", actual: 2, minimum: 2, passed: true }
-          ]
         }
       },
       corpus: createDashboardData().corpus,
@@ -735,7 +561,7 @@ describe("App", () => {
           id: "governance-1",
           languageId: "avenik",
           policyType: "access",
-          content: "Only reviewers may approve synthetic notes.",
+          content: "Only reviewers may approve community notes.",
           effectiveDate: "2026-06-05",
           approvedBy: "lead-1"
         }
@@ -747,7 +573,7 @@ describe("App", () => {
     apiMock.reviewNote.mockResolvedValue({});
     apiMock.submitExerciseAnswer.mockResolvedValue({
       accepted: true,
-      explanation: "Accepted synthetic exercise submission."
+      explanation: "Accepted exercise submission."
     });
   });
 
@@ -755,11 +581,12 @@ describe("App", () => {
     vi.clearAllMocks();
   });
 
-  it("renders the Atlas language sidebar, synthetic notice, and corpus surface", async () => {
+  it("renders the Atlas language sidebar, local prototype notice, and corpus surface", async () => {
     await renderReady();
 
     expect(await screen.findByText("Local Reviewer")).toBeInTheDocument();
-    expect(screen.getByText("Synthetic prototype")).toBeInTheDocument();
+    expect(screen.getByText("Local prototype")).toBeInTheDocument();
+    expect(screen.getByText("all data stays on this machine")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Avenik.*agglutinative/i })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: /Solari.*isolating/i })).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByRole("button", { name: "Corpus Browser" })).toHaveAttribute("aria-current", "page");
@@ -798,11 +625,11 @@ describe("App", () => {
     const createdPassage = {
       id: "imported-corpus-avenik-2",
       languageId: "avenik",
-      source: "synthetic-field-lab",
+      source: "field-lab",
       sourceMetadata: {
         author: "reviewer-1",
         year: 2026,
-        license: "synthetic-only",
+        license: "cc-by",
         consentRecord: "local-review"
       },
       textTarget: "mira lumo-ke talo-mi-na",
@@ -814,12 +641,13 @@ describe("App", () => {
       ],
       topicTags: ["movement", "locative"],
       consentStatus: {
-        use: "synthetic-testing-only" as const,
-        restrictions: ["synthetic-only"]
+        use: "community-approved" as const,
+        restrictions: ["internal-only"]
       }
     };
 
     apiMock.fetchDashboardData
+      .mockResolvedValueOnce(initialData)
       .mockResolvedValueOnce(initialData)
       .mockResolvedValueOnce({
         ...initialData,
@@ -828,7 +656,7 @@ describe("App", () => {
     apiMock.importCorpusPassage.mockResolvedValue(createdPassage);
 
     render(<App />);
-    await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+    await selectAvenik();
 
     fireEvent.change(screen.getByLabelText("Corpus target text"), {
       target: { value: "mira lumo-ke talo-mi-na" }
@@ -837,7 +665,7 @@ describe("App", () => {
       target: { value: "I walk by the river near the practice mat." }
     });
     fireEvent.change(screen.getByLabelText("Source"), {
-      target: { value: "synthetic-field-lab" }
+      target: { value: "field-lab" }
     });
     fireEvent.change(screen.getByLabelText("Author"), {
       target: { value: "reviewer-1" }
@@ -846,7 +674,7 @@ describe("App", () => {
       target: { value: "2026" }
     });
     fireEvent.change(screen.getByLabelText("License"), {
-      target: { value: "synthetic-only" }
+      target: { value: "cc-by" }
     });
     fireEvent.change(screen.getByLabelText("Consent record"), {
       target: { value: "local-review" }
@@ -864,16 +692,16 @@ describe("App", () => {
       }
     });
     fireEvent.change(screen.getByLabelText("Access restrictions"), {
-      target: { value: "synthetic-only" }
+      target: { value: "internal-only" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Import passage" }));
 
     await waitFor(() => expect(apiMock.importCorpusPassage).toHaveBeenCalledWith("avenik", {
-      source: "synthetic-field-lab",
+      source: "field-lab",
       sourceMetadata: {
         author: "reviewer-1",
         year: 2026,
-        license: "synthetic-only",
+        license: "cc-by",
         consentRecord: "local-review"
       },
       textTarget: "mira lumo-ke talo-mi-na",
@@ -885,8 +713,8 @@ describe("App", () => {
       ],
       topicTags: ["movement", "locative"],
       consentStatus: {
-        use: "synthetic-testing-only",
-        restrictions: ["synthetic-only"]
+        use: "community-approved",
+        restrictions: ["internal-only"]
       }
     }));
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
@@ -903,18 +731,18 @@ describe("App", () => {
 
     const status = screen.getByRole("status");
     expect(status).toHaveAttribute("aria-live", "polite");
-    expect(status).toHaveTextContent("Loading synthetic data...");
+    expect(status).toHaveTextContent("Loading workspace...");
 
     initialLoad.resolve(createDashboardData());
     expect(await screen.findByRole("heading", { level: 1, name: "Corpus Browser" })).toBeInTheDocument();
   });
 
   it("announces load errors through an alert region", async () => {
-    apiMock.fetchDashboardData.mockRejectedValue(new Error("Synthetic data unavailable"));
+    apiMock.fetchDashboardData.mockRejectedValue(new Error("Workspace data unavailable"));
 
     render(<App />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Synthetic data unavailable");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Workspace data unavailable");
   });
 
   it("navigates between review, learner, evaluation, governance, and model views", async () => {
@@ -931,78 +759,42 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Evaluation Dashboard" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Evaluation Dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run System Eval" })).toBeInTheDocument();
-    expect(screen.getByText("Avenik synthetic evaluation completed.")).toBeInTheDocument();
+    expect(screen.getByText("Avenik evaluation completed.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Sources & Intake" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Registered sources" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Extraction draft queue" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Governance" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Governance & Policy" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Synthetic-Only Policy" })).toBeInTheDocument();
-    expect(await screen.findByText("Only reviewers may approve synthetic notes.")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Data Stewardship Policy" })).toBeInTheDocument();
+    expect(await screen.findByText("Only reviewers may approve community notes.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Model Setup" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Model Setup" })).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "LLM provider readiness" })).toBeInTheDocument();
   });
 
-  it("loads a language profile with grammar rules and vocabulary", async () => {
+  it("loads a language profile with grammar rules, vocabulary, and intake stats", async () => {
     await renderReady();
 
     fireEvent.click(screen.getByRole("button", { name: "Language Profile" }));
 
     expect(await screen.findByRole("heading", { level: 1, name: "Language Profile" })).toBeInTheDocument();
     expect(apiMock.fetchLanguageProfile).toHaveBeenCalledWith("avenik");
+    const summary = await screen.findByRole("region", { name: "Language profile summary" });
+    expect(within(summary).getByText("Source assets")).toBeInTheDocument();
+    expect(within(summary).getByText("Pending extraction drafts")).toBeInTheDocument();
+    expect(within(summary).getByText("3")).toBeInTheDocument();
+    expect(within(summary).getByText("Corpus passages")).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Grammar inventory" })).toBeInTheDocument();
     expect(screen.getByText("morphology/verb/tense-person-suffix-chain")).toBeInTheDocument();
     expect(screen.getByText("Avenik finite verbs use root + tense + person suffixes.")).toBeInTheDocument();
-    const qualityFloor = screen.getByRole("region", { name: "Synthetic fixture quality floor" });
-    expect(within(qualityFloor).getAllByText("Needs work").length).toBeGreaterThan(0);
-    expect(within(qualityFloor).getByText("Vocabulary")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("2 / 24")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("1 / 12")).toBeInTheDocument();
-    expect(within(qualityFloor).getAllByText("2 / 6").length).toBeGreaterThan(0);
-    expect(within(qualityFloor).getByText("2 / 2")).toBeInTheDocument();
-    expect(within(qualityFloor).getByText("Met")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Phonology profile" })).toBeInTheDocument();
     expect(screen.getByText("word-initial")).toBeInTheDocument();
     expect(screen.getByText("Consonant clusters are disallowed inside native roots.")).toBeInTheDocument();
-    const paradigmTables = screen.getByRole("region", { name: "Paradigm tables" });
-    expect(paradigmTables).toBeInTheDocument();
-    expect(screen.getByText("Finite verb chain")).toBeInTheDocument();
-    expect(within(paradigmTables).getByText("talo-mi-na")).toBeInTheDocument();
-    const semanticDomains = screen.getByRole("region", { name: "Semantic domains" });
-    expect(semanticDomains).toBeInTheDocument();
-    expect(within(semanticDomains).getByText("Motion and route teaching")).toBeInTheDocument();
-    expect(within(semanticDomains).getByText("Movement roots and place nouns used to teach transparent route clauses.")).toBeInTheDocument();
-    expect(within(semanticDomains).getByText("avn-n-001")).toBeInTheDocument();
-    expect(within(semanticDomains).getByText("avn-c005")).toBeInTheDocument();
-    expect(within(semanticDomains).getByText("Route nouns pair with transparent motion verbs before tense-person suffixes.")).toBeInTheDocument();
-    const registerProfiles = screen.getByRole("region", { name: "Register profiles" });
-    expect(registerProfiles).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("Careful teaching register")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("careful suffix demonstration")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("Used when instructors slow suffix chains for first-pass learner explanation.")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("avn-domain-review-speech")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("avn-discourse-repair")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("avn-teach-verb-chain")).toBeInTheDocument();
-    expect(within(registerProfiles).getByText("Lengthened endings are teaching emphasis, not new person categories.")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Dialect variants" })).toBeInTheDocument();
-    expect(screen.getByText("River teaching register")).toBeInTheDocument();
-    expect(screen.getByText("river-side workshop register")).toBeInTheDocument();
-    expect(screen.getByText("River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.")).toBeInTheDocument();
-    expect(screen.getByText("early workshop")).toBeInTheDocument();
-    expect(screen.getByText("Instructors lengthened first-person endings while demonstrating river-route movement clauses.")).toBeInTheDocument();
-    expect(screen.getAllByText("avn-c005").length).toBeGreaterThan(0);
-    expect(screen.getByText("mira talo-mi-nena")).toBeInTheDocument();
-    const discourseExamples = screen.getByRole("region", { name: "Discourse examples" });
-    expect(discourseExamples).toBeInTheDocument();
-    expect(within(discourseExamples).getByText("Opening a teaching turn")).toBeInTheDocument();
-    expect(within(discourseExamples).getByText("kilo-ke saku-ra nemi-mi-na")).toBeInTheDocument();
-    expect(within(discourseExamples).getByText("The locative frame comes first.")).toBeInTheDocument();
-    const teachingSequences = screen.getByRole("region", { name: "Teaching sequences" });
-    expect(teachingSequences).toBeInTheDocument();
-    expect(within(teachingSequences).getByText("Build a transparent verb chain")).toBeInTheDocument();
-    expect(within(teachingSequences).getByText("Recognize and produce root-tense-person chains in short Avenik clauses.")).toBeInTheDocument();
-    expect(within(teachingSequences).getByText("avn-ex001")).toBeInTheDocument();
-    expect(within(teachingSequences).getByText("Read mira talo-mi-na and identify the verb chain.")).toBeInTheDocument();
+    expect(screen.getByText("Suffixes attach with explicit hyphen boundaries.")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Vocabulary inventory" })).toBeInTheDocument();
     expect(screen.getByText("-mi")).toBeInTheDocument();
     expect(screen.getByText("present tense")).toBeInTheDocument();
@@ -1010,6 +802,228 @@ describe("App", () => {
     expect(within(morphemeInventory).getAllByText("mira").length).toBeGreaterThan(0);
     expect(within(morphemeInventory).getByText("3 corpus uses")).toBeInTheDocument();
     expect(within(morphemeInventory).getAllByText("avn-c001").length).toBeGreaterThan(0);
+  });
+
+  it("shows an empty phonology state when the profile has no phonology", async () => {
+    apiMock.fetchLanguageProfile.mockResolvedValue({
+      ...createLanguageProfile(),
+      phonology: null
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Language Profile" }));
+
+    const phonologyPanel = await screen.findByRole("region", { name: "Phonology profile" });
+    expect(within(phonologyPanel).getByText("No phonology declared yet")).toBeInTheDocument();
+  });
+
+  it("renders registered sources and the extraction draft queue for the selected language", async () => {
+    apiMock.fetchSources.mockResolvedValue([createTextSource(), createAudioSource()]);
+    apiMock.fetchExtractionDrafts.mockResolvedValue([createLexemeDraft(), createGrammarDraft()]);
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Sources & Intake" })).toBeInTheDocument();
+    const sourcesRegion = await screen.findByRole("region", { name: "Registered sources" });
+    await waitFor(() => expect(apiMock.fetchSources).toHaveBeenCalledWith("avenik"));
+    expect(apiMock.fetchExtractionDrafts).toHaveBeenCalledWith("avenik", "proposed");
+    expect(within(sourcesRegion).getByText("2 sources")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("Field notebook page")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("Elder recording")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("text")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("audio")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("transcript ready")).toBeInTheDocument();
+
+    const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
+    expect(within(draftQueue).getByText("2 proposed drafts")).toBeInTheDocument();
+    expect(within(draftQueue).getByText("tala — water")).toBeInTheDocument();
+    expect(within(draftQueue).getByText("high confidence")).toBeInTheDocument();
+    expect(within(draftQueue).getByText("Equals sign indicates a gloss pair.")).toBeInTheDocument();
+    expect(within(draftQueue).getByText("noun phrases — Nouns precede their modifiers in elicited speech.")).toBeInTheDocument();
+    expect(within(draftQueue).getByText("medium confidence")).toBeInTheDocument();
+  });
+
+  it("registers a text source from the intake form and refreshes the source list", async () => {
+    apiMock.fetchSources
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([createTextSource()]);
+    apiMock.registerSource.mockResolvedValue(createTextSource());
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    const intakeForm = await screen.findByRole("form", { name: "Register source" });
+    fireEvent.change(within(intakeForm).getByLabelText("Source kind"), { target: { value: "text" } });
+    fireEvent.change(within(intakeForm).getByLabelText("Source title"), {
+      target: { value: "Field notebook page" }
+    });
+    fireEvent.change(within(intakeForm).getByLabelText("Raw text"), {
+      target: { value: "tala = water" }
+    });
+    fireEvent.click(within(intakeForm).getByRole("button", { name: "Register source" }));
+
+    await waitFor(() => expect(apiMock.registerSource).toHaveBeenCalledWith("avenik", {
+      kind: "text",
+      title: "Field notebook page",
+      rawText: "tala = water"
+    }));
+    expect(await screen.findByText("Source registered: Field notebook page.")).toBeInTheDocument();
+    const sourcesRegion = screen.getByRole("region", { name: "Registered sources" });
+    expect(await within(sourcesRegion).findByText("Field notebook page")).toBeInTheDocument();
+  });
+
+  it("uploads a source file and lets the API decide the source kind", async () => {
+    apiMock.fetchSources
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([createAudioSource()]);
+    apiMock.uploadSourceFile.mockResolvedValue(createAudioSource());
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    const uploadForm = await screen.findByRole("form", { name: "Upload source file" });
+    const file = new File(["audio-bytes"], "elder.mp3", { type: "audio/mpeg" });
+    fireEvent.change(within(uploadForm).getByLabelText("Upload title (optional)"), {
+      target: { value: "Elder recording" }
+    });
+    fireEvent.change(within(uploadForm).getByLabelText("Source file"), {
+      target: { files: [file] }
+    });
+    fireEvent.click(within(uploadForm).getByRole("button", { name: "Upload source file" }));
+
+    await waitFor(() => expect(apiMock.uploadSourceFile).toHaveBeenCalledWith("avenik", file, "Elder recording"));
+    expect(await screen.findByText("File uploaded as audio source: Elder recording.")).toBeInTheDocument();
+    const sourcesRegion = screen.getByRole("region", { name: "Registered sources" });
+    expect(await within(sourcesRegion).findByText("Elder recording")).toBeInTheDocument();
+  });
+
+  it("processes a source, surfaces extraction warnings, and refreshes the draft queue", async () => {
+    apiMock.fetchSources.mockResolvedValue([createTextSource()]);
+    apiMock.fetchExtractionDrafts
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([createLexemeDraft()]);
+    apiMock.processSource.mockResolvedValue({
+      asset: { ...createTextSource(), status: "processed" },
+      drafts: [createLexemeDraft()],
+      warnings: ["Skipped one line without a recognizable gloss separator."]
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Process Field notebook page" }));
+
+    await waitFor(() => expect(apiMock.processSource).toHaveBeenCalledWith("src-1"));
+    expect(await screen.findByText("Processed Field notebook page: 1 extraction draft proposed.")).toBeInTheDocument();
+    expect(screen.getByText("Skipped one line without a recognizable gloss separator.")).toBeInTheDocument();
+    const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
+    expect(await within(draftQueue).findByText("tala — water")).toBeInTheDocument();
+    expect(apiMock.fetchSources).toHaveBeenLastCalledWith("avenik");
+    expect(apiMock.fetchExtractionDrafts).toHaveBeenLastCalledWith("avenik", "proposed");
+  });
+
+  it("accepts a proposed extraction draft and refreshes the queue", async () => {
+    apiMock.fetchExtractionDrafts
+      .mockResolvedValueOnce([createLexemeDraft()])
+      .mockResolvedValue([]);
+    apiMock.acceptExtractionDraft.mockResolvedValue({
+      draft: { ...createLexemeDraft(), status: "accepted", committedEntityId: "lex-1" },
+      entity: {
+        id: "lex-1",
+        languageId: "avenik",
+        form: "tala",
+        gloss: "water",
+        partOfSpeech: "noun",
+        tags: [],
+        sourceAssetIds: ["src-1"]
+      }
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept draft draft-1" }));
+
+    await waitFor(() => expect(apiMock.acceptExtractionDraft).toHaveBeenCalledWith("draft-1"));
+    expect(await screen.findByText("Draft accepted: Lexeme committed.")).toBeInTheDocument();
+    const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
+    expect(await within(draftQueue).findByText("0 proposed drafts")).toBeInTheDocument();
+    expect(apiMock.rejectExtractionDraft).not.toHaveBeenCalled();
+  });
+
+  it("rejects a proposed extraction draft and refreshes the queue", async () => {
+    apiMock.fetchExtractionDrafts
+      .mockResolvedValueOnce([createGrammarDraft()])
+      .mockResolvedValue([]);
+    apiMock.rejectExtractionDraft.mockResolvedValue({
+      ...createGrammarDraft(),
+      status: "rejected"
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Reject draft draft-2" }));
+
+    await waitFor(() => expect(apiMock.rejectExtractionDraft).toHaveBeenCalledWith("draft-2"));
+    expect(await screen.findByText("Draft rejected: Grammar note.")).toBeInTheDocument();
+    const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
+    expect(await within(draftQueue).findByText("0 proposed drafts")).toBeInTheDocument();
+    expect(apiMock.acceptExtractionDraft).not.toHaveBeenCalled();
+  });
+
+  it("creates a language from the sidebar and selects the new workspace", async () => {
+    const createdLanguage = {
+      id: "rivertongue",
+      name: "Rivertongue",
+      typology: "isolating",
+      description: "Community river language.",
+      orthography: "Latin",
+      status: "draft"
+    };
+    apiMock.createLanguage.mockResolvedValue(createdLanguage);
+    apiMock.fetchDashboardData.mockImplementation(async (languageId?: string) => {
+      const base = createDashboardData();
+      if (languageId === "rivertongue") {
+        return {
+          ...base,
+          languages: [...base.languages, createdLanguage],
+          corpus: [],
+          notes: [],
+          exercises: []
+        };
+      }
+      return base;
+    });
+
+    render(<App />);
+    await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+
+    fireEvent.click(screen.getByRole("button", { name: "New language" }));
+    const createForm = await screen.findByRole("form", { name: "Create language" });
+    fireEvent.change(within(createForm).getByLabelText("Language name"), {
+      target: { value: "Rivertongue" }
+    });
+    fireEvent.change(within(createForm).getByLabelText("Description"), {
+      target: { value: "Community river language." }
+    });
+    fireEvent.change(within(createForm).getByLabelText("Orthography"), {
+      target: { value: "Latin" }
+    });
+    fireEvent.change(within(createForm).getByLabelText("Typology"), {
+      target: { value: "isolating" }
+    });
+    fireEvent.click(within(createForm).getByRole("button", { name: "Create language" }));
+
+    await waitFor(() => expect(apiMock.createLanguage).toHaveBeenCalledWith({
+      name: "Rivertongue",
+      description: "Community river language.",
+      orthography: "Latin",
+      typology: "isolating"
+    }));
+    await waitFor(() => expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("rivertongue"));
+    expect(await screen.findByText("Rivertongue / Corpus Browser")).toBeInTheDocument();
   });
 
   it("runs a model provider smoke test without exposing browser-side keys", async () => {
@@ -1021,7 +1035,7 @@ describe("App", () => {
     await waitFor(() => expect(apiMock.createAiSession).toHaveBeenCalledWith({
       languageId: "avenik",
       mode: "learner_practice",
-      seedPrompt: "Create one concise, safe practice prompt using only the provided public synthetic context.",
+      seedPrompt: "Create one concise, safe practice prompt using only the provided public workspace context.",
       contextNoteIds: ["avn-rule-verb-chain-note", "avn-rule-case-note"],
       contextPassageIds: ["avn-c001"]
     }));
@@ -1088,7 +1102,7 @@ describe("App", () => {
           id: "governance-1",
           languageId: "avenik",
           policyType: "access",
-          content: "Only reviewers may approve synthetic notes.",
+          content: "Only reviewers may approve community notes.",
           effectiveDate: "2026-06-05",
           approvedBy: "lead-1"
         }
@@ -1098,7 +1112,7 @@ describe("App", () => {
           id: "governance-1",
           languageId: "avenik",
           policyType: "access",
-          content: "Only reviewers may approve synthetic notes.",
+          content: "Only reviewers may approve community notes.",
           effectiveDate: "2026-06-05",
           approvedBy: "lead-1"
         },
@@ -1106,7 +1120,7 @@ describe("App", () => {
           id: "governance-2",
           languageId: "avenik",
           policyType: "generation",
-          content: "Synthetic outputs must cite reviewed notes.",
+          content: "Generated outputs must cite reviewed notes.",
           effectiveDate: "2026-06-06",
           approvedBy: "lead-1"
         }
@@ -1115,22 +1129,22 @@ describe("App", () => {
     await renderReady();
     fireEvent.click(screen.getByRole("button", { name: "Governance" }));
 
-    expect(await screen.findByText("Only reviewers may approve synthetic notes.")).toBeInTheDocument();
+    expect(await screen.findByText("Only reviewers may approve community notes.")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Policy type"), { target: { value: "generation" } });
     fireEvent.change(screen.getByLabelText("Effective date"), { target: { value: "2026-06-06" } });
     fireEvent.change(screen.getByLabelText("Policy content"), {
-      target: { value: "Synthetic outputs must cite reviewed notes." }
+      target: { value: "Generated outputs must cite reviewed notes." }
     });
     fireEvent.click(screen.getByRole("button", { name: "Create policy record" }));
 
     await waitFor(() => expect(apiMock.createGovernanceRecord).toHaveBeenCalledWith({
       languageId: "avenik",
       policyType: "generation",
-      content: "Synthetic outputs must cite reviewed notes.",
+      content: "Generated outputs must cite reviewed notes.",
       effectiveDate: "2026-06-06"
     }));
     expect(await screen.findByText("Governance policy recorded.")).toBeInTheDocument();
-    expect(await screen.findByText("Synthetic outputs must cite reviewed notes.")).toBeInTheDocument();
+    expect(await screen.findByText("Generated outputs must cite reviewed notes.")).toBeInTheDocument();
   });
 
   it("updates the review policy for the selected language", async () => {
@@ -1234,7 +1248,7 @@ describe("App", () => {
         entityType: "note",
         entityId: "avn-rule-verb-chain-note",
         languageId: "avenik",
-        summary: "Reviewed synthetic note avn-rule-verb-chain-note.",
+        summary: "Reviewed note avn-rule-verb-chain-note.",
         metadata: { status: "under_review" }
       }
     ]);
@@ -1287,7 +1301,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 paradigm table, 1 semantic domain, 1 register profile, 1 dialect variant, 1 discourse example, 1 teaching sequence, 1 of 3 fixture checks met, 2 fixture checks need work, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 source asset, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
@@ -1311,7 +1325,7 @@ describe("App", () => {
 
     render(<App />);
 
-    await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+    await selectAvenik();
     fireEvent.click(screen.getByRole("button", { name: "Note Review Queue" }));
     const languageButton = await screen.findByRole("button", { name: /Avenik.*agglutinative/i });
     fireEvent.click(screen.getByRole("button", { name: "Generate AI Drafts" }));
@@ -1332,7 +1346,8 @@ describe("App", () => {
     apiMock.runEvaluation.mockReturnValue(evaluationRun.promise);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Evaluation Dashboard" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Evaluation Dashboard" }));
 
     const languageButton = screen.getByRole("button", { name: /Avenik.*agglutinative/i });
     fireEvent.click(screen.getByRole("button", { name: "Run System Eval" }));
@@ -1354,7 +1369,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export evaluation artifact" }));
 
     await waitFor(() => expect(apiMock.fetchEvaluationArtifact).toHaveBeenCalled());
-    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, 36 fixture checks met, integrity sha256:fedcba987654.")).toBeInTheDocument();
+    expect(await screen.findByText("Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, integrity sha256:fedcba987654.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download evaluation artifact JSON" });
     expect(link).toHaveAttribute("download", "assini-evaluation-artifact.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");
@@ -1389,13 +1404,14 @@ describe("App", () => {
           noteQuality: 0.8
         },
         failures: [],
-        summary: "Avenik synthetic evaluation completed."
+        summary: "Avenik evaluation completed."
       }
     ];
     apiMock.fetchDashboardData.mockResolvedValue(dashboardData);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Evaluation Dashboard" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Evaluation Dashboard" }));
 
     expect(await screen.findByRole("region", { name: "Evaluation trends" })).toBeInTheDocument();
     expect(screen.getByText("Avenik regressed by 10 pts since previous run.")).toBeInTheDocument();
@@ -1615,7 +1631,7 @@ describe("App", () => {
     apiMock.reviewNote.mockReturnValue(review.promise);
 
     render(<App />);
-    await screen.findByRole("heading", { level: 1, name: "Corpus Browser" });
+    await selectAvenik();
     fireEvent.click(screen.getByRole("button", { name: "Note Review Queue" }));
 
     const languageButton = await screen.findByRole("button", { name: /Avenik.*agglutinative/i });
@@ -1632,18 +1648,19 @@ describe("App", () => {
     apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
     apiMock.submitExerciseAnswer.mockResolvedValue({
       accepted: true,
-      explanation: "Accepted synthetic exercise submission."
+      explanation: "Accepted exercise submission."
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Learning Lab" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
 
     const answerBox = await screen.findByLabelText("Exercise answer");
     fireEvent.change(answerBox, { target: { value: "mira talo-mi-na" } });
     fireEvent.click(screen.getByRole("button", { name: "Grade" }));
 
     await waitFor(() => expect(apiMock.submitExerciseAnswer).toHaveBeenCalledWith("avn-ex001", "mira talo-mi-na"));
-    expect(await screen.findByText("Accepted synthetic exercise submission.")).toBeInTheDocument();
+    expect(await screen.findByText("Accepted exercise submission.")).toBeInTheDocument();
   });
 
   it("shows sanitized exercise submission history and refreshes it after grading", async () => {
@@ -1655,7 +1672,7 @@ describe("App", () => {
           exerciseId: "avn-ex001",
           languageId: "avenik",
           accepted: false,
-          explanation: "Answer did not match the synthetic exercise key.",
+          explanation: "Answer did not match the exercise key.",
           submittedAt: "2026-06-03T15:00:00.000Z"
         }
       ])
@@ -1665,27 +1682,28 @@ describe("App", () => {
           exerciseId: "avn-ex001",
           languageId: "avenik",
           accepted: true,
-          explanation: "Accepted synthetic exercise submission.",
+          explanation: "Accepted exercise submission.",
           submittedAt: "2026-06-03T15:01:00.000Z"
         }
       ]);
     apiMock.submitExerciseAnswer.mockResolvedValue({
       accepted: true,
-      explanation: "Accepted synthetic exercise submission."
+      explanation: "Accepted exercise submission."
     });
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Learning Lab" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
 
     const history = await screen.findByRole("region", { name: "Exercise submission history" });
-    expect(await within(history).findByText("Answer did not match the synthetic exercise key.")).toBeInTheDocument();
+    expect(await within(history).findByText("Answer did not match the exercise key.")).toBeInTheDocument();
     expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText("Exercise answer"), { target: { value: "mira talo-mi-na" } });
     fireEvent.click(screen.getByRole("button", { name: "Grade" }));
 
     await waitFor(() => expect(apiMock.fetchExerciseSubmissions).toHaveBeenLastCalledWith("avn-ex001"));
-    expect(await within(history).findByText("Accepted synthetic exercise submission.")).toBeInTheDocument();
+    expect(await within(history).findByText("Accepted exercise submission.")).toBeInTheDocument();
     expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
   });
 
@@ -1705,11 +1723,13 @@ describe("App", () => {
     };
     apiMock.fetchDashboardData
       .mockResolvedValueOnce(initialData)
+      .mockResolvedValueOnce(initialData)
       .mockResolvedValueOnce(refreshedData);
     apiMock.createExercise.mockResolvedValue(createdExercise);
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Learning Lab" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
 
     fireEvent.change(await screen.findByLabelText("Exercise prompt"), {
       target: { value: "Translate into Avenik: I walk by the river." }
@@ -1761,7 +1781,8 @@ describe("App", () => {
     apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Learning Lab" }));
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Learning Lab" }));
     fireEvent.click(await screen.findByRole("button", { name: /Segment: nemi-lo-ki/ }));
 
     expect(await screen.findByRole("heading", { name: "Segment: nemi-lo-ki" })).toBeInTheDocument();

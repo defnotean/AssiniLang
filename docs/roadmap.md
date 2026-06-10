@@ -1,6 +1,6 @@
 # Roadmap
 
-AssiniLang is useful as a synthetic testbed today. It is not ready for real community language data. This roadmap names the main gaps before production use.
+AssiniLang is useful as a local documentation and evaluation workspace today. It is not ready for real community language data. This roadmap names the main gaps before production use.
 
 ## 1. Real Governance Layer
 
@@ -36,7 +36,7 @@ The web app now supports compact corpus import and exercise authoring, but autho
 
 ## 4. Real Study Loop
 
-The deterministic study loop is intentional for the synthetic milestone. It proves evaluation without depending on a model.
+The deterministic study loop is intentional for the current milestone. It proves evaluation without depending on a model.
 
 Next steps:
 
@@ -52,10 +52,10 @@ The current evaluator is useful but small.
 
 Next steps:
 
-- Add more synthetic languages.
+- Broaden evaluation coverage across more user-created languages.
 - Expand semantic-domain coverage into richer cultural-safety review packets before any real data is considered.
 - Expand register and style-profile coverage so teaching guidance can distinguish careful instruction, review work, prompts, and learner-facing repair contexts.
-- Continue expanding dialect histories beyond the current evidence-backed synthetic timelines.
+- Continue expanding dialect histories beyond the current evidence-backed timelines.
 - Add historical trend charts.
 - Retain named evaluation baselines.
 - Add more adversarial learner/model probes.

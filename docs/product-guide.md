@@ -1,59 +1,55 @@
 # Product Guide
 
-AssiniLang is a local research console for proving a language-learning AI workflow with invented synthetic languages before any real community language data is introduced.
+AssiniLang is a local research console for proving a language-learning AI workflow before any real community language data is introduced.
 
-The current milestone is built around four fictional languages:
+The workspace starts empty. Users create their own languages, ingest their own raw materials, and review every extracted item before it becomes lexicon, corpus, or grammar data. Consent and provenance metadata travel with every corpus passage.
 
-- `Avenik`: agglutinative suffix chains.
-- `Solari`: isolating word order and particles.
-- `Velari`: fusional endings.
-- `Ketharu`: polysynthetic-lite verb forms.
+## Core Workflow
 
-Each language has at least 24 public vocabulary items, 3 semantic domains with vocabulary and corpus evidence, 2 register profiles with usage guidance and evidence links, 12 corpus passages, 6 grammar notes, 6 learner exercises, answer keys, phonology, paradigms, dialect variants with evidence-backed history timelines, 3 discourse examples, 2 teaching sequences, and evaluation records.
+1. Create a language with a name, typology, description, orthography, and an optional phonology inventory.
+2. Add raw sources to that language: pasted text, word lists, URLs, or uploaded files including images and audio.
+3. Process a source. A local LLM extracts candidate lexemes, corpus passages, and grammar notes; without a configured model, an offline heuristic parses delimited word-list lines instead.
+4. Review the resulting extraction drafts. Each extraction draft shows its payload, confidence, and rationale; accepting commits it, rejecting discards it.
+5. Build on the committed data with corpus import, note review, exercise authoring, evaluation, governance, and elder corrections.
 
 ## Web Console
 
-The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console with section navigation for the selected synthetic language.
+The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console with section navigation for the selected language.
 
 ### Language Profile
 
-The profile view presents public linguistic metadata:
+The profile view presents public linguistic metadata derived from workspace state:
 
-- Phonology and phonotactic notes.
-- Grammar-rule inventory.
-- Public vocabulary.
-- Semantic domains that group core vocabulary, usage notes, and corpus evidence into teachable fields.
-- Register profiles that connect style labels, usage context, semantic domains, discourse examples, teaching sequences, and corpus evidence into practical learner-facing guidance.
-- A derived morpheme inventory with corpus-use counts, source passage IDs, glosses, features, and linked vocabulary metadata.
-- Paradigm tables.
-- Dialect variants with region labels, notes, evidence-backed history timelines, and standard-vs-variant examples.
-- Discourse examples that show teaching-turn openings, repairs, choices, closures, or review cues with target text, translation, usage context, and pragmatic notes.
-- Teaching sequences that connect grammar rules, corpus passages, and public learner exercises into intro, practice, or review paths with step-by-step prompts.
-- Fixture counts for corpus, notes, exercises, and profile structures.
-- The synthetic fixture quality floor from `SYNTHETIC_FIXTURE_MINIMUMS`, shown as the minimum expected vocabulary, semantic-domain, register-profile, corpus, grammar, note, exercise, paradigm, dialect, dialect-history, discourse-example, and teaching-sequence coverage for every synthetic language.
-- Actual-vs-minimum fixture quality checks, so reviewers can see whether each public profile currently meets the synthetic depth baseline.
+- The declared phonology inventory, when the language has one.
+- Public vocabulary from the language's lexicon, each item traceable to its source assets.
+- A derived morpheme inventory with corpus-use counts, source passage IDs, glosses, features, and linked lexeme metadata.
+- Grammar rules drawn from the language's public notes.
+- Counts for corpus passages, notes, exercises, source assets, and pending extraction drafts.
 
-Use this view to understand what forms and rules the selected synthetic language is allowed to use.
+Use this view to understand what forms and rules the selected language currently supports. A new language starts with an empty profile and fills in as sources are processed and drafts are accepted.
+
+### Sources And Intake
+
+The intake flow captures raw materials and turns them into reviewable drafts:
+
+- Register a pasted text, word list, or URL source, or upload a file (plain-text documents, images, or audio; 25 MB cap).
+- Process a source to generate extraction drafts. URL sources are fetched and converted to text server-side; images need a vision-capable local model; audio is transcribed through a configured transcription endpoint first.
+- Review proposed drafts one by one. Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
+- Failed processing marks the source `failed` with a sanitized error so it can be fixed and retried.
+
+Nothing extracted by a model enters the workspace without an explicit human accept.
 
 ### Corpus Browser
 
 The corpus browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels.
 
-Reviewers can also import new synthetic passages from the browser. The import flow captures:
+Reviewers can also import passages directly. The import flow captures target text, translation, source label, author/year/license/consent record, unique topic tags, structured morpheme segmentation with complete target-token coverage, and consent restrictions.
 
-- Target text.
-- English translation.
-- Source label.
-- Author, year, license, and consent record.
-- Unique topic tags.
-- Structured morpheme segmentation with unique feature labels per morpheme and complete target-token coverage.
-- Synthetic-only access restrictions.
-
-The API validates the import before saving. It rejects duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, target text with symbols outside the selected language phonology inventory, segmentation surfaces that are not present in the target text, target tokens that are not covered by contiguous segmentation surfaces, morphemes that are not grounded by the selected language vocabulary surface or lemma, invalid synthetic consent metadata, and malformed payloads. Successful imports write audit metadata without storing private reviewer data.
+The API validates the import before saving. It rejects duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, segmentation surfaces that are not present in the target text, target tokens that are not covered by contiguous segmentation surfaces, consent-use values outside the allowed enum, and malformed payloads. When the language declares a phonology inventory, target text is also scanned against it; when the language has a lexicon, each morpheme must be grounded by a lexicon surface or lemma. Successful imports write audit metadata without storing private reviewer data.
 
 ### Note Review Queue
 
-The review queue shows generated draft notes beside their status, confidence, evidence count, and examples. Reviewers can:
+The review queue shows draft notes beside their status, confidence, evidence count, and examples. Notes come from accepted grammar-note drafts, the deterministic study loop, or earlier review work. Reviewers can:
 
 - Approve notes.
 - Contest, reject, defer, or escalate notes with required comments.
@@ -69,18 +65,18 @@ Repeated contested, rejected, deferred, or escalated decisions for the same note
 
 The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.
 
-Reviewers can author compact synthetic exercises from the web UI. Exercise authoring is validated server-side against:
+Reviewers can author compact exercises from the web UI. Exercise authoring is validated server-side against:
 
 - Known language IDs.
-- Known grammar-rule IDs, with duplicates rejected after whitespace normalization.
-- Known vocabulary forms, with duplicates rejected after whitespace normalization.
+- Known grammar-rule IDs from the language's notes, with duplicates rejected after whitespace normalization.
+- Known vocabulary forms from the language's lexicon once the lexicon is non-empty, with duplicates rejected after whitespace normalization.
 - Non-empty expected answers that are unique after whitespace normalization.
-- At least two private adversarial answer probes that do not duplicate expected answers or one another after whitespace normalization.
-- Substantive grading explanations.
+- At least two private adversarial answer probes that do not duplicate expected answers or one another.
+- Substantive prompts and grading explanations.
 
 ### Evaluation Dashboard
 
-The evaluation dashboard shows latest synthetic evaluation runs, category scores, regression trends, and failure lines. The local evaluation harness currently scores these categories:
+The evaluation dashboard shows latest evaluation runs, category scores, regression trends, and failure lines. The local evaluation harness scores these categories:
 
 - Note coverage.
 - Note accuracy.
@@ -90,18 +86,16 @@ The evaluation dashboard shows latest synthetic evaluation runs, category scores
 - Exercise grading.
 - Generation-policy checks.
 
-The seeded baseline currently scores all four synthetic languages at 100%.
-
-Programmers can export a sanitized evaluation artifact from this view. The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, SHA-256 integrity metadata, and aggregate fixture-quality readiness across the synthetic language set. The web confirmation includes the fixture-check pass count so reviewers can see baseline data depth without opening the JSON first.
+Programmers can export a sanitized evaluation artifact from this view. The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, and SHA-256 integrity metadata.
 
 ### Governance
 
 The governance view exposes local prototype safety rails:
 
-- Synthetic consent, access, and generation policy records.
+- Consent, access, and generation policy records.
 - Review-policy assignment and approval thresholds.
 - Review-disposition work records for contested, rejected, deferred, and escalated notes.
-- A filtered audit ledger for synthetic data mutations.
+- A filtered audit ledger for workspace mutations, including ingestion activity.
 - Sanitized single-language snapshot exports with SHA-256 integrity manifests.
 
 These features are prototype scaffolding. They do not replace real community ownership, consent, legal review, or production access control.
@@ -112,9 +106,9 @@ The Elder workspace shows public note/corpus context and correction records for 
 
 ### Model Setup
 
-The model setup view reports server-side LLM provider readiness and AI session observability. Browser code never receives provider API keys.
+The model setup view reports server-side LLM provider readiness, transcription readiness, and AI session observability. Browser code never receives provider API keys.
 
-Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics.
+Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics.
 
 ## Local User Roles
 
@@ -132,8 +126,8 @@ The browser prototype flow is leadless on purpose. It opens HTTP-only local sess
 The browser actor mapping is:
 
 - Learner: learner exercise submissions and learner-practice AI sessions.
-- Elder: synthetic governance records and elder-correction review/apply flows.
-- Reviewer: corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
+- Elder: governance records and elder-correction review/apply flows.
+- Reviewer: language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
 - Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, AI observability, and neural-map inspection.
 
 Lead and admin identities still exist in the local state for backend authorization, persisted review-policy authority, audit integrity, and future production-account design. Review-policy edits from the browser are audited as reviewer activity, while the stored policy updater remains the canonical lead/admin authority required by local database validation.
@@ -142,9 +136,9 @@ Prototype auth exists to test workflow permissions. Replace it before production
 
 ## Export Surfaces
 
-Sanitized language snapshots include public language metadata, linguistic profile data, semantic domains, register profiles, dialect histories, discourse examples, teaching sequences, the same synthetic fixture quality floor and actual-vs-minimum quality checks shown in the profile view, corpus, public review notes, public learner exercises, governance records, and evaluation summaries. The web download summary includes semantic-domain, register-profile, discourse-example, teaching-sequence, and fixture-quality pass counts so reviewers can see baseline readiness before opening the JSON artifact.
+Sanitized language snapshots (`language-snapshot-v2`) include public language metadata, the state-derived linguistic profile (phonology, vocabulary, morpheme inventory, grammar rules, and stats), corpus, public review notes, public learner exercises, governance records, and evaluation summaries.
 
-Sanitized evaluation artifacts include latest evaluation runs, latest-vs-previous trend records, failure lines, aggregate gate metadata, aggregate fixture-quality readiness, and integrity metadata. They summarize fixture checks across all exported synthetic languages so the artifact can be reviewed as both an evaluation-health and data-depth record.
+Sanitized evaluation artifacts (`evaluation-artifact-v2`) include latest evaluation runs, latest-vs-previous trend records, failure lines, aggregate gate metadata, and integrity metadata.
 
 Exports intentionally omit:
 

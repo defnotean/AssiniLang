@@ -6,10 +6,10 @@ This folder is the detailed handbook for AssiniLang. The root README stays short
 
 1. [Product Guide](product-guide.md): what the prototype does and how each workspace is meant to be used.
 2. [UI Design Guide](ui-design.md): how the `AssiniLang.html` design handoff maps to the real React app.
-3. [Architecture And Data](architecture.md): how the apps, packages, fixtures, persistence, validation, and redaction layers fit together.
+3. [Architecture And Data](architecture.md): how the apps, packages, ingestion pipeline, persistence, validation, and redaction layers fit together.
 4. [API Reference](api.md): route behavior, auth expectations, mutation rules, and important payload shapes.
-5. [Development Guide](development.md): setup, commands, testing, browser verification, and adding synthetic languages.
-6. [Roadmap](roadmap.md): what must happen before real language material can be used.
+5. [Development Guide](development.md): setup, commands, testing, browser verification, and model/transcription configuration.
+6. [Roadmap](roadmap.md): what must happen before real community language material can be used.
 
 ## Historical Design Docs
 
@@ -18,4 +18,4 @@ This folder is the detailed handbook for AssiniLang. The root README stays short
 
 ## Project Principle
 
-AssiniLang is synthetic-only until governance, consent, access control, review, and production security are ready. Treat the current system as a research console and quality gate for invented data, not as a live community-language platform.
+AssiniLang works only on data its users create and ingest themselves, with consent and provenance tracked per passage. Do not connect real First Nations, Indigenous, or community language material until governance, consent, access control, review, and production security are ready. Treat the current system as a research console and quality gate, not as a live community-language platform.

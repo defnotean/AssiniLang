@@ -14,11 +14,12 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "check": "tsc -b packages/db packages/synthetic-langs packages/eval apps/api apps/web",
+    "check": "tsc -b packages/db packages/eval apps/api apps/web",
     "test": "vitest run --passWithNoTests",
-    "seed": "npm --workspace @assini/synthetic-langs run seed",
+    "seed": "npm --workspace @assini/db run seed",
     "eval": "npm --workspace @assini/eval run eval",
     "verify": "node scripts/verify.mjs",
+    "smoke": "tsx scripts/smokeIngestion.mjs",
     "dev": "node scripts/dev.mjs",
     "demo": "npm run seed && npm run eval && npm run dev"
   },

@@ -1,6 +1,6 @@
 # Development Guide
 
-This guide covers local setup, verification, browser checks, and synthetic-language authoring.
+This guide covers local setup, verification, browser checks, and model/transcription configuration.
 
 ## Requirements
 
@@ -28,7 +28,7 @@ The verifier runs:
 
 1. Vitest.
 2. TypeScript project checks.
-3. Synthetic seed generation.
+3. Empty-workspace seed.
 4. Deterministic evaluation.
 5. Workspace builds.
 
@@ -67,7 +67,26 @@ npm.cmd run dev
 npm.cmd run demo
 ```
 
-This seeds synthetic data, runs evaluation, and starts both local services.
+This seeds the empty workspace, runs evaluation, and starts both local services.
+
+## Model And Transcription Configuration
+
+Extraction quality depends on the configured local model. All provider configuration is server-side environment variables; the browser only sees sanitized readiness from `GET /llm/status`.
+
+- `ASSINI_LLM_PROVIDER`: `deterministic`, `openai-compatible`, `lm-studio`, `ollama`, or `openai`.
+- `ASSINI_LLM_BASE_URL`: OpenAI-compatible base URL (for example `http://127.0.0.1:11434/v1` for Ollama).
+- `ASSINI_LLM_MODEL`: model name.
+- `ASSINI_LLM_API_KEY` or `OPENAI_API_KEY`: server-side key when the endpoint needs one.
+- `ASSINI_LLM_TIMEOUT_MS`: positive integer timeout.
+- `ASSINI_TRANSCRIBE_BASE_URL`: OpenAI-compatible `/audio/transcriptions` server for audio sources (for example a local whisper server). Required before audio sources can be processed.
+- `ASSINI_TRANSCRIBE_MODEL`: transcription model name (defaults to `whisper-1`).
+- `ASSINI_TRANSCRIBE_API_KEY`: optional transcription key.
+
+Behavior by configuration:
+
+- `deterministic` (the default) has no real model. Text and word-list sources fall back to offline heuristic parsing of delimited lines; image sources are rejected with a setup hint.
+- Image sources need a vision-capable OpenAI-compatible model (for example llava via Ollama).
+- Audio sources need `ASSINI_TRANSCRIBE_BASE_URL`; the transcript then flows through normal text extraction.
 
 ## Browser Verification
 
@@ -76,46 +95,27 @@ For frontend changes, verify the user workflow in a browser in addition to autom
 Useful smoke checks:
 
 - Page title loads as `AssiniLang`.
-- Four language buttons are visible.
+- A new language can be created and appears in the sidebar.
+- A pasted word-list source can be registered, processed, and its extraction drafts reviewed.
+- Accepting a lexeme draft updates the language's lexicon and profile counts.
 - Corpus Browser shows target text, translations, segmentation, and import controls.
-- Corpus import can create a validated synthetic passage and refresh the visible passage count.
+- Corpus import can create a validated passage and refresh the visible passage count.
 - Note Review Queue shows statuses and evidence counts.
 - Learning Lab grades a correct answer.
 - Evaluation Dashboard can run a system eval.
 - Governance view can load policy, audit, disposition, and export controls.
 
-## Adding A Synthetic Language
+## Building A Language From Raw Sources
 
-Add fixture data in `packages/synthetic-langs/src/fixtures.ts`.
+The workspace has no hardcoded language data. To populate a language locally:
 
-The authoritative richness floor is `SYNTHETIC_FIXTURE_MINIMUMS` in `packages/synthetic-langs/src/validation.ts`. Update that exported contract first when raising fixture depth, then update docs and tests to match. Use `buildSyntheticFixtureQualityActuals` and `summarizeSyntheticFixtureQuality` from the same package for any actual-vs-minimum reporting instead of recreating quality-check labels or ordering in API or UI code.
+1. Create the language (`POST /languages` or the web console) with a name, typology, description, orthography, and optionally a phonology inventory. Declaring the inventory enables orthography validation for later corpus text.
+2. Register or upload raw sources for it: pasted text, word lists, URLs, or files including images and audio.
+3. Process each source (`POST /sources/:sourceId/process`) and review the proposed extraction drafts.
+4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.
+5. Author exercises against the accepted notes and lexicon, then run evaluation.
 
-Each language should include:
-
-- Language metadata.
-- Structured phonology and phonotactic notes that cover public vocabulary, corpus, and paradigm forms.
-- At least two paradigm tables with vocabulary-backed morphemes.
-- At least two public dialect variants with phonology, lexical, grammar, history, and example-phrase notes.
-- At least two history events per dialect variant, each with a nonblank period, description, and same-language corpus evidence IDs.
-- At least 24 public vocabulary items, including enough roots, particles, affixes, endings, or prefixes to support the language typology. Vocabulary IDs, normalized forms, and per-item tags must be unique.
-- At least three semantic domains, each with a nonblank label and description, at least three existing vocabulary IDs, at least one same-language corpus evidence ID, and nonblank usage notes.
-- At least two register profiles, each with a nonblank label, usage context, style label, same-language semantic-domain IDs, discourse-example IDs, teaching-sequence IDs, corpus evidence IDs, and usage notes.
-- At least six grammar rules.
-- At least 12 corpus passages.
-- Morphological segmentation.
-- Six note answer keys derived from those grammar rules.
-- At least six learner exercise answer keys.
-- Every grammar rule should be covered by a note answer key and by at least one learner exercise allow-list.
-- At least two exercise types.
-- Two curated adversarial probes per exercise.
-- At least three discourse examples.
-- At least two teaching sequences that cite existing grammar rules, corpus passages, and learner exercises, with intro/practice/review levels and nonblank ordered steps.
-
-After adding or editing fixtures:
-
-```powershell
-npm.cmd run verify
-```
+Validation tightens as the language grows: phonology scans apply once an inventory is declared, and morpheme grounding plus vocabulary checks apply once the lexicon is non-empty.
 
 ## Editing API Public Shapes
 
@@ -150,8 +150,10 @@ When adding a workflow:
 
 ## Generated Files
 
-Generated local data and build output are ignored by Git. Regenerate local state with:
+Generated local data and build output are ignored by Git. Uploaded source files are stored under `data/assets/`. Reset the local workspace with:
 
 ```powershell
 npm.cmd run seed
 ```
+
+Legacy local databases from earlier schema versions (v1-v7) migrate forward automatically on read; reseeding is only needed when you want a clean workspace.

@@ -12,7 +12,7 @@ export function draftNotesForLanguage(languageId: string, state: AppState): Note
     reviewer: {
       lastReviewedBy: null,
       lastReviewedAt: null,
-      comments: ["Deterministic draft generated from synthetic fixture evidence."]
+      comments: ["Deterministic draft generated from stored answer-key evidence."]
     },
     editHistory: [
       ...note.editHistory.map((entry) => ({ ...entry })),
@@ -20,7 +20,7 @@ export function draftNotesForLanguage(languageId: string, state: AppState): Note
         at: new Date(0).toISOString(),
         by: "deterministic-study-loop",
         action: "drafted",
-        summary: "Created draft note from answer-key fixture for baseline evaluation."
+        summary: "Created draft note from the stored answer key for baseline evaluation."
       }
     ]
   }));

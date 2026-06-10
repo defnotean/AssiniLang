@@ -1,25 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { buildSeedState } from "@assini/synthetic-langs";
+import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
 import { gradeExerciseAnswer, scoreLanguageEvaluation } from "./scoring";
 import { draftNotesForLanguage } from "./studyLoop";
 
 describe("evaluation scoring", () => {
   it("grades accepted and rejected exercise answers", () => {
-    const state = buildSeedState();
-    const exercise = state.exercises.find((item) => item.id === "avn-ex001");
-    if (!exercise) throw new Error("Missing avn-ex001");
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
 
-    expect(gradeExerciseAnswer(exercise, "mira talo-mi-na").accepted).toBe(true);
-    expect(gradeExerciseAnswer(exercise, "talo mira").accepted).toBe(false);
+    expect(gradeExerciseAnswer(exercise, "saku talo-ki").accepted).toBe(true);
+    expect(gradeExerciseAnswer(exercise, "talo saku").accepted).toBe(false);
   });
 
-  it("scores a synthetic language against the gold answer key", () => {
-    const state = buildSeedState();
-    const language = state.languages.find((item) => item.id === "avenik");
-    if (!language) throw new Error("Missing Avenik");
+  it("scores a clean workspace language at full marks", () => {
+    const state = buildTestWorkspaceState();
 
-    const drafted = draftNotesForLanguage(language.id, state);
-    const result = scoreLanguageEvaluation(language.id, state, drafted);
+    const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, drafted);
 
     expect(result.scores.noteCoverage).toBe(1);
     expect(result.scores.evidenceAccuracy).toBe(1);
@@ -27,29 +25,29 @@ describe("evaluation scoring", () => {
   });
 
   it("scores corpus translations against answer-key text", () => {
-    const state = buildSeedState();
-    const passage = state.corpus.find((item) => item.id === "avn-c001");
-    if (!passage) throw new Error("Missing avn-c001");
+    const state = buildTestWorkspaceState();
+    const passage = state.corpus.find((item) => item.id === "testlang-c001");
+    if (!passage) throw new Error("Missing testlang-c001");
 
     passage.textTranslation = "A fluent but wrong translation.";
 
-    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.translationAccuracy).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "translationAccuracy",
-          itemId: "avn-c001"
+          itemId: "testlang-c001"
         })
       ])
     );
   });
 
   it("scores corpus segmentations against answer-key morphemes", () => {
-    const state = buildSeedState();
-    const passage = state.corpus.find((item) => item.id === "avn-c002");
-    if (!passage) throw new Error("Missing avn-c002");
+    const state = buildTestWorkspaceState();
+    const passage = state.corpus.find((item) => item.id === "testlang-c002");
+    if (!passage) throw new Error("Missing testlang-c002");
 
     passage.morphologicalSegmentation = [
       { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
@@ -57,30 +55,30 @@ describe("evaluation scoring", () => {
       { surface: "-ki", lemma: "-ki", gloss: "3sg", features: ["person"] }
     ];
 
-    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.segmentationAccuracy).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "segmentationAccuracy",
-          itemId: "avn-c002"
+          itemId: "testlang-c002"
         })
       ])
     );
   });
 
   it("scores drafted notes against immutable answer keys instead of mutable reviewed notes", () => {
-    const state = buildSeedState();
-    const reviewedNote = state.notes.find((note) => note.id === "avn-rule-verb-chain-note");
+    const state = buildTestWorkspaceState();
+    const reviewedNote = state.notes.find((note) => note.id === "testlang-note-basic-order");
     if (!reviewedNote) throw new Error("Missing reviewed note");
 
     reviewedNote.explanation = "Reviewed note text that should not become the gold answer.";
 
     const result = scoreLanguageEvaluation(
-      "avenik",
+      TEST_LANGUAGE_ID,
       state,
-      state.notes.filter((note) => note.languageId === "avenik")
+      state.notes.filter((note) => note.languageId === TEST_LANGUAGE_ID)
     );
 
     expect(result.scores.noteAccuracy).toBeLessThan(1);
@@ -88,78 +86,72 @@ describe("evaluation scoring", () => {
       expect.arrayContaining([
         expect.objectContaining({
           category: "noteAccuracy",
-          itemId: "avn-rule-verb-chain-note"
+          itemId: "testlang-note-basic-order"
         })
       ])
     );
   });
 
   it("drafts baseline notes from immutable answer keys instead of reviewed notes", () => {
-    const state = buildSeedState();
-    const reviewedNote = state.notes.find((note) => note.id === "avn-rule-verb-chain-note");
+    const state = buildTestWorkspaceState();
+    const reviewedNote = state.notes.find((note) => note.id === "testlang-note-basic-order");
     if (!reviewedNote) throw new Error("Missing reviewed note");
 
     const originalExplanation = reviewedNote.explanation;
     reviewedNote.explanation = "Reviewed wording from the mutable queue.";
 
-    const drafted = draftNotesForLanguage("avenik", state);
+    const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
     const draftedNote = drafted.find((note) => note.topic === reviewedNote.topic);
 
     expect(draftedNote?.explanation).toBe(originalExplanation);
   });
 
-  it("rejects unapproved hyphenated forms in generation-policy scoring", () => {
-    const state = buildSeedState();
-    const exercise = state.exercises.find((item) => item.id === "avn-ex001");
-    if (!exercise) throw new Error("Missing avn-ex001");
+  it("rejects unapproved forms in generation-policy scoring", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
 
     exercise.expectedAnswers = ["mira rogue-form"];
 
-    const drafted = draftNotesForLanguage("avenik", state);
-    const result = scoreLanguageEvaluation("avenik", state, drafted);
+    const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, drafted);
 
     expect(result.scores.generationPolicy).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "generationPolicy",
-          itemId: "avn-ex001"
+          itemId: "testlang-ex-002"
         })
       ])
     );
   });
 
-  it("rejects extra or reordered allowed morphemes in generation-policy scoring", () => {
-    const state = buildSeedState();
-    const avenikExercise = state.exercises.find((item) => item.id === "avn-ex001");
-    const ketharuExercise = state.exercises.find((item) => item.id === "ket-ex002");
-    if (!avenikExercise) throw new Error("Missing avn-ex001");
-    if (!ketharuExercise) throw new Error("Missing ket-ex002");
+  it("rejects allowed-morpheme answers that do not exist in the corpus", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
 
-    avenikExercise.expectedAnswers = ["mira talo-mi-na-mi", "mira talo-na-mi"];
-    ketharuExercise.expectedAnswers = ["ka-se-lom-ra-ra"];
+    exercise.expectedAnswers = ["saku talo-ki-ki"];
 
-    const avenikResult = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
-    const ketharuResult = scoreLanguageEvaluation("ketharu", state, draftNotesForLanguage("ketharu", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
-    expect(avenikResult.scores.generationPolicy).toBeLessThan(1);
-    expect(ketharuResult.scores.generationPolicy).toBeLessThan(1);
-    expect([...avenikResult.failures, ...ketharuResult.failures]).toEqual(
+    expect(result.scores.generationPolicy).toBeLessThan(1);
+    expect(result.failures).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ category: "generationPolicy", itemId: "avn-ex001" }),
-        expect.objectContaining({ category: "generationPolicy", itemId: "ket-ex002" })
+        expect.objectContaining({ category: "generationPolicy", itemId: "testlang-ex-002" })
       ])
     );
   });
 
   it("emits traceable accuracy and evidence failures when a drafted note is missing", () => {
-    const state = buildSeedState();
-    const drafted = draftNotesForLanguage("avenik", state);
+    const state = buildTestWorkspaceState();
+    const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
     const missingNote = drafted[0];
     if (!missingNote) throw new Error("Missing drafted note");
 
     const result = scoreLanguageEvaluation(
-      "avenik",
+      TEST_LANGUAGE_ID,
       state,
       drafted.filter((note) => note.id !== missingNote.id)
     );
@@ -177,103 +169,94 @@ describe("evaluation scoring", () => {
   });
 
   it("scores exercise grading with deterministic negative probes", () => {
-    const state = buildSeedState();
-    const exercise = state.exercises.find((item) => item.id === "avn-ex001");
-    if (!exercise) throw new Error("Missing avn-ex001");
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
 
-    exercise.expectedAnswers = [...exercise.expectedAnswers, "talo-mi-na mira"];
+    exercise.expectedAnswers = [...exercise.expectedAnswers, "talo-ki saku"];
 
-    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.exerciseGrading).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "exerciseGrading",
-          itemId: "avn-ex001"
+          itemId: "testlang-ex-002"
         })
       ])
     );
   });
 
   it("scores exercise grading against curated adversarial answer probes", () => {
-    const state = buildSeedState();
-    const exercise = state.exercises.find((item) => item.id === "avn-ex001");
-    if (!exercise) throw new Error("Missing avn-ex001");
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
 
     exercise.adversarialAnswers = [
-      { answer: "mira talo-mi-na", reason: "Matches an expected answer and must be detected as an unsafe probe." }
+      { answer: "saku talo-ki", reason: "Matches an expected answer and must be detected as an unsafe probe." }
     ];
 
-    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.exerciseGrading).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "exerciseGrading",
-          itemId: "avn-ex001",
+          itemId: "testlang-ex-002",
           message: "Curated adversarial answer was accepted by the grader."
         })
       ])
     );
   });
 
+  it("accepts valid segment answers for suffix chains", () => {
+    const state = buildTestWorkspaceState();
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.generationPolicy).toBe(1);
+    expect(result.failures.filter((failure) => failure.itemId === "testlang-ex-003")).toHaveLength(0);
+  });
+
   it("rejects segment answers that collapse required morpheme boundaries", () => {
-    const state = buildSeedState();
-    const exercise = state.exercises.find((item) => item.id === "avn-ex002");
-    if (!exercise) throw new Error("Missing avn-ex002");
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-003");
+    if (!exercise) throw new Error("Missing testlang-ex-003");
 
     exercise.expectedAnswers = [...exercise.expectedAnswers, "nemi-lo -ki"];
 
-    const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.generationPolicy).toBeLessThan(1);
     expect(result.failures).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           category: "generationPolicy",
-          itemId: "avn-ex002"
+          itemId: "testlang-ex-003"
         })
       ])
     );
   });
 
-  it("accepts valid segment answers for fused surface forms", () => {
-    const state = buildSeedState();
-
-    const result = scoreLanguageEvaluation("velari", state, draftNotesForLanguage("velari", state));
-
-    expect(result.scores.generationPolicy).toBe(1);
-    expect(result.failures.filter((failure) => failure.itemId === "vel-ex002")).toHaveLength(0);
-  });
-
-  it("accepts valid segment answers for linked predicate prefix chains", () => {
-    const state = buildSeedState();
-
-    const result = scoreLanguageEvaluation("ketharu", state, draftNotesForLanguage("ketharu", state));
-
-    expect(result.scores.generationPolicy).toBe(1);
-    expect(result.failures.filter((failure) => failure.itemId === "ket-ex006")).toHaveLength(0);
-  });
-
   it.each(["nemi -ki -lo", "nemi -lo -ki -ki"])(
     "rejects malformed segment answer %s even when it is listed as expected",
     (malformedAnswer) => {
-      const state = buildSeedState();
-      const exercise = state.exercises.find((item) => item.id === "avn-ex002");
-      if (!exercise) throw new Error("Missing avn-ex002");
+      const state = buildTestWorkspaceState();
+      const exercise = state.exercises.find((item) => item.id === "testlang-ex-003");
+      if (!exercise) throw new Error("Missing testlang-ex-003");
 
       exercise.expectedAnswers = [...exercise.expectedAnswers, malformedAnswer];
 
-      const result = scoreLanguageEvaluation("avenik", state, draftNotesForLanguage("avenik", state));
+      const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
       expect(result.scores.generationPolicy).toBeLessThan(1);
       expect(result.failures).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             category: "generationPolicy",
-            itemId: "avn-ex002"
+            itemId: "testlang-ex-003"
           })
         ])
       );

@@ -6,12 +6,11 @@ AssiniLang is organized as a local-first TypeScript monorepo. The system keeps p
 
 ```text
 apps/
-  api/                 Fastify API, auth checks, route handlers, redaction, snapshots, and LLM provider wiring.
+  api/                 Fastify API, auth checks, route handlers, raw-source ingestion pipeline, redaction, snapshots, and LLM/transcription provider wiring.
   web/                 React research console.
 
 packages/
-  db/                  Zod schemas, TypeScript types, JSON persistence, and migration helpers.
-  synthetic-langs/     Synthetic fixtures, fixture validation, and seed-state construction.
+  db/                  Zod schemas, TypeScript types, JSON persistence, migrations, and the empty-workspace bootstrap/seed CLI.
   eval/                Deterministic study-loop generation, answer grading, and evaluation scoring.
 
 docs/                  Product, architecture, API, development, roadmap, spec, and plan docs.
@@ -19,49 +18,49 @@ docs/                  Product, architecture, API, development, roadmap, spec, a
 
 ## Data Flow
 
-1. Synthetic fixture data is defined in `packages/synthetic-langs/src/fixtures.ts`.
-2. Fixture validation runs before seed-state construction.
-3. `npm.cmd run seed` writes generated local state to `data/local-db.json`.
-4. The Fastify API reads and mutates the JSON-backed state through `JsonStore`.
-5. Public projection helpers strip private fields before data reaches the web app.
-6. The React app drives review, corpus import, exercise submission, governance, exports, and observability workflows through API calls.
-7. `npm.cmd run eval` compares generated and mutable state against immutable answer keys.
+1. `npm.cmd run seed` writes an empty workspace to `data/local-db.json`: the local prototype users and no languages.
+2. Users create languages through `POST /languages` with name, typology, description, orthography, and an optional phonology inventory.
+3. Raw materials are registered or uploaded as source assets: pasted text, word lists, URLs, images, audio, and plain-text documents.
+4. `POST /sources/:sourceId/process` runs the ingestion pipeline, turning a source asset into proposed extraction drafts.
+5. Reviewers accept or reject each draft. Accepted drafts commit lexemes, corpus passages with private answer keys, or grammar notes.
+6. The Fastify API reads and mutates the JSON-backed state through `JsonStore`; public projection helpers strip private fields before data reaches the web app.
+7. The React app drives ingestion, review, corpus import, exercise submission, governance, exports, and observability workflows through API calls.
+8. `npm.cmd run eval` compares drafted and mutable state against immutable answer keys.
 
-## Synthetic Fixtures
+## Core Collections
 
-Each synthetic language should include:
+The persisted app state (schemaVersion 8) keeps these collections beside the existing corpus, notes, exercises, governance, review, and audit records:
 
-- Language metadata.
-- Structured phonology and phonotactic notes.
-- Public vocabulary with at least 24 lexemes, particles, endings, prefixes, or other usable forms.
-- At least 12 corpus passages with translation and morpheme segmentation.
-- At least 6 grammar rules.
-- At least 6 note answer keys.
-- At least 6 learner exercise answer keys.
-- At least two private adversarial exercise probes.
-- Paradigm tables.
-- Semantic domains that group core vocabulary, cite same-language corpus evidence, and explain usage patterns.
-- Register profiles that describe style/use contexts and link to semantic domains, discourse examples, teaching sequences, and corpus evidence.
-- Dialect variants with history timelines.
-- Discourse examples.
-- Teaching sequences that reference real grammar rules, corpus passages, and learner exercises.
+- `languages`: user-created language records. `status` is `active`, `draft`, or `archived`. Each language may carry an optional `phonology` object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) plus optional `createdBy` and `createdAt` fields.
+- `lexemes`: the per-language lexicon. Each lexeme keeps `form`, `gloss`, `partOfSpeech`, `tags`, and `sourceAssetIds` linking it back to the raw materials it came from.
+- `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a `filePath` under `data/`, plus an optional `transcript` for audio.
+- `extractionDrafts`: reviewable extraction output. `kind` is `lexeme`, `corpus_passage`, or `grammar_note`; each draft carries a `payload`, a `confidence` level, an optional `rationale`, and a `status` of `proposed`, `accepted`, or `rejected` with `reviewedBy`/`reviewedAt` and a `committedEntityId` once accepted.
 
-The shared `SYNTHETIC_FIXTURE_MINIMUMS` export in `packages/synthetic-langs/src/validation.ts` is the source of truth for the current fixture depth floor; tests and docs should reference or mirror that contract when the baseline changes. Public language profiles and sanitized snapshots derive `fixtureQuality` checks from `buildSyntheticFixtureQualityActuals` and `summarizeSyntheticFixtureQuality` in the same package, so reviewers can compare actual public profile depth, including semantic-domain, register-profile, dialect-history, discourse-example, and teaching-sequence coverage, against the current minimums without exposing private answer-key content.
+`consentStatus.use` on corpus passages is an enum (`CONSENT_USE_VALUES`): `testing-only`, `community-approved`, `personal-study`, `research`, `public-domain`, `licensed`, or `pending-review`.
 
-Fixture loading validates cross-references, linguistic consistency, and fixture depth. It rejects broken evidence IDs, duplicate IDs, duplicate vocabulary IDs or forms, duplicate vocabulary tags, empty semantic-domain labels, semantic domains below the vocabulary floor, semantic domains that reference missing vocabulary IDs or corpus passages, empty register-profile labels/context/style labels, register profiles below the fixture floor, register profiles with duplicate or missing semantic-domain, discourse-example, teaching-sequence, corpus-evidence, or usage-note references, empty dialect labels, undersized phonology inventories, missing stress or syllable-template metadata, lexicons below 24 public vocabulary items, corpus/rule/note/exercise/paradigm/semantic-domain/register-profile/dialect/dialect-history/discourse-example/teaching-sequence sets below the synthetic milestone floor, dialect histories with blank summaries, blank period/description fields, duplicate period or evidence labels, or evidence IDs that do not resolve to same-language corpus passages, discourse examples with blank function/context/target/translation/note fields or target text outside the phonology inventory, teaching sequences with blank title/objective/step fields, invalid intro/practice/review levels, duplicate references, or references to missing rules, corpus passages, or exercises, grammar rules without note or learner-exercise coverage, mismatched language IDs, public forms outside the phonology inventory, corpus tokens that are not covered by segmentation, corpus morphemes not grounded by vocabulary surface or lemma, duplicate corpus topic tags, duplicate morpheme feature labels, missing exercise rules, unknown or duplicate allowed exercise vocabulary and rules, duplicate expected exercise answers, invalid particle answers, target-language answers absent from the corpus, adversarial probes that duplicate accepted answers or one another, note evidence-count drift, and note examples that no longer match their cited corpus passage.
+## Ingestion Pipeline
 
-Validation rules live in `packages/synthetic-langs/src/validation.ts`; seed-state cloning and answer-key materialization live in `packages/synthetic-langs/src/loader.ts`.
-The shared orthography scanner is exported so fixture validation and live API imports use the same phonology-inventory rules.
+Source processing lives in `apps/api/src/ingestion.ts` and is driven by the server-side LLM provider:
+
+- `text` and `wordlist` sources go to LLM extraction. When no real model is configured (deterministic mode), an offline heuristic parses delimited lines (`=`, `-`, tab, pipe) into low-confidence lexeme or passage drafts instead.
+- `url` sources are fetched server-side (http/https only, size-capped), converted from HTML to text, then extracted.
+- `image` sources require a vision-capable OpenAI-compatible model; the image is sent as base64 content.
+- `audio` sources are transcribed through an OpenAI-compatible `/audio/transcriptions` endpoint (`ASSINI_TRANSCRIBE_BASE_URL`), then the transcript goes through LLM extraction.
+- `document` sources are limited to plain-text formats (txt, md, csv, tsv, json) for now.
+
+Extraction output is never committed directly. Accepting a draft commits a lexeme, a corpus passage (with a derived private answer key; missing or incomplete segmentation falls back to honest token-level "unanalyzed" morphemes), or a grammar note that enters the normal review workflow as a `draft`. Uploaded files are stored under `data/assets/` with a 25 MB cap per file.
 
 ## Local Persistence
 
 The generated local database lives at `data/local-db.json`. `JsonStore` writes through a temporary file and rename so normal writes are atomic.
 
-Persisted top-level records must keep stable nonblank unique IDs inside each app-state collection. The schema rejects duplicate IDs for languages, corpus passages, notes, exercises, submissions, evaluations, governance records, users, AI sessions, elder corrections, audit events, review policies, review approvals, and review dispositions; corpus answer keys are unique by nonblank source passage ID and must point at an existing same-language corpus passage. Persisted language records must also keep public names, descriptions, orthography labels, and fixture-source labels nonblank so corrupted local JSON cannot publish empty language catalog entries.
+The current schema version is 8. Legacy v1-v7 local databases migrate forward automatically on read; older state gains empty `lexemes`, `sourceAssets`, and `extractionDrafts` collections and keeps its existing records.
 
-Seeded local databases include six local user identities used by review policies, audit attribution, and backend authorization: learner, Elder, reviewer, lead, programmer, and admin. The web console opens HTTP-only prototype sessions only for learner, Elder, reviewer, and programmer users; lead/admin identities remain server-token authorities for persisted policy ownership and administrative workflows. The API still falls back to the same shared prototype-user list when reading older local databases with an empty `users` array. Persisted user records must keep nonblank IDs and names, and optional avatar URLs must be nonblank when present, so local auth, review assignment, and audit attribution do not depend on empty user identities.
+Persisted top-level records must keep stable nonblank unique IDs inside each app-state collection. The schema validates referential integrity during local JSON reads: language IDs on corpus, notes, exercises, lexemes, sourceAssets, extractionDrafts, and governance/review/audit records must resolve to existing languages; answer keys must point at existing same-language passages; actor attribution must use known local users in allowed roles; timestamps must stay parseable and chronologically consistent. Corrupted or manually edited local JSON fails loudly with the exact database path instead of leaking malformed records into public views.
 
-If the file is manually edited or corrupted, startup/read errors include the exact database path. Regenerate the synthetic baseline with:
+Seeded local databases include six local user identities used by review policies, audit attribution, and backend authorization: learner, Elder, reviewer, lead, programmer, and admin. The web console opens HTTP-only prototype sessions only for learner, Elder, reviewer, and programmer users; lead/admin identities remain server-token authorities for persisted policy ownership and administrative workflows.
+
+Regenerate the empty workspace with:
 
 ```powershell
 npm.cmd run seed
@@ -82,78 +81,51 @@ The state separates mutable review records from immutable answer keys:
 
 This matters because the system must not evaluate itself against whatever a reviewer last edited.
 
-Seeded fixtures derive corpus answer keys from each seeded corpus passage. Live corpus imports do the same after validation, storing the imported passage publicly while adding a private answer key for evaluation. Persisted app-state reads reject corpus answer keys that reference missing passages, carry a different language ID than the passage they key, contain blank target text, translation, morpheme surface, lemma, gloss, or feature labels, duplicate morpheme feature labels after whitespace normalization, or lose their own target-text segmentation coverage.
-
-Persisted corpus passages must keep nonblank language IDs that reference existing synthetic languages; keep nonblank source labels, source author, source license, source consent record, target text, translation, consent restrictions, morpheme surfaces, morpheme lemmas, and morpheme glosses; keep at least one nonblank topic tag; keep duplicate-free topic tags and morpheme feature lists after whitespace normalization; use segmentation surfaces that appear in the target text; and cover every target-text token with one or more contiguous segmentation surfaces. Persisted corpus answer keys must keep nonblank passage and language IDs tied to existing same-language corpus passages. The persisted DB layer does not check phonology inventory or vocabulary grounding because those depend on synthetic fixture metadata; those checks stay in `packages/synthetic-langs` and the live corpus import route.
-
-Persisted notes and note answer keys must keep nonblank language IDs that reference existing synthetic languages. Their topic, explanation, and dialect-scope text must remain nonblank; their evidence counts must match their evidence passage ID lists; reviewer and edit-history timestamps must remain parseable when present; reviewer and edit-history actor IDs must be nonblank review-capable local users or reserved deterministic system actors; reviewer comments and edit-history summaries must remain nonblank; edit-history actions must stay inside the known note timeline vocabulary (`created`, `drafted`, `migrated`, `reviewed`, `disposition_resolved`, and `applied_correction`); evidence passage IDs must be nonblank and resolve to same-language corpus passages; and note examples must cite existing same-language corpus passages through nonblank passage IDs with matching target text and translation. These checks keep reviewer drafts, immutable note answer keys, public snapshots, and evaluation inputs anchored to real local corpus evidence after manual JSON edits or legacy migration.
-
-Persisted exercises must keep nonblank language IDs that reference an existing synthetic language, keep prompt and private grading explanation text nonblank, keep nonblank duplicate-free allowed rule IDs, allowed vocabulary, expected answers, and adversarial probes after whitespace normalization, require nonblank adversarial reasons, retain at least two adversarial probes, avoid adversarial answers that duplicate expected answers, keep translate-to-target expected answers present in same-language corpus text, and keep choose-particle expected answers inside the exercise's allowed vocabulary. Fixture-level rule and vocabulary existence checks stay in `packages/synthetic-langs` and the live API authoring route because the DB package deliberately has no dependency on fixture metadata.
-
-Persisted exercise submissions must keep nonblank exercise, language, and learner IDs, reference an existing exercise, match that exercise's language ID, keep nonblank private answer and grading-explanation text, keep a parseable submission timestamp, and use a known local actor with a role allowed to submit answers. This prevents manually edited local JSON from creating orphaned learner history or leaking malformed records through public submission views.
+Live corpus imports and accepted corpus extraction drafts both store the passage publicly while deriving a private corpus answer key from the validated target text, translation, and segmentation. Persisted reads reject answer keys that reference missing passages, cross language boundaries, carry blank text or morpheme fields, or lose their own segmentation coverage.
 
 ## Public Projection Layer
 
-Public data shaping belongs in `apps/api/src/publicLanguageViews.ts`.
+Public data shaping belongs in `apps/api/src/publicLanguageViews.ts`. Profiles and snapshots are derived entirely from workspace state:
 
-Keep these responsibilities there:
+- Vocabulary comes from the language's lexicon.
+- The morpheme inventory is derived from corpus segmentation with occurrence counts, passage IDs, glosses, features, and linked lexeme metadata.
+- Grammar rules are the language's public notes.
+- Stats include corpus, note, exercise, source-asset, and pending-extraction-draft counts.
 
-- Stripping answer keys from exercises.
+There are no fixture minimums or fixture-quality checks; an empty language simply has an empty profile.
+
+Keep these responsibilities in the projection layer:
+
+- Stripping answer keys, adversarial probes, and grading explanations from exercises.
 - Removing internal note markers.
-- Building rich language profiles.
-- Deriving public morpheme inventories from corpus segmentation and vocabulary metadata.
-- Cloning public semantic domains with only public vocabulary IDs, usage notes, and corpus evidence IDs.
-- Cloning public register profiles with style guidance and public semantic-domain, discourse-example, teaching-sequence, usage-note, and corpus-evidence IDs.
-- Cloning public dialect histories with only public corpus evidence IDs.
-- Cloning public teaching sequences with only public rule, corpus, exercise, and step references.
-- Building sanitized language snapshots.
-- Building sanitized evaluation artifacts.
-- Computing visible integrity manifests.
+- Building language profiles and sanitized language snapshots (`language-snapshot-v2`).
+- Building sanitized evaluation artifacts (`evaluation-artifact-v2`).
+- Computing visible SHA-256 integrity manifests.
 
 Route handlers should stay focused on auth, validation, mutation, and response status.
 
 ## Mutation And Audit Rules
 
-Mutating API routes append `AuditEvent` records when they change persistent state. Events record:
+Mutating API routes append `AuditEvent` records when they change persistent state, including language creation/updates, source registration/upload/processing, and extraction-draft accept/reject. Events record actor and role, action, entity type and ID, language ID, timestamp, a human-readable summary, and minimal metadata.
 
-- Actor and role.
-- Action.
-- Entity type and ID.
-- Language ID.
-- Timestamp.
-- Human-readable summary.
-- Minimal metadata.
+Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads. Persisted app-state reads reject blank audit fields, private payload keys, and secret-looking string values. Audit events must be attributable to a known local user whose role matches the event, and non-null `languageId` values must reference an existing language (`null` is reserved for global events).
 
-Audit metadata must not include learner answers, answer keys, provider prompts, hidden model traces, API keys, or other private payloads. Persisted app-state reads reject blank audit actions, entity IDs, and summaries, audit metadata with private payload keys such as learner answers, expected answers, answer keys, grading explanations, provider prompts, hidden chain-of-thought, API keys, tokens, or secrets; they also reject secret-looking string values.
-
-Persisted audit events must keep a parseable `at` timestamp, be attributable to a nonblank known local user, and store an actor role that matches that user. Non-null audit `languageId` values must be nonblank and reference an existing synthetic language; `null` is reserved for global events. These checks keep restored JSON from misrepresenting when or who performed a mutation or attaching events to non-existent languages.
-
-Governance records are local synthetic policy records, not production consent infrastructure. API writes and persisted restores require nonblank policy content and a parseable `effectiveDate`; persisted records must also keep nonblank language IDs that reference an existing synthetic language and be approved by a nonblank known Elder, lead, or admin user. This keeps local JSON restores aligned with the API mutation boundary and prevents orphaned, empty, misdated, or misattributed policy records from appearing in exports.
-
-Review-disposition ledger writes are de-duplicated per note, disposition, and open status. Reopening the same unresolved disposition updates the existing work record's reason, assignee, and due date while preserving original opened attribution and writing a new audit event for the update. Persisted disposition records must keep nonblank language and note IDs, reference an existing note in the same language, keep open work attached to notes currently in a disposition status, use nonblank assignable local users for assignee/opener/resolver fields, keep nonblank reason and resolution text, keep parseable `dueAt`, `openedAt`, and non-null `resolvedAt` fields, prevent resolved timestamps from predating opened timestamps, keep resolution fields empty while open, and include all resolution fields once resolved.
-
-Elder correction review is a one-way transition out of `pending_review`. Accepted, rejected, and applied corrections cannot be re-reviewed, which preserves reviewer attribution and keeps later note edits auditable. Persisted correction records must keep nonblank language IDs that reference an existing synthetic language, must keep nonblank same-language note or corpus targets when those IDs are present, keep correction text, rationale, and custom context text nonblank, use nonblank Elders/leads/admins for proposer and reviewer attribution, keep parseable proposal/review timestamps in chronological order, keep pending corrections free of review attribution, and include reviewer attribution once accepted, rejected, or applied. Applied corrections must remain note-linked because applying a correction mutates a note explanation and reopens that note for review.
-
-Review-policy records are validated both at the API mutation boundary and at the persisted app-state boundary. Assigned reviewers must be nonblank, unique, known local users, and in an assignable review role; approval thresholds must fit either the assigned reviewer list or the open assignable reviewer pool. Persisted policies are unique per synthetic language, must keep nonblank language IDs that reference an existing language, must keep a parseable update timestamp, and must use a nonblank updater ID for a known lead/admin user, except for `system-seed`, which is reserved for initial fixture policy generation.
-
-Review-approval records are unique per language, note, and reviewer. The local database schema rejects duplicate approval tuples, approvals with blank language, note, or reviewer IDs, approvals with unparseable approval timestamps, approvals for missing notes, approval language mismatches, approvals attached to notes outside `under_review` or `approved`, unknown reviewer IDs, and approvals from users outside assignable review roles so quorum counts cannot drift from malformed persisted records.
+Governance records, review policies, review approvals, review dispositions, and elder corrections keep the same validation and one-way state-transition rules as before: governance writes need Elder/lead/admin approval and a parseable effective date; review-disposition ledger writes are de-duplicated per note, disposition, and open status; elder correction review is a one-way transition out of `pending_review`; review-policy thresholds must fit the assigned reviewer list or the assignable reviewer pool; and approvals are unique per language, note, and reviewer.
 
 ## Corpus Import Integrity
 
-Corpus imports are treated as synthetic source-data mutations. They are role-gated and validated before persistence.
-
-The API rejects imports when:
+Corpus imports are role-gated and validated before persistence. The API rejects imports when:
 
 - The language ID is unknown.
 - The body is malformed.
 - Target text duplicates an existing passage for the language.
 - A segmentation surface does not appear in the target text.
 - A target-text token is not covered by one or more contiguous segmentation surfaces.
-- Target text uses a symbol outside the selected language phonology inventory.
-- A morpheme is not grounded by the selected language vocabulary surface or lemma.
-- Synthetic consent metadata is missing or not `synthetic-testing-only`.
+- Target text uses a symbol outside the language's declared phonology inventory. This orthography scan runs only when the language declares an inventory; languages without one skip the check.
+- A morpheme is not grounded by the language's lexicon (surface or lemma). Grounding is enforced only when the lexicon is non-empty, so early-stage languages can import freely.
+- `consentStatus.use` is not one of the `CONSENT_USE_VALUES` enum values.
 
-Successful imports append the passage, derive a private corpus answer key from the validated text/translation/segmentation, and write an audit event with source, morpheme count, tag count, consent-use label, and restriction count.
+Successful imports append the passage, derive a private corpus answer key, and write an audit event with source, morpheme count, tag count, consent-use label, and restriction count. Exercise authoring follows the same pattern: rules are validated against the language's notes and note answer keys, and vocabulary against its lexicon once the lexicon is non-empty.
 
 ## Evaluation Harness
 
@@ -167,9 +139,9 @@ Successful imports append the passage, derive a private corpus answer key from t
 - Exercise grading.
 - Generation policy.
 
-Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output.
+Most categories use a 96% minimum threshold. Generation policy requires 100% because unapproved forms should never enter learner-facing output. Evaluation runs record `fixtureVersion: "workspace-corpus-v1"` because the evaluated corpus is whatever the workspace currently contains.
 
-Persisted evaluation runs must keep nonblank language IDs that reference an existing synthetic language; keep nonblank system version, fixture version, score category, and summary text; keep a parseable creation timestamp; and each failure line must use a nonblank language ID matching the run it belongs to with a nonblank category, item ID, and diagnostic message. This keeps restored evaluation history traceable by language and prevents malformed local JSON from polluting dashboards or sanitized evaluation artifacts.
+Persisted evaluation runs must keep nonblank language IDs that reference an existing language, nonblank system version, fixture version, score categories, and summary text, a parseable creation timestamp, and failure lines that match their parent run's language.
 
 ## LLM Provider Boundary
 
@@ -182,7 +154,9 @@ Useful environment variables:
 - `ASSINI_LLM_MODEL`: model name.
 - `ASSINI_LLM_API_KEY` or `OPENAI_API_KEY`: server-side key.
 - `ASSINI_LLM_TIMEOUT_MS`: positive integer timeout.
+- `ASSINI_TRANSCRIBE_BASE_URL`: OpenAI-compatible `/audio/transcriptions` server for audio sources (for example a local whisper server).
+- `ASSINI_TRANSCRIBE_MODEL` and `ASSINI_TRANSCRIBE_API_KEY`: transcription model name and optional key.
 
-Provider errors are sanitized before returning to clients or storing observable session records.
+`GET /llm/status` reports provider readiness and transcription readiness without exposing keys. Provider errors are sanitized before returning to clients or storing observable session records.
 
-Persisted AI sessions must keep nonblank language and creator IDs, reference an existing synthetic language, be created by a known local user whose role is allowed for the session mode, keep nonblank thinking summaries, message content, trace labels, trace summaries, trace warnings, privacy redaction labels, and note/corpus context IDs, keep parseable session and message timestamps inside the session timeline, and use same-language note and corpus context IDs. This keeps restored observability records aligned with the live AI-session route and prevents malformed JSON from leaking empty diagnostics or impossible context graphs into model setup and neural-map views.
+Persisted AI sessions must keep nonblank language and creator IDs, reference an existing language, be created by a known local user whose role is allowed for the session mode, keep nonblank diagnostics and context IDs, and keep parseable timestamps inside the session timeline.

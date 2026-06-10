@@ -143,11 +143,11 @@ describe("fetchDashboardData", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const payload = {
-      source: "synthetic-field-lab",
+      source: "field-lab",
       sourceMetadata: {
         author: "reviewer-1",
         year: 2026,
-        license: "synthetic-only",
+        license: "cc-by",
         consentRecord: "local-review"
       },
       textTarget: "mira lumo-ke talo-mi-na",
@@ -159,8 +159,8 @@ describe("fetchDashboardData", () => {
       ],
       topicTags: ["movement", "locative"],
       consentStatus: {
-        use: "synthetic-testing-only" as const,
-        restrictions: ["synthetic-only"]
+        use: "testing-only" as const,
+        restrictions: ["internal-only"]
       }
     };
 
@@ -219,24 +219,23 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/llm/status", undefined);
   });
 
-  it("fetches encoded synthetic language profiles", async () => {
+  it("fetches encoded language profiles", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
         language: { id: "avenik/test language" },
         phonology: { consonants: [], vowels: [], syllableTemplate: "", stress: "", phonotactics: [] },
-        paradigms: [],
-        dialectVariants: [],
         vocabulary: [],
+        morphemeInventory: [],
         grammarRules: [],
         stats: {
           vocabularyItems: 0,
           grammarRules: 0,
-          paradigms: 0,
-          dialectVariants: 0,
           corpusPassages: 0,
           notes: 0,
           exercises: 0,
+          sourceAssets: 0,
+          pendingExtractionDrafts: 0,
           exerciseTypes: {}
         }
       })
@@ -300,7 +299,7 @@ describe("fetchDashboardData", () => {
     const payload = {
       languageId: "avenik",
       policyType: "generation" as const,
-      content: "Synthetic outputs must cite reviewed notes.",
+      content: "Generated outputs must cite reviewed notes.",
       effectiveDate: "2026-06-05"
     };
     await createGovernanceRecord(payload);
@@ -426,7 +425,7 @@ describe("fetchDashboardData", () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        exportVersion: "synthetic-language-snapshot-v1",
+        exportVersion: "language-snapshot-v2",
         language: { id: "avenik/test language" },
         corpus: [],
         notes: [],
@@ -449,7 +448,7 @@ describe("fetchDashboardData", () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({
-        exportVersion: "synthetic-evaluation-artifact-v1",
+        exportVersion: "evaluation-artifact-v2",
         exportedAt: "2026-06-06T00:00:00.000Z",
         summary: { languages: 4, totalRuns: 4, latestRuns: 4, failedLatestRuns: 0, averageLatestScore: 1, passed: true, failureCount: 0 },
         latestRuns: [],

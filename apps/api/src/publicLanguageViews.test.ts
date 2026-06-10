@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { buildSeedState, SYNTHETIC_FIXTURE_MINIMUMS, syntheticLanguageFixtures } from "@assini/synthetic-langs";
+import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
 import {
-  buildSyntheticLanguageProfile,
+  buildLanguageProfile,
   toPublicExercise,
   toPublicEvaluationArtifact,
   toPublicExerciseSubmission,
@@ -20,206 +20,122 @@ const EXPORT_REDACTION_POLICY = [
 ];
 
 describe("public language views", () => {
-  it("builds a rich profile without sharing mutable fixture arrays", () => {
-    const state = buildSeedState();
-    const profile = buildSyntheticLanguageProfile(state, "avenik");
+  it("builds a rich profile without sharing mutable workspace arrays", () => {
+    const state = buildTestWorkspaceState();
+    const profile = buildLanguageProfile(state, TEST_LANGUAGE_ID);
 
     expect(profile).toMatchObject({
-      language: { id: "avenik", name: "Avenik" },
+      language: { id: TEST_LANGUAGE_ID, name: "Testlang", typology: "agglutinative" },
       stats: {
-        vocabularyItems: 24,
-        grammarRules: 6,
-        paradigms: 2,
-        semanticDomains: 3,
-        registerProfiles: 2,
-        dialectVariants: 2,
-        discourseExamples: 3,
-        teachingSequences: 2,
-        corpusPassages: 12,
-        notes: 6,
-        exercises: 6
+        vocabularyItems: 7,
+        grammarRules: 2,
+        corpusPassages: 3,
+        notes: 2,
+        exercises: 3,
+        sourceAssets: 0,
+        pendingExtractionDrafts: 0,
+        exerciseTypes: {
+          choose_particle: 1,
+          translate_to_target: 1,
+          segment: 1
+        }
       }
     });
-    expect(profile?.fixtureMinimums).toEqual(SYNTHETIC_FIXTURE_MINIMUMS);
-    expect(profile?.fixtureQuality).toMatchObject({
-      passed: true,
-      checks: [
-        { id: "consonants", label: "Consonants", actual: 9, minimum: 6, passed: true },
-        { id: "vowels", label: "Vowels", actual: 5, minimum: 3, passed: true },
-        { id: "phonotacticNotes", label: "Phonotactic notes", actual: 3, minimum: 2, passed: true },
-        { id: "vocabularyItems", label: "Vocabulary", actual: 24, minimum: 24, passed: true },
-        { id: "semanticDomains", label: "Semantic domains", actual: 3, minimum: 3, passed: true },
-        { id: "semanticDomainVocabulary", label: "Semantic domain vocabulary", actual: 3, minimum: 3, passed: true },
-        { id: "registerProfiles", label: "Register profiles", actual: 2, minimum: 2, passed: true },
-        { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
-        { id: "grammarRules", label: "Grammar rules", actual: 6, minimum: 6, passed: true },
-        { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
-        { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true },
-        { id: "exerciseTypes", label: "Exercise types", actual: 3, minimum: 2, passed: true },
-        { id: "paradigms", label: "Paradigm tables", actual: 2, minimum: 2, passed: true },
-        { id: "paradigmRows", label: "Minimum paradigm rows", actual: 3, minimum: 3, passed: true },
-        { id: "dialectVariants", label: "Dialect variants", actual: 2, minimum: 2, passed: true },
-        { id: "dialectHistoryEvents", label: "Dialect history events", actual: 2, minimum: 2, passed: true },
-        { id: "discourseExamples", label: "Discourse examples", actual: 3, minimum: 3, passed: true },
-        { id: "teachingSequences", label: "Teaching sequences", actual: 2, minimum: 2, passed: true }
-      ]
+    expect(profile?.phonology).toMatchObject({
+      syllableTemplate: "CV",
+      stress: "word-initial"
     });
-    expect(profile?.phonology.phonotactics).toContain("Consonant clusters are disallowed inside native roots.");
-    expect(profile?.paradigms[0].rows[0]).toMatchObject({
-      form: "talo-mi-na",
-      morphemes: ["talo", "-mi", "-na"]
+    expect(profile?.phonology?.notes).toContain("No consonant clusters in native roots.");
+    expect(profile?.grammarRules[0]).toMatchObject({
+      id: "testlang-note-basic-order",
+      topic: "syntax/basic-order",
+      evidencePassageIds: ["testlang-c001", "testlang-c002"],
+      confidence: "high",
+      status: "draft"
     });
-    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")).toMatchObject({
-      surface: "mira",
-      lemma: "mira",
-      glosses: ["river"],
+    expect(profile?.vocabulary.find((item) => item.form === "-na")).toMatchObject({
+      gloss: "first person singular",
+      partOfSpeech: "suffix"
+    });
+    expect(profile?.morphemeInventory.find((item) => item.surface === "saku")).toMatchObject({
+      surface: "saku",
+      lemma: "saku",
+      glosses: ["child"],
       features: ["noun"],
+      occurrenceCount: 2,
+      passageIds: ["testlang-c002", "testlang-c003"],
       vocabulary: expect.objectContaining({
-        form: "mira",
-        gloss: "river",
+        form: "saku",
+        gloss: "child",
         partOfSpeech: "noun"
       })
     });
-    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.occurrenceCount).toBeGreaterThan(1);
-    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")?.passageIds).toEqual(
-      expect.arrayContaining(["avn-c001"])
-    );
-    expect(profile?.semanticDomains[0]).toMatchObject({
-      id: "avn-domain-motion",
-      label: "Motion and route teaching",
-      coreVocabularyIds: ["avn-v-001", "avn-n-001", "avn-s-001"],
-      evidencePassageIds: ["avn-c001", "avn-c005"],
-      usageNotes: expect.arrayContaining(["Route nouns pair with transparent motion verbs before tense-person suffixes."])
+    expect(profile?.morphemeInventory.find((item) => item.surface === "mira")).toMatchObject({
+      lemma: "mira",
+      glosses: ["river"],
+      occurrenceCount: 1,
+      passageIds: ["testlang-c001"]
     });
-    expect(profile?.registerProfiles[0]).toMatchObject({
-      id: "avn-register-careful-teaching",
-      label: "Careful teaching register",
-      styleLabel: "careful suffix demonstration",
-      semanticDomainIds: ["avn-domain-motion", "avn-domain-review-speech"],
-      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"],
-      teachingSequenceIds: ["avn-teach-verb-chain"],
-      evidencePassageIds: ["avn-c001", "avn-c005", "avn-c011"],
-      usageNotes: expect.arrayContaining(["Lengthened endings are teaching emphasis, not new person categories."])
-    });
-    expect(profile?.discourseExamples[0]).toMatchObject({
-      id: "avn-discourse-opening",
-      functionLabel: "Opening a teaching turn",
-      target: "kilo-ke saku-ra nemi-mi-na",
-      translation: "At the first step, I teach the child."
-    });
-    expect(profile?.dialectVariants[0].history).toMatchObject({
-      summary: "River-side Avenik teaching speech grew around slow suffix demonstration and water-route practice stories.",
-      events: expect.arrayContaining([
-        expect.objectContaining({
-          period: "early workshop",
-          description: "Instructors lengthened first-person endings while demonstrating river-route movement clauses.",
-          evidencePassageIds: ["avn-c001", "avn-c005"]
-        })
-      ])
-    });
-    expect(profile?.teachingSequences[0]).toMatchObject({
-      id: "avn-teach-verb-chain",
-      title: "Build a transparent verb chain",
-      ruleIds: ["avn-rule-verb-chain"],
-      exerciseIds: ["avn-ex001", "avn-ex002"]
-    });
+    expect(JSON.stringify(profile)).not.toContain("expectedAnswers");
+    expect(JSON.stringify(profile)).not.toContain("gradingExplanation");
+    expect(JSON.stringify(profile)).not.toContain("adversarialAnswers");
+    expect(JSON.stringify(profile)).not.toContain("test-generator");
 
-    profile?.phonology.consonants.push("x-test");
-    profile?.paradigms[0].rows[0].morphemes.push("-test");
-    profile?.dialectVariants[0].examplePhrases.push({
-      standard: "test",
-      variant: "test",
-      translation: "test"
-    });
-    profile?.dialectVariants[0].history.events.push({
-      period: "test",
-      description: "test",
-      evidencePassageIds: ["test"]
-    });
-    profile?.semanticDomains[0].coreVocabularyIds.push("test-vocab");
-    profile?.semanticDomains[0].usageNotes.push("test-note");
-    profile?.registerProfiles[0].semanticDomainIds.push("test-domain");
-    profile?.registerProfiles[0].usageNotes.push("test-note");
-    profile?.discourseExamples[0].notes.push("test-note");
-    profile?.teachingSequences[0].steps.push({ label: "test", prompt: "test" });
-    profile?.vocabulary[0].tags.push("test-tag");
+    profile?.phonology?.consonants.push("x-test");
+    profile?.phonology?.notes.push("test-note");
+    const firstVocabulary = profile?.vocabulary[0];
+    firstVocabulary?.tags.push("test-tag");
+    profile?.grammarRules[0]?.evidencePassageIds.push("test-passage");
+    profile?.morphemeInventory
+      .find((item) => item.surface === "saku")
+      ?.vocabulary?.tags.push("test-tag");
 
-    const fixture = syntheticLanguageFixtures.find((item) => item.language.id === "avenik");
-    expect(fixture?.phonology.consonants).not.toContain("x-test");
-    expect(fixture?.paradigms[0].rows[0].morphemes).not.toContain("-test");
-    expect(fixture?.dialectVariants[0].examplePhrases).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ standard: "test" })])
-    );
-    expect(fixture?.dialectVariants[0].history.events).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ period: "test" })])
-    );
-    expect(fixture?.semanticDomains[0].coreVocabularyIds).not.toContain("test-vocab");
-    expect(fixture?.semanticDomains[0].usageNotes).not.toContain("test-note");
-    expect(fixture?.registerProfiles[0].semanticDomainIds).not.toContain("test-domain");
-    expect(fixture?.registerProfiles[0].usageNotes).not.toContain("test-note");
-    expect(fixture?.discourseExamples[0].notes).not.toContain("test-note");
-    expect(fixture?.teachingSequences[0].steps).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ label: "test" })])
-    );
-    expect(fixture?.vocabulary[0].tags).not.toContain("test-tag");
+    const language = state.languages.find((item) => item.id === TEST_LANGUAGE_ID);
+    expect(language?.phonology?.consonants).not.toContain("x-test");
+    expect(language?.phonology?.notes).not.toContain("test-note");
+    const sourceLexeme = state.lexemes.find((item) => item.form === firstVocabulary?.form);
+    expect(sourceLexeme?.tags).not.toContain("test-tag");
+    const sakuLexeme = state.lexemes.find((item) => item.form === "saku");
+    expect(sakuLexeme?.tags).not.toContain("test-tag");
+    const sourceNote = state.notes.find((item) => item.id === "testlang-note-basic-order");
+    expect(sourceNote?.evidencePassageIds).not.toContain("test-passage");
+  });
+
+  it("returns undefined profiles for unknown languages", () => {
+    const state = buildTestWorkspaceState();
+
+    expect(buildLanguageProfile(state, "not-a-language")).toBeUndefined();
   });
 
   it("exports sanitized language snapshots with linguistic profile data", () => {
-    const state = buildSeedState();
-    const snapshot = toPublicLanguageSnapshot(state, "avenik", "2026-06-06T00:00:00.000Z");
+    const state = buildTestWorkspaceState();
+    const snapshot = toPublicLanguageSnapshot(state, TEST_LANGUAGE_ID, "2026-06-06T00:00:00.000Z");
 
     expect(snapshot).toMatchObject({
-      exportVersion: "synthetic-language-snapshot-v1",
+      exportVersion: "language-snapshot-v2",
       exportedAt: "2026-06-06T00:00:00.000Z",
-      language: { id: "avenik" },
+      language: { id: TEST_LANGUAGE_ID, status: "active" },
       linguisticProfile: {
-        fixtureMinimums: SYNTHETIC_FIXTURE_MINIMUMS,
-        fixtureQuality: {
-          passed: true,
-          checks: expect.arrayContaining([
-            { id: "corpusPassages", label: "Corpus passages", actual: 12, minimum: 12, passed: true },
-            { id: "noteAnswerKeys", label: "Public notes", actual: 6, minimum: 6, passed: true },
-            { id: "exerciseAnswerKeys", label: "Learner exercises", actual: 6, minimum: 6, passed: true }
-          ])
+        stats: {
+          vocabularyItems: 7,
+          grammarRules: 2,
+          corpusPassages: 3,
+          notes: 2,
+          exercises: 3,
+          sourceAssets: 0,
+          pendingExtractionDrafts: 0
         },
-        stats: { vocabularyItems: 24, grammarRules: 6, paradigms: 2, semanticDomains: 3, registerProfiles: 2, dialectVariants: 2, discourseExamples: 3, teachingSequences: 2 },
         phonology: { syllableTemplate: "CV", stress: "word-initial" }
       }
     });
-    expect(snapshot?.linguisticProfile.paradigms[0].title).toBe("Finite verb chain");
-    expect(snapshot?.linguisticProfile.morphemeInventory.find((item) => item.surface === "mira")).toMatchObject({
-      lemma: "mira",
-      occurrenceCount: expect.any(Number),
-      passageIds: expect.arrayContaining(["avn-c001"])
+    expect(snapshot?.linguisticProfile.grammarRules[0]).toMatchObject({
+      id: "testlang-note-basic-order",
+      evidencePassageIds: ["testlang-c001", "testlang-c002"]
     });
-    expect(snapshot?.linguisticProfile.semanticDomains[0]).toMatchObject({
-      id: "avn-domain-motion",
-      evidencePassageIds: ["avn-c001", "avn-c005"]
-    });
-    expect(snapshot?.linguisticProfile.registerProfiles[0]).toMatchObject({
-      id: "avn-register-careful-teaching",
-      discourseExampleIds: ["avn-discourse-opening", "avn-discourse-repair"]
-    });
-    expect(snapshot?.linguisticProfile.dialectVariants[0]).toMatchObject({
-      id: "avn-dialect-river",
-      name: "River teaching register",
-      history: {
-        events: expect.arrayContaining([
-          expect.objectContaining({
-            period: "early workshop",
-            evidencePassageIds: ["avn-c001", "avn-c005"]
-          })
-        ])
-      }
-    });
-    expect(snapshot?.linguisticProfile.discourseExamples[0]).toMatchObject({
-      id: "avn-discourse-opening",
-      functionLabel: "Opening a teaching turn"
-    });
-    expect(snapshot?.linguisticProfile.teachingSequences[0]).toMatchObject({
-      id: "avn-teach-verb-chain",
-      corpusPassageIds: ["avn-c001", "avn-c002"],
-      exerciseIds: ["avn-ex001", "avn-ex002"]
+    expect(snapshot?.linguisticProfile.morphemeInventory.find((item) => item.surface === "saku")).toMatchObject({
+      lemma: "saku",
+      occurrenceCount: 2,
+      passageIds: expect.arrayContaining(["testlang-c002"])
     });
     expect(snapshot?.integrity).toMatchObject({
       algorithm: "sha256",
@@ -227,80 +143,87 @@ describe("public language views", () => {
       redactionPolicy: EXPORT_REDACTION_POLICY
     });
     expect(snapshot?.integrity.contentHash).toMatch(SHA_256_HEX);
-    expect(snapshot?.corpus).toHaveLength(12);
-    expect(snapshot?.notes).toHaveLength(6);
+    expect(snapshot?.corpus).toHaveLength(3);
+    expect(snapshot?.notes).toHaveLength(2);
     expect(snapshot?.exercises[0]).not.toHaveProperty("expectedAnswers");
     expect(snapshot?.exercises[0]).not.toHaveProperty("gradingExplanation");
     expect(snapshot?.exercises[0]).not.toHaveProperty("adversarialAnswers");
     expect(JSON.stringify(snapshot)).not.toContain("answer key");
+    expect(JSON.stringify(snapshot)).not.toContain("test-generator");
+  });
+
+  it("returns undefined snapshots for unknown languages", () => {
+    const state = buildTestWorkspaceState();
+
+    expect(toPublicLanguageSnapshot(state, "not-a-language", "2026-06-06T00:00:00.000Z")).toBeUndefined();
   });
 
   it("changes language snapshot integrity when public export content changes", () => {
-    const state = buildSeedState();
-    const first = toPublicLanguageSnapshot(state, "avenik", "2026-06-06T00:00:00.000Z");
-    const note = state.notes.find((item) => item.languageId === "avenik");
-    if (!note) throw new Error("Expected Avenik fixture note.");
+    const state = buildTestWorkspaceState();
+    const first = toPublicLanguageSnapshot(state, TEST_LANGUAGE_ID, "2026-06-06T00:00:00.000Z");
+    const note = state.notes.find((item) => item.languageId === TEST_LANGUAGE_ID);
+    if (!note) throw new Error("Expected a Testlang note.");
     note.explanation = `${note.explanation} Public reviewer clarification.`;
 
-    const second = toPublicLanguageSnapshot(state, "avenik", "2026-06-06T00:00:00.000Z");
+    const second = toPublicLanguageSnapshot(state, TEST_LANGUAGE_ID, "2026-06-06T00:00:00.000Z");
 
     expect(first?.integrity.contentHash).not.toBe(second?.integrity.contentHash);
   });
 
   it("exports sanitized evaluation artifacts with aggregate gate metadata", () => {
     const state = {
-      ...buildSeedState(),
+      ...buildTestWorkspaceState(),
       evaluationRuns: [
         {
-          id: "eval-avenik-old",
-          languageId: "avenik",
+          id: "eval-testlang-old",
+          languageId: TEST_LANGUAGE_ID,
           createdAt: "2026-06-05T00:00:00.000Z",
           systemVersion: "deterministic-study-loop-v1",
-          fixtureVersion: "synthetic-fixtures-2026-06-03",
+          fixtureVersion: "workspace-corpus-v1",
           scores: { noteAccuracy: 0.5 },
           failures: [
             {
               category: "noteAccuracy",
-              languageId: "avenik",
-              itemId: "avn-note-old",
+              languageId: TEST_LANGUAGE_ID,
+              itemId: "testlang-note-old",
               message: "Older failure."
             }
           ],
-          summary: "Avenik: 50.0% average score across 1 categories."
+          summary: "Testlang: 50.0% average score across 1 categories."
         },
         {
-          id: "eval-avenik-latest",
-          languageId: "avenik",
+          id: "eval-testlang-latest",
+          languageId: TEST_LANGUAGE_ID,
           createdAt: "2026-06-06T00:00:00.000Z",
           systemVersion: "deterministic-study-loop-v1",
-          fixtureVersion: "synthetic-fixtures-2026-06-03",
+          fixtureVersion: "workspace-corpus-v1",
           scores: { noteAccuracy: 1, corpusCoverage: 0.75 },
           failures: [
             {
               category: "corpusCoverage",
-              languageId: "avenik",
-              itemId: "avn-c999",
-              message: "Missing synthetic passage coverage."
+              languageId: TEST_LANGUAGE_ID,
+              itemId: "testlang-c999",
+              message: "Missing passage coverage."
             }
           ],
-          summary: "Avenik: 87.5% average score across 2 categories."
+          summary: "Testlang: 87.5% average score across 2 categories."
         },
         {
-          id: "eval-solari-latest",
-          languageId: "solari",
+          id: "eval-otherlang-latest",
+          languageId: "otherlang",
           createdAt: "2026-06-06T00:01:00.000Z",
           systemVersion: "deterministic-study-loop-v1",
-          fixtureVersion: "synthetic-fixtures-2026-06-03",
+          fixtureVersion: "workspace-corpus-v1",
           scores: { noteAccuracy: 1 },
           failures: [],
-          summary: "Solari: 100.0% average score across 1 categories."
+          summary: "Otherlang: 100.0% average score across 1 categories."
         }
       ],
       exerciseSubmissions: [
         {
           id: "private-submission",
-          exerciseId: "avn-ex001",
-          languageId: "avenik",
+          exerciseId: "testlang-ex-001",
+          languageId: TEST_LANGUAGE_ID,
           answer: "private learner answer",
           accepted: false,
           explanation: "private grading explanation",
@@ -313,25 +236,16 @@ describe("public language views", () => {
     const artifact = toPublicEvaluationArtifact(state, "2026-06-06T00:02:00.000Z");
 
     expect(artifact).toMatchObject({
-      exportVersion: "synthetic-evaluation-artifact-v1",
+      exportVersion: "evaluation-artifact-v2",
       exportedAt: "2026-06-06T00:02:00.000Z",
       summary: {
-        languages: 4,
+        languages: 1,
         totalRuns: 3,
         latestRuns: 2,
         failedLatestRuns: 1,
         averageLatestScore: 0.9375,
         passed: false,
-        failureCount: 2,
-        fixtureQuality: {
-          languages: 4,
-          passedLanguages: 4,
-          failedLanguages: 0,
-          totalChecks: 72,
-          passedChecks: 72,
-          failedChecks: 0,
-          passed: true
-        }
+        failureCount: 2
       }
     });
     expect(artifact.integrity).toMatchObject({
@@ -340,14 +254,14 @@ describe("public language views", () => {
       redactionPolicy: EXPORT_REDACTION_POLICY
     });
     expect(artifact.integrity.contentHash).toMatch(SHA_256_HEX);
-    expect(artifact.latestRuns.map((run) => run.id)).toEqual(["eval-avenik-latest", "eval-solari-latest"]);
+    expect(artifact.latestRuns.map((run) => run.id)).toEqual(["eval-otherlang-latest", "eval-testlang-latest"]);
     expect(artifact.failureLines).toEqual([
-      "Avenik corpusCoverage avn-c999: Missing synthetic passage coverage.",
-      "Avenik corpusCoverage threshold: score 75.0% is below required 96.0%."
+      "Testlang corpusCoverage testlang-c999: Missing passage coverage.",
+      "Testlang corpusCoverage threshold: score 75.0% is below required 96.0%."
     ]);
     expect(artifact.runsByLanguage).toMatchObject({
-      avenik: ["eval-avenik-old", "eval-avenik-latest"],
-      solari: ["eval-solari-latest"]
+      [TEST_LANGUAGE_ID]: ["eval-testlang-old", "eval-testlang-latest"],
+      otherlang: ["eval-otherlang-latest"]
     });
     expect(artifact).not.toHaveProperty("exerciseSubmissions");
     expect(artifact).not.toHaveProperty("noteAnswerKeys");
@@ -358,17 +272,17 @@ describe("public language views", () => {
   });
 
   it("counts threshold-only latest evaluation runs as failed in exported summaries", () => {
-    const state = buildSeedState();
+    const state = buildTestWorkspaceState();
     state.evaluationRuns = [
       {
-        id: "eval-avenik-threshold-only",
-        languageId: "avenik",
+        id: "eval-testlang-threshold-only",
+        languageId: TEST_LANGUAGE_ID,
         createdAt: "2026-06-06T00:03:00.000Z",
         systemVersion: "deterministic-study-loop-v1",
-        fixtureVersion: "synthetic-fixtures-2026-06-03",
+        fixtureVersion: "workspace-corpus-v1",
         scores: { noteAccuracy: 0.95 },
         failures: [],
-        summary: "Avenik: 95.0% average score across 1 categories."
+        summary: "Testlang: 95.0% average score across 1 categories."
       }
     ];
 
@@ -377,42 +291,42 @@ describe("public language views", () => {
     expect(artifact.summary.failedLatestRuns).toBe(1);
     expect(artifact.summary.failureCount).toBe(1);
     expect(artifact.failureLines).toEqual([
-      "Avenik noteAccuracy threshold: score 95.0% is below required 96.0%."
+      "Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."
     ]);
   });
 
   it("exports latest-versus-previous evaluation trends for regression reports", () => {
-    const state = buildSeedState();
+    const state = buildTestWorkspaceState();
     state.evaluationRuns = [
       {
-        id: "eval-avenik-old",
-        languageId: "avenik",
+        id: "eval-testlang-old",
+        languageId: TEST_LANGUAGE_ID,
         createdAt: "2026-06-05T00:00:00.000Z",
         systemVersion: "deterministic-study-loop-v1",
-        fixtureVersion: "synthetic-fixtures-2026-06-03",
+        fixtureVersion: "workspace-corpus-v1",
         scores: { noteAccuracy: 1, translationAccuracy: 1 },
         failures: [],
-        summary: "Avenik: 100.0% average score across 2 categories."
+        summary: "Testlang: 100.0% average score across 2 categories."
       },
       {
-        id: "eval-avenik-latest",
-        languageId: "avenik",
+        id: "eval-testlang-latest",
+        languageId: TEST_LANGUAGE_ID,
         createdAt: "2026-06-06T00:00:00.000Z",
         systemVersion: "deterministic-study-loop-v1",
-        fixtureVersion: "synthetic-fixtures-2026-06-03",
+        fixtureVersion: "workspace-corpus-v1",
         scores: { noteAccuracy: 0.9, translationAccuracy: 1 },
         failures: [],
-        summary: "Avenik: 95.0% average score across 2 categories."
+        summary: "Testlang: 95.0% average score across 2 categories."
       },
       {
-        id: "eval-solari-only",
-        languageId: "solari",
+        id: "eval-otherlang-only",
+        languageId: "otherlang",
         createdAt: "2026-06-06T00:00:00.000Z",
         systemVersion: "deterministic-study-loop-v1",
-        fixtureVersion: "synthetic-fixtures-2026-06-03",
+        fixtureVersion: "workspace-corpus-v1",
         scores: { noteAccuracy: 1 },
         failures: [],
-        summary: "Solari: 100.0% average score across 1 categories."
+        summary: "Otherlang: 100.0% average score across 1 categories."
       }
     ];
 
@@ -426,21 +340,8 @@ describe("public language views", () => {
     });
     expect(artifact.trends).toEqual([
       {
-        languageId: "avenik",
-        latestRunId: "eval-avenik-latest",
-        previousRunId: "eval-avenik-old",
-        latestAverageScore: 0.95,
-        previousAverageScore: 1,
-        averageDelta: -0.05,
-        status: "regressed",
-        categoryDeltas: {
-          noteAccuracy: { latestScore: 0.9, previousScore: 1, delta: -0.1 },
-          translationAccuracy: { latestScore: 1, previousScore: 1, delta: 0 }
-        }
-      },
-      {
-        languageId: "solari",
-        latestRunId: "eval-solari-only",
+        languageId: "otherlang",
+        latestRunId: "eval-otherlang-only",
         previousRunId: null,
         latestAverageScore: 1,
         previousAverageScore: null,
@@ -449,26 +350,39 @@ describe("public language views", () => {
         categoryDeltas: {
           noteAccuracy: { latestScore: 1, previousScore: null, delta: null }
         }
+      },
+      {
+        languageId: TEST_LANGUAGE_ID,
+        latestRunId: "eval-testlang-latest",
+        previousRunId: "eval-testlang-old",
+        latestAverageScore: 0.95,
+        previousAverageScore: 1,
+        averageDelta: -0.05,
+        status: "regressed",
+        categoryDeltas: {
+          noteAccuracy: { latestScore: 0.9, previousScore: 1, delta: -0.1 },
+          translationAccuracy: { latestScore: 1, previousScore: 1, delta: 0 }
+        }
       }
     ]);
   });
 
   it("strips internal reviewer markers and private grading fields from public records", () => {
-    const state = buildSeedState();
+    const state = buildTestWorkspaceState();
     const note = toPublicNote({
       ...state.notes[0],
       reviewer: {
         ...state.notes[0].reviewer,
-        lastReviewedBy: "synthetic-answer-key-loader",
+        lastReviewedBy: "test-generator",
         comments: [...state.notes[0].reviewer.comments, "answer key: private marker"]
       },
       editHistory: [
         ...state.notes[0].editHistory,
         {
           at: "2026-06-06T00:00:00.000Z",
-          by: "synthetic-fixture-generator",
+          by: "test-generator",
           action: "answer key import",
-          summary: "fixture grammar rule copied from answer key"
+          summary: "grammar rule copied from answer key"
         }
       ]
     });
@@ -476,22 +390,33 @@ describe("public language views", () => {
     const submission = toPublicExerciseSubmission({
       id: "submission-private",
       exerciseId: state.exercises[0].id,
-      languageId: "avenik",
+      languageId: TEST_LANGUAGE_ID,
       answer: "private learner answer",
       accepted: false,
       explanation: "private grading explanation",
       submittedAt: "2026-06-06T00:00:00.000Z",
       learnerId: "learner-1"
     });
+    const acceptedSubmission = toPublicExerciseSubmission({
+      id: "submission-accepted",
+      exerciseId: state.exercises[0].id,
+      languageId: TEST_LANGUAGE_ID,
+      answer: "private learner answer",
+      accepted: true,
+      explanation: "private grading explanation",
+      submittedAt: "2026-06-06T00:00:00.000Z",
+      learnerId: "learner-1"
+    });
 
-    expect(note.reviewer.lastReviewedBy).toBe("synthetic-review");
+    expect(note.reviewer.lastReviewedBy).toBe("internal-review");
     expect(JSON.stringify(note)).not.toContain("answer key");
-    expect(JSON.stringify(note)).not.toContain("synthetic-fixture-generator");
+    expect(JSON.stringify(note)).not.toContain("test-generator");
     expect(exercise).not.toHaveProperty("expectedAnswers");
     expect(exercise).not.toHaveProperty("gradingExplanation");
     expect(exercise).not.toHaveProperty("adversarialAnswers");
     expect(submission).not.toHaveProperty("answer");
     expect(submission).not.toHaveProperty("learnerId");
-    expect(submission.explanation).toBe("Answer did not match the synthetic exercise key.");
+    expect(submission.explanation).toBe("Answer did not match the exercise answer key.");
+    expect(acceptedSubmission.explanation).toBe("Submission accepted.");
   });
 });

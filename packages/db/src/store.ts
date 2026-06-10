@@ -7,7 +7,7 @@ export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
 export function createEmptyState(): AppState {
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     languages: [],
     corpus: [],
     noteAnswerKeys: [],
@@ -22,7 +22,10 @@ export function createEmptyState(): AppState {
     auditEvents: [],
     reviewPolicies: [],
     reviewApprovals: [],
-    reviewDispositions: []
+    reviewDispositions: [],
+    lexemes: [],
+    sourceAssets: [],
+    extractionDrafts: []
   };
 }
 

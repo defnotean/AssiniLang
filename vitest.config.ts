@@ -8,7 +8,6 @@ export default defineConfig({
   resolve: {
     alias: {
       "@assini/db": resolve(rootDir, "packages/db/src/index.ts"),
-      "@assini/synthetic-langs": resolve(rootDir, "packages/synthetic-langs/src/index.ts"),
       "@assini/eval": resolve(rootDir, "packages/eval/src/index.ts")
     }
   },

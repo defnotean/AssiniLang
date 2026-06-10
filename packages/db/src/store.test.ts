@@ -33,10 +33,9 @@ function createTestLanguage(overrides: Partial<Language> = {}): Language {
     id: "avenik",
     name: "Avenik",
     typology: "agglutinative",
-    description: "Synthetic test language.",
-    orthography: "Latin synthetic orthography",
-    status: "synthetic",
-    fixtureSource: "unit-test",
+    description: "Test language.",
+    orthography: "Latin test orthography",
+    status: "draft",
     ...overrides
   };
 }
@@ -46,7 +45,7 @@ function createTestNote(overrides: Partial<Note> = {}): Note {
     id: "note-1",
     languageId: "avenik",
     topic: "syntax/test",
-    explanation: "Synthetic note explanation.",
+    explanation: "Test note explanation.",
     examples: [],
     evidencePassageIds: [],
     evidenceCount: 0,
@@ -57,7 +56,7 @@ function createTestNote(overrides: Partial<Note> = {}): Note {
       lastReviewedAt: null,
       comments: []
     },
-    dialectScope: "synthetic-default",
+    dialectScope: "test-default",
     editHistory: [],
     ...overrides
   };
@@ -67,12 +66,12 @@ function createTestCorpusPassage(overrides: Partial<CorpusPassage> = {}): Corpus
   return {
     id: "passage-1",
     languageId: "avenik",
-    source: "synthetic-test",
+    source: "unit-test",
     sourceMetadata: {
-      author: "Synthetic Tester",
+      author: "Test Author",
       year: 2026,
-      license: "synthetic-only",
-      consentRecord: "synthetic-test-consent"
+      license: "internal-test-data",
+      consentRecord: "unit-test-consent"
     },
     textTarget: "mira talo-mi-na",
     textTranslation: "I walk by the river.",
@@ -92,7 +91,7 @@ function createTestCorpusPassage(overrides: Partial<CorpusPassage> = {}): Corpus
     ],
     topicTags: ["motion"],
     consentStatus: {
-      use: "synthetic-testing-only",
+      use: "testing-only",
       restrictions: ["unit-test"]
     },
     ...overrides
@@ -119,7 +118,7 @@ function createTestElderCorrection(overrides: Partial<ElderCorrection> = {}): El
     id: "elder-correction-1",
     languageId: "avenik",
     noteId: "note-1",
-    correction: "Clarify that tense appears before person in the synthetic suffix chain.",
+    correction: "Clarify that tense appears before person in the verb suffix chain.",
     rationale: "Elder review should preserve suffix-order teaching notes.",
     severity: "major",
     status: "pending_review",
@@ -147,10 +146,10 @@ function createTestExercise(overrides: Partial<Exercise> = {}): Exercise {
       },
       {
         answer: "mira talo",
-        reason: "Missing required synthetic suffixes."
+        reason: "Missing required verb suffixes."
       }
     ],
-    gradingExplanation: "Accepted answer matches the synthetic exercise key.",
+    gradingExplanation: "Accepted answer matches the exercise answer key.",
     ...overrides
   };
 }
@@ -162,7 +161,7 @@ function createTestSubmission(overrides: Partial<ExerciseSubmission> = {}): Exer
     languageId: "avenik",
     answer: "mira talo-mi-na",
     accepted: true,
-    explanation: "Accepted answer matches the synthetic exercise key.",
+    explanation: "Accepted answer matches the exercise answer key.",
     submittedAt: "2026-06-06T00:00:00.000Z",
     learnerId: "learner-1",
     ...overrides
@@ -174,7 +173,7 @@ function createTestGovernanceRecord(overrides: Partial<GovernanceRecord> = {}): 
     id: "governance-1",
     languageId: "avenik",
     policyType: "generation",
-    content: "Synthetic generation policy for local testing.",
+    content: "Generation policy for local testing.",
     effectiveDate: "2026-06-06",
     approvedBy: "lead-1",
     ...overrides
@@ -191,7 +190,7 @@ function createTestAuditEvent(overrides: Partial<AuditEvent> = {}): AuditEvent {
     entityType: "governance_record",
     entityId: "governance-1",
     languageId: "avenik",
-    summary: "Created synthetic governance record.",
+    summary: "Created governance record.",
     metadata: { policyType: "generation" },
     ...overrides
   };
@@ -202,16 +201,16 @@ function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
     {
       id: "ai-session-1-message-1",
       role: "user",
-      content: "Trace the synthetic note safely.",
+      content: "Trace the note safely.",
       createdAt: "2026-06-06T00:00:00.000Z",
       createdBy: "programmer-1"
     },
     {
       id: "ai-session-1-message-2",
       role: "assistant",
-      content: "Safe synthetic response.",
+      content: "Safe assistant response.",
       createdAt: "2026-06-06T00:00:00.000Z",
-      createdBy: "synthetic-ai"
+      createdBy: "local-ai"
     }
   ];
 
@@ -226,7 +225,7 @@ function createTestAiSession(overrides: Partial<AiSession> = {}): AiSession {
     contextNoteIds: ["note-1"],
     contextPassageIds: ["passage-1"],
     messages,
-    thinkingSummary: "Safe reasoning summary: observable trace for synthetic context.",
+    thinkingSummary: "Safe reasoning summary: observable trace for session context.",
     trace: [
       {
         id: "ai-session-1-trace-retrieval",
@@ -253,7 +252,7 @@ function createTestAiMessage(overrides: Partial<AiSession["messages"][number]> =
   return {
     id: "ai-session-1-message-custom",
     role: "user",
-    content: "Trace the synthetic note safely.",
+    content: "Trace the note safely.",
     createdAt: "2026-06-06T00:00:00.000Z",
     createdBy: "programmer-1",
     ...overrides
@@ -272,7 +271,7 @@ function createTestEvaluationRun(overrides: Partial<EvaluationRun> = {}): Evalua
       noteAccuracy: 1
     },
     failures: [],
-    summary: "Synthetic evaluation run.",
+    summary: "Evaluation run for unit tests.",
     ...overrides
   };
 }
@@ -308,10 +307,9 @@ describe("JsonStore", () => {
         id: "test-lang",
         name: "Test Lang",
         typology: "isolating",
-        description: "Synthetic test language.",
+        description: "Test language.",
         orthography: "Latin test alphabet",
-        status: "synthetic",
-        fixtureSource: "unit-test"
+        status: "draft"
       });
 
       await store.write(state);
@@ -319,7 +317,7 @@ describe("JsonStore", () => {
       const raw = JSON.parse(await readFile(dbPath, "utf8"));
 
       expect(loaded.languages[0]?.id).toBe("test-lang");
-      expect(raw.schemaVersion).toBe(7);
+      expect(raw.schemaVersion).toBe(8);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
@@ -356,7 +354,7 @@ describe("JsonStore", () => {
           lastReviewedAt: null,
           comments: []
         },
-        dialectScope: "synthetic legacy",
+        dialectScope: "legacy",
         editHistory: []
       });
 
@@ -365,7 +363,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.schemaVersion).toBe(8);
       expect(loaded.notes).toHaveLength(1);
       expect(loaded.noteAnswerKeys).toHaveLength(1);
       expect(loaded.exerciseSubmissions).toEqual([]);
@@ -396,7 +394,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.schemaVersion).toBe(8);
       expect(loaded.exerciseSubmissions).toEqual([]);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
@@ -433,7 +431,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.schemaVersion).toBe(8);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
@@ -455,7 +453,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.schemaVersion).toBe(8);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
       expect(loaded.reviewDispositions).toEqual([]);
@@ -476,7 +474,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(7);
+      expect(loaded.schemaVersion).toBe(8);
       expect(loaded.reviewDispositions).toEqual([]);
     } finally {
       await rm(dir, { recursive: true, force: true });
@@ -493,7 +491,7 @@ describe("JsonStore", () => {
       entityType: "governance_record",
       entityId: "governance-1",
       languageId: "avenik",
-      summary: "Created synthetic governance record.",
+      summary: "Created governance record.",
       metadata: { policyType: "generation" }
     })).toMatchObject({
       actorId: "lead-1",
@@ -539,7 +537,7 @@ describe("JsonStore", () => {
       note,
       {
         ...note,
-        explanation: "Second synthetic note with a duplicated persistent ID."
+        explanation: "Second note with a duplicated persistent ID."
       }
     ];
 
@@ -709,11 +707,6 @@ describe("JsonStore", () => {
       "blank orthography",
       { orthography: "   " },
       "Language orthography must not be blank: avenik"
-    ],
-    [
-      "blank fixture source",
-      { fixtureSource: "   " },
-      "Language fixtureSource must not be blank: avenik"
     ]
   ])("rejects persisted languages with %s", (_caseName, languagePatch, errorMessage) => {
     const state = createEmptyState();
@@ -990,7 +983,7 @@ describe("JsonStore", () => {
         editHistory: [
           {
             at: "2026-06-06T00:00:00.000Z",
-            by: "synthetic-generator",
+            by: "test-generator",
             action: "seeded",
             summary: "Unsupported answer-key timeline actions should not restore."
           }
@@ -1007,7 +1000,7 @@ describe("JsonStore", () => {
         editHistory: [
           {
             at: "2026-06-06T00:00:00.000Z",
-            by: "synthetic-generator",
+            by: "test-generator",
             action: "created",
             summary: "   "
           }
@@ -1141,7 +1134,7 @@ describe("JsonStore", () => {
       "blank consent restriction",
       createTestCorpusPassage({
         consentStatus: {
-          use: "synthetic-testing-only",
+          use: "testing-only",
           restrictions: ["   "]
         }
       }),
@@ -1825,7 +1818,7 @@ describe("JsonStore", () => {
       createTestExercise({
         adversarialAnswers: [
           { answer: "mira talo-mi-na", reason: "Duplicates the expected answer." },
-          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+          { answer: "mira talo", reason: "Missing required verb suffixes." }
         ]
       }),
       "Exercise adversarial answer duplicates an expected answer: mira talo-mi-na"
@@ -1845,7 +1838,7 @@ describe("JsonStore", () => {
       createTestExercise({
         adversarialAnswers: [
           { answer: "   ", reason: "Blank adversarial answers should not restore." },
-          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+          { answer: "mira talo", reason: "Missing required verb suffixes." }
         ]
       }),
       "Exercise adversarial answer must not be blank"
@@ -1855,7 +1848,7 @@ describe("JsonStore", () => {
       createTestExercise({
         adversarialAnswers: [
           { answer: "talo mira", reason: "   " },
-          { answer: "mira talo", reason: "Missing required synthetic suffixes." }
+          { answer: "mira talo", reason: "Missing required verb suffixes." }
         ]
       }),
       "Exercise adversarial reason must not be blank"
@@ -2338,7 +2331,7 @@ describe("JsonStore", () => {
             category: "noteAccuracy",
             languageId: "solari",
             itemId: "note-1",
-            message: "Mismatched synthetic failure line."
+            message: "Mismatched failure line."
           }
         ]
       }),
@@ -2742,10 +2735,9 @@ describe("JsonStore", () => {
                 id: `lang-${index}`,
                 name: `Lang ${index}`,
                 typology: "isolating",
-                description: "Synthetic concurrent update language.",
+                description: "Concurrent update test language.",
                 orthography: "Latin",
-                status: "synthetic",
-                fixtureSource: "concurrency-test"
+                status: "draft"
               }
             ]
           }))

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildSeedState } from "@assini/synthetic-langs";
+import { buildTestWorkspaceState } from "@assini/db";
 import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation";
 
 describe("evaluation run gate", () => {
-  it("passes for the clean synthetic fixture baseline", () => {
-    const runs = runEvaluationForState(buildSeedState());
+  it("passes for a clean workspace baseline", () => {
+    const runs = runEvaluationForState(buildTestWorkspaceState());
     const gate = summarizeEvaluationGate(runs);
 
     expect(gate).toEqual({
@@ -14,10 +14,28 @@ describe("evaluation run gate", () => {
     });
   });
 
+  it("produces no runs for an empty workspace", () => {
+    const runs = runEvaluationForState({
+      ...buildTestWorkspaceState(),
+      languages: [],
+      corpus: [],
+      corpusAnswerKeys: [],
+      lexemes: [],
+      notes: [],
+      noteAnswerKeys: [],
+      exercises: [],
+      reviewPolicies: []
+    });
+    const gate = summarizeEvaluationGate(runs);
+
+    expect(runs).toHaveLength(0);
+    expect(gate.passed).toBe(true);
+  });
+
   it("fails loudly with traceable lines when any evaluation run has failures", () => {
-    const state = buildSeedState();
-    const passage = state.corpus.find((item) => item.id === "avn-c001");
-    if (!passage) throw new Error("Missing avn-c001");
+    const state = buildTestWorkspaceState();
+    const passage = state.corpus.find((item) => item.id === "testlang-c001");
+    if (!passage) throw new Error("Missing testlang-c001");
     passage.textTranslation = "A wrong translation.";
 
     const runs = runEvaluationForState(state);
@@ -27,13 +45,13 @@ describe("evaluation run gate", () => {
     expect(gate.exitCode).toBe(1);
     expect(gate.failureLines).toEqual(
       expect.arrayContaining([
-        "Avenik translationAccuracy avn-c001: Translation mismatch for corpus passage avn-c001."
+        "Testlang translationAccuracy testlang-c001: Translation mismatch for corpus passage testlang-c001."
       ])
     );
   });
 
   it("fails loudly when a category score drops below its required threshold", () => {
-    const [run] = runEvaluationForState(buildSeedState());
+    const [run] = runEvaluationForState(buildTestWorkspaceState());
     if (!run) throw new Error("Missing evaluation run");
 
     const gate = summarizeEvaluationGate([
@@ -51,7 +69,7 @@ describe("evaluation run gate", () => {
     expect(gate.exitCode).toBe(1);
     expect(gate.failureLines).toEqual(
       expect.arrayContaining([
-        "Avenik noteAccuracy threshold: score 95.0% is below required 96.0%."
+        "Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."
       ])
     );
   });

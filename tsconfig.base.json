@@ -17,7 +17,6 @@
     "baseUrl": ".",
     "paths": {
       "@assini/db": ["packages/db/src/index.ts"],
-      "@assini/synthetic-langs": ["packages/synthetic-langs/src/index.ts"],
       "@assini/eval": ["packages/eval/src/index.ts"]
     }
   }

@@ -2,18 +2,13 @@
 
 AssiniLang is a local-first prototype for building and testing a language-learning AI workflow before any real community language data is used.
 
-The current milestone uses only invented synthetic languages. It proves the workflow for corpus browsing, note review, learner exercises, evaluation, governance, audit trails, sanitized exports, and local model-provider readiness.
+The current milestone starts from an empty workspace. Users create their own languages and feed them from their own raw materials through a local-LLM ingestion pipeline. Every extracted item is a reviewable draft before it becomes lexicon, corpus, or grammar data. Corpus browsing, note review, learner exercises, evaluation, governance, audit trails, sanitized exports, and local model-provider readiness work as before.
 
-## Synthetic-Only Policy
+## Data Stewardship
 
-Do not add real First Nations, Indigenous, or community language data to this repository yet.
+The workspace ships empty. All language data is created by users from raw materials they bring themselves, and every corpus passage carries consent and provenance metadata.
 
-The fixture languages are fictional by design:
-
-- `Avenik`: agglutinative suffix chains.
-- `Solari`: isolating word order and particles.
-- `Velari`: fusional endings.
-- `Ketharu`: polysynthetic-lite verb forms.
+Do not connect real First Nations, Indigenous, or community language data without the governance, consent, access-control, and review infrastructure described in the [Roadmap](docs/roadmap.md). The prototype is a workflow testbed, not a stewardship platform.
 
 ## Quick Start
 
@@ -47,12 +42,16 @@ npm.cmd run dev
 
 ## What Works
 
-- Four synthetic languages with 48 corpus passages, 24 notes, 25 learner exercises, and immutable answer keys.
+- Empty-workspace bootstrap: `npm.cmd run seed` writes `data/local-db.json` with the local prototype users and no languages.
+- Language creation and editing with typology, orthography, and an optional declared phonology inventory.
+- Raw source ingestion per language: pasted text, word lists, URLs, and file uploads including images and audio.
+- Local-LLM extraction of lexemes, corpus passages, and grammar notes, with offline heuristic parsing of delimited lines when no model is configured.
+- Draft review: each extracted item is an extraction draft that a reviewer accepts or rejects before it becomes workspace data.
 - A Fastify API backed by a JSON local database.
 - A React web console for language profiles, corpus browsing/import, note review, learning exercises, evaluation, governance, elder corrections, and model setup.
 - Leadless browser prototype sessions for learners, Elders, reviewers, and programmers, with lead/admin authority retained server-side for policy integrity.
 - Review policies, disposition ledgers, audit events, and sanitized snapshot/evaluation exports with SHA-256 integrity manifests.
-- A deterministic evaluation harness that currently scores all seeded synthetic languages at 100%.
+- A deterministic evaluation harness that scores workspace languages against immutable answer keys.
 
 ## Common Commands
 
@@ -61,7 +60,7 @@ npm.cmd run dev
 | `npm.cmd run verify` | Runs tests, TypeScript checks, seed, eval, and builds. |
 | `npm.cmd test` | Runs all Vitest tests. |
 | `npm.cmd run check` | Runs TypeScript project checks. |
-| `npm.cmd run seed` | Regenerates `data/local-db.json` from synthetic fixtures. |
+| `npm.cmd run seed` | Initializes an empty workspace at `data/local-db.json`. |
 | `npm.cmd run eval` | Runs the deterministic evaluation CLI. |
 | `npm.cmd run dev` | Starts the API and web app together. |
 | `npm.cmd run demo` | Seeds, evaluates, and starts the local prototype. |
@@ -87,12 +86,11 @@ Detailed design history lives in:
 
 ```text
 apps/
-  api/                 Fastify API and public redaction/export projection helpers.
+  api/                 Fastify API, raw-source ingestion pipeline, LLM/transcription provider wiring, and public redaction/export projection helpers.
   web/                 React research console.
 
 packages/
-  db/                  Zod schemas, TypeScript types, migrations, and JSON persistence.
-  synthetic-langs/     Fictional languages, corpora, grammar notes, exercises, and answer keys.
+  db/                  Zod schemas, TypeScript types, migrations, bootstrap/seed CLI, and JSON persistence.
   eval/                Deterministic study-loop simulation and scoring logic.
 
 docs/                  Product, architecture, API, development, roadmap, spec, and plan docs.

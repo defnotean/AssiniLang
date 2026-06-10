@@ -32,7 +32,7 @@ export function runEvaluationForState(state: AppState): EvaluationRun[] {
       languageId: language.id,
       createdAt: new Date().toISOString(),
       systemVersion: "deterministic-study-loop-v1",
-      fixtureVersion: "synthetic-fixtures-2026-06-03",
+      fixtureVersion: "workspace-corpus-v1",
       scores: result.scores,
       failures: result.failures,
       summary: `${language.name}: ${(average * 100).toFixed(1)}% average score across ${Object.keys(result.scores).length} categories.`

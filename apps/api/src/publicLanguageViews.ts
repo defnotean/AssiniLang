@@ -1,14 +1,15 @@
 import { createHash } from "node:crypto";
 
-import type { AppState, EvaluationFailure, EvaluationRun, Exercise, ExerciseSubmission, Note } from "@assini/db";
-import {
-  SYNTHETIC_FIXTURE_MINIMUMS,
-  buildSyntheticFixtureQualityActuals,
-  summarizeSyntheticFixtureQuality,
-  syntheticLanguageFixtures,
-  type SyntheticFixtureQualitySummary,
-  type SyntheticLanguageFixture
-} from "@assini/synthetic-langs";
+import type {
+  AppState,
+  EvaluationFailure,
+  EvaluationRun,
+  Exercise,
+  ExerciseSubmission,
+  LanguagePhonology,
+  Lexeme,
+  Note
+} from "@assini/db";
 import { summarizeEvaluationGate } from "@assini/eval";
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
@@ -22,44 +23,39 @@ export type PublicExportIntegrity = {
   redactionPolicy: string[];
 };
 
-export type SyntheticLanguageProfile = {
+export type PublicVocabularyItem = {
+  id: string;
+  form: string;
+  gloss: string;
+  partOfSpeech: string;
+  tags: string[];
+};
+
+export type PublicGrammarRule = {
+  id: string;
+  topic: string;
+  explanation: string;
+  evidencePassageIds: string[];
+  confidence: Note["confidence"];
+  status: Note["status"];
+};
+
+export type LanguageProfile = {
   language: AppState["languages"][number];
-  phonology: SyntheticLanguageFixture["phonology"];
-  paradigms: SyntheticLanguageFixture["paradigms"];
-  semanticDomains: SyntheticLanguageFixture["semanticDomains"];
-  registerProfiles: SyntheticLanguageFixture["registerProfiles"];
-  dialectVariants: SyntheticLanguageFixture["dialectVariants"];
-  discourseExamples: SyntheticLanguageFixture["discourseExamples"];
-  teachingSequences: SyntheticLanguageFixture["teachingSequences"];
-  vocabulary: SyntheticLanguageFixture["vocabulary"];
+  phonology: LanguagePhonology | null;
+  vocabulary: PublicVocabularyItem[];
   morphemeInventory: MorphemeInventoryItem[];
-  grammarRules: SyntheticLanguageFixture["grammarRules"];
-  fixtureMinimums: typeof SYNTHETIC_FIXTURE_MINIMUMS;
-  fixtureQuality: SyntheticFixtureQualitySummary;
+  grammarRules: PublicGrammarRule[];
   stats: {
     vocabularyItems: number;
     grammarRules: number;
-    paradigms: number;
-    semanticDomains: number;
-    registerProfiles: number;
-    dialectVariants: number;
-    discourseExamples: number;
-    teachingSequences: number;
     corpusPassages: number;
     notes: number;
     exercises: number;
+    sourceAssets: number;
+    pendingExtractionDrafts: number;
     exerciseTypes: Partial<Record<Exercise["type"], number>>;
   };
-};
-
-export type PublicFixtureQualitySummary = {
-  languages: number;
-  passedLanguages: number;
-  failedLanguages: number;
-  totalChecks: number;
-  passedChecks: number;
-  failedChecks: number;
-  passed: boolean;
 };
 
 export type MorphemeInventoryItem = {
@@ -69,14 +65,14 @@ export type MorphemeInventoryItem = {
   features: string[];
   occurrenceCount: number;
   passageIds: string[];
-  vocabulary: SyntheticLanguageFixture["vocabulary"][number] | null;
+  vocabulary: PublicVocabularyItem | null;
 };
 
 export type PublicLanguageSnapshot = {
   exportVersion: typeof LANGUAGE_SNAPSHOT_EXPORT_VERSION;
   exportedAt: string;
   language: AppState["languages"][number];
-  linguisticProfile: Omit<SyntheticLanguageProfile, "language">;
+  linguisticProfile: Omit<LanguageProfile, "language">;
   corpus: AppState["corpus"];
   notes: Note[];
   exercises: PublicExercise[];
@@ -100,7 +96,6 @@ export type PublicEvaluationArtifact = {
     averageLatestScore: number;
     passed: boolean;
     failureCount: number;
-    fixtureQuality: PublicFixtureQualitySummary;
   };
   latestRuns: EvaluationRun[];
   runsByLanguage: Record<string, string[]>;
@@ -126,8 +121,8 @@ export type EvaluationTrend = {
   }>;
 };
 
-const LANGUAGE_SNAPSHOT_EXPORT_VERSION = "synthetic-language-snapshot-v1";
-const EVALUATION_ARTIFACT_EXPORT_VERSION = "synthetic-evaluation-artifact-v1";
+const LANGUAGE_SNAPSHOT_EXPORT_VERSION = "language-snapshot-v2";
+const EVALUATION_ARTIFACT_EXPORT_VERSION = "evaluation-artifact-v2";
 const EXPORT_INTEGRITY_ALGORITHM = "sha256";
 const EXPORT_GENERATOR_ID = "assini-local-export-v1";
 const EXPORT_REDACTION_POLICY = [
@@ -141,10 +136,7 @@ const EXPORT_REDACTION_POLICY = [
 
 const INTERNAL_NOTE_MARKERS = [
   /answer key/i,
-  /synthetic fixture evaluation/i,
-  /fixture grammar rule/i,
-  /synthetic-answer-key/i,
-  /synthetic-fixture-generator/i
+  /test-generator/i
 ];
 
 function containsInternalNoteMarker(value: string): boolean {
@@ -279,28 +271,6 @@ function evaluationTrendsForRuns(runs: EvaluationRun[]): EvaluationTrend[] {
     .sort((left, right) => left.languageId.localeCompare(right.languageId));
 }
 
-function aggregateFixtureQualityForState(state: AppState): PublicFixtureQualitySummary {
-  const summaries = state.languages
-    .map((language) => buildSyntheticLanguageProfile(state, language.id)?.fixtureQuality)
-    .filter((summary): summary is SyntheticFixtureQualitySummary => summary !== undefined);
-  const passedLanguages = summaries.filter((summary) => summary.passed).length;
-  const totalChecks = summaries.reduce((total, summary) => total + summary.totalChecks, 0);
-  const passedChecks = summaries.reduce((total, summary) => total + summary.passedChecks, 0);
-  const failedChecks = summaries.reduce((total, summary) => total + summary.failedChecks, 0);
-
-  return {
-    languages: summaries.length,
-    passedLanguages,
-    failedLanguages: summaries.length - passedLanguages,
-    totalChecks,
-    passedChecks,
-    failedChecks,
-    passed: summaries.length > 0
-      && summaries.length === state.languages.length
-      && summaries.every((summary) => summary.passed)
-  };
-}
-
 export function toPublicExercise(exercise: Exercise): PublicExercise {
   const {
     expectedAnswers: _expectedAnswers,
@@ -315,7 +285,7 @@ export function toPublicExerciseSubmission(submission: ExerciseSubmission): Publ
   const { answer: _answer, learnerId: _learnerId, ...publicSubmission } = submission;
   return {
     ...publicSubmission,
-    explanation: submission.accepted ? "Accepted synthetic exercise submission." : "Answer did not match the synthetic exercise key."
+    explanation: submission.accepted ? "Submission accepted." : "Answer did not match the exercise answer key."
   };
 }
 
@@ -332,7 +302,7 @@ export function toPublicNote(note: Note): Note {
     reviewer: {
       ...note.reviewer,
       lastReviewedBy: note.reviewer.lastReviewedBy && containsInternalNoteMarker(note.reviewer.lastReviewedBy)
-        ? "synthetic-review"
+        ? "internal-review"
         : note.reviewer.lastReviewedBy,
       comments: publicComments
     },
@@ -344,21 +314,22 @@ export function toPublicNotes(notes: Note[]): Note[] {
   return notes.map(toPublicNote);
 }
 
-function cloneVocabularyItem(item: SyntheticLanguageFixture["vocabulary"][number]): SyntheticLanguageFixture["vocabulary"][number] {
+function toPublicVocabularyItem(lexeme: Lexeme): PublicVocabularyItem {
   return {
-    ...item,
-    tags: [...item.tags]
+    id: lexeme.id,
+    form: lexeme.form,
+    gloss: lexeme.gloss,
+    partOfSpeech: lexeme.partOfSpeech,
+    tags: [...lexeme.tags]
   };
 }
 
 function buildMorphemeInventory(
   state: AppState,
   languageId: string,
-  fixture: SyntheticLanguageFixture | undefined
+  vocabulary: PublicVocabularyItem[]
 ): MorphemeInventoryItem[] {
-  const vocabularyByForm = new Map(
-    fixture?.vocabulary.map((item) => [item.form.toLowerCase(), item]) ?? []
-  );
+  const vocabularyByForm = new Map(vocabulary.map((item) => [item.form.toLowerCase(), item]));
   const inventory = new Map<string, {
     surface: string;
     lemma: string;
@@ -366,14 +337,14 @@ function buildMorphemeInventory(
     features: Set<string>;
     occurrenceCount: number;
     passageIds: Set<string>;
-    vocabulary: SyntheticLanguageFixture["vocabulary"][number] | null;
+    vocabulary: PublicVocabularyItem | null;
   }>();
 
   for (const passage of state.corpus.filter((item) => item.languageId === languageId)) {
     for (const morpheme of passage.morphologicalSegmentation) {
-      const key = `${morpheme.surface}\u0000${morpheme.lemma}`;
+      const key = `${morpheme.surface}|${morpheme.lemma}`;
       const existing = inventory.get(key);
-      const vocabulary = vocabularyByForm.get(morpheme.surface.toLowerCase())
+      const vocabularyMatch = vocabularyByForm.get(morpheme.surface.toLowerCase())
         ?? vocabularyByForm.get(morpheme.lemma.toLowerCase())
         ?? null;
 
@@ -385,7 +356,7 @@ function buildMorphemeInventory(
           features: new Set(morpheme.features),
           occurrenceCount: 1,
           passageIds: new Set([passage.id]),
-          vocabulary
+          vocabulary: vocabularyMatch
         });
       } else {
         existing.glosses.add(morpheme.gloss);
@@ -406,7 +377,7 @@ function buildMorphemeInventory(
       features: [...item.features].sort(),
       occurrenceCount: item.occurrenceCount,
       passageIds: [...item.passageIds].sort(),
-      vocabulary: item.vocabulary ? cloneVocabularyItem(item.vocabulary) : null
+      vocabulary: item.vocabulary ? { ...item.vocabulary, tags: [...item.vocabulary.tags] } : null
     }))
     .sort((left, right) => (
       left.surface.localeCompare(right.surface)
@@ -440,8 +411,7 @@ export function toPublicEvaluationArtifact(
       singleRunLanguages: trends.filter((trend) => trend.status === "single-run").length,
       averageLatestScore,
       passed: gateSummary.passed,
-      failureCount: gateSummary.failureLines.length,
-      fixtureQuality: aggregateFixtureQualityForState(state)
+      failureCount: gateSummary.failureLines.length
     },
     latestRuns,
     runsByLanguage: state.evaluationRuns.reduce<Record<string, string[]>>((runsByLanguage, run) => {
@@ -458,24 +428,37 @@ export function toPublicEvaluationArtifact(
   };
 }
 
-export function buildSyntheticLanguageProfile(state: AppState, languageId: string): SyntheticLanguageProfile | undefined {
+export function buildLanguageProfile(state: AppState, languageId: string): LanguageProfile | undefined {
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) return undefined;
 
-  const fixture = syntheticLanguageFixtures.find((item) => item.language.id === languageId);
+  const vocabulary = state.lexemes
+    .filter((lexeme) => lexeme.languageId === languageId)
+    .map(toPublicVocabularyItem)
+    .sort((left, right) => left.form.localeCompare(right.form));
+
+  const grammarRules: PublicGrammarRule[] = toPublicNotes(
+    state.notes.filter((note) => note.languageId === languageId)
+  ).map((note) => ({
+    id: note.id,
+    topic: note.topic,
+    explanation: note.explanation,
+    evidencePassageIds: [...note.evidencePassageIds],
+    confidence: note.confidence,
+    status: note.status
+  }));
+
   const exercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
-  const stats: SyntheticLanguageProfile["stats"] = {
-    vocabularyItems: fixture?.vocabulary.length ?? 0,
-    grammarRules: fixture?.grammarRules.length ?? 0,
-    paradigms: fixture?.paradigms.length ?? 0,
-    semanticDomains: fixture?.semanticDomains.length ?? 0,
-    registerProfiles: fixture?.registerProfiles.length ?? 0,
-    dialectVariants: fixture?.dialectVariants.length ?? 0,
-    discourseExamples: fixture?.discourseExamples.length ?? 0,
-    teachingSequences: fixture?.teachingSequences.length ?? 0,
+  const stats: LanguageProfile["stats"] = {
+    vocabularyItems: vocabulary.length,
+    grammarRules: grammarRules.length,
     corpusPassages: state.corpus.filter((passage) => passage.languageId === languageId).length,
     notes: state.notes.filter((note) => note.languageId === languageId).length,
     exercises: exercises.length,
+    sourceAssets: state.sourceAssets.filter((asset) => asset.languageId === languageId).length,
+    pendingExtractionDrafts: state.extractionDrafts.filter(
+      (draft) => draft.languageId === languageId && draft.status === "proposed"
+    ).length,
     exerciseTypes: exercises.reduce<Partial<Record<Exercise["type"], number>>>((counts, exercise) => {
       counts[exercise.type] = (counts[exercise.type] ?? 0) + 1;
       return counts;
@@ -484,84 +467,18 @@ export function buildSyntheticLanguageProfile(state: AppState, languageId: strin
 
   return {
     language,
-    phonology: {
-      consonants: [...(fixture?.phonology.consonants ?? [])],
-      vowels: [...(fixture?.phonology.vowels ?? [])],
-      syllableTemplate: fixture?.phonology.syllableTemplate ?? "",
-      stress: fixture?.phonology.stress ?? "",
-      phonotactics: [...(fixture?.phonology.phonotactics ?? [])]
-    },
-    paradigms: fixture?.paradigms.map((paradigm) => ({
-      ...paradigm,
-      rows: paradigm.rows.map((row) => ({
-        ...row,
-        morphemes: [...row.morphemes]
-      }))
-    })) ?? [],
-    semanticDomains: fixture?.semanticDomains.map((domain) => ({
-      ...domain,
-      coreVocabularyIds: [...domain.coreVocabularyIds],
-      evidencePassageIds: [...domain.evidencePassageIds],
-      usageNotes: [...domain.usageNotes]
-    })) ?? [],
-    registerProfiles: fixture?.registerProfiles.map((register) => ({
-      ...register,
-      semanticDomainIds: [...register.semanticDomainIds],
-      discourseExampleIds: [...register.discourseExampleIds],
-      teachingSequenceIds: [...register.teachingSequenceIds],
-      evidencePassageIds: [...register.evidencePassageIds],
-      usageNotes: [...register.usageNotes]
-    })) ?? [],
-    dialectVariants: fixture?.dialectVariants.map((dialect) => ({
-      ...dialect,
-      phonologyNotes: [...dialect.phonologyNotes],
-      lexicalNotes: [...dialect.lexicalNotes],
-      grammarNotes: [...dialect.grammarNotes],
-      history: {
-        summary: dialect.history.summary,
-        events: dialect.history.events.map((event) => ({
-          ...event,
-          evidencePassageIds: [...event.evidencePassageIds]
-        }))
-      },
-      examplePhrases: dialect.examplePhrases.map((example) => ({ ...example }))
-    })) ?? [],
-    discourseExamples: fixture?.discourseExamples.map((example) => ({
-      ...example,
-      notes: [...example.notes]
-    })) ?? [],
-    teachingSequences: fixture?.teachingSequences.map((sequence) => ({
-      ...sequence,
-      ruleIds: [...sequence.ruleIds],
-      corpusPassageIds: [...sequence.corpusPassageIds],
-      exerciseIds: [...sequence.exerciseIds],
-      steps: sequence.steps.map((step) => ({ ...step }))
-    })) ?? [],
-    vocabulary: fixture?.vocabulary.map((item) => ({
-      ...item,
-      tags: [...item.tags]
-    })) ?? [],
-    morphemeInventory: buildMorphemeInventory(state, languageId, fixture),
-    grammarRules: fixture?.grammarRules.map((rule) => ({
-      ...rule,
-      evidencePassageIds: [...rule.evidencePassageIds]
-    })) ?? [],
-    fixtureMinimums: { ...SYNTHETIC_FIXTURE_MINIMUMS },
-    fixtureQuality: summarizeSyntheticFixtureQuality({
-      ...buildSyntheticFixtureQualityActuals(fixture),
-      vocabularyItems: stats.vocabularyItems,
-      corpusPassages: stats.corpusPassages,
-      grammarRules: stats.grammarRules,
-      noteAnswerKeys: stats.notes,
-      exerciseAnswerKeys: stats.exercises,
-      exerciseTypes: Object.keys(stats.exerciseTypes).length,
-      paradigms: stats.paradigms,
-      semanticDomains: stats.semanticDomains,
-      registerProfiles: stats.registerProfiles,
-      dialectVariants: stats.dialectVariants,
-      discourseExamples: stats.discourseExamples,
-      teachingSequences: stats.teachingSequences
-    }),
+    phonology: language.phonology
+      ? {
+          consonants: [...language.phonology.consonants],
+          vowels: [...language.phonology.vowels],
+          syllableTemplate: language.phonology.syllableTemplate,
+          stress: language.phonology.stress,
+          notes: [...language.phonology.notes]
+        }
+      : null,
+    vocabulary,
+    morphemeInventory: buildMorphemeInventory(state, languageId, vocabulary),
+    grammarRules,
     stats
   };
 }
@@ -574,7 +491,7 @@ export function toPublicLanguageSnapshot(
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) return undefined;
 
-  const profile = buildSyntheticLanguageProfile(state, languageId);
+  const profile = buildLanguageProfile(state, languageId);
   if (!profile) return undefined;
   const { language: _profileLanguage, ...linguisticProfile } = profile;
 

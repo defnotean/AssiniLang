@@ -16,3 +16,12 @@ export function resolveRuntimeDbPath(options: RuntimeDbPathOptions = {}) {
   const moduleDir = dirname(fileURLToPath(options.moduleUrl ?? import.meta.url));
   return resolve(moduleDir, "..", "..", "..", "data", "local-db.json");
 }
+
+/**
+ * Directory that holds the local database and uploaded source-asset
+ * files. Kept next to the resolved database path so uploads land in
+ * the repository data folder regardless of the process working directory.
+ */
+export function resolveRuntimeDataDir(options: RuntimeDbPathOptions = {}) {
+  return dirname(resolveRuntimeDbPath(options));
+}

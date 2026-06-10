@@ -2481,3 +2481,23 @@ label,
     font-size: 1.72rem;
   }
 }
+
+.ingest-view {
+  display: grid;
+  gap: 0.86rem;
+}
+
+.ingest-view .source-row,
+.ingest-view .draft-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sidebar-footer .new-language-toggle,
+.sidebar-footer .new-language-form {
+  width: 100%;
+  margin-bottom: 0.6rem;
+}

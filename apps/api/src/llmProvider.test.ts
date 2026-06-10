@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildSeedState } from "@assini/synthetic-langs";
+import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
 import {
   buildLlmGenerationInputFromState,
+  createDeterministicLlmProvider,
   createLlmProviderFromEnv,
   createOpenAiCompatibleLlmProvider,
   describeLlmProviderFromEnv
@@ -37,12 +38,12 @@ describe("llm provider", () => {
       ASSINI_LLM_MODEL: "llama3.1"
     }, fetchFn);
 
-    const input = buildLlmGenerationInputFromState(buildSeedState(), {
-      languageId: "avenik",
+    const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
       mode: "learner_practice",
-      prompt: "Help me practice verb chains.",
-      contextNoteIds: ["avn-rule-verb-chain-note"],
-      contextPassageIds: ["avn-c001"]
+      prompt: "Help me practice suffix order.",
+      contextNoteIds: ["testlang-note-basic-order"],
+      contextPassageIds: ["testlang-c001"]
     });
     const result = await provider.generateAssistantMessage(input);
 
@@ -53,6 +54,8 @@ describe("llm provider", () => {
 
     const body = JSON.parse(calls[0].init?.body as string);
     expect(body).toMatchObject({ model: "llama3.1", temperature: 0.2, stream: false });
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[0].content).toContain("You are AssiniLang's server-side language-learning assistant.");
     expect(JSON.stringify(body)).not.toContain("noteAnswerKeys");
     expect(JSON.stringify(body)).not.toContain("expectedAnswers");
     expect(JSON.stringify(body)).not.toContain("gradingExplanation");
@@ -66,8 +69,8 @@ describe("llm provider", () => {
       ASSINI_LLM_MODEL: "gpt-test"
     }, fetchFn);
 
-    const input = buildLlmGenerationInputFromState(buildSeedState(), {
-      languageId: "avenik",
+    const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
       mode: "programmer_debug",
       prompt: "Summarize safe context.",
       contextNoteIds: [],
@@ -79,6 +82,50 @@ describe("llm provider", () => {
     expect(calls[0].url).toBe("https://api.openai.com/v1/chat/completions");
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer sk-test-secret");
     expect(calls[0].init?.body as string).not.toContain("sk-test-secret");
+  });
+
+  it("returns deterministic offline responses without exposing an extraction chat surface", async () => {
+    const provider = createDeterministicLlmProvider();
+    expect(provider.name).toBe("deterministic");
+    expect(provider.completeChat).toBeUndefined();
+
+    const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: ["testlang-note-basic-order"],
+      contextPassageIds: ["testlang-c001"]
+    });
+    const result = await provider.generateAssistantMessage(input);
+
+    expect(result.content).toBe(
+      "Deterministic offline response for Testlang: Subjects precede verbs in simple clauses, and person suffixes close the verb form."
+    );
+    expect(result.warnings).toContain("deterministic-fallback");
+  });
+
+  it("exposes completeChat on OpenAI-compatible providers for extraction with a low temperature", async () => {
+    const { calls, fetchFn } = captureFetch('{"summary":"extracted"}');
+    const provider = createOpenAiCompatibleLlmProvider({
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "llama3.1"
+    }, fetchFn);
+
+    const content = await provider.completeChat?.([
+      { role: "system", content: "Extract structured data." },
+      { role: "user", content: "mira = river" }
+    ]);
+
+    expect(content).toBe('{"summary":"extracted"}');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
+
+    const body = JSON.parse(calls[0].init?.body as string);
+    expect(body).toMatchObject({ model: "llama3.1", temperature: 0.1, stream: false });
+    expect(body.messages).toEqual([
+      { role: "system", content: "Extract structured data." },
+      { role: "user", content: "mira = river" }
+    ]);
   });
 
   it("fails fast for incomplete OpenAI-compatible configuration", () => {
@@ -103,6 +150,34 @@ describe("llm provider", () => {
       apiKey: { required: true, configured: true }
     });
     expect(JSON.stringify(status)).not.toContain("super-secret-key");
+  });
+
+  it("describes transcription readiness from the ASSINI_TRANSCRIBE_* environment variables", () => {
+    const unconfigured = describeLlmProviderFromEnv({});
+    expect(unconfigured.transcription).toMatchObject({
+      configured: false,
+      baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL",
+      modelVariable: "ASSINI_TRANSCRIBE_MODEL"
+    });
+    expect(unconfigured.transcription.baseUrl).toBeUndefined();
+
+    const configured = describeLlmProviderFromEnv({
+      ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/",
+      ASSINI_TRANSCRIBE_MODEL: "whisper-large"
+    });
+    expect(configured.transcription).toMatchObject({
+      configured: true,
+      baseUrl: "http://127.0.0.1:9000",
+      model: "whisper-large",
+      baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL",
+      modelVariable: "ASSINI_TRANSCRIBE_MODEL"
+    });
+
+    const invalid = describeLlmProviderFromEnv({
+      ASSINI_TRANSCRIBE_BASE_URL: "not-a-url"
+    });
+    expect(invalid.transcription.configured).toBe(false);
+    expect(invalid.transcription.baseUrl).toBe("[configured but not a valid http(s) URL]");
   });
 
   it("warns when timeout environment values are invalid", () => {
@@ -134,8 +209,8 @@ describe("llm provider", () => {
       timeoutMs: 25
     }, fetchFn);
 
-    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildSeedState(), {
-      languageId: "avenik",
+    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
       mode: "learner_practice",
       prompt: "Practice safely.",
       contextNoteIds: [],
@@ -163,8 +238,8 @@ describe("llm provider", () => {
       model: "gpt-test",
       apiKey: "sk-provider-secret"
     }, fetchFn);
-    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildSeedState(), {
-      languageId: "avenik",
+    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
       mode: "programmer_debug",
       prompt: "Summarize safely.",
       contextNoteIds: [],

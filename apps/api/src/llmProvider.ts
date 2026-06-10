@@ -59,9 +59,26 @@ export type LlmGenerationResult = {
   warnings: string[];
 };
 
+export type LlmChatContentPart =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export type LlmChatMessage = {
+  role: ChatRole;
+  content: string | LlmChatContentPart[];
+};
+
 export type LlmProvider = {
   name: string;
   generateAssistantMessage(input: LlmGenerationInput): Promise<LlmGenerationResult>;
+  /**
+   * Low-level chat completion used by the ingestion pipeline for
+   * structured extraction. Message content may include base64 image
+   * parts for vision-capable models. Providers without real model
+   * access (the deterministic fallback) leave this undefined and the
+   * pipeline falls back to offline heuristics.
+   */
+  completeChat?(messages: LlmChatMessage[]): Promise<string>;
 };
 
 export type OpenAiCompatibleConfig = {
@@ -90,6 +107,13 @@ export type LlmProviderReadiness = {
     modelVariable: "ASSINI_LLM_MODEL";
     apiKeyVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"];
     timeoutVariable: "ASSINI_LLM_TIMEOUT_MS";
+  };
+  transcription: {
+    configured: boolean;
+    baseUrl?: string;
+    model?: string;
+    baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL";
+    modelVariable: "ASSINI_TRANSCRIBE_MODEL";
   };
   setup: {
     localExamples: string[];
@@ -263,9 +287,9 @@ function modeInstruction(mode: AiSessionMode): string {
     return "Mode: programmer_debug. Explain observable behavior, retrieval context, and safe diagnostics only. Do not reveal hidden chain-of-thought or protected answer keys.";
   }
   if (mode === "elder_review") {
-    return "Mode: elder_review. Help review synthetic draft language-learning content and surface uncertainty or governance concerns clearly.";
+    return "Mode: elder_review. Help review draft language-learning content and surface uncertainty or governance concerns clearly.";
   }
-  return "Mode: learner_practice. Help a learner practice with synthetic language data without revealing grading keys or protected internals.";
+  return "Mode: learner_practice. Help a learner practice with the available language data without revealing grading keys or protected internals.";
 }
 
 export function buildOpenAiCompatibleMessages(input: LlmGenerationInput): LlmConversationMessage[] {
@@ -298,7 +322,7 @@ export function buildOpenAiCompatibleMessages(input: LlmGenerationInput): LlmCon
     {
       role: "system",
       content: [
-        "You are AssiniLang's server-side language-learning assistant for synthetic test data.",
+        "You are AssiniLang's server-side language-learning assistant.",
         "Use only the supplied public notes and corpus context. If the context is insufficient, say so.",
         "Never expose hidden chain-of-thought, API keys, environment variables, server configuration, answer keys, expected exercise answers, or learner identifiers.",
         "Keep responses concise, cite note or corpus IDs when useful, and label uncertainty."
@@ -322,14 +346,26 @@ export function createDeterministicLlmProvider(): LlmProvider {
     async generateAssistantMessage(input) {
       const firstNote = input.notes[0];
       const content = input.language
-        ? `Synthetic AI response for ${input.language.name}: ${firstNote?.explanation ?? "No draft note is available yet."}`
-        : "Synthetic AI response unavailable.";
+        ? `Deterministic offline response for ${input.language.name}: ${firstNote?.explanation ?? "No draft note is available yet."}`
+        : "Deterministic offline response unavailable.";
       return { content, warnings: ["deterministic-fallback"] };
     }
   };
 }
 
-function baseReadinessFields(timeoutMs: number): Pick<LlmProviderReadiness, "apiKey" | "environment" | "setup" | "warnings" | "timeoutMs"> {
+function transcriptionReadiness(env: Env): LlmProviderReadiness["transcription"] {
+  const baseUrl = trimValue(env.ASSINI_TRANSCRIBE_BASE_URL);
+  const model = trimValue(env.ASSINI_TRANSCRIBE_MODEL);
+  return {
+    configured: Boolean(baseUrl && parseHttpBaseUrl(baseUrl)),
+    baseUrl: sanitizeConfiguredBaseUrl(baseUrl),
+    model,
+    baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL",
+    modelVariable: "ASSINI_TRANSCRIBE_MODEL"
+  };
+}
+
+function baseReadinessFields(timeoutMs: number, env: Env): Pick<LlmProviderReadiness, "apiKey" | "environment" | "transcription" | "setup" | "warnings" | "timeoutMs"> {
   return {
     timeoutMs,
     apiKey: {
@@ -344,6 +380,7 @@ function baseReadinessFields(timeoutMs: number): Pick<LlmProviderReadiness, "api
       apiKeyVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"],
       timeoutVariable: "ASSINI_LLM_TIMEOUT_MS"
     },
+    transcription: transcriptionReadiness(env),
     setup: {
       localExamples: [
         "ASSINI_LLM_PROVIDER=openai-compatible ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1",
@@ -365,7 +402,7 @@ export function describeLlmProviderFromEnv(env: Env = process.env): LlmProviderR
   const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
   const timeout = parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS);
   const timeoutMs = timeout.value;
-  const base = baseReadinessFields(timeoutMs);
+  const base = baseReadinessFields(timeoutMs, env);
 
   if (provider === "deterministic" || provider === "off" || provider === "mock") {
     return {
@@ -535,61 +572,70 @@ export function createOpenAiCompatibleLlmProvider(
   }
 
   const apiKey = trimValue(config.apiKey);
+  const resolvedBaseUrl: string = baseUrl;
   const timeoutMs = Number.isInteger(config.timeoutMs) && (config.timeoutMs ?? 0) > 0
     ? config.timeoutMs as number
     : DEFAULT_LLM_TIMEOUT_MS;
 
+  async function requestCompletion(messages: LlmChatMessage[], temperature: number): Promise<string> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) {
+        headers.Authorization = `Bearer ${apiKey}`;
+      }
+
+      const response = await fetchFn(completionUrl(resolvedBaseUrl), {
+        method: "POST",
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+          stream: false
+        })
+      });
+
+      if (!response.ok) {
+        const detail = await readProviderErrorDetail(response, apiKey);
+        throw new Error(
+          detail
+            ? `LLM provider request failed with status ${response.status}: ${detail}`
+            : `LLM provider request failed with status ${response.status}`
+        );
+      }
+
+      const payload = await response.json() as OpenAiChatCompletionResponse;
+      const content = payload.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || content.trim().length === 0) {
+        throw new Error("LLM provider returned an empty assistant message");
+      }
+
+      return content.trim();
+    } catch (error) {
+      if (timedOut || isAbortError(error)) {
+        throw new Error(`LLM provider request timed out after ${timeoutMs}ms`, { cause: error });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   return {
     name: "openai-compatible",
     async generateAssistantMessage(input) {
-      const controller = new AbortController();
-      let timedOut = false;
-      const timeout = setTimeout(() => {
-        timedOut = true;
-        controller.abort();
-      }, timeoutMs);
-      try {
-        const headers: Record<string, string> = { "Content-Type": "application/json" };
-        if (apiKey) {
-          headers.Authorization = `Bearer ${apiKey}`;
-        }
-
-        const response = await fetchFn(completionUrl(baseUrl), {
-          method: "POST",
-          headers,
-          signal: controller.signal,
-          body: JSON.stringify({
-            model,
-            messages: buildOpenAiCompatibleMessages(input),
-            temperature: 0.2,
-            stream: false
-          })
-        });
-
-        if (!response.ok) {
-          const detail = await readProviderErrorDetail(response, apiKey);
-          throw new Error(
-            detail
-              ? `LLM provider request failed with status ${response.status}: ${detail}`
-              : `LLM provider request failed with status ${response.status}`
-          );
-        }
-
-        const payload = await response.json() as OpenAiChatCompletionResponse;
-        const content = payload.choices?.[0]?.message?.content;
-        if (typeof content !== "string" || content.trim().length === 0) {
-          throw new Error("LLM provider returned an empty assistant message");
-        }
-
-        return { content: content.trim(), warnings: [] };
-      } catch (error) {
-        if (timedOut || isAbortError(error)) {
-          throw new Error(`LLM provider request timed out after ${timeoutMs}ms`, { cause: error });
-        }
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-      }
+      const content = await requestCompletion(buildOpenAiCompatibleMessages(input), 0.2);
+      return { content, warnings: [] };
+    },
+    async completeChat(messages) {
+      return requestCompletion(messages, 0.1);
     }
   };
 }

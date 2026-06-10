@@ -10,8 +10,7 @@
     "test": "vitest run --root ../.. packages/eval/src"
   },
   "dependencies": {
-    "@assini/db": "0.1.0",
-    "@assini/synthetic-langs": "0.1.0"
+    "@assini/db": "0.1.0"
   },
   "devDependencies": {
     "tsx": "^4.19.2",

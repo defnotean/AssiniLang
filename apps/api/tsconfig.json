@@ -7,7 +7,6 @@
   },
   "references": [
     { "path": "../../packages/db" },
-    { "path": "../../packages/synthetic-langs" },
     { "path": "../../packages/eval" }
   ],
   "include": ["src/**/*.ts"],

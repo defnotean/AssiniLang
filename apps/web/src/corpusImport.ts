@@ -1,5 +1,20 @@
 import type { CorpusImportPayload } from "./api";
 
+export type CorpusConsentUse = CorpusImportPayload["consentStatus"]["use"];
+
+/** Mirrors CONSENT_USE_VALUES from @assini/db (type-checked against the schema union). */
+export const CORPUS_CONSENT_USE_VALUES: readonly CorpusConsentUse[] = [
+  "testing-only",
+  "community-approved",
+  "personal-study",
+  "research",
+  "public-domain",
+  "licensed",
+  "pending-review"
+];
+
+export const DEFAULT_CORPUS_CONSENT_USE: CorpusConsentUse = "community-approved";
+
 export type CorpusImportDraft = {
   target: string;
   translation: string;
@@ -8,6 +23,7 @@ export type CorpusImportDraft = {
   year: string;
   license: string;
   consentRecord: string;
+  consentUse: string;
   tags: string;
   morphemes: string;
   restrictions: string;
@@ -18,6 +34,7 @@ type CorpusImportBuildResult =
   | { ok: false; error: string };
 
 const INCOMPLETE_IMPORT_ERROR = "Please complete target text, translation, provenance, tags, and morphemes.";
+const INVALID_CONSENT_USE_ERROR = `Consent use must be one of: ${CORPUS_CONSENT_USE_VALUES.join(", ")}.`;
 
 export const EMPTY_CORPUS_IMPORT_DRAFT: CorpusImportDraft = {
   target: "",
@@ -27,10 +44,15 @@ export const EMPTY_CORPUS_IMPORT_DRAFT: CorpusImportDraft = {
   year: "",
   license: "",
   consentRecord: "",
+  consentUse: DEFAULT_CORPUS_CONSENT_USE,
   tags: "",
   morphemes: "",
   restrictions: ""
 };
+
+function isCorpusConsentUse(value: string): value is CorpusConsentUse {
+  return (CORPUS_CONSENT_USE_VALUES as readonly string[]).includes(value);
+}
 
 function parseDraftList(value: string): string[] {
   return value
@@ -69,6 +91,7 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
   const parsedYear = Number(draft.year.trim());
   const topicTags = parseDraftList(draft.tags);
   const morphologicalSegmentation = parseCorpusMorphemeDraft(draft.morphemes);
+  const consentUse = draft.consentUse.trim();
 
   if (
     draft.target.trim().length === 0
@@ -83,6 +106,10 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
     || !hasCompleteCorpusMorphemes(morphologicalSegmentation)
   ) {
     return { ok: false, error: INCOMPLETE_IMPORT_ERROR };
+  }
+
+  if (!isCorpusConsentUse(consentUse)) {
+    return { ok: false, error: INVALID_CONSENT_USE_ERROR };
   }
 
   return {
@@ -100,7 +127,7 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
       morphologicalSegmentation,
       topicTags,
       consentStatus: {
-        use: "synthetic-testing-only",
+        use: consentUse,
         restrictions: parseDraftList(draft.restrictions)
       }
     }

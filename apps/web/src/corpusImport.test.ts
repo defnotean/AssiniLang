@@ -24,30 +24,31 @@ describe("corpus import helpers", () => {
       ...EMPTY_CORPUS_IMPORT_DRAFT,
       target: "  mira lumo-ke talo-mi-na  ",
       translation: "  I walk by the river at the practice mat.  ",
-      source: "  synthetic-import  ",
+      source: "  field-import  ",
       author: "  Local Reviewer  ",
       year: "2026",
-      license: "  synthetic-only  ",
-      consentRecord: "  local synthetic import consent  ",
+      license: "  cc-by  ",
+      consentRecord: "  local import consent  ",
+      consentUse: " testing-only ",
       tags: "motion, place\nimported",
       morphemes: [
         "mira | mira | river | noun",
         "lumo-ke | lumo | practice-mat.locative | noun, case-loc",
         "talo-mi-na | talo | walk.present.1sg | verb, present, 1sg"
       ].join("\n"),
-      restrictions: "local prototype import, synthetic-only"
+      restrictions: "local prototype import, internal-only"
     };
 
     expect(canSubmitCorpusImportDraft(draft)).toBe(true);
     expect(buildCorpusImportPayload(draft)).toEqual({
       ok: true,
       payload: {
-        source: "synthetic-import",
+        source: "field-import",
         sourceMetadata: {
           author: "Local Reviewer",
           year: 2026,
-          license: "synthetic-only",
-          consentRecord: "local synthetic import consent"
+          license: "cc-by",
+          consentRecord: "local import consent"
         },
         textTarget: "mira lumo-ke talo-mi-na",
         textTranslation: "I walk by the river at the practice mat.",
@@ -58,8 +59,8 @@ describe("corpus import helpers", () => {
         ],
         topicTags: ["motion", "place", "imported"],
         consentStatus: {
-          use: "synthetic-testing-only",
-          restrictions: ["local prototype import", "synthetic-only"]
+          use: "testing-only",
+          restrictions: ["local prototype import", "internal-only"]
         }
       }
     });
@@ -74,11 +75,11 @@ describe("corpus import helpers", () => {
       ...EMPTY_CORPUS_IMPORT_DRAFT,
       target: "mira talo-mi-na",
       translation: "I walk by the river.",
-      source: "synthetic-import",
+      source: "field-import",
       author: "Local Reviewer",
       year: "2026",
-      license: "synthetic-only",
-      consentRecord: "local synthetic import consent",
+      license: "cc-by",
+      consentRecord: "local import consent",
       tags: "motion",
       morphemes: "mira | mira | river | noun",
       ...overrides
