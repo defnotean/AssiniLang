@@ -20,29 +20,29 @@ Uploads are multipart, one file, 25 MB cap, stored under `data/assets/<languageI
 ```mermaid
 flowchart TD
     A[Source asset] --> B{Kind}
-    B -->|url| C[Fetch with SSRF guard\nHTML to text]
-    B -->|audio| D[Transcribe via\nASSINI_TRANSCRIBE_BASE_URL]
-    B -->|document| E[Parse PDF / DOCX /\nplain-text formats]
+    B -->|url| C[Fetch with SSRF guard<br>HTML to text]
+    B -->|audio| D[Transcribe via<br>ASSINI_TRANSCRIBE_BASE_URL]
+    B -->|document| E[Parse PDF / DOCX /<br>plain-text formats]
     B -->|text / wordlist| F[Raw text]
-    B -->|image| G{Vision model\nconfigured?}
-    G -->|yes| H[Model reads image\nas base64 content]
-    G -->|no| I[Local OCR\ntesseract.js]
+    B -->|image| G{Vision model<br>configured?}
+    G -->|yes| H[Model reads image<br>as base64 content]
+    G -->|no| I[Local OCR<br>tesseract.js]
     C --> J[Normalized text]
     D --> J
     E --> J
     F --> J
     I --> J
-    J --> K{Chat model\nconfigured?}
-    K -->|yes| L[Chunk ~12k chars,\nmax 8 chunks]
-    L --> M[Per-chunk LLM extraction\nstrict JSON contract]
+    J --> K{Chat model<br>configured?}
+    K -->|yes| L[Chunk ~12k chars,<br>max 8 chunks]
+    L --> M[Per-chunk LLM extraction<br>strict JSON contract]
     M --> N[Merge + dedupe candidates]
-    K -->|no| O[Offline heuristic:\ndelimited-line parsing]
+    K -->|no| O[Offline heuristic:<br>delimited-line parsing]
     M -->|all chunks unparseable| O
     H --> P[Parse extraction JSON]
     N --> Q[Proposed extraction drafts]
     O --> Q
     P --> Q
-    Q --> R[Human review:\naccept or reject]
+    Q --> R[Human review:<br>accept or reject]
 ```
 
 The model is asked for a single JSON object with `summary`, `lexemes`, `passages`, and `grammarNotes`. Responses are tolerant-parsed: code fences are stripped and the first balanced JSON object is extracted before Zod validation.
@@ -127,8 +127,8 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Transcription request failed with status N.` / `Transcription endpoint returned no text.` | 422 | Transcription server error or empty result | Check the server, model name, and audio file. |
 | `Local OCR could not read the image: ... Configure a vision-capable model via ASSINI_LLM_PROVIDER ...` | 422 | OCR failed (often `OCR found no readable text in the image.`) | Provide a clearer image or configure a vision model such as llava. |
 | `The model response could not be parsed as extraction JSON. Try again or use a larger model.` | 422 | A vision model replied with non-JSON output | Retry, or use a model that follows JSON instructions. |
-| `The PDF contains no extractable text - it may be a scanned image; OCR is not supported yet.` | 422 | Scanned/image-only PDF | Convert pages to images and upload those, or OCR externally. |
-| `The document contains no extractable text - it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
+| `The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Scanned/image-only PDF | Convert pages to images and upload those, or OCR externally. |
+| `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
 | `Document type .X is not supported yet. Upload a PDF, DOCX, plain-text, Markdown, or CSV file, or convert it first.` | 422 | Unsupported document extension | Convert to a supported format. |
 | `Text source asset has no content.` / `... has no stored file.` / `URL source asset has no URL.` | 422 | The asset record is incomplete (usually hand-edited state) | Re-register or re-upload the source. |
 | `Source contains no readable text.` | 422 | Resolved text was empty after normalization | Check the source content. |

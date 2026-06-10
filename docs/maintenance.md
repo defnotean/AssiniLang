@@ -30,7 +30,7 @@ The console is one app in `apps/web/src/App.tsx`:
 Seams in `apps/api/src/ingestion.ts`:
 
 - New document format: extend `TEXT_DOCUMENT_EXTENSIONS` or add a branch in `resolveAssetText` under `asset.kind === "document"` (the PDF/DOCX branches show the dynamic-import pattern). Update the unsupported-type error message.
-- New source kind: add the enum value to `sourceAssetSchema` in `packages/db/src/schema.ts`, teach `sourceKindForUpload` in `server.ts` (or the registration body parser) to produce it, and handle it in `resolveAssetText` or `extractCandidatesForAsset`.
+- New source kind: add the enum value to `sourceAssetKindSchema` (the `z.enum`) in `packages/db/src/schema.ts`, which `sourceAssetSchema.kind` consumes; teach `sourceKindForUpload` in `server.ts` (or the registration body parser) to produce it, and handle it in `resolveAssetText` or `extractCandidatesForAsset`.
 - Tests live in `apps/api/src/ingestion.test.ts` (pipeline behavior with fake providers/fetch) and `apps/api/src/server.test.ts` (route behavior). Update the source-kinds table and error catalogue in [ingestion.md](ingestion.md).
 
 ## Changing the persisted schema
@@ -41,7 +41,7 @@ The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currentl
 2. For a new collection or breaking change, bump the `schemaVersion` literal, keep the old version as a legacy schema (the v1-v7 schemas near the bottom of the file are the pattern), and extend `parseAppState` so legacy databases migrate forward on read.
 3. Add integrity checks in the `superRefine` block when the new data references other collections - corrupted local JSON must fail loudly, not leak into public views.
 4. Tests: `packages/db/src/store.test.ts` covers parse/migrate/reject paths; `packages/db/src/testing.ts` has state-building helpers. Add a migration test (old-version JSON parses and gains the new field/collection) and a rejection test (malformed new data fails with a useful message).
-5. Update the collections list in [architecture.md](architecture.md) - the doc test checks it stays in sync by spirit, reviewers check it literally.
+5. Update the collections list in [architecture.md](architecture.md). The doc test derives the collection names from `appStateSchema` in `schema.ts` and fails if any of them is missing from architecture.md's collections list, and it asserts the `schemaVersion` literal in architecture.md matches the one in `schema.ts` - so adding a collection or bumping the version without touching architecture.md breaks the build.
 
 ## Editing public response shapes safely
 
@@ -57,7 +57,7 @@ Each doc owns one topic; link instead of repeating:
 
 | Doc | Owns |
 | --- | --- |
-| `README.md` | Landing page: overview, quick start, command table, doc index. Keep it under 150 lines. |
+| `README.md` | Landing page: overview, quick start, command table, doc index. Keep it at most 150 lines. |
 | `docs/configuration.md` | Every environment variable and setup recipe. The only place env vars are exhaustively listed. |
 | `docs/ingestion.md` | Source kinds, processing flow, chunking, SSRF guard, OCR, transcription, duplicate flags, ingestion errors. |
 | `docs/api.md` | Route index, auth model, per-route behavior and validation. |
@@ -77,7 +77,16 @@ When you change code, update docs in the same change:
 - Schema/collection change: `docs/architecture.md`.
 - New doc file: link it from `docs/README.md` (the doc test enforces this) and the README index.
 
-`scripts/documentation.test.ts` guards the docs: it checks that every doc exists with its key headings, the README stays short and links the hub, every relative markdown link in `README.md` and `docs/*.md` resolves to a real file, every `ASSINI_*` variable referenced in `apps/`, `packages/`, or `scripts/` is documented in `docs/configuration.md`, and the hub links every doc in `docs/`. Run it directly with:
+`scripts/documentation.test.ts` guards the docs against source and code:
+
+- Every doc exists with its key headings and sentinels, the README is at most 150 lines, and the hub links every doc in `docs/`.
+- Every relative markdown link in `README.md` and `docs/*.md` resolves to a real file.
+- Every `ASSINI_*` variable referenced in `apps/`, `packages/`, or `scripts/` is documented in `docs/configuration.md`, as are the non-prefixed vars read from source (`PORT`, `HOST`, `OPENAI_API_KEY`, `OPENAI_MODEL`).
+- Every route path registered in `apps/api/src/server.ts` (parsed from the `app.get/post/put/patch/delete(...)` calls, count derived from source) appears in the `docs/api.md` route index.
+- Every `sourceAssetKindSchema` enum member from `schema.ts` appears in the `docs/ingestion.md` source-kinds table.
+- Every `appStateSchema` collection name and the `schemaVersion` literal from `schema.ts` appear in `docs/architecture.md`.
+
+Run it directly with:
 
 ```powershell
 npx vitest run scripts/documentation.test.ts

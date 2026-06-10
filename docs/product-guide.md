@@ -6,7 +6,7 @@ The workspace starts empty. Users create their own languages, ingest their own r
 
 ## Core workflow
 
-1. Create a language with a name, typology, description, orthography, and an optional phonology inventory. The web console's New language form lives at the bottom of the language sidebar.
+1. Create a language. The web console's New language form (at the bottom of the language sidebar) collects name, typology, description, and orthography. A phonology inventory can currently be supplied only through the `POST /languages` API, not the web form.
 2. Add raw sources to that language: pasted text, word lists, URLs, or uploaded files including images, audio, and PDF/DOCX documents.
 3. Process a source. A local LLM extracts candidate lexemes, corpus passages, and grammar notes; without a configured model, an offline heuristic parses delimited word-list lines and local OCR reads images instead.
 4. Review the resulting extraction drafts. Each extraction draft shows its payload, confidence, rationale, and any duplicate badge; accepting commits it, rejecting discards it.
@@ -129,7 +129,7 @@ The browser actor mapping is:
 - Learner: learner exercise submissions and learner-practice AI sessions.
 - Elder: governance records and elder-correction review/apply flows.
 - Reviewer: language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
-- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, AI observability, and neural-map inspection.
+- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, and AI observability. The `GET /observability/neural-map` context graph is reachable with a programmer token through the API but is not surfaced in the browser console.
 
 Lead and admin identities still exist in the local state for backend authorization, persisted review-policy authority, audit integrity, and future production-account design. Review-policy edits from the browser are audited as reviewer activity, while the stored policy updater remains the canonical lead/admin authority required by local database validation.
 

@@ -26,7 +26,7 @@ Symptom-cause-fix tables for the problems you are most likely to hit locally. Co
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | URL source fails with `... points at a private or local network ... and was blocked.` | The SSRF guard blocks localhost and private ranges by default | Use a public URL, or set `ASSINI_ALLOW_PRIVATE_URLS=1` only in a trusted local setup. |
-| PDF fails with `The PDF contains no extractable text - it may be a scanned image; OCR is not supported yet.` | The PDF is a scan with no text layer; OCR applies only to image sources | Export pages as images and upload those (OCR fallback applies), or OCR the PDF externally and upload the text. |
+| PDF/DOCX fails with `The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.` (or the parallel `The document contains no extractable text — ...` for DOCX) | The file has no text layer; OCR applies only to image sources and is not supported for documents yet | Export pages as images and upload those (the image OCR fallback applies), or OCR the document externally and upload the text. |
 | A source is stuck at `processing` after the API crashed or was restarted | Async processing was claimed but the background task never persisted a result; there is no in-process resume | Edit `data/local-db.json` and set that asset's `status` to `failed` (or `pending`), then reprocess. With seedable data, `npm.cmd run seed` resets the whole workspace. |
 | Processing returns `409 Source is already processing` | An async run is still in flight, or a crash left the asset stuck | Wait for polling to finish (the console polls every 2.5 s); if it never finishes, apply the stuck-`processing` fix above. |
 

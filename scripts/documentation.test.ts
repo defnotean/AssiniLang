@@ -32,6 +32,49 @@ async function readAllDocs(): Promise<Map<string, string>> {
   return docs;
 }
 
+// Route paths registered in the Fastify server, derived from source so the
+// guard cannot go stale when routes are added or renamed.
+async function readRegisteredRoutePaths(): Promise<string[]> {
+  const server = await readProjectFile("apps/api/src/server.ts");
+  const paths = new Set<string>();
+  for (const match of server.matchAll(/app\.(?:get|post|put|patch|delete)\(\s*"([^"]+)"/g)) {
+    const path = match[1];
+    if (path) paths.add(path);
+  }
+  return [...paths];
+}
+
+// Members of a named `z.enum([...])` declaration in schema.ts.
+async function readEnumMembers(exportName: string): Promise<string[]> {
+  const schema = await readProjectFile("packages/db/src/schema.ts");
+  const declaration = new RegExp(`export const ${exportName} = z\\.enum\\(\\[([^\\]]*)\\]`);
+  const match = schema.match(declaration);
+  if (!match || match[1] === undefined) {
+    throw new Error(`Could not find ${exportName} z.enum(...) in schema.ts`);
+  }
+  return [...match[1].matchAll(/"([^"]+)"/g)].map((member) => member[1] as string);
+}
+
+// Collection keys and schemaVersion literal of the persisted appStateSchema,
+// derived from schema.ts so a new collection cannot ship undocumented.
+async function readAppStateShape(): Promise<{ collections: string[]; schemaVersion: number }> {
+  const schema = await readProjectFile("packages/db/src/schema.ts");
+  const block = schema.match(/export const appStateSchema = z\.object\(\{([\s\S]*?)\}\)\.superRefine/);
+  if (!block || block[1] === undefined) {
+    throw new Error("Could not find appStateSchema z.object({...}).superRefine in schema.ts");
+  }
+  const body = block[1];
+  const collections: string[] = [];
+  for (const match of body.matchAll(/^\s*([A-Za-z0-9_]+):\s*z\.array\(/gm)) {
+    if (match[1]) collections.push(match[1]);
+  }
+  const versionMatch = body.match(/schemaVersion:\s*z\.literal\((\d+)\)/);
+  if (!versionMatch || versionMatch[1] === undefined) {
+    throw new Error("Could not find schemaVersion z.literal(...) in appStateSchema");
+  }
+  return { collections, schemaVersion: Number(versionMatch[1]) };
+}
+
 describe("project documentation", () => {
   it("keeps every handbook doc present with its key sections", async () => {
     const docs = await readAllDocs();
@@ -147,5 +190,51 @@ describe("project documentation", () => {
     expect(referenced.size).toBeGreaterThanOrEqual(10);
     const undocumented = [...referenced].filter((name) => !configurationDoc.includes(name)).sort();
     expect(undocumented, `Add these variables to docs/configuration.md: ${undocumented.join(", ")}`).toEqual([]);
+  });
+
+  it("documents the non-ASSINI environment variables read in source", async () => {
+    const configurationDoc = await readProjectFile("docs/configuration.md");
+    const nonPrefixedVars = ["PORT", "HOST", "OPENAI_API_KEY", "OPENAI_MODEL"];
+    const undocumented = nonPrefixedVars.filter((name) => !configurationDoc.includes(name));
+    expect(undocumented, `Add these variables to docs/configuration.md: ${undocumented.join(", ")}`).toEqual([]);
+  });
+
+  it("indexes every server route path in docs/api.md", async () => {
+    const apiDoc = await readProjectFile("docs/api.md");
+    const routePaths = await readRegisteredRoutePaths();
+
+    expect(routePaths.length).toBeGreaterThanOrEqual(10);
+    const undocumented = routePaths.filter((path) => !apiDoc.includes(`\`${path}\``)).sort();
+    expect(undocumented, `Add these routes to the docs/api.md route index: ${undocumented.join(", ")}`).toEqual([]);
+  });
+
+  it("lists every source-asset kind in the ingestion source-kinds table", async () => {
+    const ingestionDoc = await readProjectFile("docs/ingestion.md");
+    const kinds = await readEnumMembers("sourceAssetKindSchema");
+
+    expect(kinds).toContain("document");
+    const undocumented = kinds.filter((kind) => !ingestionDoc.includes(`\`${kind}\``)).sort();
+    expect(undocumented, `Add these source kinds to the docs/ingestion.md table: ${undocumented.join(", ")}`).toEqual([]);
+  });
+
+  it("enumerates every persisted collection and the schema version in architecture.md", async () => {
+    const architectureDoc = await readProjectFile("docs/architecture.md");
+    const { collections, schemaVersion } = await readAppStateShape();
+
+    expect(collections).toContain("languages");
+    expect(collections).toContain("extractionDrafts");
+    const missingCollections = collections
+      .filter((name) => name !== "schemaVersion")
+      .filter((name) => !architectureDoc.includes(`\`${name}\``))
+      .sort();
+    expect(
+      missingCollections,
+      `Add these collections to the architecture.md collections list: ${missingCollections.join(", ")}`
+    ).toEqual([]);
+
+    expect(
+      architectureDoc.includes(`schemaVersion: ${schemaVersion}`),
+      `architecture.md should state schemaVersion: ${schemaVersion} to match schema.ts`
+    ).toBe(true);
   });
 });

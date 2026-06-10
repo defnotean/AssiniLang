@@ -70,7 +70,7 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 - Learner practice and learner-mode AI sessions use the learner actor.
 - Language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review-policy editing, and review-disposition workflows use the reviewer actor.
 - Governance writes and elder-correction review/apply flows use the Elder actor.
-- Audit reads, evaluation artifact reads, programmer AI sessions, AI observability, and neural-map inspection use the programmer actor.
+- Audit reads, evaluation artifact reads, programmer AI sessions, and AI observability use the programmer actor. The `GET /observability/neural-map` graph is programmer-token reachable but is not wired into the browser console.
 
 Do not treat prototype auth as production security.
 
@@ -111,7 +111,7 @@ The route also supports background processing for long sources: send a JSON body
 
 `GET /languages/:languageId/extraction-drafts` lists drafts; `?status=proposed|accepted|rejected` filters.
 
-Listed proposed drafts may carry a read-time `duplicate` flag, computed per request and never persisted. Existing-workspace matches produce `{ kind, entityId }`: `exact` for a case-insensitive lexeme form+gloss match or a case/whitespace-insensitive corpus target-text match, `form` for a lexeme form that already exists with a different gloss (a possible homonym or gloss refinement), and `topic` for a grammar note repeating an existing note topic. When two pending drafts propose the same thing, the later draft gets `{ kind: "pending", draftId }` pointing at the earlier one. Each draft gets at most one flag (existing-entity matches win over pending matches); the flag is advisory and does not block accept or reject.
+Listed proposed drafts may carry a read-time `duplicate` flag, computed per request and never persisted. Existing-workspace matches produce `{ kind, entityId }`: `exact` for a case-insensitive lexeme form+gloss match or a case/whitespace-insensitive corpus target-text match, `form` for a lexeme form that already exists with a different gloss (a possible homonym or gloss refinement), and `topic` for a grammar note repeating an existing note topic. The lexeme `exact` flag requires the draft to carry both a form and a gloss; a form match on a glossless draft yields the `form` flag instead. Topic matching is case- and whitespace-insensitive, like the lexeme and corpus comparisons. When two pending drafts propose the same thing, the later draft gets `{ kind: "pending", draftId }` pointing at the earlier one. Each draft gets at most one flag (existing-entity matches win over pending matches); the flag is advisory and does not block accept or reject.
 
 `POST /extraction-drafts/:draftId/accept` and `POST /extraction-drafts/:draftId/reject`
 

@@ -27,7 +27,7 @@ Read by `apps/api/src/llmProvider.ts`. The same provider drives ingestion extrac
 
 | Variable | Default | Accepted values | Effect |
 | --- | --- | --- | --- |
-| `ASSINI_LLM_PROVIDER` | unset (auto-detect) | `deterministic`, `off`, `mock`, `openai-compatible`, `local`, `ollama`, `lm-studio`, `openai`, `remote` | Selects the provider mode. `deterministic`/`off`/`mock` disable model calls. `openai-compatible`/`local`/`ollama`/`lm-studio` all mean "OpenAI-compatible endpoint at `ASSINI_LLM_BASE_URL`". `openai`/`remote` mean a remote API that requires a key. Any other value is an error. |
+| `ASSINI_LLM_PROVIDER` | unset (auto-detect) | `deterministic`, `off`, `mock`, `openai-compatible`, `local`, `ollama`, `lm-studio`, `openai`, `remote` | Selects the provider mode. `deterministic`/`off`/`mock` disable model calls. `openai-compatible`/`local`/`ollama`/`lm-studio` all mean "OpenAI-compatible endpoint at `ASSINI_LLM_BASE_URL`". `openai`/`remote` mean a remote API that requires a key. Any other value is unknown: model calls throw, and `GET /llm/status` reports mode `invalid` with a warning rather than HTTP-erroring itself. |
 | `ASSINI_LLM_BASE_URL` | `https://api.openai.com/v1` in remote mode; required in local mode | http(s) URL | Base URL of the OpenAI-compatible `/chat/completions` endpoint. |
 | `ASSINI_LLM_MODEL` | `gpt-4o-mini` in remote mode; required in local mode | model name string | Model sent in completion requests. Falls back to `OPENAI_MODEL` when unset. |
 | `ASSINI_LLM_API_KEY` | unset | secret string | Bearer token for the LLM endpoint. Required in remote mode. `OPENAI_API_KEY` is accepted as an alias. |

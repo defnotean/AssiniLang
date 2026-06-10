@@ -69,6 +69,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run check` | TypeScript project checks. |
 | `npm.cmd run seed` | Reset to an empty workspace at `data/local-db.json`. |
 | `npm.cmd run eval` | Deterministic evaluation CLI. |
+| `npm.cmd run build` | Build all workspaces. |
 | `npm.cmd run smoke` | End-to-end ingestion smoke script. |
 | `npm.cmd run demo` | Seed, evaluate, and start the prototype. |
 
@@ -79,7 +80,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 - [Configuration Reference](docs/configuration.md) - every environment variable, with setup recipes.
 - [Ingestion Deep Dive](docs/ingestion.md) - source kinds, processing flow, fallbacks, error catalogue.
 - [API Reference](docs/api.md) - full route index, auth model, validation rules.
-- [Architecture And Data](docs/architecture.md) - components, data model, persistence, projection.
+- [Architecture and Data](docs/architecture.md) - components, data model, persistence, projection.
 - [Development Guide](docs/development.md) - setup, quality gate, browser verification, walkthrough.
 - [Maintenance Guide](docs/maintenance.md) - recipes for changing routes, views, schema, and docs.
 - [Troubleshooting](docs/troubleshooting.md) - symptom, cause, fix.

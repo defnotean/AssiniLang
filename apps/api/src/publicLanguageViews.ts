@@ -565,8 +565,9 @@ function existingEntityDuplicate(state: AppState, draft: ExtractionDraft): Extra
 
   const topic = draft.payload.topic?.trim();
   if (!topic) return undefined;
+  const normalizedTopic = normalizeDuplicateKey(topic);
   const match = state.notes.find(
-    (note) => note.languageId === draft.languageId && note.topic.trim() === topic
+    (note) => note.languageId === draft.languageId && normalizeDuplicateKey(note.topic) === normalizedTopic
   );
   return match ? { kind: "topic", entityId: match.id } : undefined;
 }

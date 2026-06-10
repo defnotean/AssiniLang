@@ -5,7 +5,7 @@ This guide covers local setup, the quality gate, browser verification, and a wal
 ## Requirements
 
 - Node.js compatible with the repository lockfile (`>=20.19.0`).
-- npm.
+- npm `>=10` (the repo pins `npm@11.11.1` via `packageManager`).
 - PowerShell on Windows, or any shell that can run the equivalent npm commands.
 
 ## Install
@@ -80,7 +80,7 @@ Extraction quality depends on the configured local model. All provider configura
 
 The workspace has no hardcoded language data. To populate a language locally:
 
-1. Create the language (`POST /languages` or the web console's New language form in the sidebar) with a name, typology, description, orthography, and optionally a phonology inventory. Declaring the inventory enables orthography validation for later corpus text.
+1. Create the language with a name, typology, description, and orthography. The web console's New language form in the sidebar collects those four fields; a phonology inventory can be supplied only through `POST /languages`. Declaring the inventory enables orthography validation for later corpus text.
 2. Register or upload raw sources for it in the Sources & intake view: pasted text, word lists, URLs, or files including images, audio, and PDF/DOCX documents.
 3. Process each source (`POST /sources/:sourceId/process`; the console uses async mode and polls) and review the proposed extraction drafts. Duplicate badges flag drafts that repeat existing entries or other pending drafts.
 4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.
