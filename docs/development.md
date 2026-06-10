@@ -1,10 +1,10 @@
-# Development Guide
+# Development guide
 
-This guide covers local setup, verification, browser checks, and model/transcription configuration.
+This guide covers local setup, the quality gate, browser verification, and a walkthrough of building a language from raw sources. Maintainer change recipes (routes, views, schema, public shapes, docs) live in the [Maintenance Guide](maintenance.md); environment variables live in the [Configuration Reference](configuration.md).
 
 ## Requirements
 
-- Node.js compatible with the repository lockfile.
+- Node.js compatible with the repository lockfile (`>=20.19.0`).
 - npm.
 - PowerShell on Windows, or any shell that can run the equivalent npm commands.
 
@@ -16,7 +16,7 @@ npm.cmd install
 
 On macOS, Linux, or shells where the normal npm shim is available, use `npm` instead of `npm.cmd`.
 
-## Local Quality Gate
+## Local quality gate
 
 Use the full verifier before committing meaningful changes:
 
@@ -40,9 +40,12 @@ npm.cmd run check
 npm.cmd run seed
 npm.cmd run eval
 npm.cmd run build
+npm.cmd run smoke
 ```
 
-## Start The App
+`npm.cmd run smoke` exercises the ingestion workflow end to end against an in-memory server.
+
+## Start the app
 
 ```powershell
 npm.cmd run dev
@@ -61,7 +64,7 @@ $env:ASSINI_DEV_WEB_PORT="55173"
 npm.cmd run dev
 ```
 
-## Demo Mode
+## Demo mode
 
 ```powershell
 npm.cmd run demo
@@ -69,30 +72,23 @@ npm.cmd run demo
 
 This seeds the empty workspace, runs evaluation, and starts both local services.
 
-## Model And Transcription Configuration
+## Model and transcription configuration
 
-Extraction quality depends on the configured local model. All provider configuration is server-side environment variables; the browser only sees sanitized readiness from `GET /llm/status`.
+Extraction quality depends on the configured local model. All provider configuration is server-side environment variables; the browser only sees sanitized readiness from `GET /llm/status`. The [Configuration Reference](configuration.md) documents every variable (`ASSINI_LLM_*`, `ASSINI_TRANSCRIBE_*`, `ASSINI_OCR_LANG`, `ASSINI_ALLOW_PRIVATE_URLS`, and the rest) with defaults and ready-to-paste recipes for Ollama, LM Studio, generic OpenAI-compatible servers, local whisper servers, and deterministic mode.
 
-- `ASSINI_LLM_PROVIDER`: `deterministic`, `openai-compatible`, `lm-studio`, `ollama`, or `openai`.
-- `ASSINI_LLM_BASE_URL`: OpenAI-compatible base URL (for example `http://127.0.0.1:11434/v1` for Ollama).
-- `ASSINI_LLM_MODEL`: model name.
-- `ASSINI_LLM_API_KEY` or `OPENAI_API_KEY`: server-side key when the endpoint needs one.
-- `ASSINI_LLM_TIMEOUT_MS`: positive integer timeout.
-- `ASSINI_TRANSCRIBE_BASE_URL`: OpenAI-compatible `/audio/transcriptions` server for audio sources (for example a local whisper server). Required before audio sources can be processed.
-- `ASSINI_TRANSCRIBE_MODEL`: transcription model name (defaults to `whisper-1`).
-- `ASSINI_TRANSCRIBE_API_KEY`: optional transcription key.
-- `ASSINI_OCR_LANG`: Tesseract language code for the local OCR fallback on image sources (defaults to `eng`). Use a code like `spa` or `fra` matching the dominant script of your scanned material.
-- `ASSINI_ALLOW_PRIVATE_URLS`: set to `1` or `true` to allow URL sources that point at private/local network addresses (localhost, 10/8, 192.168/16, and similar reserved ranges are blocked by default). Only enable this in a trusted local setup.
+## Building a language from raw sources
 
-Behavior by configuration:
+The workspace has no hardcoded language data. To populate a language locally:
 
-- `deterministic` (the default) has no real model. Text and word-list sources fall back to offline heuristic parsing of delimited lines; image sources fall back to local OCR (tesseract.js) followed by the same heuristic parsing, with a warning on the extraction result.
-- Image sources prefer a vision-capable OpenAI-compatible model (for example llava via Ollama) when one is configured; the OCR fallback only runs when no chat-capable model is available.
-- The first OCR run for a given `ASSINI_OCR_LANG` downloads that language's trained data (a few megabytes) from the tesseract.js CDN, so it needs internet access once; the data is then cached under `data/ocr-cache/` and later runs work offline.
-- Audio sources need `ASSINI_TRANSCRIBE_BASE_URL`; the transcript then flows through normal text extraction.
-- Document sources accept plain text, Markdown, CSV/TSV, JSON, PDF, and DOCX files. Long sources are processed in chunks of roughly 12,000 characters (up to 8 chunks) and the per-chunk results are merged and deduplicated.
+1. Create the language (`POST /languages` or the web console's New language form in the sidebar) with a name, typology, description, orthography, and optionally a phonology inventory. Declaring the inventory enables orthography validation for later corpus text.
+2. Register or upload raw sources for it in the Sources & intake view: pasted text, word lists, URLs, or files including images, audio, and PDF/DOCX documents.
+3. Process each source (`POST /sources/:sourceId/process`; the console uses async mode and polls) and review the proposed extraction drafts. Duplicate badges flag drafts that repeat existing entries or other pending drafts.
+4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.
+5. Author exercises against the accepted notes and lexicon, then run evaluation.
 
-## Browser Verification
+Validation tightens as the language grows: phonology scans apply once an inventory is declared, and morpheme grounding plus vocabulary checks apply once the lexicon is non-empty.
+
+## Browser verification
 
 For frontend changes, verify the user workflow in a browser in addition to automated tests.
 
@@ -109,52 +105,9 @@ Useful smoke checks:
 - Evaluation Dashboard can run a system eval.
 - Governance view can load policy, audit, disposition, and export controls.
 
-## Building A Language From Raw Sources
+## Generated files
 
-The workspace has no hardcoded language data. To populate a language locally:
-
-1. Create the language (`POST /languages` or the web console) with a name, typology, description, orthography, and optionally a phonology inventory. Declaring the inventory enables orthography validation for later corpus text.
-2. Register or upload raw sources for it: pasted text, word lists, URLs, or files including images and audio.
-3. Process each source (`POST /sources/:sourceId/process`) and review the proposed extraction drafts.
-4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.
-5. Author exercises against the accepted notes and lexicon, then run evaluation.
-
-Validation tightens as the language grows: phonology scans apply once an inventory is declared, and morpheme grounding plus vocabulary checks apply once the lexicon is non-empty.
-
-## Editing API Public Shapes
-
-When changing public responses:
-
-- Keep redaction/projection logic in `apps/api/src/publicLanguageViews.ts`.
-- Add tests that assert private fields are omitted.
-- Check snapshot and evaluation export integrity fields.
-- Avoid logging or returning answer keys, learner answers, provider prompts, API keys, or hidden model traces.
-
-## Editing Mutations
-
-When adding a mutation route:
-
-- Validate before mutation.
-- Role-gate the route.
-- Preserve state on validation failure.
-- Add an audit event after successful mutation.
-- Keep audit metadata minimal and non-private.
-- Add red/green tests for success, invalid body, unknown language or entity, and forbidden role cases.
-
-## Editing The Web App
-
-When adding a workflow:
-
-- Add API client tests for route construction, auth session behavior, and payload shape.
-- Add app tests for the user workflow.
-- Keep local form validation focused on obvious missing fields.
-- Treat the API as the source of truth for domain validation.
-- Extract reusable form parsing and payload-building logic into focused helper modules with direct tests.
-- Run a browser smoke check after automated tests pass.
-
-## Generated Files
-
-Generated local data and build output are ignored by Git. Uploaded source files are stored under `data/assets/`. Reset the local workspace with:
+Generated local data and build output are ignored by Git. Uploaded source files are stored under `data/assets/`; OCR language data is cached under `data/ocr-cache/`. Reset the local workspace with:
 
 ```powershell
 npm.cmd run seed

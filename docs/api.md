@@ -1,12 +1,65 @@
-# API Reference
+# API reference
 
-The API runs on `http://localhost:4321` during local development. Routes are implemented in `apps/api/src/server.ts`; the ingestion pipeline lives in `apps/api/src/ingestion.ts`.
+The API runs on `http://localhost:4321` during local development. Routes are implemented in `apps/api/src/server.ts`; the ingestion pipeline lives in `apps/api/src/ingestion.ts` and is documented in depth in the [Ingestion Deep Dive](ingestion.md).
 
-## Auth Model
+## Route index
+
+Every route in `server.ts`. "Public" means no auth required; role lists mean the request must carry a prototype session or server-token actor with one of those roles; "any actor" means any authenticated local user.
+
+| Method | Path | Auth / roles | Purpose |
+| --- | --- | --- | --- |
+| GET | `/health` | Public | Health check. |
+| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. |
+| GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
+| GET | `/users/me` | Any actor | Current prototype user. |
+| GET | `/languages` | Public | List languages. |
+| POST | `/languages` | reviewer, lead, admin | Create a language. |
+| PATCH | `/languages/:languageId` | reviewer, lead, admin | Update language metadata or phonology. |
+| GET | `/languages/:languageId/profile` | Public | State-derived public profile. |
+| GET | `/languages/:languageId/lexicon` | Public | The language's lexemes. |
+| GET | `/languages/:languageId/sources` | Public | List source assets (the async-processing polling target). |
+| POST | `/languages/:languageId/sources` | reviewer, lead, admin | Register a `text`, `wordlist`, or `url` source. |
+| POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). |
+| POST | `/sources/:sourceId/process` | reviewer, lead, admin | Run extraction; `{ "async": true }` for background mode. |
+| GET | `/languages/:languageId/extraction-drafts` | Public | List drafts with read-time duplicate flags; `?status=` filters. |
+| POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
+| POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
+| GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. |
+| POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. |
+| GET | `/languages/:languageId/notes` | Public | Public review notes. |
+| PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
+| POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. |
+| GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
+| POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. |
+| GET | `/exercises/:exerciseId/submissions` | Public | Sanitized submission history. |
+| POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
+| GET | `/evaluations` | Public | Previous evaluation runs. |
+| POST | `/evaluations/run` | lead, admin, programmer, reviewer | Run evaluation for all languages. |
+| GET | `/exports/languages/:languageId/snapshot` | reviewer, elder, lead, admin | Sanitized language snapshot with integrity metadata. |
+| GET | `/exports/evaluations/artifact` | reviewer, lead, admin, programmer | Sanitized evaluation artifact. |
+| GET | `/governance` | Public | List governance records. |
+| POST | `/governance` | elder, lead, admin | Create a consent, access, or generation policy record. |
+| GET | `/languages/:languageId/review-policy` | reviewer, elder, lead, admin | Review policy for one language. |
+| PUT | `/languages/:languageId/review-policy` | lead, admin (prototype-session reviewer exception) | Update assigned reviewers and threshold. |
+| GET | `/languages/:languageId/review-dispositions` | reviewer, elder, lead, admin | Review-disposition work records. |
+| PATCH | `/review-dispositions/:dispositionId/resolve` | reviewer, elder, lead, admin | Resolve a disposition work record. |
+| GET | `/audit/events` | lead, admin, programmer | Role-gated audit events; `?languageId=` filters. |
+| GET | `/languages/:languageId/elder-context` | elder, reviewer, lead, admin | Public context and correction ledger for elder review. |
+| GET | `/elder/corrections` | elder, reviewer, lead, admin | Correction records; `?languageId=` filters. |
+| POST | `/elder/corrections` | elder, lead, admin | Submit a pending correction. |
+| PATCH | `/elder/corrections/:correctionId/review` | elder, lead, admin | Accept or reject a pending correction. |
+| PATCH | `/elder/corrections/:correctionId/apply` | elder, lead, admin | Apply an accepted note-linked correction. |
+| POST | `/ai/sessions` | Mode-based: learner_practice = learner/elder/reviewer/lead/admin; elder_review = elder/lead/admin; programmer_debug = programmer/admin | Create an AI session with public language context. |
+| GET | `/ai/sessions/:sessionId` | Any actor | Return one AI session. |
+| POST | `/ai/sessions/:sessionId/messages` | Any actor | Add a message to an AI session. |
+| GET | `/observability/ai-sessions` | programmer, admin, lead | Sanitized AI-session observability. |
+| GET | `/observability/neural-map` | programmer, admin, lead | Role-gated sanitized context graph. |
+
+## Auth model
 
 The current auth system is a local prototype. It exists to exercise role-aware workflows before production accounts are designed.
 
-Some routes can be called anonymously because they expose public workspace data. Mutating and sensitive read routes require one of the configured local prototype users. The web app opens an HTTP-only prototype session before calling role-gated routes.
+Some routes can be called anonymously because they expose public workspace data. Mutating and sensitive read routes require one of the configured local prototype users. The web app opens an HTTP-only prototype session before calling role-gated routes. Server-side callers (tests, scripts) authenticate with `x-assini-user-id` plus the `x-assini-dev-token` header matching `ASSINI_DEV_AUTH_TOKEN`.
 
 Seeded local databases persist the same prototype users used by the API fallback: learner, Elder, reviewer, lead, programmer, and admin. The fallback remains for older local databases that were generated before users were written into `data/local-db.json`.
 
@@ -21,94 +74,40 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 
 Do not treat prototype auth as production security.
 
-## Common Response Rules
+## Common response rules
 
 - Unknown language, source, or draft IDs return `404`.
 - Invalid mutation bodies return `400`.
-- Missing auth returns `401`.
-- Valid auth with an insufficient role returns `403`.
-- Mutation routes validate before changing local state.
-- Mutation routes write audit events when state changes.
+- Missing auth returns `401`; valid auth with an insufficient role returns `403`.
+- Mutating methods are rate-limited per actor and route (120 per minute by default); exceeding it returns `429` with a `Retry-After` header.
+- Request bodies are capped at 64 KB (`413` beyond that); file uploads at 25 MB.
+- Mutation routes validate before changing local state and write audit events when state changes.
 
-## Routes
-
-| Route | Purpose |
-| --- | --- |
-| `GET /health` | Health check. |
-| `POST /auth/prototype-session` | Open a local HTTP-only prototype session for an allowed user. |
-| `GET /users/me` | Return the current prototype user. |
-| `GET /languages` | List languages. |
-| `POST /languages` | Create a language with name, typology, description, orthography, and optional phonology. |
-| `PATCH /languages/:languageId` | Update language metadata or phonology. |
-| `GET /languages/:languageId/profile` | Return the state-derived public profile: phonology, lexicon vocabulary, derived morpheme inventory, grammar rules, and stats. |
-| `GET /languages/:languageId/lexicon` | Return the language's lexemes. |
-| `GET /languages/:languageId/sources` | List the language's source assets. |
-| `POST /languages/:languageId/sources` | Register a text, wordlist, or url source. |
-| `POST /languages/:languageId/sources/upload` | Upload a file source (multipart, 25 MB cap). |
-| `POST /sources/:sourceId/process` | Run extraction on a source and create proposed drafts. |
-| `GET /languages/:languageId/extraction-drafts` | List extraction drafts, optionally filtered by `status`. |
-| `POST /extraction-drafts/:draftId/accept` | Accept a draft and commit a lexeme, corpus passage, or grammar note. |
-| `POST /extraction-drafts/:draftId/reject` | Reject a proposed draft. |
-| `GET /languages/:languageId/corpus` | Return corpus passages for one language. |
-| `POST /languages/:languageId/corpus` | Import a validated corpus passage. |
-| `GET /languages/:languageId/notes` | Return public review notes for one language. |
-| `PATCH /notes/:noteId/review` | Review or edit one note with attribution and policy enforcement. |
-| `POST /study-loop/draft` | Generate deterministic draft notes for a language. |
-| `GET /languages/:languageId/exercises` | Return learner exercises without answer keys. |
-| `POST /languages/:languageId/exercises` | Author a validated exercise. |
-| `GET /exercises/:exerciseId/submissions` | Return public learner submission history for one exercise. |
-| `POST /exercises/:exerciseId/submissions` | Grade and persist a learner answer. |
-| `GET /evaluations` | Return previous evaluation runs. |
-| `POST /evaluations/run` | Run evaluation for all languages. |
-| `GET /exports/languages/:languageId/snapshot` | Return a sanitized language snapshot with integrity metadata. |
-| `GET /exports/evaluations/artifact` | Return a sanitized evaluation artifact with trend and integrity metadata. |
-| `GET /governance` | List governance records. |
-| `POST /governance` | Create a consent, access, or generation policy record. |
-| `GET /languages/:languageId/review-policy` | Return review policy for one language. |
-| `PUT /languages/:languageId/review-policy` | Update assigned reviewers and approval threshold. |
-| `GET /languages/:languageId/review-dispositions` | Return review-disposition work records for one language. |
-| `PATCH /review-dispositions/:dispositionId/resolve` | Resolve a review-disposition work record. |
-| `GET /audit/events` | Read role-gated audit events, optionally filtered by `languageId`. |
-| `GET /languages/:languageId/elder-context` | Return public context and correction ledger for elder review. |
-| `GET /elder/corrections` | Return correction records, optionally filtered by language ID. |
-| `POST /elder/corrections` | Submit a pending elder correction without mutating notes. |
-| `PATCH /elder/corrections/:correctionId/review` | Accept or reject a pending correction with reviewer attribution. |
-| `PATCH /elder/corrections/:correctionId/apply` | Apply an accepted note-linked correction through a revised explanation. |
-| `GET /llm/status` | Return sanitized LLM provider and transcription readiness. |
-| `POST /ai/sessions` | Create an AI session with public language context. |
-| `GET /ai/sessions/:sessionId` | Return one AI session. |
-| `POST /ai/sessions/:sessionId/messages` | Add a message to an AI session. |
-| `GET /observability/ai-sessions` | Return sanitized AI session observability. |
-| `GET /observability/neural-map` | Return a role-gated sanitized graph of local AI/session context. |
-
-## Language Management
+## Language management
 
 `POST /languages` and `PATCH /languages/:languageId`
 
-Allowed roles: reviewer, lead, admin.
-
 Creation requires nonblank name, description, and orthography; typology defaults to `unknown` when omitted. The phonology object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) is optional but unlocks orthography validation for corpus text once declared. New languages get `status: "active"`, creator attribution, and a default review policy assigned to available reviewers. IDs are slugs derived from the name.
 
-## Source Ingestion
+## Source ingestion
 
 `POST /languages/:languageId/sources` registers a pasted `text`, `wordlist`, or `url` source with a title.
 
-`POST /languages/:languageId/sources/upload` accepts one multipart file up to 25 MB. The source kind is detected from MIME type and extension: images become `image`, audio files become `audio`, everything else becomes `document`. Document extraction currently supports plain-text formats (txt, md, csv, tsv, json) only.
+`POST /languages/:languageId/sources/upload` accepts one multipart file up to 25 MB. The source kind is detected from MIME type and extension: images become `image`, audio files become `audio`, everything else becomes `document`. Document extraction supports plain-text formats (txt, md, csv, tsv, json), PDF, and DOCX.
 
-`POST /sources/:sourceId/process` runs the extraction pipeline. Allowed roles for all three: reviewer, lead, admin.
+`POST /sources/:sourceId/process` runs the extraction pipeline. Processing per kind, chunking and merge rules, fallback behavior, and the full error catalogue are documented in the [Ingestion Deep Dive](ingestion.md). In short:
 
-Processing per kind:
-
-- `text`/`wordlist`: LLM extraction; when no real model is configured, an offline heuristic parses delimited lines (`=`, `-`, tab, pipe) into low-confidence drafts.
-- `url`: server-side fetch (http/https, size-capped) and HTML-to-text conversion, then LLM extraction.
-- `image`: requires a vision-capable OpenAI-compatible model; the image is sent as base64 content.
-- `audio`: transcribed through the `ASSINI_TRANSCRIBE_BASE_URL` endpoint, then the transcript goes through LLM extraction.
+- `text`/`wordlist`: LLM extraction; without a configured model, offline heuristic parsing of delimited lines.
+- `url`: SSRF-guarded server-side fetch and HTML-to-text conversion, then extraction.
+- `image`: vision-capable model when configured, otherwise local OCR (tesseract.js).
+- `audio`: transcription through `ASSINI_TRANSCRIBE_BASE_URL`, then text extraction.
+- `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing, then extraction.
 
 Successful processing marks the source `processed`, stores a summary (and transcript for audio), and returns the new `proposed` drafts plus warnings. Failures mark the source `failed` with a sanitized error and return `422`; the source can be reprocessed.
 
 The route also supports background processing for long sources: send a JSON body of `{ "async": true }` and the server validates the same preconditions, marks the source `processing`, and returns `202` with the updated asset (and empty `drafts`/`warnings`). Extraction then runs in the background and persists the same results as the synchronous path: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset. Poll `GET /languages/:languageId/sources` until the asset leaves `processing`. A source that is already `processing` returns `409` in both modes.
 
-## Extraction Drafts
+## Extraction drafts
 
 `GET /languages/:languageId/extraction-drafts` lists drafts; `?status=proposed|accepted|rejected` filters.
 
@@ -116,7 +115,7 @@ Listed proposed drafts may carry a read-time `duplicate` flag, computed per requ
 
 `POST /extraction-drafts/:draftId/accept` and `POST /extraction-drafts/:draftId/reject`
 
-Allowed roles: reviewer, lead, admin. Only `proposed` drafts can be reviewed; re-reviewing returns `400`.
+Only `proposed` drafts can be reviewed; re-reviewing returns `400`.
 
 Accepting commits by draft kind:
 
@@ -126,11 +125,9 @@ Accepting commits by draft kind:
 
 Both decisions record reviewer attribution, the committed entity ID on accept, and an audit event.
 
-## Corpus Import
+## Corpus import
 
 `POST /languages/:languageId/corpus`
-
-Allowed roles: reviewer, lead, admin.
 
 The route imports one corpus passage after validating provenance, consent, segmentation, and duplicate target text. The response returns only the public corpus passage, but the server also stores a private corpus answer key derived from the validated target text, translation, and segmentation.
 
@@ -174,11 +171,9 @@ Important validation:
 
 Successful imports create a `corpus.imported` audit event. The persisted app-state schema later re-verifies that passages and answer keys keep nonblank fields, valid language references, duplicate-free tags and features, and full segmentation coverage so manually edited local JSON cannot leave evaluation keys orphaned, malformed, or attached to the wrong language.
 
-## Exercise Authoring
+## Exercise authoring
 
 `POST /languages/:languageId/exercises`
-
-Allowed roles: reviewer, lead, admin.
 
 The route stores private answer-key fields server-side and returns only the public exercise shape.
 
@@ -193,33 +188,27 @@ Important validation:
 - Adversarial answers and reasons must be nonblank, and adversarial answers must not duplicate accepted answers or another adversarial probe.
 - Translate-to-target expected answers must be present in same-language corpus text; choose-particle answers must be inside the exercise's allowed vocabulary.
 
-## Exercise Submissions
+## Exercise submissions
 
 `POST /exercises/:exerciseId/submissions`
-
-Allowed submitter roles: learner, reviewer, lead, admin.
 
 Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID.
 
 The persisted app-state schema validates restored submission records before the API serves them: each submission must reference an existing exercise, keep the same `languageId`, keep nonblank private answer and grading-explanation text, keep a parseable `submittedAt`, and use a known local actor whose role is allowed to submit answers.
 
-## Governance Records
+## Governance records
 
 `POST /governance`
 
-Allowed approver roles: Elder, lead, admin.
-
 Governance records are local policy notes for consent, access, and generation workflows. Writes require an existing language ID and a parseable `effectiveDate`, then append an audit event with policy type and effective date metadata. Persisted records must keep nonblank policy content, a valid language reference, and Elder/lead/admin approver attribution.
 
-## Audit Events
+## Audit events
 
 `GET /audit/events`
 
-Allowed reader roles: lead, admin, programmer.
-
 Audit events are written by mutation routes, including language creation, source registration/upload/processing, and extraction-draft decisions. They derive `actorId` plus `actorRole` from the same resolved local user. Persisted audit events must keep nonblank action, entity ID, summary text, and actor IDs, parseable timestamps, and consistent actor attribution; any non-null `languageId` must reference an existing language (`null` remains valid for global or provider-level events). Restored metadata is rejected when it contains private payload keys or secret-looking values.
 
-## Note Review
+## Note review
 
 `PATCH /notes/:noteId/review`
 
@@ -235,41 +224,35 @@ Review-policy updates have a prototype-only reviewer exception so the leadless b
 
 Stored approvals remain auditable after policy changes, but only reviewers eligible under the current policy count toward the active approval quorum. The persisted app-state schema enforces one approval per language, note, and reviewer, valid reviewer attribution, and policy uniqueness per language so malformed local JSON cannot create impossible approval quorums.
 
-## Sanitized Exports
+## Sanitized exports
 
 Language snapshots (`language-snapshot-v2`) and evaluation artifacts (`evaluation-artifact-v2`) include SHA-256 integrity manifests. Snapshots carry the state-derived linguistic profile: phonology, lexicon vocabulary, derived morpheme inventory, grammar rules, and stats including source-asset and pending-draft counts. Evaluation artifacts include latest runs, run histories by language, trend records with category deltas, gate metadata, and failure lines. Both omit private fields such as answer keys, adversarial probes, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
 
-## Evaluation Runs
+## Evaluation runs
 
 `POST /evaluations/run`
 
 Evaluation runs are generated for existing languages against the workspace corpus (`fixtureVersion: "workspace-corpus-v1"`). Persisted runs are validated during local JSON reads: each run must keep a nonblank language ID that references an existing language, nonblank version and summary text, a parseable `createdAt`, and failure lines that match their parent run's language.
 
-## Elder Corrections
+## Elder corrections
 
 `POST /elder/corrections`
-
-Allowed submitter roles: Elder, lead, admin.
 
 Corrections can target a note, a corpus passage, or custom context text. Note and passage targets must belong to the correction language. Submitting a correction records it as `pending_review` and does not mutate note content.
 
 `PATCH /elder/corrections/:correctionId/review`
 
-Allowed reviewer roles: Elder, lead, admin.
-
 Only pending corrections can be reviewed. Once a correction is accepted, rejected, or applied, later review attempts return `409` and preserve the existing status and attribution.
 
 `PATCH /elder/corrections/:correctionId/apply`
-
-Allowed applier roles: Elder, lead, admin.
 
 Only accepted note-linked corrections can be applied. Applying a correction requires a revised note explanation, moves the correction to `applied`, sets the linked note back to `under_review`, appends a note edit-history entry, and writes audit events for both the correction and the note.
 
 The persisted app-state schema enforces the same ledger invariants during local JSON reads: valid language/note/passage references, nonblank correction text and rationale, Elder/lead/admin attribution, chronological timestamps, no review attribution on pending corrections, and a note reference on applied corrections.
 
-## LLM Status And Sessions
+## LLM status and sessions
 
-`GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing.
+`GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. See the [Configuration Reference](configuration.md) for every variable.
 
 AI session routes use public language context and store sanitized observability records. Failed provider calls preserve safe diagnostics without exposing provider secrets.
 

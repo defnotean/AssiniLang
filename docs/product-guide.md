@@ -1,22 +1,22 @@
-# Product Guide
+# Product guide
 
 AssiniLang is a local research console for proving a language-learning AI workflow before any real community language data is introduced.
 
 The workspace starts empty. Users create their own languages, ingest their own raw materials, and review every extracted item before it becomes lexicon, corpus, or grammar data. Consent and provenance metadata travel with every corpus passage.
 
-## Core Workflow
+## Core workflow
 
-1. Create a language with a name, typology, description, orthography, and an optional phonology inventory.
-2. Add raw sources to that language: pasted text, word lists, URLs, or uploaded files including images and audio.
-3. Process a source. A local LLM extracts candidate lexemes, corpus passages, and grammar notes; without a configured model, an offline heuristic parses delimited word-list lines instead.
-4. Review the resulting extraction drafts. Each extraction draft shows its payload, confidence, and rationale; accepting commits it, rejecting discards it.
+1. Create a language with a name, typology, description, orthography, and an optional phonology inventory. The web console's New language form lives at the bottom of the language sidebar.
+2. Add raw sources to that language: pasted text, word lists, URLs, or uploaded files including images, audio, and PDF/DOCX documents.
+3. Process a source. A local LLM extracts candidate lexemes, corpus passages, and grammar notes; without a configured model, an offline heuristic parses delimited word-list lines and local OCR reads images instead.
+4. Review the resulting extraction drafts. Each extraction draft shows its payload, confidence, rationale, and any duplicate badge; accepting commits it, rejecting discards it.
 5. Build on the committed data with corpus import, note review, exercise authoring, evaluation, governance, and elder corrections.
 
-## Web Console
+## Web console
 
-The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console with section navigation for the selected language.
+The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console: the sidebar selects a language, and section navigation switches between that language's workspaces - Language Profile, Sources & intake, Corpus Browser, Note Review Queue, Learning Lab, Evaluation Dashboard, Governance, and Model Setup.
 
-### Language Profile
+### Language profile
 
 The profile view presents public linguistic metadata derived from workspace state:
 
@@ -28,18 +28,19 @@ The profile view presents public linguistic metadata derived from workspace stat
 
 Use this view to understand what forms and rules the selected language currently supports. A new language starts with an empty profile and fills in as sources are processed and drafts are accepted.
 
-### Sources And Intake
+### Sources & intake
 
-The intake flow captures raw materials and turns them into reviewable drafts:
+The intake workspace captures raw materials and turns them into reviewable drafts:
 
-- Register a pasted text, word list, or URL source, or upload a file (plain-text documents, images, or audio; 25 MB cap).
-- Process a source to generate extraction drafts. URL sources are fetched and converted to text server-side; images need a vision-capable local model; audio is transcribed through a configured transcription endpoint first.
-- Review proposed drafts one by one. Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
+- Register a pasted text, word list, or URL source, or upload a file (PDF, DOCX, plain-text documents, images, or audio; 25 MB cap).
+- Process a source to generate extraction drafts. The console processes in the background and polls until the source leaves `processing`, so long sources through a slow local model do not block the page. URL sources are fetched and converted to text server-side; images use a vision-capable model or fall back to local OCR; audio is transcribed through a configured transcription endpoint first.
+- Review proposed drafts one by one. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision.
+- Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
 - Failed processing marks the source `failed` with a sanitized error so it can be fixed and retried.
 
 Nothing extracted by a model enters the workspace without an explicit human accept.
 
-### Corpus Browser
+### Corpus browser
 
 The corpus browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels.
 
@@ -47,7 +48,7 @@ Reviewers can also import passages directly. The import flow captures target tex
 
 The API validates the import before saving. It rejects duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, segmentation surfaces that are not present in the target text, target tokens that are not covered by contiguous segmentation surfaces, consent-use values outside the allowed enum, and malformed payloads. When the language declares a phonology inventory, target text is also scanned against it; when the language has a lexicon, each morpheme must be grounded by a lexicon surface or lemma. Successful imports write audit metadata without storing private reviewer data.
 
-### Note Review Queue
+### Note review queue
 
 The review queue shows draft notes beside their status, confidence, evidence count, and examples. Notes come from accepted grammar-note drafts, the deterministic study loop, or earlier review work. Reviewers can:
 
@@ -61,7 +62,7 @@ If assignments change mid-review, earlier approvals stay in the audit trail but 
 
 Repeated contested, rejected, deferred, or escalated decisions for the same note and disposition update the existing open work item instead of creating duplicate open ledger entries.
 
-### Learning Lab
+### Learning lab
 
 The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.
 
@@ -74,7 +75,7 @@ Reviewers can author compact exercises from the web UI. Exercise authoring is va
 - At least two private adversarial answer probes that do not duplicate expected answers or one another.
 - Substantive prompts and grading explanations.
 
-### Evaluation Dashboard
+### Evaluation dashboard
 
 The evaluation dashboard shows latest evaluation runs, category scores, regression trends, and failure lines. The local evaluation harness scores these categories:
 
@@ -100,17 +101,17 @@ The governance view exposes local prototype safety rails:
 
 These features are prototype scaffolding. They do not replace real community ownership, consent, legal review, or production access control.
 
-### Elder Workspace
+### Elder workspace
 
 The Elder workspace shows public note/corpus context and correction records for the selected language. Elders, leads, and admins can submit corrections tied to a note, passage, or custom context. Pending corrections can be accepted or rejected once with reviewer attribution. Accepted note-linked corrections can then be applied through an explicit revised note explanation, which reopens the note for review.
 
-### Model Setup
+### Model setup
 
 The model setup view reports server-side LLM provider readiness, transcription readiness, and AI session observability. Browser code never receives provider API keys.
 
-Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics.
+Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics. See the [Configuration Reference](configuration.md) for setup recipes.
 
-## Local User Roles
+## Local user roles
 
 The local prototype keeps six role-aware identities in the local database:
 
@@ -134,7 +135,7 @@ Lead and admin identities still exist in the local state for backend authorizati
 
 Prototype auth exists to test workflow permissions. Replace it before production use.
 
-## Export Surfaces
+## Export surfaces
 
 Sanitized language snapshots (`language-snapshot-v2`) include public language metadata, the state-derived linguistic profile (phonology, vocabulary, morpheme inventory, grammar rules, and stats), corpus, public review notes, public learner exercises, governance records, and evaluation summaries.
 

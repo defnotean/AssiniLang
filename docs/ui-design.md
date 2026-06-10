@@ -1,22 +1,22 @@
-# UI Design Guide
+# UI design guide
 
-This guide documents how the Claude Design handoff for `AssiniLang.html` maps into the real AssiniLang React app. Keep detailed UI notes here so the root README can stay concise.
+This guide documents how the `AssiniLang.html` design handoff maps into the real AssiniLang React app. Keep detailed UI notes here so the root README can stay concise.
 
-## Source Handoff
+## Source handoff
 
-The implemented direction is the final `AssiniLang.html` handoff from the design bundle. The chat transcript settled on a dark, language-first research console, not a marketing page or generic dashboard.
+The implemented direction is the final `AssiniLang.html` handoff from the design bundle. The design exploration settled on a dark, language-first research console, not a marketing page or generic dashboard.
 
 The chosen design is the `Atlas layout`:
 
 - A language-first left sidebar.
-- Per-language section navigation for profile, corpus, notes, learner practice, evaluation, governance, and model setup.
+- Per-language section navigation for profile, intake, corpus, notes, learner practice, evaluation, governance, and model setup.
 - Dense but readable work surfaces for repeated research and review tasks.
 - A dark night-sky visual system with warm gold accents.
 - Subtle geometric dividers and glyphs used as interface texture, not decoration-heavy branding.
 
 The design remains local-first. It should communicate care, preservation, and review discipline, and make clear that every ingested source carries provenance and consent records and is processed on the user's machine.
 
-## Visual System
+## Visual system
 
 The web app implements the design through `apps/web/src/styles.css` and reusable JSX primitives in `apps/web/src/App.tsx`.
 
@@ -31,12 +31,12 @@ Key tokens and motifs:
 
 Use cultural visual cues cautiously. The current motifs are broad placeholder cues inspired by night sky, four-direction geometry, bead-like rhythm, and woven diamond dividers. They are not nation-specific and must be reviewed with community partners before real data or public launch.
 
-## Application Shell
+## Application shell
 
 The main shell should preserve the Atlas structure:
 
-- Sidebar first: the language is the primary context.
-- Section nav second: each workspace belongs to the selected language.
+- Sidebar first: the language is the primary context, with the New language creation form at the bottom of the sidebar so a workspace can be started without leaving the console.
+- Section nav second: each workspace belongs to the selected language. The order is profile, Sources & intake, corpus, review, learner, evaluation, governance, model setup.
 - Local-prototype notice always visible near the top.
 - Header shows the selected language, current workspace, metadata chips, and primary actions.
 - Stat strip summarizes corpus, notes, exercises, and latest score for the active language.
@@ -45,19 +45,27 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 
 ## Workspaces
 
-### Language Profile
+### Language profile
 
 The profile view should make each documented language inspectable:
 
-- Keep phonology, grammar inventory, paradigms, semantic domains, register profiles, dialects, discourse examples, vocabulary, and morpheme inventory as separate scan-friendly regions.
-- Show semantic domains as compact cards with a label, short description, vocabulary ID chips, corpus evidence chips, and usage notes.
-- Show register profiles as compact cards with a style label, usage context, semantic-domain chips, discourse-example chips, teaching-sequence chips, corpus evidence chips, and usage notes.
-- Show dialect histories as compact timelines with period labels, short descriptions, and corpus evidence chips.
-- Show discourse examples with function, context, target text, translation, and pragmatic notes.
-- Show teaching sequences as compact paths that link rule IDs, corpus passage IDs, exercise IDs, and ordered prompts without revealing answer keys.
-- Keep fixture-quality counters near the top so reviewers can see data-depth gaps before reading detailed panels.
+- Keep phonology, vocabulary, the derived morpheme inventory, and grammar rules as separate scan-friendly regions.
+- Show vocabulary entries with form, gloss, part of speech, tags, and source-asset traceability.
+- Show morpheme-inventory entries with occurrence counts, passage chips, glosses, features, and linked lexeme metadata.
+- Keep the stat counts (corpus, notes, exercises, source assets, pending drafts) near the top so reviewers can see data depth before reading detailed panels.
+- An empty language shows empty regions; there are no fixture minimums to satisfy.
 
-### Corpus Browser
+### Sources & intake
+
+The intake workspace is the front door for raw materials:
+
+- Registration and upload controls stay compact; the source list with status chips (`pending`, `processing`, `processed`, `failed`) is the main surface.
+- Background processing keeps the view responsive: a processing source shows its in-flight state and the list polls until it settles.
+- Failed sources surface their sanitized error inline so the fix is obvious before retrying.
+- Proposed drafts render with kind, payload, confidence, rationale, and duplicate badges ("Duplicate of existing entry", "Same form, different gloss", "Duplicate topic", "Duplicates another pending draft"). Badges warn; they never disable the accept/reject actions.
+- Accept/reject actions stay adjacent to each draft for high-volume triage.
+
+### Corpus browser
 
 The corpus view should make source material scannable:
 
@@ -67,7 +75,7 @@ The corpus view should make source material scannable:
 - Tags, source, and consent labels visible but secondary.
 - Import controls compact enough that the passage list remains the main surface.
 
-### Note Review Queue
+### Note review queue
 
 The review queue should support high-volume triage:
 
@@ -76,7 +84,7 @@ The review queue should support high-volume triage:
 - Keep selected-note detail alongside the table on desktop.
 - Require clear comments for contested, rejected, deferred, and escalated states through API validation.
 
-### Learning Lab
+### Learning lab
 
 Learner exercises are functional previews, not answer-key displays:
 
@@ -85,7 +93,7 @@ Learner exercises are functional previews, not answer-key displays:
 - Submission history stays sanitized and must not reveal learner answers.
 - Authoring controls belong in this workspace but should stay visually secondary to exercise preview and grading.
 
-### Evaluation Dashboard
+### Evaluation dashboard
 
 The evaluation view should make quality obvious at a glance:
 
@@ -94,13 +102,14 @@ The evaluation view should make quality obvious at a glance:
 - Trend cards call out regression, improvement, or stable state.
 - Failure lines should be visible and concrete enough to guide the next fix.
 
-### Governance And Model Setup
+### Governance and model setup
 
 Governance and model setup are operational surfaces:
 
 - Keep policy records, dispositions, audit events, and exports data-forward.
 - Do not over-style these views; reliability and scanability matter most.
-- Snapshot export summaries should include semantic-domain, register-profile, teaching-sequence, and fixture-quality pass counts so reviewers can identify baseline gaps before opening JSON artifacts.
+- Snapshot export summaries should surface the profile-derived counts (vocabulary, morphemes, grammar rules, corpus, source assets, pending drafts) so reviewers can identify gaps before opening JSON artifacts.
+- Model setup reports provider readiness, transcription readiness, and observability without exposing secrets.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness
@@ -114,7 +123,7 @@ The desktop layout is primary, but mobile must remain usable:
 
 When changing layout CSS, smoke test at desktop, tablet, and narrow mobile widths.
 
-## Maintenance Checklist
+## Maintenance checklist
 
 For future UI changes:
 
@@ -124,3 +133,4 @@ For future UI changes:
 - Add or update React tests for navigation, mutation flows, redaction expectations, and error states.
 - Run `npm.cmd run verify` before committing.
 - Browser-smoke frontend changes after automated tests pass.
+- Follow the view-addition recipe in the [Maintenance Guide](maintenance.md) when adding a workspace.
