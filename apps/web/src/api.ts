@@ -244,6 +244,18 @@ export type ProcessSourceResult = {
   warnings: string[];
 };
 
+/**
+ * Read-time duplicate flag computed by the API when listing extraction
+ * drafts. Never persisted; informs the reviewer without blocking review.
+ */
+export type ExtractionDraftDuplicate =
+  | { kind: "exact"; entityId: string }
+  | { kind: "form"; entityId: string }
+  | { kind: "topic"; entityId: string }
+  | { kind: "pending"; draftId: string };
+
+export type ExtractionDraftView = ExtractionDraft & { duplicate?: ExtractionDraftDuplicate };
+
 export type AcceptExtractionDraftResult = {
   draft: ExtractionDraft;
   entity: Lexeme | CorpusPassage | Note;
@@ -547,10 +559,15 @@ export async function uploadSourceFile(languageId: string, file: File, title?: s
   return response.json() as Promise<SourceAsset>;
 }
 
-export async function processSource(sourceId: string): Promise<ProcessSourceResult> {
+export async function processSource(
+  sourceId: string,
+  options?: { async?: boolean }
+): Promise<ProcessSourceResult> {
+  const useAsync = options?.async === true;
   const response = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/process`, {
     method: "POST",
-    ...(await actorRequest("reviewer"))
+    ...(await actorRequest("reviewer", useAsync)),
+    ...(useAsync ? { body: JSON.stringify({ async: true }) } : {})
   });
 
   await assertOk(response, "Source processing failed");
@@ -561,9 +578,9 @@ export async function processSource(sourceId: string): Promise<ProcessSourceResu
 export async function fetchExtractionDrafts(
   languageId: string,
   status?: ExtractionDraft["status"]
-): Promise<ExtractionDraft[]> {
+): Promise<ExtractionDraftView[]> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return getJson<ExtractionDraft[]>(`/languages/${encodeURIComponent(languageId)}/extraction-drafts${query}`);
+  return getJson<ExtractionDraftView[]>(`/languages/${encodeURIComponent(languageId)}/extraction-drafts${query}`);
 }
 
 export async function acceptExtractionDraft(draftId: string): Promise<AcceptExtractionDraftResult> {

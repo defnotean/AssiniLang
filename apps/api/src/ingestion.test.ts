@@ -8,6 +8,7 @@ import {
   fetchUrlText,
   heuristicExtractFromText,
   htmlToText,
+  ocrImageFile,
   parseExtractionResponse,
   splitTextIntoChunks,
   transcribeAudioFile
@@ -16,9 +17,45 @@ import type { LlmChatMessage, LlmProvider } from "./llmProvider";
 
 const pdfStub = vi.hoisted(() => ({ text: "mira = river" }));
 const docxStub = vi.hoisted(() => ({ value: "saku = child" }));
+const ocrStub = vi.hoisted(() => ({
+  text: "mira = river",
+  error: undefined as Error | undefined,
+  createWorkerCalls: 0,
+  recognizedImages: [] as string[],
+  terminateCalls: 0,
+  lastLang: undefined as unknown,
+  lastOptions: undefined as Record<string, unknown> | undefined,
+  reset(text: string) {
+    this.text = text;
+    this.error = undefined;
+    this.createWorkerCalls = 0;
+    this.recognizedImages = [];
+    this.terminateCalls = 0;
+    this.lastLang = undefined;
+    this.lastOptions = undefined;
+  }
+}));
 
 vi.mock("unpdf", () => ({
   extractText: vi.fn(async () => ({ totalPages: 1, text: pdfStub.text }))
+}));
+
+vi.mock("tesseract.js", () => ({
+  createWorker: vi.fn(async (lang: unknown, _oem: unknown, options: Record<string, unknown> | undefined) => {
+    ocrStub.createWorkerCalls += 1;
+    ocrStub.lastLang = lang;
+    ocrStub.lastOptions = options;
+    return {
+      recognize: async (image: string) => {
+        ocrStub.recognizedImages.push(image);
+        if (ocrStub.error) throw ocrStub.error;
+        return { data: { text: ocrStub.text } };
+      },
+      terminate: async () => {
+        ocrStub.terminateCalls += 1;
+      }
+    };
+  })
 }));
 
 vi.mock("mammoth", () => ({
@@ -335,13 +372,22 @@ describe("extractCandidatesForAsset", () => {
     expect(result.warnings.some((warning) => warning.includes("deterministic mode"))).toBe(true);
   });
 
-  it("rejects image sources when the provider has no vision support", async () => {
-    await expect(extractCandidatesForAsset({
+  it("routes image sources through local OCR when the provider has no vision support", async () => {
+    ocrStub.reset("mira = river");
+
+    const result = await extractCandidatesForAsset({
       asset: makeAsset({ kind: "image", filePath: "assets/x/img.png" }),
       language,
       provider: providerWithoutChat,
       dataDir: tmpdir()
-    })).rejects.toThrow(/vision-capable model/);
+    });
+
+    expect(ocrStub.createWorkerCalls).toBe(1);
+    expect(ocrStub.terminateCalls).toBe(1);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.kind).toBe("lexeme");
+    expect(result.candidates[0]?.payload.form).toBe("mira");
+    expect(result.warnings.some((warning) => warning.includes("used local OCR (tesseract.js)"))).toBe(true);
   });
 
   it("rejects unsupported document types with conversion guidance", async () => {
@@ -564,5 +610,96 @@ describe("extractCandidatesForAsset document support", () => {
       provider: providerWithoutChat,
       dataDir
     })).rejects.toThrow(/no extractable text/);
+  });
+});
+
+describe("ocrImageFile", () => {
+  it("recognizes the image, terminates the worker, and returns trimmed text", async () => {
+    ocrStub.reset("  mira = river  \n");
+
+    const text = await ocrImageFile({ filePath: "C:/data/assets/x/img.png", env: {} });
+
+    expect(text).toBe("mira = river");
+    expect(ocrStub.recognizedImages).toEqual(["C:/data/assets/x/img.png"]);
+    expect(ocrStub.lastLang).toBe("eng");
+    expect(ocrStub.terminateCalls).toBe(1);
+  });
+
+  it("uses the OCR language from ASSINI_OCR_LANG", async () => {
+    ocrStub.reset("mira = river");
+
+    await ocrImageFile({ filePath: "img.png", env: { ASSINI_OCR_LANG: "spa" } });
+
+    expect(ocrStub.lastLang).toBe("spa");
+  });
+
+  it("fails clearly when OCR finds no readable text", async () => {
+    ocrStub.reset("   \n  ");
+
+    await expect(ocrImageFile({ filePath: "img.png", env: {} }))
+      .rejects.toThrow(/OCR found no readable text in the image/);
+    expect(ocrStub.terminateCalls).toBe(1);
+  });
+
+  it("terminates the worker even when recognition fails", async () => {
+    ocrStub.reset("unused");
+    ocrStub.error = new Error("recognition exploded");
+
+    await expect(ocrImageFile({ filePath: "img.png", env: {} })).rejects.toThrow(/recognition exploded/);
+    expect(ocrStub.terminateCalls).toBe(1);
+  });
+});
+
+describe("extractCandidatesForAsset image OCR fallback", () => {
+  it("prefers the vision model and never invokes OCR when completeChat exists", async () => {
+    ocrStub.reset("should not be used");
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-"));
+    await writeFile(join(dataDir, "photo.png"), Buffer.from([1, 2, 3, 4]));
+
+    const provider = providerWithChat(JSON.stringify({
+      summary: "Vision extraction.",
+      lexemes: [{ form: "talo", gloss: "walk" }]
+    }));
+
+    const result = await extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: "photo.png", mimeType: "image/png" }),
+      language,
+      provider,
+      dataDir
+    });
+
+    expect(result.summary).toBe("Vision extraction.");
+    expect(result.candidates[0]?.payload.form).toBe("talo");
+    expect(ocrStub.createWorkerCalls).toBe(0);
+    expect(ocrStub.recognizedImages).toHaveLength(0);
+  });
+
+  it("surfaces both remedies when OCR itself fails in deterministic mode", async () => {
+    ocrStub.reset("unused");
+    ocrStub.error = new Error("could not decode image");
+
+    const attempt = extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: "assets/x/blurry.png" }),
+      language,
+      provider: providerWithoutChat,
+      dataDir: tmpdir()
+    });
+
+    await expect(attempt).rejects.toThrow(/ASSINI_LLM_PROVIDER/);
+    await attempt.catch((error: Error) => {
+      expect(error.message).toContain("could not decode image");
+      expect(error.message).toContain("provide a clearer image");
+    });
+  });
+
+  it("surfaces both remedies when OCR finds no text in deterministic mode", async () => {
+    ocrStub.reset("   ");
+
+    await expect(extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: "assets/x/blank.png" }),
+      language,
+      provider: providerWithoutChat,
+      dataDir: tmpdir()
+    })).rejects.toThrow(/OCR found no readable text in the image.*ASSINI_LLM_PROVIDER/s);
   });
 });

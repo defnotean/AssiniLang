@@ -7,6 +7,8 @@ import type {
   EvaluationArtifact,
   ExerciseAuthoringPayload,
   ExtractionDraft,
+  ExtractionDraftDuplicate,
+  ExtractionDraftView,
   CorpusImportPayload,
   GovernancePayload,
   LanguageCreatePayload,
@@ -132,6 +134,12 @@ const EXTRACTION_DRAFT_KIND_LABELS: Record<ExtractionDraft["kind"], string> = {
   lexeme: "Lexeme",
   corpus_passage: "Corpus passage",
   grammar_note: "Grammar note"
+};
+const EXTRACTION_DRAFT_DUPLICATE_LABELS: Record<ExtractionDraftDuplicate["kind"], string> = {
+  exact: "Duplicate of existing entry",
+  form: "Same form, different gloss",
+  topic: "Duplicate topic",
+  pending: "Duplicates another pending draft"
 };
 const REVIEWER_COMMENTS: Record<ReviewStatus, string> = {
   approved: "Approved in local prototype.",
@@ -1914,7 +1922,7 @@ function extractionDraftSummary(draft: ExtractionDraft): string {
 
 function IngestView({ languageId }: { languageId: string }) {
   const [sources, setSources] = useState<SourceAsset[]>([]);
-  const [drafts, setDrafts] = useState<ExtractionDraft[]>([]);
+  const [drafts, setDrafts] = useState<ExtractionDraftView[]>([]);
   const [isLoadingIntake, setIsLoadingIntake] = useState(true);
   const [intakeError, setIntakeError] = useState<string | null>(null);
 
@@ -1931,6 +1939,7 @@ function IngestView({ languageId }: { languageId: string }) {
   const [isUploadingSource, setIsUploadingSource] = useState(false);
 
   const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
+  const [pollingSource, setPollingSource] = useState<{ id: string; title: string } | null>(null);
   const [processNotice, setProcessNotice] = useState<string | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
   const [processWarnings, setProcessWarnings] = useState<string[]>([]);
@@ -1945,6 +1954,8 @@ function IngestView({ languageId }: { languageId: string }) {
     setIntakeError(null);
     setRegisterNotice(null);
     setRegisterError(null);
+    setProcessingSourceId(null);
+    setPollingSource(null);
     setProcessNotice(null);
     setProcessError(null);
     setProcessWarnings([]);
@@ -2045,20 +2056,65 @@ function IngestView({ languageId }: { languageId: string }) {
     }
   }
 
+  // Poll the source list while a background extraction is running. The
+  // first poll fires immediately, then every 2.5s until the asset leaves
+  // "processing"; cleanup cancels the loop on unmount or language change.
+  useEffect(() => {
+    if (!pollingSource) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const poll = async () => {
+      try {
+        const loadedSources = await fetchSources(languageId);
+        if (cancelled) return;
+        setSources(loadedSources);
+
+        const asset = loadedSources.find((item) => item.id === pollingSource.id);
+        if (asset && asset.status === "processing") {
+          timer = setTimeout(() => { void poll(); }, 2500);
+          return;
+        }
+
+        setPollingSource(null);
+        setProcessingSourceId(null);
+        if (asset && asset.status === "failed") {
+          setProcessError(asset.error ?? `Processing ${pollingSource.title} failed.`);
+        } else {
+          setProcessNotice(`Processing ${pollingSource.title} finished.`);
+        }
+
+        const loadedDrafts = await fetchExtractionDrafts(languageId, "proposed");
+        if (!cancelled) setDrafts(loadedDrafts);
+      } catch {
+        // Transient fetch failure: keep polling instead of giving up.
+        if (!cancelled) {
+          timer = setTimeout(() => { void poll(); }, 2500);
+        }
+      }
+    };
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) clearTimeout(timer);
+    };
+  }, [pollingSource, languageId]);
+
   async function handleProcessSource(sourceId: string) {
     setProcessingSourceId(sourceId);
     setProcessNotice(null);
     setProcessError(null);
     setProcessWarnings([]);
     try {
-      const result = await processSource(sourceId);
-      setProcessNotice(`Processed ${result.asset.title}: ${formatCount(result.drafts.length, "extraction draft")} proposed.`);
-      setProcessWarnings(result.warnings);
-      await refreshIntake();
+      const result = await processSource(sourceId, { async: true });
+      setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
+      setPollingSource({ id: result.asset.id, title: result.asset.title });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Source processing failed";
       setProcessError(message);
-    } finally {
       setProcessingSourceId(null);
     }
   }
@@ -2241,6 +2297,11 @@ function IngestView({ languageId }: { languageId: string }) {
                   <div className="pill-row">
                     <span className="pill">{EXTRACTION_DRAFT_KIND_LABELS[draft.kind]}</span>
                     <ConfidenceBadge confidence={draft.confidence} />
+                    {draft.duplicate && (
+                      <span className={`status-badge ${draft.duplicate.kind === "pending" ? "under_review" : "contested"}`}>
+                        {EXTRACTION_DRAFT_DUPLICATE_LABELS[draft.duplicate.kind]}
+                      </span>
+                    )}
                   </div>
                   <strong>{extractionDraftSummary(draft)}</strong>
                   {draft.rationale && <p>{draft.rationale}</p>}

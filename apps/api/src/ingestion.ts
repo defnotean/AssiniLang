@@ -1,5 +1,5 @@
 import { lookup as dnsLookup } from "node:dns/promises";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import type { ExtractionDraftKind, ExtractionDraftPayload, Language, SourceAsset } from "@assini/db";
@@ -293,6 +293,37 @@ export async function transcribeAudioFile(
     throw new Error("Transcription endpoint returned no text.");
   }
   return payload.text.trim();
+}
+
+/**
+ * Reads printed/handwritten text out of an image with local OCR
+ * (tesseract.js). Used as the image fallback when no vision-capable model
+ * is configured. The OCR language comes from ASSINI_OCR_LANG (default
+ * "eng"); the first use of a language downloads its trained data from the
+ * tesseract.js CDN (a few MB, internet required once) and caches it under
+ * `cachePath` when provided.
+ */
+export async function ocrImageFile(
+  params: { filePath: string; lang?: string; env?: Env; cachePath?: string }
+): Promise<string> {
+  const env = params.env ?? process.env;
+  const lang = params.lang?.trim() || env.ASSINI_OCR_LANG?.trim() || "eng";
+
+  const { createWorker } = await import("tesseract.js");
+  if (params.cachePath) {
+    await mkdir(params.cachePath, { recursive: true });
+  }
+  const worker = await createWorker(lang, undefined, params.cachePath ? { cachePath: params.cachePath } : {});
+  try {
+    const { data } = await worker.recognize(params.filePath);
+    const text = data.text.trim();
+    if (text.length === 0) {
+      throw new Error("OCR found no readable text in the image.");
+    }
+    return text;
+  } finally {
+    await worker.terminate();
+  }
 }
 
 function extractionInstructions(language: Language, sourceKind: SourceAsset["kind"]): string {
@@ -661,24 +692,40 @@ export async function extractCandidatesForAsset(
   const { asset, language, provider } = params;
   const warnings: string[] = [];
 
+  let resolved: { text: string; transcript?: string; warnings: string[] };
+
   if (asset.kind === "image") {
     if (!asset.filePath) throw new Error("Image source asset has no stored file.");
-    if (!provider.completeChat) {
+
+    if (provider.completeChat) {
+      const imageData = await readFile(resolve(params.dataDir, asset.filePath));
+      const messages = buildImageExtractionMessages(language, asset.mimeType ?? "image/png", imageData.toString("base64"));
+      const content = await provider.completeChat(messages);
+      const parsed = parseExtractionResponse(content);
+      if (!parsed) {
+        throw new Error("The model response could not be parsed as extraction JSON. Try again or use a larger model.");
+      }
+      return { ...parsed, warnings };
+    }
+
+    let ocrText: string;
+    try {
+      ocrText = await ocrImageFile({
+        filePath: resolve(params.dataDir, asset.filePath),
+        env,
+        cachePath: resolve(params.dataDir, "ocr-cache")
+      });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
       throw new Error(
-        "Image sources need a vision-capable model. Configure ASSINI_LLM_PROVIDER with a local multimodal model (for example llava via Ollama) and retry."
+        `Local OCR could not read the image: ${reason} Configure a vision-capable model via ASSINI_LLM_PROVIDER (for example llava via Ollama), or provide a clearer image.`
       );
     }
-    const imageData = await readFile(resolve(params.dataDir, asset.filePath));
-    const messages = buildImageExtractionMessages(language, asset.mimeType ?? "image/png", imageData.toString("base64"));
-    const content = await provider.completeChat(messages);
-    const parsed = parseExtractionResponse(content);
-    if (!parsed) {
-      throw new Error("The model response could not be parsed as extraction JSON. Try again or use a larger model.");
-    }
-    return { ...parsed, warnings };
+    warnings.push("No vision model configured; used local OCR (tesseract.js) to read the image.");
+    resolved = { text: ocrText, warnings: [] };
+  } else {
+    resolved = await resolveAssetText(asset, params.dataDir, env, fetchFn, params.lookupFn);
   }
-
-  const resolved = await resolveAssetText(asset, params.dataDir, env, fetchFn, params.lookupFn);
   warnings.push(...resolved.warnings);
   const text = normalizeSourceText(resolved.text);
   if (text.length === 0) {

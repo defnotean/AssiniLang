@@ -55,6 +55,7 @@ import {
 } from "./llmProvider";
 import {
   buildLanguageProfile,
+  toExtractionDraftViews,
   toPublicExercise,
   toPublicEvaluationArtifact,
   toPublicExerciseSubmission,
@@ -221,6 +222,105 @@ function appendAuditEvents(state: AppState, drafts: AuditEventDraft[]): AppState
 
 function appendAuditEvent(state: AppState, draft: AuditEventDraft): AppState {
   return appendAuditEvents(state, [draft]);
+}
+
+type SourceProcessCompletionInput = {
+  sourceId: string;
+  actor: User;
+  processedAt: string;
+  extraction?: SourceExtractionResult;
+  extractionError?: string;
+};
+
+type SourceProcessCompletionOutput = {
+  drafts: ExtractionDraft[];
+  updatedAsset?: SourceAsset;
+};
+
+/**
+ * Applies the result of a source extraction run (success or failure) to the
+ * app state in a single mutation: asset status, error, summary, transcript,
+ * new extraction drafts, and the audit event. Shared by the synchronous and
+ * background processing paths so both persist identically.
+ */
+function applySourceProcessCompletion(
+  state: AppState,
+  input: SourceProcessCompletionInput,
+  output: SourceProcessCompletionOutput
+): AppState {
+  const { sourceId, actor, processedAt, extraction, extractionError } = input;
+  const stored = state.sourceAssets.find((item) => item.id === sourceId);
+  if (!stored) return state;
+
+  if (!extraction) {
+    output.updatedAsset = {
+      ...stored,
+      status: "failed",
+      error: extractionError ?? "Source processing failed.",
+      processedAt
+    };
+    return appendAuditEvent({
+      ...state,
+      sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? output.updatedAsset as SourceAsset : item))
+    }, {
+      actor,
+      at: processedAt,
+      action: "source_asset.process_failed",
+      entityType: "source_asset",
+      entityId: sourceId,
+      languageId: stored.languageId,
+      summary: `Processing failed for source "${stored.title}".`,
+      metadata: { reason: extractionError ?? "unknown" }
+    });
+  }
+
+  output.drafts = extraction.candidates.map((candidate) => ({
+    id: `draft-${randomUUID()}`,
+    languageId: stored.languageId,
+    sourceAssetId: stored.id,
+    kind: candidate.kind,
+    payload: candidate.payload,
+    confidence: candidate.confidence,
+    rationale: candidate.rationale,
+    status: "proposed" as const,
+    createdAt: processedAt
+  }));
+
+  output.updatedAsset = {
+    ...stored,
+    status: "processed",
+    error: undefined,
+    summary: extraction.summary,
+    transcript: extraction.transcript ?? stored.transcript,
+    processedAt
+  };
+
+  return appendAuditEvent({
+    ...state,
+    sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? output.updatedAsset as SourceAsset : item)),
+    extractionDrafts: [...state.extractionDrafts, ...output.drafts]
+  }, {
+    actor,
+    at: processedAt,
+    action: "source_asset.processed",
+    entityType: "source_asset",
+    entityId: sourceId,
+    languageId: stored.languageId,
+    summary: `Processed source "${stored.title}" into ${output.drafts.length} extraction drafts.`,
+    metadata: {
+      draftCount: output.drafts.length,
+      warningCount: extraction.warnings.length
+    }
+  });
+}
+
+function isAsyncProcessRequested(body: unknown): boolean {
+  return Boolean(
+    body
+    && typeof body === "object"
+    && !Array.isArray(body)
+    && (body as Record<string, unknown>).async === true
+  );
 }
 
 function averageEvaluationScore(run: AppState["evaluationRuns"][number]): number {
@@ -2047,6 +2147,85 @@ export function createServer(options: ServerOptions = {}) {
       return { error: `Language not found: ${asset.languageId}` };
     }
 
+    if (asset.status === "processing") {
+      reply.code(409);
+      return { error: `Source is already processing: ${sourceId}` };
+    }
+
+    if (isAsyncProcessRequested(request.body)) {
+      let claimed: SourceAsset | undefined;
+      let alreadyProcessing = false;
+
+      await updateState((state) => {
+        const stored = state.sourceAssets.find((item) => item.id === sourceId);
+        if (!stored) return state;
+        if (stored.status === "processing") {
+          alreadyProcessing = true;
+          return state;
+        }
+
+        claimed = { ...stored, status: "processing", error: undefined };
+        return appendAuditEvent({
+          ...state,
+          sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? claimed as SourceAsset : item))
+        }, {
+          actor,
+          action: "source_asset.process_started",
+          entityType: "source_asset",
+          entityId: sourceId,
+          languageId: stored.languageId,
+          summary: `Started background processing for source "${stored.title}".`,
+          metadata: { kind: stored.kind }
+        });
+      });
+
+      if (alreadyProcessing) {
+        reply.code(409);
+        return { error: `Source is already processing: ${sourceId}` };
+      }
+
+      if (!claimed) {
+        reply.code(404);
+        return { error: `Source not found: ${sourceId}` };
+      }
+
+      const claimedAsset = claimed;
+      const runInBackground = async () => {
+        let extraction: SourceExtractionResult | undefined;
+        let extractionError: string | undefined;
+        try {
+          extraction = await extractCandidatesForAsset({
+            asset: claimedAsset,
+            language,
+            provider: llmProvider,
+            dataDir,
+            fetchFn: ingestionFetch
+          });
+        } catch (error) {
+          extractionError = redactErrorSecrets(error instanceof Error ? error.message : "Source processing failed.");
+        }
+
+        const output: SourceProcessCompletionOutput = { drafts: [] };
+        await updateState((state) => applySourceProcessCompletion(state, {
+          sourceId,
+          actor,
+          processedAt: new Date().toISOString(),
+          extraction,
+          extractionError
+        }, output));
+      };
+
+      // Un-awaited on purpose: the request returns 202 immediately while
+      // extraction continues. The catch guarantees the promise never
+      // rejects unhandled, even if persisting the completion fails.
+      void runInBackground().catch((error) => {
+        app.log.error({ err: error, sourceId }, "Background source processing failed to persist");
+      });
+
+      reply.code(202);
+      return { asset: claimedAsset, drafts: [], warnings: [] };
+    }
+
     let extraction: SourceExtractionResult | undefined;
     let extractionError: string | undefined;
     try {
@@ -2062,88 +2241,29 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     const processedAt = new Date().toISOString();
-    let drafts: ExtractionDraft[] = [];
-    let updatedAsset: SourceAsset | undefined;
+    const output: SourceProcessCompletionOutput = { drafts: [] };
 
-    await updateState((state) => {
-      const stored = state.sourceAssets.find((item) => item.id === sourceId);
-      if (!stored) return state;
+    await updateState((state) => applySourceProcessCompletion(state, {
+      sourceId,
+      actor,
+      processedAt,
+      extraction,
+      extractionError
+    }, output));
 
-      if (!extraction) {
-        updatedAsset = {
-          ...stored,
-          status: "failed",
-          error: extractionError ?? "Source processing failed.",
-          processedAt
-        };
-        return appendAuditEvent({
-          ...state,
-          sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? updatedAsset as SourceAsset : item))
-        }, {
-          actor,
-          at: processedAt,
-          action: "source_asset.process_failed",
-          entityType: "source_asset",
-          entityId: sourceId,
-          languageId: stored.languageId,
-          summary: `Processing failed for source "${stored.title}".`,
-          metadata: { reason: extractionError ?? "unknown" }
-        });
-      }
-
-      drafts = extraction.candidates.map((candidate) => ({
-        id: `draft-${randomUUID()}`,
-        languageId: stored.languageId,
-        sourceAssetId: stored.id,
-        kind: candidate.kind,
-        payload: candidate.payload,
-        confidence: candidate.confidence,
-        rationale: candidate.rationale,
-        status: "proposed" as const,
-        createdAt: processedAt
-      }));
-
-      updatedAsset = {
-        ...stored,
-        status: "processed",
-        error: undefined,
-        summary: extraction.summary,
-        transcript: extraction.transcript ?? stored.transcript,
-        processedAt
-      };
-
-      return appendAuditEvent({
-        ...state,
-        sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? updatedAsset as SourceAsset : item)),
-        extractionDrafts: [...state.extractionDrafts, ...drafts]
-      }, {
-        actor,
-        at: processedAt,
-        action: "source_asset.processed",
-        entityType: "source_asset",
-        entityId: sourceId,
-        languageId: stored.languageId,
-        summary: `Processed source "${stored.title}" into ${drafts.length} extraction drafts.`,
-        metadata: {
-          draftCount: drafts.length,
-          warningCount: extraction.warnings.length
-        }
-      });
-    });
-
-    if (!updatedAsset) {
+    if (!output.updatedAsset) {
       reply.code(500);
       return { error: "Source could not be processed" };
     }
 
     if (!extraction) {
       reply.code(422);
-      return { error: extractionError ?? "Source processing failed.", asset: updatedAsset };
+      return { error: extractionError ?? "Source processing failed.", asset: output.updatedAsset };
     }
 
     return {
-      asset: updatedAsset,
-      drafts,
+      asset: output.updatedAsset,
+      drafts: output.drafts,
       warnings: extraction.warnings
     };
   });
@@ -2159,9 +2279,9 @@ export function createServer(options: ServerOptions = {}) {
 
     const drafts = state.extractionDrafts.filter((draft) => draft.languageId === languageId);
     if (status === "proposed" || status === "accepted" || status === "rejected") {
-      return drafts.filter((draft) => draft.status === status);
+      return toExtractionDraftViews(state, drafts.filter((draft) => draft.status === status));
     }
-    return drafts;
+    return toExtractionDraftViews(state, drafts);
   });
 
   app.post("/extraction-drafts/:draftId/accept", async (request, reply) => {

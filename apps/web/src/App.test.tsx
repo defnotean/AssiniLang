@@ -898,15 +898,17 @@ describe("App", () => {
     expect(await within(sourcesRegion).findByText("Elder recording")).toBeInTheDocument();
   });
 
-  it("processes a source, surfaces extraction warnings, and refreshes the draft queue", async () => {
-    apiMock.fetchSources.mockResolvedValue([createTextSource()]);
+  it("starts background processing, polls until the source is processed, and refreshes the draft queue", async () => {
+    apiMock.fetchSources
+      .mockResolvedValueOnce([createTextSource()])
+      .mockResolvedValue([{ ...createTextSource(), status: "processed" }]);
     apiMock.fetchExtractionDrafts
       .mockResolvedValueOnce([])
       .mockResolvedValue([createLexemeDraft()]);
     apiMock.processSource.mockResolvedValue({
-      asset: { ...createTextSource(), status: "processed" },
-      drafts: [createLexemeDraft()],
-      warnings: ["Skipped one line without a recognizable gloss separator."]
+      asset: { ...createTextSource(), status: "processing" },
+      drafts: [],
+      warnings: []
     });
 
     await renderReady();
@@ -914,13 +916,73 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Process Field notebook page" }));
 
-    await waitFor(() => expect(apiMock.processSource).toHaveBeenCalledWith("src-1"));
-    expect(await screen.findByText("Processed Field notebook page: 1 extraction draft proposed.")).toBeInTheDocument();
-    expect(screen.getByText("Skipped one line without a recognizable gloss separator.")).toBeInTheDocument();
+    await waitFor(() => expect(apiMock.processSource).toHaveBeenCalledWith("src-1", { async: true }));
+    expect(await screen.findByText("Processing Field notebook page finished.")).toBeInTheDocument();
     const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
     expect(await within(draftQueue).findByText("tala — water")).toBeInTheDocument();
     expect(apiMock.fetchSources).toHaveBeenLastCalledWith("avenik");
     expect(apiMock.fetchExtractionDrafts).toHaveBeenLastCalledWith("avenik", "proposed");
+    const sourcesRegion = screen.getByRole("region", { name: "Registered sources" });
+    expect(within(sourcesRegion).getByRole("button", { name: "Process Field notebook page" })).toBeEnabled();
+  });
+
+  it("keeps the source marked as processing while polling and surfaces the stored error on failure", async () => {
+    const pendingPoll = createDeferred<unknown>();
+    apiMock.fetchSources
+      .mockResolvedValueOnce([createTextSource()])
+      .mockImplementationOnce(() => pendingPoll.promise)
+      .mockResolvedValue([{
+        ...createTextSource(),
+        status: "failed",
+        error: "The document contains no extractable text."
+      }]);
+    apiMock.fetchExtractionDrafts.mockResolvedValue([]);
+    apiMock.processSource.mockResolvedValue({
+      asset: { ...createTextSource(), status: "processing" },
+      drafts: [],
+      warnings: []
+    });
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Process Field notebook page" }));
+
+    await waitFor(() => expect(apiMock.processSource).toHaveBeenCalledWith("src-1", { async: true }));
+
+    // The first poll is still in flight: the row stays busy and disabled.
+    await waitFor(() => expect(apiMock.fetchSources).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole("button", { name: "Processing..." })).toBeDisabled();
+
+    // The poll reports "processing", so polling continues; the next poll
+    // returns the stored failure.
+    pendingPoll.resolve([{ ...createTextSource(), status: "processing" }]);
+
+    const failureMessages = await screen.findAllByText(
+      "The document contains no extractable text.",
+      undefined,
+      { timeout: 4000 }
+    );
+    expect(failureMessages.length).toBeGreaterThan(0);
+    expect(screen.getByRole("button", { name: "Process Field notebook page" })).toBeEnabled();
+  }, 10000);
+
+  it("shows a duplicate warning badge on flagged drafts and none on unflagged drafts", async () => {
+    apiMock.fetchExtractionDrafts.mockResolvedValue([
+      { ...createLexemeDraft(), duplicate: { kind: "exact", entityId: "lex-9" } },
+      createGrammarDraft()
+    ]);
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Sources & intake" }));
+
+    const draftQueue = await screen.findByRole("region", { name: "Extraction draft queue" });
+    const flaggedRow = await within(draftQueue).findByRole("article", { name: "Extraction draft draft-1" });
+    expect(within(flaggedRow).getByText("Duplicate of existing entry")).toBeInTheDocument();
+
+    const unflaggedRow = within(draftQueue).getByRole("article", { name: "Extraction draft draft-2" });
+    expect(
+      within(unflaggedRow).queryByText(/Duplicate of existing entry|Same form, different gloss|Duplicate topic|Duplicates another pending draft/)
+    ).not.toBeInTheDocument();
   });
 
   it("accepts a proposed extraction draft and refreshes the queue", async () => {

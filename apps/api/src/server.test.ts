@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildTestWorkspaceState,
   createEmptyState,
@@ -2836,5 +2836,284 @@ describe("api server", () => {
     now += 60_001;
     const afterWindow = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });
     expect(afterWindow.statusCode).toBe(201);
+  });
+
+  it("flags duplicate extraction drafts at read time without persisting the flag", async () => {
+    const baseState = buildTestWorkspaceState();
+    const sourceAssetId = "source-duplicate-check";
+    const draftBase = {
+      languageId: TEST_LANGUAGE_ID,
+      sourceAssetId,
+      confidence: "medium" as const,
+      status: "proposed" as const
+    };
+    const emptyPayload = { tags: [], morphologicalSegmentation: [], topicTags: [] };
+    const app = createServer({
+      initialState: {
+        ...baseState,
+        sourceAssets: [
+          ...baseState.sourceAssets,
+          {
+            id: sourceAssetId,
+            languageId: TEST_LANGUAGE_ID,
+            kind: "text" as const,
+            title: "Overlapping source",
+            rawText: "mira = river",
+            status: "processed" as const,
+            createdBy: "reviewer-1",
+            createdAt: "2026-06-09T00:00:00.000Z"
+          }
+        ],
+        extractionDrafts: [
+          {
+            ...draftBase,
+            id: "draft-lexeme-exact",
+            kind: "lexeme" as const,
+            payload: { ...emptyPayload, form: "Mira", gloss: "River" },
+            createdAt: "2026-06-09T00:00:01.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-lexeme-form",
+            kind: "lexeme" as const,
+            payload: { ...emptyPayload, form: "MIRA", gloss: "stream" },
+            createdAt: "2026-06-09T00:00:02.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-passage-exact",
+            kind: "corpus_passage" as const,
+            payload: { ...emptyPayload, textTarget: "  Mira   talo-na ", textTranslation: "I walk by the river." },
+            createdAt: "2026-06-09T00:00:03.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-topic-duplicate",
+            kind: "grammar_note" as const,
+            payload: { ...emptyPayload, topic: "syntax/basic-order", explanation: "Subjects come before verbs." },
+            createdAt: "2026-06-09T00:00:04.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-pending-first",
+            kind: "lexeme" as const,
+            payload: { ...emptyPayload, form: "pelu", gloss: "stone" },
+            createdAt: "2026-06-09T00:00:05.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-pending-second",
+            kind: "lexeme" as const,
+            payload: { ...emptyPayload, form: "pelu", gloss: "stone" },
+            createdAt: "2026-06-09T00:00:06.000Z"
+          },
+          {
+            ...draftBase,
+            id: "draft-unique",
+            kind: "grammar_note" as const,
+            payload: { ...emptyPayload, topic: "phonology/vowel-harmony", explanation: "Vowels agree across suffixes." },
+            createdAt: "2026-06-09T00:00:07.000Z"
+          }
+        ]
+      }
+    });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+    });
+    expect(response.statusCode).toBe(200);
+    const byId = new Map<string, { duplicate?: unknown }>(
+      response.json().map((draft: { id: string }) => [draft.id, draft])
+    );
+
+    expect(byId.get("draft-lexeme-exact")?.duplicate).toEqual({ kind: "exact", entityId: "testlang-lex-001" });
+    expect(byId.get("draft-lexeme-form")?.duplicate).toEqual({ kind: "form", entityId: "testlang-lex-001" });
+    expect(byId.get("draft-passage-exact")?.duplicate).toEqual({ kind: "exact", entityId: "testlang-c001" });
+    expect(byId.get("draft-topic-duplicate")?.duplicate).toEqual({ kind: "topic", entityId: "testlang-note-basic-order" });
+    expect(byId.get("draft-pending-first")?.duplicate).toBeUndefined();
+    expect(byId.get("draft-pending-second")?.duplicate).toEqual({ kind: "pending", draftId: "draft-pending-first" });
+    expect(byId.get("draft-unique")?.duplicate).toBeUndefined();
+  });
+
+  describe("background source processing", () => {
+    async function registerWordlistSource(app: ReturnType<typeof createServer>, title: string): Promise<string> {
+      const registered = await app.inject({
+        method: "POST",
+        url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+        headers: authHeaders("reviewer-1"),
+        payload: { kind: "wordlist", title, rawText: "mira = river\nsaku = child" }
+      });
+      expect(registered.statusCode).toBe(201);
+      return registered.json().id as string;
+    }
+
+    async function fetchStoredSource(app: ReturnType<typeof createServer>, sourceId: string) {
+      const sources = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/sources` });
+      expect(sources.statusCode).toBe(200);
+      return sources.json().find((item: { id: string }) => item.id === sourceId);
+    }
+
+    it("accepts async processing with 202, then persists drafts and the processed status", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Background word list");
+
+      const accepted = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+
+      expect(accepted.statusCode).toBe(202);
+      expect(accepted.json()).toMatchObject({
+        asset: { id: sourceId, status: "processing" },
+        drafts: [],
+        warnings: []
+      });
+
+      await vi.waitFor(async () => {
+        const stored = await fetchStoredSource(app, sourceId);
+        expect(stored.status).toBe("processed");
+      });
+
+      const stored = await fetchStoredSource(app, sourceId);
+      expect(stored.error).toBeUndefined();
+      expect(typeof stored.processedAt).toBe("string");
+
+      const drafts = await app.inject({
+        method: "GET",
+        url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+      });
+      expect(drafts.statusCode).toBe(200);
+      const sourceDrafts = drafts.json().filter((draft: { sourceAssetId: string }) => draft.sourceAssetId === sourceId);
+      expect(sourceDrafts.length).toBeGreaterThanOrEqual(2);
+
+      const audit = await app.inject({
+        method: "GET",
+        url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+        headers: authHeaders("programmer-1")
+      });
+      expect(audit.statusCode).toBe(200);
+      const actions = audit.json().map((event: { action: string }) => event.action);
+      expect(actions).toContain("source_asset.process_started");
+      expect(actions).toContain("source_asset.processed");
+    });
+
+    it("records a failed status and sanitized error when background extraction throws", async () => {
+      const baseState = buildTestWorkspaceState();
+      const documentAssetId = "source-async-unsupported-document";
+      const app = createServer({
+        initialState: {
+          ...baseState,
+          sourceAssets: [
+            ...baseState.sourceAssets,
+            {
+              id: documentAssetId,
+              languageId: TEST_LANGUAGE_ID,
+              kind: "document" as const,
+              title: "Legacy ebook",
+              originalName: "notes.epub",
+              filePath: "assets/testlang/notes.epub",
+              status: "pending" as const,
+              createdBy: "reviewer-1",
+              createdAt: "2026-06-09T00:00:00.000Z"
+            }
+          ]
+        }
+      });
+
+      const accepted = await app.inject({
+        method: "POST",
+        url: `/sources/${documentAssetId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(accepted.statusCode).toBe(202);
+      expect(accepted.json().asset.status).toBe("processing");
+
+      await vi.waitFor(async () => {
+        const stored = await fetchStoredSource(app, documentAssetId);
+        expect(stored.status).toBe("failed");
+      });
+
+      const stored = await fetchStoredSource(app, documentAssetId);
+      expect(stored.error).toMatch(/not supported yet/);
+
+      const audit = await app.inject({
+        method: "GET",
+        url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+        headers: authHeaders("programmer-1")
+      });
+      expect(audit.statusCode).toBe(200);
+      const actions = audit.json().map((event: { action: string }) => event.action);
+      expect(actions).toContain("source_asset.process_failed");
+    });
+
+    it("returns 409 in both modes while a source is already processing", async () => {
+      let release: (value: string) => void = () => {};
+      const blocked = new Promise<string>((resolve) => {
+        release = resolve;
+      });
+      const llmProvider: LlmProvider = {
+        name: "blocking-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          return blocked;
+        }
+      };
+      const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
+      const sourceId = await registerWordlistSource(app, "Slow word list");
+
+      const accepted = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(accepted.statusCode).toBe(202);
+
+      const conflictAsync = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(conflictAsync.statusCode).toBe(409);
+      expect(conflictAsync.json().error).toContain("already processing");
+
+      const conflictSync = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(conflictSync.statusCode).toBe(409);
+      expect(conflictSync.json().error).toContain("already processing");
+
+      release(JSON.stringify({ summary: "Done.", lexemes: [{ form: "mira", gloss: "river" }] }));
+
+      await vi.waitFor(async () => {
+        const stored = await fetchStoredSource(app, sourceId);
+        expect(stored.status).toBe("processed");
+      });
+    });
+
+    it("keeps the synchronous response shape when async is not requested", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Synchronous word list");
+
+      const processed = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(processed.statusCode).toBe(200);
+      expect(processed.json().asset).toMatchObject({ id: sourceId, status: "processed" });
+      expect(processed.json().drafts.length).toBeGreaterThanOrEqual(2);
+      expect(Array.isArray(processed.json().warnings)).toBe(true);
+    });
   });
 });

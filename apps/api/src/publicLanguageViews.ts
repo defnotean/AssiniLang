@@ -6,6 +6,7 @@ import type {
   EvaluationRun,
   Exercise,
   ExerciseSubmission,
+  ExtractionDraft,
   LanguagePhonology,
   Lexeme,
   Note
@@ -13,6 +14,26 @@ import type {
 import { summarizeEvaluationGate } from "@assini/eval";
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
+
+/**
+ * Read-time duplicate flag for an extraction draft. Never persisted: it is
+ * recomputed for every listing so it always reflects the current workspace.
+ *
+ * - `exact`: the draft matches an existing same-language entity outright
+ *   (lexeme form+gloss or corpus passage target text).
+ * - `form`: a lexeme draft reuses an existing form with a different gloss
+ *   (possibly a homonym or a gloss refinement, so it is flagged separately).
+ * - `topic`: a grammar-note draft repeats an existing note topic.
+ * - `pending`: an earlier proposed draft in the queue already proposes the
+ *   same thing; only the later draft is flagged.
+ */
+export type ExtractionDraftDuplicate =
+  | { kind: "exact"; entityId: string }
+  | { kind: "form"; entityId: string }
+  | { kind: "topic"; entityId: string }
+  | { kind: "pending"; draftId: string };
+
+export type ExtractionDraftView = ExtractionDraft & { duplicate?: ExtractionDraftDuplicate };
 
 export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer" | "learnerId">;
 
@@ -481,6 +502,115 @@ export function buildLanguageProfile(state: AppState, languageId: string): Langu
     grammarRules,
     stats
   };
+}
+
+function normalizeDuplicateKey(value: string): string {
+  return value.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Identity key for "two drafts proposing the same thing" within the pending
+ * queue: form+gloss for lexemes, normalized target text for passages, and
+ * the topic for grammar notes. Returns undefined for incomplete payloads.
+ */
+function extractionDraftIdentityKey(draft: ExtractionDraft): string | undefined {
+  if (draft.kind === "lexeme") {
+    const form = draft.payload.form?.trim();
+    const gloss = draft.payload.gloss?.trim();
+    if (!form || !gloss) return undefined;
+    return `lexeme:${normalizeDuplicateKey(form)}::${normalizeDuplicateKey(gloss)}`;
+  }
+
+  if (draft.kind === "corpus_passage") {
+    const textTarget = draft.payload.textTarget?.trim();
+    if (!textTarget) return undefined;
+    return `corpus_passage:${normalizeDuplicateKey(textTarget)}`;
+  }
+
+  const topic = draft.payload.topic?.trim();
+  if (!topic) return undefined;
+  return `grammar_note:${normalizeDuplicateKey(topic)}`;
+}
+
+function existingEntityDuplicate(state: AppState, draft: ExtractionDraft): ExtractionDraftDuplicate | undefined {
+  if (draft.kind === "lexeme") {
+    const form = draft.payload.form?.trim();
+    const gloss = draft.payload.gloss?.trim();
+    if (!form) return undefined;
+    const normalizedForm = normalizeDuplicateKey(form);
+    const normalizedGloss = gloss ? normalizeDuplicateKey(gloss) : undefined;
+
+    const sameLanguageLexemes = state.lexemes.filter(
+      (lexeme) => lexeme.languageId === draft.languageId && normalizeDuplicateKey(lexeme.form) === normalizedForm
+    );
+    const exactMatch = normalizedGloss === undefined
+      ? undefined
+      : sameLanguageLexemes.find((lexeme) => normalizeDuplicateKey(lexeme.gloss) === normalizedGloss);
+    if (exactMatch) return { kind: "exact", entityId: exactMatch.id };
+
+    const formMatch = sameLanguageLexemes[0];
+    return formMatch ? { kind: "form", entityId: formMatch.id } : undefined;
+  }
+
+  if (draft.kind === "corpus_passage") {
+    const textTarget = draft.payload.textTarget?.trim();
+    if (!textTarget) return undefined;
+    const normalizedTarget = normalizeDuplicateKey(textTarget);
+    const match = state.corpus.find(
+      (passage) => passage.languageId === draft.languageId
+        && normalizeDuplicateKey(passage.textTarget) === normalizedTarget
+    );
+    return match ? { kind: "exact", entityId: match.id } : undefined;
+  }
+
+  const topic = draft.payload.topic?.trim();
+  if (!topic) return undefined;
+  const match = state.notes.find(
+    (note) => note.languageId === draft.languageId && note.topic.trim() === topic
+  );
+  return match ? { kind: "topic", entityId: match.id } : undefined;
+}
+
+/**
+ * Annotates listed extraction drafts with non-persisted duplicate flags,
+ * computed at read time against committed workspace entities and the pending
+ * queue itself. One flag per draft; existing-entity matches (exact, then
+ * form/topic) take priority over pending-queue matches.
+ */
+export function toExtractionDraftViews(state: AppState, drafts: ExtractionDraft[]): ExtractionDraftView[] {
+  const pendingQueue = state.extractionDrafts
+    .map((draft, index) => ({ draft, index }))
+    .filter(({ draft }) => draft.status === "proposed")
+    .sort((left, right) => (
+      Date.parse(left.draft.createdAt) - Date.parse(right.draft.createdAt)
+      || left.index - right.index
+    ));
+
+  const earliestPendingByKey = new Map<string, string>();
+  const pendingDuplicateOf = new Map<string, string>();
+  for (const { draft } of pendingQueue) {
+    const key = extractionDraftIdentityKey(draft);
+    if (!key) continue;
+    const scopedKey = `${draft.languageId}::${key}`;
+    const earliest = earliestPendingByKey.get(scopedKey);
+    if (earliest === undefined) {
+      earliestPendingByKey.set(scopedKey, draft.id);
+    } else {
+      pendingDuplicateOf.set(draft.id, earliest);
+    }
+  }
+
+  return drafts.map((draft) => {
+    if (draft.status !== "proposed") return { ...draft };
+
+    const existing = existingEntityDuplicate(state, draft);
+    if (existing) return { ...draft, duplicate: existing };
+
+    const earlierDraftId = pendingDuplicateOf.get(draft.id);
+    if (earlierDraftId) return { ...draft, duplicate: { kind: "pending", draftId: earlierDraftId } };
+
+    return { ...draft };
+  });
 }
 
 export function toPublicLanguageSnapshot(
