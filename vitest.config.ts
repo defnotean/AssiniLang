@@ -7,6 +7,7 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      "@assini/api-contract": resolve(rootDir, "packages/api-contract/src/index.ts"),
       "@assini/db": resolve(rootDir, "packages/db/src/index.ts"),
       "@assini/eval": resolve(rootDir, "packages/eval/src/index.ts")
     }
