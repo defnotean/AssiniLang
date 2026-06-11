@@ -19,10 +19,12 @@ flowchart LR
 
 ## Features
 
-- Ingestion: six source kinds, chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate flags on drafts.
-- Review and governance: extraction-draft review, note review queue with per-language policies and approval thresholds, review dispositions, elder corrections, audit events.
-- Learning and evaluation: server-graded exercises with private answer keys and adversarial probes, deterministic evaluation across seven categories.
-- Safety boundaries: public projection layer strips answer keys and internals, exports carry SHA-256 integrity manifests, provider keys never reach the browser, corrupted local data fails loudly.
+- Ingestion: six source kinds, chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
+- Review and governance: single and bulk extraction-draft review, note review queue with per-language policies and approval thresholds, model-drafted notes with automatic grounding scores, review dispositions, elder corrections, audit events.
+- Learning and evaluation: server-graded exercises with private answer keys and adversarial probes, spaced-repetition practice recommendations, deterministic evaluation across seven categories, paradigm-gap detection as a fieldwork to-do.
+- AI Assistant: grounded chat with the configured local model - natural-language corrections, standing setup instructions, per-reply fallback labeling, conversations that survive reloads.
+- Console ergonomics: command palette (Ctrl+K), interlinear glossed text and concordance in the corpus browser, persisted theme/view/language selection.
+- Safety boundaries: public projection layer strips answer keys and internals, exports carry SHA-256 integrity manifests, provider keys never reach the browser, corrupted local data fails loudly, validated database backup/restore.
 
 ## Quick start
 

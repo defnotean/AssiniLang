@@ -9,7 +9,7 @@ The implemented direction is the final `AssiniLang.html` handoff from the design
 The chosen design is the `Atlas layout`:
 
 - A language-first left sidebar.
-- Per-language section navigation for profile, intake, corpus, notes, learner practice, evaluation, governance, and model setup.
+- Per-language section navigation for profile, intake, corpus, notes, learner practice, evaluation, governance, AI assistant chat, and model setup.
 - Dense but readable work surfaces for repeated research and review tasks.
 - A dark night-sky visual system with warm gold accents.
 - Subtle geometric dividers and glyphs used as interface texture, not decoration-heavy branding.

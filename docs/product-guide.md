@@ -36,7 +36,7 @@ The intake workspace captures raw materials and turns them into reviewable draft
 
 - Register a pasted text, word list, or URL source, or upload a file (PDF, DOCX, plain-text documents, images, or audio; 25 MB cap).
 - Process a source to generate extraction drafts. The console processes in the background and polls until the source leaves `processing`, so long sources through a slow local model do not block the page. URL sources are fetched and converted to text server-side; images use a vision-capable model or fall back to local OCR; audio is transcribed through a configured transcription endpoint first.
-- Review proposed drafts one by one, or select several with the per-draft checkboxes (or "Select all proposed") and accept/reject them in bulk - up to 50 at a time, with a confirm step and a per-draft failure report when some items cannot be reviewed. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision.
+- Review proposed drafts one by one, or select several with the per-draft checkboxes (or "Select all proposed") and accept/reject them in bulk - up to 50 at a time, with a confirm step and a per-draft failure report when some items cannot be reviewed. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision. Grounding badges additionally warn when a draft contradicts already-accepted data: a form whose gloss conflicts with an accepted lexeme, a form that decomposes into accepted morphemes (so its gloss probably belongs to a different word), or a corpus segmentation that contradicts an accepted gloss - hover a badge for the full explanation.
 - Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
 - Failed processing marks the source `failed` with a sanitized error so it can be fixed and retried.
 - Processing warnings are shown under the source (for example "used offline heuristic parsing" or "fell back to offline heuristics"), so you can see when extraction fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts.
@@ -49,7 +49,7 @@ The corpus browser shows target-language passages, English translations, morphol
 
 A command palette (Ctrl+K or Cmd+K) is available everywhere in the console for jumping to a language, opening a workspace view, or toggling the theme.
 
-Reviewers can also import passages directly. The import flow captures target text, translation, source label, author/year/license/consent record, unique topic tags, structured morpheme segmentation with complete target-token coverage, and consent restrictions.
+Reviewers can also import passages directly through the collapsed-by-default "Add source passage" form (so the passage list keeps the screen while browsing). The import flow captures target text, translation, source label, author/year/license/consent record, unique topic tags, structured morpheme segmentation with complete target-token coverage, and consent restrictions.
 
 The API validates the import before saving. It rejects duplicate target passages, duplicate topic tags, duplicate morpheme feature labels, segmentation surfaces that are not present in the target text, target tokens that are not covered by contiguous segmentation surfaces, consent-use values outside the allowed enum, and malformed payloads. When the language declares a phonology inventory, target text is also scanned against it; when the language has a lexicon, each morpheme must be grounded by a lexicon surface or lemma. Successful imports write audit metadata without storing private reviewer data.
 
@@ -121,6 +121,10 @@ The Elder workspace shows public note/corpus context and correction records for 
 The AI Assistant view is a direct chat workspace over the AI session routes. Conversations run in the public learner-practice mode and are grounded only in the selected language's public notes and corpus passages, which are attached to the session as observable evidence. Hidden chain-of-thought is never exposed.
 
 Every assistant reply is labeled honestly: replies from a configured provider carry a model badge, while replies answered by the deterministic offline fallback are flagged with a "deterministic fallback (no model)" warning chip, so canned offline text is never mistaken for a real model answer. A New conversation button discards the current session and starts fresh.
+
+The conversation is fully interactive in natural language: the complete message history is re-sent to the model on every turn, so you can correct the assistant ("that's wrong - ka marks the dual, not the plural") and it applies the correction in later replies. An optional "Conversation setup" field provides standing instructions the assistant follows for the entire session (glossing conventions, reply format, quiz behavior). Replies render basic markdown (bold, italics, code, lists) safely, and the active conversation is remembered per language so a page reload resumes where you left off.
+
+The assistant is a conversation partner, not an authority: its claims carry no special status, and nothing it says changes workspace data - the lexicon, corpus, and notes only change through the reviewed workflows.
 
 ### Model setup
 

@@ -91,6 +91,11 @@ The explicit `/v1` base URL above is still correct. With the `ollama` alias a ba
 
 For image sources, pick a vision-capable model such as `llava`.
 
+Two practical notes from real-model testing:
+
+- On AMD GPUs that ROCm does not cover (verified on an RX 9070 XT), Ollama silently falls back to CPU at roughly a tenth of the speed. Start the Ollama server with `OLLAMA_VULKAN=1` to use the Vulkan backend and check placement with `ollama ps` (it should report `100% GPU`).
+- Extraction prompts generate long structured output; for 7B-14B models, raise the request timeout (for example `ASSINI_LLM_TIMEOUT_MS=180000`) so long sources do not abort at the 30-second default.
+
 ### LM Studio
 
 ```powershell

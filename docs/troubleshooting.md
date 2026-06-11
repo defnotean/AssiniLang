@@ -22,6 +22,8 @@ Symptom-cause-fix tables for the problems you are most likely to hit locally. Co
 | First image processing in deterministic mode is slow or fails offline | The first OCR run per `ASSINI_OCR_LANG` downloads trained data from the tesseract.js CDN | Run it once with internet access; the data is cached under `data/ocr-cache/` and later runs work offline. |
 | Audio processing fails with `Audio sources need a transcription endpoint.` | `ASSINI_TRANSCRIBE_BASE_URL` is not set | Point it at an OpenAI-compatible `/audio/transcriptions` server - see the [whisper recipe](configuration.md#local-whisper-server-audio-transcription). |
 | `LLM provider request timed out after 30000ms` | The local model is slower than the timeout | Raise `ASSINI_LLM_TIMEOUT_MS`, use async processing for long sources, or pick a smaller model. |
+| Local model is extremely slow even though a capable GPU is installed | Ollama fell back to CPU inference (common on AMD GPUs that ROCm does not cover) | Check `ollama ps` - if it reports `100% CPU`, restart the Ollama server with `OLLAMA_VULKAN=1` and confirm it reports `100% GPU`. |
+| Assistant replies are labeled "deterministic fallback (no model)" | No LLM provider is configured or the provider call failed | Configure `ASSINI_LLM_*` (see the [configuration reference](configuration.md)) and use Model Setup's connection test; the chip means the reply is canned offline text, not a model answer. |
 
 ## Sources
 
