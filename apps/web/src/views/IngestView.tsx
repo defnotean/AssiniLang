@@ -524,22 +524,24 @@ export function IngestView({ languageId }: { languageId: string }) {
                   <strong>{extractionDraftSummary(draft)}</strong>
                   {draft.rationale && <p>{draft.rationale}</p>}
                 </div>
-                <div className="correction-actions">
+                <div className="correction-actions draft-actions">
                   <button
                     type="button"
                     className="secondary"
+                    aria-label={`Accept draft ${draft.id}`}
                     disabled={reviewingDraftId !== null}
                     onClick={() => handleDraftDecision(draft.id, "accept")}
                   >
-                    {reviewingDraftId === draft.id ? "Reviewing..." : `Accept draft ${draft.id}`}
+                    {reviewingDraftId === draft.id ? "Reviewing..." : "Accept"}
                   </button>
                   <button
                     type="button"
                     className="contest"
+                    aria-label={`Reject draft ${draft.id}`}
                     disabled={reviewingDraftId !== null}
                     onClick={() => handleDraftDecision(draft.id, "reject")}
                   >
-                    Reject draft {draft.id}
+                    Reject
                   </button>
                 </div>
               </article>

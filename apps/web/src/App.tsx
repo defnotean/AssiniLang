@@ -31,10 +31,12 @@ import type {
   ViewMode
 } from "./lib/types";
 import { REVIEWER_COMMENTS, VIEW_CONFIG, VIEW_ORDER } from "./lib/viewConfig";
+import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
 import { useElderWorkspace } from "./hooks/useElderWorkspace";
 import { useGovernanceWorkspace } from "./hooks/useGovernanceWorkspace";
 import { useLearnerWorkspace } from "./hooks/useLearnerWorkspace";
 import { useModelWorkspace } from "./hooks/useModelWorkspace";
+import { AssistantView } from "./views/AssistantView";
 import { CorpusView } from "./views/CorpusView";
 import { CreateLanguageForm } from "./views/CreateLanguageForm";
 import { ElderWorkspace } from "./views/ElderWorkspace";
@@ -76,6 +78,7 @@ export function App() {
   const elder = useElderWorkspace(selectedLanguageId, isElderMode, refreshDashboard, model.refreshModelObservability);
   const learner = useLearnerWorkspace(view, selectedLanguageId, data, refreshDashboard);
   const governance = useGovernanceWorkspace(selectedLanguageId, view, refreshDashboard);
+  const assistant = useAssistantWorkspace();
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -189,7 +192,8 @@ export function App() {
     || governance.resolvingReviewDispositionId !== null
     || governance.isExportingSnapshot
     || governance.isExportingEvaluationArtifact
-    || model.isTestingModel;
+    || model.isTestingModel
+    || assistant.isSending;
 
   const overviewStats = useMemo(() => {
     if (!data) return [];
@@ -656,6 +660,14 @@ export function App() {
                   }}
                   onResolveReviewDisposition={governance.handleResolveReviewDisposition}
                   onExportSnapshot={governance.handleExportSnapshot}
+                />
+              )}
+              {view === "assistant" && (
+                <AssistantView
+                  selectedLanguageId={selectedLanguageId}
+                  contextNoteIds={data.notes.slice(0, 4).map((note) => note.id)}
+                  contextPassageIds={data.corpus.slice(0, 4).map((passage) => passage.id)}
+                  assistant={assistant}
                 />
               )}
               {view === "model" && (

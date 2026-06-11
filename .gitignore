@@ -33,3 +33,6 @@ data/ocr-cache/
 .DS_Store
 Thumbs.db
 *.log
+
+# Local editor/agent tooling
+.claude/

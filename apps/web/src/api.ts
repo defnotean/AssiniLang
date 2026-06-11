@@ -907,3 +907,24 @@ export async function createAiSession(payload: CreateAiSessionPayload): Promise<
 export async function fetchAiSession(sessionId: string, actor: LocalActor = "programmer"): Promise<AiSession> {
   return getJson<AiSession>(`/ai/sessions/${encodeURIComponent(sessionId)}`, actor);
 }
+
+/**
+ * Appends a follow-up message to an existing AI session. The actor must match
+ * the session creator, so callers pass the session mode and we reuse the same
+ * mode-to-actor convention as createAiSession.
+ */
+export async function continueAiSession(
+  sessionId: string,
+  content: string,
+  mode: AiSessionMode = "learner_practice"
+): Promise<AiSession> {
+  const response = await fetch(`/api/ai/sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: "POST",
+    ...(await actorRequest(actorForAiMode(mode), true)),
+    body: JSON.stringify({ content })
+  });
+
+  await assertOk(response, "AI session message failed");
+
+  return response.json() as Promise<AiSession>;
+}

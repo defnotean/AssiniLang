@@ -116,6 +116,12 @@ These features are prototype scaffolding. They do not replace real community own
 
 The Elder workspace shows public note/corpus context and correction records for the selected language. Elders, leads, and admins can submit corrections tied to a note, passage, or custom context. Pending corrections can be accepted or rejected once with reviewer attribution. Accepted note-linked corrections can then be applied through an explicit revised note explanation, which reopens the note for review.
 
+### AI Assistant
+
+The AI Assistant view is a direct chat workspace over the AI session routes. Conversations run in the public learner-practice mode and are grounded only in the selected language's public notes and corpus passages, which are attached to the session as observable evidence. Hidden chain-of-thought is never exposed.
+
+Every assistant reply is labeled honestly: replies from a configured provider carry a model badge, while replies answered by the deterministic offline fallback are flagged with a "deterministic fallback (no model)" warning chip, so canned offline text is never mistaken for a real model answer. A New conversation button discards the current session and starts fresh.
+
 ### Model setup
 
 The model setup view reports server-side LLM provider readiness, transcription readiness, and AI session observability. Browser code never receives provider API keys.
