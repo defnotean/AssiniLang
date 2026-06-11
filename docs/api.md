@@ -1,10 +1,10 @@
 # API reference
 
-The API runs on `http://localhost:4321` during local development. Routes are implemented in `apps/api/src/server.ts`; the ingestion pipeline lives in `apps/api/src/ingestion.ts` and is documented in depth in the [Ingestion Deep Dive](ingestion.md).
+The API runs on `http://localhost:4321` during local development. Routes are implemented as domain modules under `apps/api/src/routes/`, registered by `createServer` in `apps/api/src/server.ts`; the ingestion pipeline lives in `apps/api/src/ingestion.ts` and is documented in depth in the [Ingestion Deep Dive](ingestion.md).
 
 ## Route index
 
-Every route in `server.ts`. "Public" means no auth required; role lists mean the request must carry a prototype session or server-token actor with one of those roles; "any actor" means any authenticated local user.
+Every registered route. "Public" means no auth required; role lists mean the request must carry a prototype session or server-token actor with one of those roles; "any actor" means any authenticated local user.
 
 | Method | Path | Auth / roles | Purpose |
 | --- | --- | --- | --- |

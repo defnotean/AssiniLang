@@ -35,11 +35,21 @@ async function readAllDocs(): Promise<Map<string, string>> {
 // Route paths registered in the Fastify server, derived from source so the
 // guard cannot go stale when routes are added or renamed.
 async function readRegisteredRoutePaths(): Promise<string[]> {
-  const server = await readProjectFile("apps/api/src/server.ts");
+  const routeFiles = ["apps/api/src/server.ts"];
+  const routesDir = join(projectRoot, "apps/api/src/routes");
+  for (const entry of await readdir(routesDir, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".ts")) {
+      routeFiles.push(`apps/api/src/routes/${entry.name}`);
+    }
+  }
+
   const paths = new Set<string>();
-  for (const match of server.matchAll(/app\.(?:get|post|put|patch|delete)\(\s*"([^"]+)"/g)) {
-    const path = match[1];
-    if (path) paths.add(path);
+  for (const file of routeFiles) {
+    const source = await readProjectFile(file);
+    for (const match of source.matchAll(/app\.(?:get|post|put|patch|delete)\(\s*"([^"]+)"/g)) {
+      const path = match[1];
+      if (path) paths.add(path);
+    }
   }
   return [...paths];
 }

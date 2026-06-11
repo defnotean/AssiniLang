@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -64,12 +64,31 @@ function nullToUndefined(val: any, key?: string): any {
   return val;
 }
 
+type SnapshotKey = { mtimeMs: number; size: number };
+
 export class JsonStore {
   private updateQueue: Promise<void> = Promise.resolve();
   private readonly isSqlite: boolean;
+  // Parsed-state snapshot keyed by the database file's mtime+size. Reads of an
+  // unchanged file cost one stat() instead of a full table scan + Zod parse;
+  // any external write changes the key and forces a real re-read.
+  private snapshot: (SnapshotKey & { state: AppState }) | null = null;
 
   constructor(private readonly dbPath = DEFAULT_DB_PATH) {
     this.isSqlite = !this.dbPath.endsWith(".json");
+  }
+
+  private async snapshotKey(): Promise<SnapshotKey | null> {
+    try {
+      const stats = await stat(this.dbPath);
+      return { mtimeMs: stats.mtimeMs, size: stats.size };
+    } catch {
+      return null;
+    }
+  }
+
+  private cacheSnapshot(key: SnapshotKey | null, state: AppState): void {
+    this.snapshot = key ? { ...key, state: structuredClone(state) } : null;
   }
 
   private ensureTables(db: any): void {
@@ -300,10 +319,17 @@ export class JsonStore {
   }
 
   async read(): Promise<AppState> {
+    const key = await this.snapshotKey();
+    if (key && this.snapshot && this.snapshot.mtimeMs === key.mtimeMs && this.snapshot.size === key.size) {
+      return structuredClone(this.snapshot.state);
+    }
+
     if (!this.isSqlite) {
       try {
         const raw = await readFile(this.dbPath, "utf8");
-        return parseAppState(JSON.parse(raw));
+        const parsed = parseAppState(JSON.parse(raw));
+        this.cacheSnapshot(key, parsed);
+        return parsed;
       } catch (error) {
         if (error instanceof Error && "code" in error && error.code === "ENOENT") {
           return createEmptyState();
@@ -364,7 +390,9 @@ export class JsonStore {
         extractionDrafts: nullToUndefined(extractionDraftsList) as any
       };
 
-      return parseAppState(state);
+      const parsed = parseAppState(state);
+      this.cacheSnapshot(key, parsed);
+      return parsed;
     } catch (error) {
       if (db) {
         try {
@@ -389,6 +417,8 @@ export class JsonStore {
       } catch (error) {
         await unlink(tempPath).catch(() => undefined);
         throw error;
+      } finally {
+        this.snapshot = null;
       }
       return;
     }
@@ -444,6 +474,7 @@ export class JsonStore {
         if (parsed.extractionDrafts.length > 0) drizzleDb.insert(schema.extractionDrafts).values(parsed.extractionDrafts as any).run();
       })();
     } finally {
+      this.snapshot = null;
       db.close();
     }
   }

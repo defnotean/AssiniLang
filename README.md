@@ -90,10 +90,11 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 ## Repository map
 
 ```text
-apps/api/        Fastify API: routes, ingestion pipeline, LLM/transcription providers, public projection.
-apps/web/        React 19 + Vite research console.
-packages/db/     Zod schemas, integrity validation, migrations, JSON store, bootstrap/seed CLI.
+apps/api/        Fastify API: domain route modules (src/routes/), ingestion pipeline, LLM/transcription providers, public projection.
+apps/web/        React 19 + Vite research console: App shell, per-workspace views (src/views/), shared components and lib helpers.
+packages/db/     Zod schemas, integrity validation, migrations, JSON/SQLite store, bootstrap/seed CLI.
 packages/eval/   Deterministic study-loop and scoring logic.
+packages/api-contract/  Shared API payload/response contracts.
 scripts/         Dev/verify launchers, ingestion smoke test, documentation guard tests.
 docs/            The handbook, plus dated history under docs/specs and docs/plans.
 data/            Generated local database, uploaded assets, OCR cache (gitignored).

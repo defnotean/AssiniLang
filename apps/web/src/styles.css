@@ -2355,6 +2355,55 @@ label,
   color: var(--danger);
 }
 
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 0.9rem;
+  z-index: 10;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  padding: 0.6rem 0.9rem;
+  background: var(--accent);
+  color: #11121d;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.skip-link:focus-visible {
+  top: 0.9rem;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 2.2rem;
+  height: 2.2rem;
+  margin-bottom: 0.8rem;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spinner-turn 0.9s linear infinite;
+}
+
+.full-page-status {
+  grid-auto-flow: row;
+}
+
+@keyframes spinner-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

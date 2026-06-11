@@ -40,11 +40,24 @@ flowchart LR
 
 ```text
 apps/
-  api/                 Fastify API, auth checks, route handlers, raw-source ingestion pipeline, redaction, snapshots, and LLM/transcription provider wiring.
+  api/                 Fastify API.
+    src/server.ts        createServer: plugin setup, shared RouteContext, route registration.
+    src/routes/          One module per domain (languages, sources, corpus, notes, exercises,
+                         evaluations, governance, studyLoop, aiSessions, elder, observability,
+                         exports, llm, auth, system) plus context.ts (shared RouteContext type).
+    src/routeHelpers.ts  Cross-domain helpers: audit builders, actor resolution, redaction.
+    src/ingestion.ts     Raw-source extraction pipeline (chunking, OCR, transcription, fallbacks).
+    src/publicLanguageViews.ts  Public projection and redaction.
+    src/llmProvider.ts   LLM/transcription provider wiring.
   web/                 React research console.
+    src/App.tsx          App shell: layout, sidebar, theme, top-level state and data fetching.
+    src/views/           One module per workspace (CorpusView, ReviewView, GovernanceView, ...).
+    src/components/      Shared presentational pieces (badges, marks, ScoreRing, StatusScreen, ...).
+    src/lib/             Pure helpers: formatting, view config, theme + workspace persistence, types.
 
 packages/
-  db/                  Zod schemas, TypeScript types, JSON persistence, migrations, and the empty-workspace bootstrap/seed CLI.
+  api-contract/        Shared API payload/response contracts.
+  db/                  Zod schemas, TypeScript types, JSON/SQLite persistence, migrations, seed CLI.
   eval/                Deterministic study-loop generation, answer grading, and evaluation scoring.
 
 scripts/               Dev/verify launchers, ingestion smoke test, documentation guard tests.
@@ -112,7 +125,7 @@ Source processing lives in `apps/api/src/ingestion.ts` and is driven by the serv
 
 ## Local persistence
 
-The generated local database lives at `data/local-db.json` (override with `ASSINI_DB_PATH`). `JsonStore` writes through a temporary file and rename so normal writes are atomic.
+The generated local database lives at `data/local-db.json` (override with `ASSINI_DB_PATH`; a path that does not end in `.json` selects the better-sqlite3 backend). `JsonStore` writes through a temporary file and rename so normal writes are atomic, and keeps an in-memory snapshot of the last parsed state keyed by the database file's mtime and size: reads of an unchanged file are served from the snapshot (a deep clone, so callers cannot poison the cache), and any write - including one from another store instance or process - changes the key and forces a real re-read and re-validation.
 
 Persisted source-asset file paths are validated before use. File-backed assets must stay under `assets/<languageId>/` inside the configured data directory; absolute paths, URL-like paths, drive/UNC paths, backslashes, traversal segments, and wrong-language prefixes are rejected on persisted reads and at ingestion resolution time.
 

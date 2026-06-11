@@ -1,0 +1,222 @@
+import { useMemo, useState, type FormEvent } from "react";
+import type { CorpusImportPayload } from "../api";
+import {
+  buildCorpusImportPayload,
+  canSubmitCorpusImportDraft,
+  EMPTY_CORPUS_IMPORT_DRAFT,
+  type CorpusImportDraft
+} from "../corpusImport";
+import { MorphChips } from "../components/MorphChips";
+import type { CorpusPassage } from "../lib/types";
+
+export function CorpusView({
+  corpus,
+  isWorkflowBusy,
+  onImportCorpusPassage
+}: {
+  corpus: CorpusPassage[];
+  isWorkflowBusy: boolean;
+  onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
+}) {
+  const [search, setSearch] = useState("");
+  const [importDraft, setImportDraft] = useState<CorpusImportDraft>(() => ({ ...EMPTY_CORPUS_IMPORT_DRAFT }));
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isImportingCorpus, setIsImportingCorpus] = useState(false);
+  const normalized = search.trim().toLowerCase();
+  const canImportPassage = canSubmitCorpusImportDraft(importDraft)
+    && !isWorkflowBusy
+    && !isImportingCorpus;
+  const filtered = useMemo(() => {
+    if (!normalized) return corpus;
+    return corpus.filter((passage) => {
+      const morphemeText = passage.morphologicalSegmentation
+        .map((morpheme) => `${morpheme.surface} ${morpheme.gloss} ${morpheme.lemma} ${morpheme.features.join(" ")}`)
+        .join(" ");
+      return [
+        passage.id,
+        passage.source,
+        passage.textTarget,
+        passage.textTranslation,
+        passage.topicTags.join(" "),
+        morphemeText
+      ].some((value) => value.toLowerCase().includes(normalized));
+    });
+  }, [corpus, normalized]);
+
+  function clearImportNotice() {
+    setImportMessage(null);
+    setImportError(null);
+  }
+
+  function updateImportDraft(field: keyof CorpusImportDraft, value: string) {
+    setImportDraft((current) => ({ ...current, [field]: value }));
+    clearImportNotice();
+  }
+
+  async function handleImportCorpus(event: FormEvent) {
+    event.preventDefault();
+    const result = buildCorpusImportPayload(importDraft);
+    if (!result.ok) {
+      setImportMessage(null);
+      setImportError(result.error);
+      return;
+    }
+
+    setIsImportingCorpus(true);
+    setImportMessage(null);
+    setImportError(null);
+    try {
+      await onImportCorpusPassage(result.payload);
+      setImportDraft({ ...EMPTY_CORPUS_IMPORT_DRAFT });
+      setImportMessage("Corpus passage imported.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Corpus import failed";
+      setImportError(message);
+    } finally {
+      setIsImportingCorpus(false);
+    }
+  }
+
+  return (
+    <div className="corpus-view">
+      <form className="record-card form-panel compact corpus-import-form" aria-label="Corpus import" onSubmit={handleImportCorpus}>
+        <div>
+          <span className="detail-label">Corpus import</span>
+          <h3>Add source passage</h3>
+        </div>
+        <div className="corpus-import-grid">
+          <div className="form-group wide">
+            <label htmlFor="corpus-import-target">Corpus target text</label>
+            <input
+              id="corpus-import-target"
+              value={importDraft.target}
+              onChange={(event) => updateImportDraft("target", event.target.value)}
+            />
+          </div>
+          <div className="form-group wide">
+            <label htmlFor="corpus-import-translation">English translation</label>
+            <input
+              id="corpus-import-translation"
+              value={importDraft.translation}
+              onChange={(event) => updateImportDraft("translation", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-source">Source</label>
+            <input
+              id="corpus-import-source"
+              value={importDraft.source}
+              onChange={(event) => updateImportDraft("source", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-author">Author</label>
+            <input
+              id="corpus-import-author"
+              value={importDraft.author}
+              onChange={(event) => updateImportDraft("author", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-year">Year</label>
+            <input
+              id="corpus-import-year"
+              type="number"
+              inputMode="numeric"
+              value={importDraft.year}
+              onChange={(event) => updateImportDraft("year", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-license">License</label>
+            <input
+              id="corpus-import-license"
+              value={importDraft.license}
+              onChange={(event) => updateImportDraft("license", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-consent-record">Consent record</label>
+            <input
+              id="corpus-import-consent-record"
+              value={importDraft.consentRecord}
+              onChange={(event) => updateImportDraft("consentRecord", event.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="corpus-import-tags">Topic tags</label>
+            <input
+              id="corpus-import-tags"
+              value={importDraft.tags}
+              onChange={(event) => updateImportDraft("tags", event.target.value)}
+            />
+          </div>
+          <div className="form-group wide">
+            <label htmlFor="corpus-import-morphemes">Morpheme segmentation</label>
+            <textarea
+              id="corpus-import-morphemes"
+              value={importDraft.morphemes}
+              onChange={(event) => updateImportDraft("morphemes", event.target.value)}
+            />
+          </div>
+          <div className="form-group wide">
+            <label htmlFor="corpus-import-restrictions">Access restrictions</label>
+            <input
+              id="corpus-import-restrictions"
+              value={importDraft.restrictions}
+              onChange={(event) => updateImportDraft("restrictions", event.target.value)}
+            />
+          </div>
+        </div>
+        <button type="submit" className="secondary" disabled={!canImportPassage}>
+          {isImportingCorpus ? "Importing..." : "Import passage"}
+        </button>
+        {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
+        {importError && <p className="result-notice error" role="alert">{importError}</p>}
+      </form>
+
+      <div className="toolbar-row">
+        <label className="search-field" htmlFor="corpus-search">
+          <span className="visually-hidden">Search corpus</span>
+          <input
+            id="corpus-search"
+            type="search"
+            aria-label="Search corpus"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search passages, translations, tags"
+          />
+        </label>
+        <span className="record-count">{filtered.length} of {corpus.length} passages</span>
+      </div>
+
+      <section className="corpus-list" aria-label="Corpus passages">
+        {filtered.length === 0 ? (
+          <p className="empty-state">No passages match your search.</p>
+        ) : (
+          filtered.map((passage) => (
+            <article className="corpus-card" key={passage.id}>
+              <div className="bead-strip" aria-hidden="true" />
+              <div className="corpus-card-body">
+                <div className="corpus-topline">
+                  <code>{passage.textTarget}</code>
+                  <span className="id-badge">{passage.id}</span>
+                </div>
+                <p className="translation">{passage.textTranslation}</p>
+                <MorphChips morphemes={passage.morphologicalSegmentation} />
+                <div className="pill-row">
+                  {passage.topicTags.map((tag) => (
+                    <span className="pill" key={tag}>{tag}</span>
+                  ))}
+                  <span className="pill">{passage.source}</span>
+                  <span className="pill">{passage.consentStatus.use}</span>
+                </div>
+              </div>
+            </article>
+          ))
+        )}
+      </section>
+    </div>
+  );
+}

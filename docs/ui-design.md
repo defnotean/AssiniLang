@@ -18,7 +18,7 @@ The design remains local-first. It should communicate care, preservation, and re
 
 ## Visual system
 
-The web app implements the design through `apps/web/src/styles.css` and reusable JSX primitives in `apps/web/src/App.tsx`.
+The web app implements the design through `apps/web/src/styles.css`, reusable JSX primitives in `apps/web/src/components/`, and one module per workspace in `apps/web/src/views/`, composed by the App shell in `apps/web/src/App.tsx`. The shell persists the active theme, view, and selected language across reloads, exposes a skip-to-content link, and honors `prefers-reduced-motion`.
 
 Key tokens and motifs:
 

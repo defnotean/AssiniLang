@@ -1,6 +1,6 @@
 # Ingestion deep dive
 
-This document explains how a raw source becomes reviewable extraction drafts. The pipeline lives in `apps/api/src/ingestion.ts`; the routes that drive it live in `apps/api/src/server.ts`; provider wiring lives in `apps/api/src/llmProvider.ts`. Model and endpoint configuration is covered in the [configuration reference](configuration.md).
+This document explains how a raw source becomes reviewable extraction drafts. The pipeline lives in `apps/api/src/ingestion.ts`; the routes that drive it live in `apps/api/src/routes/sources.ts`; provider wiring lives in `apps/api/src/llmProvider.ts`. Model and endpoint configuration is covered in the [configuration reference](configuration.md).
 
 ## Source kinds
 
