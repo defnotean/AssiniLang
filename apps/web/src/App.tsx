@@ -49,6 +49,7 @@ import {
   submitExerciseAnswer,
   updateReviewPolicy
 } from "./api";
+import { CommandPalette, type PaletteCommand } from "./components/CommandPalette";
 import { StatusScreen } from "./components/StatusScreen";
 import { CompassMark, DiamondBand, TypologyMark, ViewGlyph } from "./components/marks";
 import {
@@ -95,6 +96,7 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [profileState, setProfileState] = useState<AsyncState<LanguageProfile>>({ status: "idle" });
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
 
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
@@ -175,6 +177,17 @@ export function App() {
   useEffect(() => {
     persistWorkspaceSelection(view, selectedLanguageId);
   }, [view, selectedLanguageId]);
+
+  useEffect(() => {
+    function onGlobalKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setIsPaletteOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", onGlobalKeyDown);
+    return () => window.removeEventListener("keydown", onGlobalKeyDown);
+  }, []);
 
   // Restore the last-open language once the workspace list is known, so a
   // stale stored id can never wedge the dashboard request in an error state.
@@ -315,6 +328,29 @@ export function App() {
       { label: "Exercises", value: data.exercises.length.toString(), hint: "learner tasks" },
       { label: "Evals", value: data.evaluations.length.toString(), hint: "quality runs" }
     ];
+  }, [data]);
+
+  const paletteCommands = useMemo<PaletteCommand[]>(() => {
+    const languageCommands: PaletteCommand[] = (data?.languages ?? []).map((language) => ({
+      id: `language-${language.id}`,
+      label: `Go to ${language.name}`,
+      run: () => handleLanguageSelect(language.id)
+    }));
+    const viewCommands: PaletteCommand[] = VIEW_ORDER.map((mode) => ({
+      id: `view-${mode}`,
+      label: `Open ${VIEW_CONFIG[mode].label}`,
+      run: () => handleViewSelect(mode)
+    }));
+    return [
+      ...languageCommands,
+      ...viewCommands,
+      {
+        id: "toggle-theme",
+        label: "Toggle theme",
+        run: () => setTheme((current) => (current === "dark" ? "light" : "dark"))
+      }
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
   useEffect(() => {
@@ -525,10 +561,18 @@ export function App() {
     setModelDraftMessage(null);
     setModelDraftError(null);
     try {
-      const { generated, warnings } = await generateModelDraftNotes(selectedLanguageId);
+      const { generated, warnings, notes } = await generateModelDraftNotes(selectedLanguageId);
       await refreshDashboard();
       const summary = `Generated ${generated} model-backed draft note${generated === 1 ? "" : "s"}.`;
-      setModelDraftMessage(warnings.length > 0 ? `${summary} ${warnings.join(" ")}` : summary);
+      const scored = notes?.filter((note) => note.grounding) ?? [];
+      const groundingSummary = scored.length > 0
+        ? ` Grounding: ${scored
+            .map((note) => `${Math.round((note.grounding?.score ?? 0) * 100)}%`)
+            .join(", ")}.${scored.some((note) => (note.grounding?.failures.length ?? 0) > 0) ? " Review flagged checks before approving." : ""}`
+        : "";
+      setModelDraftMessage(
+        warnings.length > 0 ? `${summary}${groundingSummary} ${warnings.join(" ")}` : `${summary}${groundingSummary}`
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Model draft generation failed";
       setModelDraftError(message);
@@ -960,7 +1004,11 @@ export function App() {
   };
 
   return (
-    <div className="app-shell">
+    <>
+      {isPaletteOpen && (
+        <CommandPalette commands={paletteCommands} onClose={() => setIsPaletteOpen(false)} />
+      )}
+      <div className="app-shell">
       <a className="skip-link" href="#main-content">
         Skip to main content
       </a>
@@ -1264,6 +1312,7 @@ export function App() {
           )}
         </section>
       </main>
-    </div>
+      </div>
+    </>
   );
 }

@@ -34,7 +34,7 @@ The intake workspace captures raw materials and turns them into reviewable draft
 
 - Register a pasted text, word list, or URL source, or upload a file (PDF, DOCX, plain-text documents, images, or audio; 25 MB cap).
 - Process a source to generate extraction drafts. The console processes in the background and polls until the source leaves `processing`, so long sources through a slow local model do not block the page. URL sources are fetched and converted to text server-side; images use a vision-capable model or fall back to local OCR; audio is transcribed through a configured transcription endpoint first.
-- Review proposed drafts one by one. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision.
+- Review proposed drafts one by one, or select several with the per-draft checkboxes (or "Select all proposed") and accept/reject them in bulk - up to 50 at a time, with a confirm step and a per-draft failure report when some items cannot be reviewed. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision.
 - Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
 - Failed processing marks the source `failed` with a sanitized error so it can be fixed and retried.
 - Processing warnings are shown under the source (for example "used offline heuristic parsing" or "fell back to offline heuristics"), so you can see when extraction fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts.
@@ -43,7 +43,9 @@ Nothing extracted by a model enters the workspace without an explicit human acce
 
 ### Corpus browser
 
-The corpus browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels.
+The corpus browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels. Two display modes are available: cards, and an interlinear glossed text mode that aligns each surface form over its gloss with the free translation beneath. Clicking any morpheme (in either mode) filters the list to passages containing that surface form - a lightweight concordance - with an active-filter pill showing the match count.
+
+A command palette (Ctrl+K or Cmd+K) is available everywhere in the console for jumping to a language, opening a workspace view, or toggling the theme.
 
 Reviewers can also import passages directly. The import flow captures target text, translation, source label, author/year/license/consent record, unique topic tags, structured morpheme segmentation with complete target-token coverage, and consent restrictions.
 
@@ -51,7 +53,7 @@ The API validates the import before saving. It rejects duplicate target passages
 
 ### Note review queue
 
-The review queue shows draft notes beside their status, confidence, evidence count, and examples. Notes come from accepted grammar-note drafts, the deterministic study loop, or earlier review work. Reviewers can:
+The review queue shows draft notes beside their status, confidence, evidence count, and examples. Notes come from accepted grammar-note drafts, the deterministic study loop, model-backed drafting, or earlier review work. When "Draft notes with model" runs, each generated draft is automatically scored for grounding (evidence resolves, forms are known to the lexicon/corpus, topic aligns with answer keys, examples are covered) and the per-draft percentages appear in the generation status message, so reviewers know which drafts deserve extra scrutiny before approving. Reviewers can:
 
 - Approve notes.
 - Contest, reject, defer, or escalate notes with required comments.

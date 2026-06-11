@@ -26,6 +26,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/languages/:languageId/extraction-drafts` | Public | List drafts with read-time duplicate flags; `?status=` filters. |
 | POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
 | POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
+| POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. |
 | GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. |
 | POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. |
 | GET | `/languages/:languageId/notes` | Public | Public review notes. |

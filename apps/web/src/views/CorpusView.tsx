@@ -19,6 +19,8 @@ export function CorpusView({
   onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
 }) {
   const [search, setSearch] = useState("");
+  const [displayMode, setDisplayMode] = useState<"cards" | "interlinear">("cards");
+  const [morphFilter, setMorphFilter] = useState<string | null>(null);
   const [importDraft, setImportDraft] = useState<CorpusImportDraft>(() => ({ ...EMPTY_CORPUS_IMPORT_DRAFT }));
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -43,6 +45,17 @@ export function CorpusView({
       ].some((value) => value.toLowerCase().includes(normalized));
     });
   }, [corpus, normalized]);
+
+  const visible = useMemo(() => {
+    if (!morphFilter) return filtered;
+    return filtered.filter((passage) =>
+      passage.morphologicalSegmentation.some((morpheme) => morpheme.surface === morphFilter)
+    );
+  }, [filtered, morphFilter]);
+
+  function toggleMorphFilter(surface: string) {
+    setMorphFilter((current) => (current === surface ? null : surface));
+  }
 
   function clearImportNotice() {
     setImportMessage(null);
@@ -188,14 +201,79 @@ export function CorpusView({
             placeholder="Search passages, translations, tags"
           />
         </label>
-        <span className="record-count">{filtered.length} of {corpus.length} passages</span>
+        <div className="display-mode-toggle" role="group" aria-label="Corpus display mode">
+          <button
+            type="button"
+            className={displayMode === "cards" ? "active" : ""}
+            aria-pressed={displayMode === "cards"}
+            onClick={() => setDisplayMode("cards")}
+          >
+            Cards
+          </button>
+          <button
+            type="button"
+            className={displayMode === "interlinear" ? "active" : ""}
+            aria-pressed={displayMode === "interlinear"}
+            onClick={() => setDisplayMode("interlinear")}
+          >
+            Interlinear
+          </button>
+        </div>
+        <span className="record-count">{visible.length} of {corpus.length} passages</span>
       </div>
 
+      {morphFilter && (
+        <div className="active-filter-row">
+          <span className="active-filter-pill">
+            <span>Morpheme: {morphFilter}</span>
+            <button
+              type="button"
+              aria-label={`Clear morpheme filter ${morphFilter}`}
+              onClick={() => setMorphFilter(null)}
+            >
+              ×
+            </button>
+          </span>
+          <span className="record-count" role="status" aria-live="polite">
+            {visible.length} passage{visible.length === 1 ? "" : "s"} containing {morphFilter}
+          </span>
+        </div>
+      )}
+
       <section className="corpus-list" aria-label="Corpus passages">
-        {filtered.length === 0 ? (
-          <p className="empty-state">No passages match your search.</p>
+        {visible.length === 0 ? (
+          <p className="empty-state">
+            {morphFilter ? "No passages contain the selected morpheme." : "No passages match your search."}
+          </p>
+        ) : displayMode === "interlinear" ? (
+          visible.map((passage) => (
+            <article className="igt-passage" key={passage.id}>
+              <div className="igt-topline">
+                <span className="id-badge">{passage.id}</span>
+                <span className="pill">{passage.source}</span>
+              </div>
+              <div className="igt-line">
+                {passage.morphologicalSegmentation.map((morpheme, index) => {
+                  const isActive = morphFilter === morpheme.surface;
+                  return (
+                    <button
+                      type="button"
+                      className={`igt-word${isActive ? " active" : ""}`}
+                      key={`${morpheme.surface}-${morpheme.gloss}-${index}`}
+                      aria-pressed={isActive}
+                      onClick={() => toggleMorphFilter(morpheme.surface)}
+                    >
+                      <span className="igt-surface">{morpheme.surface}</span>
+                      <span className="igt-gloss">{morpheme.gloss}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="igt-translation">{passage.textTranslation}</p>
+            </article>
+          ))
         ) : (
-          filtered.map((passage) => (
+          visible.map((passage) => (
             <article className="corpus-card" key={passage.id}>
               <div className="bead-strip" aria-hidden="true" />
               <div className="corpus-card-body">
@@ -204,7 +282,11 @@ export function CorpusView({
                   <span className="id-badge">{passage.id}</span>
                 </div>
                 <p className="translation">{passage.textTranslation}</p>
-                <MorphChips morphemes={passage.morphologicalSegmentation} />
+                <MorphChips
+                  morphemes={passage.morphologicalSegmentation}
+                  onSelect={toggleMorphFilter}
+                  activeSurface={morphFilter}
+                />
                 <div className="pill-row">
                   {passage.topicTags.map((tag) => (
                     <span className="pill" key={tag}>{tag}</span>

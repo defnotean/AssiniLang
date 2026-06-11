@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   acceptExtractionDraft,
+  bulkReviewExtractionDrafts,
   fetchExtractionDrafts,
   fetchSources,
   processSource,
@@ -8,7 +9,7 @@ import {
   rejectExtractionDraft,
   uploadSourceFile
 } from "../api";
-import type { ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
+import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { extractionDraftSummary, formatCount } from "../lib/format";
 import { EXTRACTION_DRAFT_DUPLICATE_LABELS, EXTRACTION_DRAFT_KIND_LABELS } from "../lib/viewConfig";
@@ -41,6 +42,11 @@ export function IngestView({ languageId }: { languageId: string }) {
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
   const [draftError, setDraftError] = useState<string | null>(null);
 
+  const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
+  const [pendingBulkAction, setPendingBulkAction] = useState<BulkReviewAction | null>(null);
+  const [isBulkReviewing, setIsBulkReviewing] = useState(false);
+  const [bulkFailures, setBulkFailures] = useState<{ draftId: string; error: string }[]>([]);
+
   useEffect(() => {
     let isCurrent = true;
     setIsLoadingIntake(true);
@@ -54,6 +60,9 @@ export function IngestView({ languageId }: { languageId: string }) {
     setProcessWarnings([]);
     setDraftNotice(null);
     setDraftError(null);
+    setSelectedDraftIds([]);
+    setPendingBulkAction(null);
+    setBulkFailures([]);
 
     Promise.all([fetchSources(languageId), fetchExtractionDrafts(languageId, "proposed")])
       .then(([loadedSources, loadedDrafts]) => {
@@ -80,6 +89,7 @@ export function IngestView({ languageId }: { languageId: string }) {
     ]);
     setSources(loadedSources);
     setDrafts(loadedDrafts);
+    setSelectedDraftIds((previous) => previous.filter((id) => loadedDrafts.some((draft) => draft.id === id)));
   }
 
   async function handleRegisterSource(event: FormEvent) {
@@ -230,6 +240,53 @@ export function IngestView({ languageId }: { languageId: string }) {
       setDraftError(message);
     } finally {
       setReviewingDraftId(null);
+    }
+  }
+
+  function toggleDraftSelection(draftId: string) {
+    setPendingBulkAction(null);
+    setSelectedDraftIds((previous) =>
+      previous.includes(draftId) ? previous.filter((id) => id !== draftId) : [...previous, draftId]
+    );
+  }
+
+  function toggleSelectAllProposed() {
+    setPendingBulkAction(null);
+    setSelectedDraftIds((previous) => (previous.length === drafts.length ? [] : drafts.map((draft) => draft.id)));
+  }
+
+  async function handleBulkReview(action: BulkReviewAction) {
+    // Two-click confirm: the first click arms the action, the second runs it.
+    if (pendingBulkAction !== action) {
+      setPendingBulkAction(action);
+      return;
+    }
+
+    setPendingBulkAction(null);
+    setIsBulkReviewing(true);
+    setDraftNotice(null);
+    setDraftError(null);
+    setBulkFailures([]);
+    try {
+      const result = await bulkReviewExtractionDrafts(languageId, action, selectedDraftIds);
+      const succeeded = action === "accept" ? result.accepted : result.rejected;
+      const summary = `Bulk review finished: ${succeeded} ${action === "accept" ? "accepted" : "rejected"}, ${result.failed} failed.`;
+      if (result.failed > 0) {
+        setDraftError(summary);
+        setBulkFailures(
+          result.results
+            .filter((item) => !item.ok)
+            .map((item) => ({ draftId: item.draftId, error: item.error ?? "Unknown failure" }))
+        );
+      } else {
+        setDraftNotice(summary);
+      }
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Bulk extraction draft review failed";
+      setDraftError(message);
+    } finally {
+      setIsBulkReviewing(false);
     }
   }
 
@@ -387,14 +444,66 @@ export function IngestView({ languageId }: { languageId: string }) {
         </div>
         {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}
         {draftError && <p className="result-notice error" role="alert">{draftError}</p>}
+        {bulkFailures.length > 0 && (
+          <ul className="warning-list" aria-label="Bulk review failures">
+            {bulkFailures.map((failure) => (
+              <li key={failure.draftId}>{failure.draftId}: {failure.error}</li>
+            ))}
+          </ul>
+        )}
         {drafts.length === 0 ? (
           <p className="empty-state">No proposed extraction drafts. Process a source to propose lexemes, passages, and grammar notes.</p>
         ) : (
-          <div className="detail-list">
+          <>
+            <div className="pill-row bulk-review-bar" aria-label="Bulk draft review">
+              <label>
+                <input
+                  type="checkbox"
+                  aria-label="Select all proposed drafts"
+                  checked={drafts.length > 0 && selectedDraftIds.length === drafts.length}
+                  disabled={isBulkReviewing}
+                  onChange={toggleSelectAllProposed}
+                />
+                {" "}Select all proposed
+              </label>
+              <span className="muted">{selectedDraftIds.length} selected</span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={isBulkReviewing || selectedDraftIds.length === 0}
+                onClick={() => { void handleBulkReview("accept"); }}
+              >
+                {isBulkReviewing
+                  ? "Reviewing selected..."
+                  : pendingBulkAction === "accept"
+                    ? "Confirm accept selected"
+                    : "Accept selected"}
+              </button>
+              <button
+                type="button"
+                className="contest"
+                disabled={isBulkReviewing || selectedDraftIds.length === 0}
+                onClick={() => { void handleBulkReview("reject"); }}
+              >
+                {isBulkReviewing
+                  ? "Reviewing selected..."
+                  : pendingBulkAction === "reject"
+                    ? "Confirm reject selected"
+                    : "Reject selected"}
+              </button>
+            </div>
+            <div className="detail-list">
             {drafts.map((draft) => (
               <article className="detail-row draft-row" key={draft.id} aria-label={`Extraction draft ${draft.id}`}>
                 <div>
                   <div className="pill-row">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select draft ${draft.id}`}
+                      checked={selectedDraftIds.includes(draft.id)}
+                      disabled={isBulkReviewing}
+                      onChange={() => toggleDraftSelection(draft.id)}
+                    />
                     <span className="pill">{EXTRACTION_DRAFT_KIND_LABELS[draft.kind]}</span>
                     <ConfidenceBadge confidence={draft.confidence} />
                     {draft.duplicate && (
@@ -426,7 +535,8 @@ export function IngestView({ languageId }: { languageId: string }) {
                 </div>
               </article>
             ))}
-          </div>
+            </div>
+          </>
         )}
       </section>
     </div>

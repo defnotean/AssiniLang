@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { CorpusPassage, Note } from "@assini/db";
-import { draftNotesForLanguage } from "@assini/eval";
+import { draftNotesForLanguage, scoreModelDraft } from "@assini/eval";
 import { generateModelDraftNotes, ModelRequiredError, type GeneratedNoteDraft } from "../generation.js";
 import { toPublicNotes } from "../publicLanguageViews.js";
 import {
@@ -200,6 +200,18 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
       }))));
     }
 
-    return { notes: createdNotes, warnings: generation.warnings, generated: createdNotes.length };
+    // Grounding scores are response-only metadata; persisted notes keep their schema.
+    const scoringContext = {
+      languageId,
+      passages: corpus,
+      lexemes,
+      noteAnswerKeys: current.noteAnswerKeys.filter((note) => note.languageId === languageId)
+    };
+    const scoredNotes = createdNotes.map((note) => ({
+      ...note,
+      grounding: scoreModelDraft(note, scoringContext)
+    }));
+
+    return { notes: scoredNotes, warnings: generation.warnings, generated: createdNotes.length };
   });
 }

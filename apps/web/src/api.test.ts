@@ -19,7 +19,8 @@ import {
   applyElderCorrection,
   reviewElderCorrection,
   submitExerciseAnswer,
-  createAiSession
+  createAiSession,
+  bulkReviewExtractionDrafts
 } from "./api";
 
 describe("fetchDashboardData", () => {
@@ -483,6 +484,48 @@ describe("fetchDashboardData", () => {
 
     await expect(reviewNote("note-1", { status: "contested" })).rejects.toThrow(
       "Note review failed (400): Contested notes require a substantive reviewer comment."
+    );
+  });
+
+  it("posts bulk extraction draft reviews as a reviewer", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        results: [{ draftId: "draft-1", ok: true, committedEntityId: "lex-1" }],
+        accepted: 1,
+        rejected: 0,
+        failed: 0
+      })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await bulkReviewExtractionDrafts("avenik/test language", "accept", ["draft-1"]);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/extraction-drafts/bulk-review", {
+      ...jsonRequest,
+      method: "POST",
+      body: JSON.stringify({ action: "accept", draftIds: ["draft-1"] })
+    });
+    expect(result.accepted).toBe(1);
+    expect(result.results[0]).toMatchObject({ draftId: "draft-1", ok: true });
+  });
+
+  it("includes server validation messages in bulk review failures", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: "Too many draftIds: at most 50 per request." })
+      });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(bulkReviewExtractionDrafts("avenik", "accept", ["a"])).rejects.toThrow(
+      "Bulk extraction draft review failed (400): Too many draftIds: at most 50 per request."
     );
   });
 });

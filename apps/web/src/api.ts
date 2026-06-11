@@ -255,6 +255,22 @@ export type AcceptExtractionDraftResult = {
   entity: Lexeme | CorpusPassage | Note;
 };
 
+export type BulkReviewAction = "accept" | "reject";
+
+export type BulkReviewItemResult = {
+  draftId: string;
+  ok: boolean;
+  error?: string;
+  committedEntityId?: string;
+};
+
+export type BulkReviewExtractionDraftsResult = {
+  results: BulkReviewItemResult[];
+  accepted: number;
+  rejected: number;
+  failed: number;
+};
+
 export type GovernancePayload = Pick<GovernanceRecord, "languageId" | "policyType" | "content" | "effectiveDate">;
 export type ReviewPolicyPayload = Pick<ReviewPolicy, "assignedReviewerIds" | "approvalThreshold" | "requiresAssignedReviewer">;
 export type CorpusImportPayload = Omit<CorpusPassage, "id" | "languageId">;
@@ -457,15 +473,33 @@ export async function generateDraftNotes(languageId: string): Promise<Note[]> {
   return response.json() as Promise<Note[]>;
 }
 
+export type ModelDraftGroundingCheck = {
+  passed: boolean;
+  detail: string;
+};
+
+export type ModelDraftGrounding = {
+  score: number;
+  checks: {
+    groundedEvidence: ModelDraftGroundingCheck;
+    knownForms: ModelDraftGroundingCheck;
+    topicAlignment: ModelDraftGroundingCheck;
+    exampleCoverage: ModelDraftGroundingCheck;
+  };
+  failures: string[];
+};
+
+export type ModelDraftNote = Note & { grounding?: ModelDraftGrounding };
+
 export async function generateModelDraftNotes(
   languageId: string
-): Promise<{ notes: Note[]; warnings: string[]; generated: number }> {
+): Promise<{ notes: ModelDraftNote[]; warnings: string[]; generated: number }> {
   const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/study-loop/model-draft`, {
     method: "POST",
     ...(await actorRequest("reviewer", true))
   });
   await assertOk(response, "Model draft generation failed");
-  return response.json() as Promise<{ notes: Note[]; warnings: string[]; generated: number }>;
+  return response.json() as Promise<{ notes: ModelDraftNote[]; warnings: string[]; generated: number }>;
 }
 
 export async function fetchCurrentUser(): Promise<User> {
@@ -629,6 +663,22 @@ export async function rejectExtractionDraft(draftId: string): Promise<Extraction
   await assertOk(response, "Extraction draft reject failed");
 
   return response.json() as Promise<ExtractionDraft>;
+}
+
+export async function bulkReviewExtractionDrafts(
+  languageId: string,
+  action: BulkReviewAction,
+  draftIds: string[]
+): Promise<BulkReviewExtractionDraftsResult> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/extraction-drafts/bulk-review`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify({ action, draftIds })
+  });
+
+  await assertOk(response, "Bulk extraction draft review failed");
+
+  return response.json() as Promise<BulkReviewExtractionDraftsResult>;
 }
 
 export async function fetchLanguageProfile(languageId: string): Promise<LanguageProfile> {
