@@ -14,6 +14,9 @@ export default defineConfig({
   },
   test: {
     globals: true,
+    // SQLite suites are I/O-bound and can exceed the 5s default on slow
+    // Windows CI runners; the suite still finishes in well under a minute.
+    testTimeout: 20000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"]

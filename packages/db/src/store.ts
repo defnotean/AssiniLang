@@ -104,6 +104,11 @@ export class JsonStore {
   // unchanged file cost one stat() instead of a full table scan + Zod parse;
   // any external write changes the key and forces a real re-read.
   private snapshot: (SnapshotKey & { state: AppState }) | null = null;
+  // File key (mtime+size) at the time the schema was last ensured/verified.
+  // While the file is unchanged, table DDL and the migration/version check
+  // can be skipped; any external change forces re-verification so a
+  // newer-version database is still refused.
+  private schemaVerifiedKey: SnapshotKey | null = null;
 
   constructor(private readonly dbPath = DEFAULT_DB_PATH, options?: JsonStoreOptions) {
     this.backend = resolveBackend(this.dbPath, options);
@@ -351,6 +356,23 @@ export class JsonStore {
     runSqliteMigrations(db, this.dbPath);
   }
 
+  // Re-running the table DDL and migration check on every open is wasteful
+  // (and measurably slow on Windows CI). Skip it while the database file is
+  // byte-identical to when the schema was last verified; a missing or
+  // changed file (external write, version bump, fresh database) re-runs the
+  // full ensure + migration/version check.
+  private ensureTablesOnce(db: Database.Database, key: SnapshotKey | null): void {
+    if (
+      key === null
+      || this.schemaVerifiedKey === null
+      || this.schemaVerifiedKey.mtimeMs !== key.mtimeMs
+      || this.schemaVerifiedKey.size !== key.size
+    ) {
+      this.ensureTables(db);
+      this.schemaVerifiedKey = key;
+    }
+  }
+
   async read(): Promise<AppState> {
     const key = await this.snapshotKey();
     if (key && this.snapshot && this.snapshot.mtimeMs === key.mtimeMs && this.snapshot.size === key.size) {
@@ -375,7 +397,7 @@ export class JsonStore {
     let db: Database.Database | undefined;
     try {
       db = new Database(this.dbPath);
-      this.ensureTables(db);
+      this.ensureTablesOnce(db, key);
       const drizzleDb = drizzle(db, { schema });
 
       const languagesList = drizzleDb.select().from(schema.languages).all();
@@ -519,9 +541,10 @@ export class JsonStore {
     const parsed = appStateSchema.parse(state);
     const dbDir = dirname(this.dbPath);
     await mkdir(dbDir, { recursive: true });
+    const preWriteKey = await this.snapshotKey();
 
     const db = new Database(this.dbPath);
-    this.ensureTables(db);
+    this.ensureTablesOnce(db, preWriteKey);
     const drizzleDb = drizzle(db, { schema });
 
     try {
@@ -550,6 +573,9 @@ export class JsonStore {
       this.snapshot = null;
       db.close();
     }
+    // Our own write changed the file key; stamp the post-write key so the
+    // next open can skip re-verifying a schema we just wrote.
+    this.schemaVerifiedKey = await this.snapshotKey();
   }
 
   /**
