@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -12,8 +12,8 @@ import {
   parseExtractionResponse,
   splitTextIntoChunks,
   transcribeAudioFile
-} from "./ingestion";
-import type { LlmChatMessage, LlmProvider } from "./llmProvider";
+} from "./ingestion.js";
+import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
 const pdfStub = vi.hoisted(() => ({ text: "mira = river" }));
 const docxStub = vi.hoisted(() => ({ value: "saku = child" }));
@@ -65,6 +65,7 @@ vi.mock("mammoth", () => ({
 }));
 
 const language = buildTestLanguage();
+const assetPath = (fileName: string) => `assets/${language.id}/${fileName}`;
 
 const publicLookup = async () => ({ address: "93.184.216.34", family: 4 });
 const privateLookup = async () => ({ address: "10.0.0.5", family: 4 });
@@ -372,11 +373,31 @@ describe("extractCandidatesForAsset", () => {
     expect(result.warnings.some((warning) => warning.includes("deterministic mode"))).toBe(true);
   });
 
+  it.each([
+    ["parent traversal", "../outside.txt"],
+    ["absolute path", undefined]
+  ])("rejects unsafe persisted file paths before reading %s", async (_caseName, relativePath) => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ingest-path-"));
+    const outsidePath = join(dir, "outside.txt");
+    await writeFile(outsidePath, "mira = river", "utf8");
+
+    await expect(extractCandidatesForAsset({
+      asset: makeAsset({
+        kind: "text",
+        rawText: undefined,
+        filePath: relativePath ?? outsidePath
+      }),
+      language,
+      provider: providerWithoutChat,
+      dataDir: join(dir, "data")
+    })).rejects.toThrow(/Unsafe source asset file path/);
+  });
+
   it("routes image sources through local OCR when the provider has no vision support", async () => {
     ocrStub.reset("mira = river");
 
     const result = await extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: "assets/x/img.png" }),
+      asset: makeAsset({ kind: "image", filePath: assetPath("img.png") }),
       language,
       provider: providerWithoutChat,
       dataDir: tmpdir()
@@ -392,7 +413,7 @@ describe("extractCandidatesForAsset", () => {
 
   it("rejects unsupported document types with conversion guidance", async () => {
     await expect(extractCandidatesForAsset({
-      asset: makeAsset({ kind: "document", filePath: "assets/x/notes.epub", originalName: "notes.epub" }),
+      asset: makeAsset({ kind: "document", filePath: assetPath("notes.epub"), originalName: "notes.epub" }),
       language,
       provider: providerWithoutChat,
       dataDir: tmpdir()
@@ -551,9 +572,10 @@ describe("extractCandidatesForAsset chunked processing", () => {
 describe("extractCandidatesForAsset document support", () => {
   async function makeDocumentAsset(fileName: string): Promise<{ asset: SourceAsset; dataDir: string }> {
     const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-doc-"));
-    await writeFile(join(dataDir, fileName), Buffer.from([1, 2, 3, 4]));
+    await mkdir(join(dataDir, "assets", language.id), { recursive: true });
+    await writeFile(join(dataDir, "assets", language.id, fileName), Buffer.from([1, 2, 3, 4]));
     return {
-      asset: makeAsset({ kind: "document", filePath: fileName, originalName: fileName }),
+      asset: makeAsset({ kind: "document", filePath: assetPath(fileName), originalName: fileName }),
       dataDir
     };
   }
@@ -654,7 +676,8 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
   it("prefers the vision model and never invokes OCR when completeChat exists", async () => {
     ocrStub.reset("should not be used");
     const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-"));
-    await writeFile(join(dataDir, "photo.png"), Buffer.from([1, 2, 3, 4]));
+    await mkdir(join(dataDir, "assets", language.id), { recursive: true });
+    await writeFile(join(dataDir, "assets", language.id, "photo.png"), Buffer.from([1, 2, 3, 4]));
 
     const provider = providerWithChat(JSON.stringify({
       summary: "Vision extraction.",
@@ -662,7 +685,7 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
     }));
 
     const result = await extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: "photo.png", mimeType: "image/png" }),
+      asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
       language,
       provider,
       dataDir
@@ -677,10 +700,11 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
   it("throws an image-specific vision error when a configured model returns unparseable text", async () => {
     ocrStub.reset("should not be used");
     const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-"));
-    await writeFile(join(dataDir, "photo.png"), Buffer.from([1, 2, 3, 4]));
+    await mkdir(join(dataDir, "assets", language.id), { recursive: true });
+    await writeFile(join(dataDir, "assets", language.id, "photo.png"), Buffer.from([1, 2, 3, 4]));
 
     const attempt = extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: "photo.png", mimeType: "image/png" }),
+      asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
       language,
       provider: providerWithChat("Sorry, I cannot read images."),
       dataDir
@@ -700,7 +724,7 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
     ocrStub.error = new Error("could not decode image");
 
     const attempt = extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: "assets/x/blurry.png" }),
+      asset: makeAsset({ kind: "image", filePath: assetPath("blurry.png") }),
       language,
       provider: providerWithoutChat,
       dataDir: tmpdir()
@@ -717,7 +741,7 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
     ocrStub.reset("   ");
 
     await expect(extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: "assets/x/blank.png" }),
+      asset: makeAsset({ kind: "image", filePath: assetPath("blank.png") }),
       language,
       provider: providerWithoutChat,
       dataDir: tmpdir()

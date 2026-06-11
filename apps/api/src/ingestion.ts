@@ -2,8 +2,8 @@ import { lookup as dnsLookup } from "node:dns/promises";
 import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
-import type { ExtractionDraftKind, ExtractionDraftPayload, Language, SourceAsset } from "@assini/db";
-import type { LlmChatMessage, LlmProvider } from "./llmProvider";
+import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDraftPayload, type Language, type SourceAsset } from "@assini/db";
+import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
 type Env = Record<string, string | undefined>;
 type FetchFn = typeof fetch;
@@ -620,8 +620,9 @@ async function resolveAssetText(
 
   if (asset.kind === "audio") {
     if (!asset.filePath) throw new Error("Audio source asset has no stored file.");
+    const absolutePath = resolveSourceAssetFilePath(dataDir, asset.filePath, asset.languageId);
     const transcript = asset.transcript ?? await transcribeAudioFile({
-      filePath: resolve(dataDir, asset.filePath),
+      filePath: absolutePath,
       mimeType: asset.mimeType,
       originalName: asset.originalName,
       env,
@@ -635,7 +636,7 @@ async function resolveAssetText(
       return { text: asset.rawText, warnings };
     }
     if (asset.filePath) {
-      return { text: await readFile(resolve(dataDir, asset.filePath), "utf8"), warnings };
+      return { text: await readFile(resolveSourceAssetFilePath(dataDir, asset.filePath, asset.languageId), "utf8"), warnings };
     }
     throw new Error("Text source asset has no content.");
   }
@@ -643,7 +644,7 @@ async function resolveAssetText(
   if (asset.kind === "document") {
     if (!asset.filePath) throw new Error("Document source asset has no stored file.");
     const extension = documentExtension(asset);
-    const absolutePath = resolve(dataDir, asset.filePath);
+    const absolutePath = resolveSourceAssetFilePath(dataDir, asset.filePath, asset.languageId);
 
     if (extension === "pdf") {
       const { extractText } = await import("unpdf");
@@ -696,9 +697,10 @@ export async function extractCandidatesForAsset(
 
   if (asset.kind === "image") {
     if (!asset.filePath) throw new Error("Image source asset has no stored file.");
+    const absolutePath = resolveSourceAssetFilePath(params.dataDir, asset.filePath, asset.languageId);
 
     if (provider.completeChat) {
-      const imageData = await readFile(resolve(params.dataDir, asset.filePath));
+      const imageData = await readFile(absolutePath);
       const messages = buildImageExtractionMessages(language, asset.mimeType ?? "image/png", imageData.toString("base64"));
       const content = await provider.completeChat(messages);
       const parsed = parseExtractionResponse(content);
@@ -713,7 +715,7 @@ export async function extractCandidatesForAsset(
     let ocrText: string;
     try {
       ocrText = await ocrImageFile({
-        filePath: resolve(params.dataDir, asset.filePath),
+        filePath: absolutePath,
         env,
         cachePath: resolve(params.dataDir, "ocr-cache")
       });

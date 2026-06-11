@@ -1,6 +1,8 @@
 import { JsonStore } from "@assini/db";
-import { resolveRuntimeDataDir, resolveRuntimeDbPath } from "./runtimePath";
-import { createServer } from "./server";
+import { readRuntimeConfig } from "./runtimeConfig.js";
+import { registerShutdownHandlers } from "./runtimeLifecycle.js";
+import { resolveRuntimeDataDir, resolveRuntimeDbPath } from "./runtimePath.js";
+import { createServer } from "./server.js";
 
 // Load a repo-root `.env` (e.g. ASSINI_LLM_* config) before reading any env so
 // users can keep settings in a file instead of re-exporting every shell.
@@ -11,13 +13,16 @@ try {
   // No .env file present (or unreadable); rely on the ambient environment.
 }
 
-const port = Number(process.env.PORT ?? 4321);
-const host = process.env.HOST ?? "127.0.0.1";
+const config = readRuntimeConfig(process.env);
 
 const app = createServer({
   store: new JsonStore(resolveRuntimeDbPath({ moduleUrl: import.meta.url })),
-  dataDir: resolveRuntimeDataDir({ moduleUrl: import.meta.url })
+  dataDir: resolveRuntimeDataDir({ moduleUrl: import.meta.url }),
+  allowedOrigins: config.allowedOrigins,
+  bodyLimitBytes: config.bodyLimitBytes,
+  logger: config.logger
 });
-await app.listen({ port, host });
+registerShutdownHandlers({ app });
+await app.listen({ port: config.port, host: config.host });
 
-console.log(`AssiniLang API listening at http://${host}:${port}`);
+console.log(`AssiniLang API listening at http://${config.host}:${config.port}`);

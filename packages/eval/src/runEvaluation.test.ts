@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState } from "@assini/db";
-import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation";
+import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation.js";
 
 describe("evaluation run gate", () => {
   it("passes for a clean workspace baseline", () => {
@@ -72,5 +72,32 @@ describe("evaluation run gate", () => {
         "Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."
       ])
     );
+  });
+
+  it("evaluates model drafts and sets systemVersion to model-study-loop-v1 when model drafts exist", () => {
+    const state = buildTestWorkspaceState();
+    state.notes.push({
+      id: "model-draft-testlang-1-xyz",
+      languageId: "testlang",
+      topic: "syntax/basic-order",
+      explanation: "Subjects come before verbs.",
+      examples: [],
+      evidencePassageIds: ["testlang-c001"],
+      evidenceCount: 1,
+      confidence: "medium",
+      status: "draft",
+      reviewer: {
+        lastReviewedBy: null,
+        lastReviewedAt: null,
+        comments: []
+      },
+      dialectScope: "general",
+      editHistory: []
+    });
+
+    const runs = runEvaluationForState(state);
+    const run = runs.find((item: any) => item.languageId === "testlang");
+    expect(run).toBeDefined();
+    expect(run?.systemVersion).toBe("model-study-loop-v1");
   });
 });

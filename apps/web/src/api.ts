@@ -19,6 +19,18 @@ import type {
   SourceAsset,
   User
 } from "@assini/db";
+import type {
+  LanguageCreatePayload,
+  LanguagePatchPayload,
+  SourceRegistrationPayload,
+  ElderCorrectionPayload
+} from "@assini/api-contract";
+export type {
+  LanguageCreatePayload,
+  LanguagePatchPayload,
+  SourceRegistrationPayload,
+  ElderCorrectionPayload
+};
 
 export type { ExtractionDraft, Language, LanguagePhonology, Lexeme, SourceAsset };
 
@@ -214,37 +226,10 @@ export type LlmReachability = {
   latencyMs?: number;
 };
 
-export type ElderCorrectionPayload = {
-  languageId: string;
-  noteId?: string;
-  passageId?: string;
-  correction: string;
-  rationale: string;
-  severity: ElderCorrection["severity"];
-  contextText?: string;
-};
-
 export type ElderCorrectionReviewStatus = Extract<ElderCorrection["status"], "accepted" | "rejected">;
 export type ElderCorrectionApplyResult = {
   correction: ElderCorrection;
   note: Note;
-};
-
-export type LanguageCreatePayload = {
-  name: string;
-  description: string;
-  orthography: string;
-  typology?: Language["typology"];
-  phonology?: LanguagePhonology;
-};
-
-export type LanguagePatchPayload = Partial<LanguageCreatePayload>;
-
-export type SourceRegistrationPayload = {
-  kind: Extract<SourceAsset["kind"], "text" | "wordlist" | "url">;
-  title: string;
-  rawText?: string;
-  url?: string;
 };
 
 export type ProcessSourceResult = {

@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { auditMetadataPrivacyIssue } from "./auditMetadataPrivacy.js";
+import { sourceAssetFilePathIssue } from "./sourceAssetPaths.js";
 
 export const languageTypologySchema = z.enum([
   "agglutinative",
@@ -516,6 +518,10 @@ function isBlankPersistedValue(item: string): boolean {
   return normalizePersistedText(item).length === 0;
 }
 
+function isSafePersistedLanguageId(item: string): boolean {
+  return /^[a-z0-9][a-z0-9_-]*$/.test(item);
+}
+
 function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
   const normalizedSurface = normalizePersistedSurfaceKey(surface);
   return normalizePersistedText(textTarget)
@@ -712,6 +718,12 @@ function addLanguageIntegrityIssues(
         message: "Language id must not be blank",
         path: ["languages", languagePathId]
       });
+    } else if (!isSafePersistedLanguageId(language.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Language id must be a safe slug: ${language.id}`,
+        path: ["languages", languagePathId]
+      });
     }
 
     if (isBlankPersistedValue(language.name)) {
@@ -845,6 +857,17 @@ function addSourceAssetIntegrityIssues(
         message: `File-backed source asset requires filePath: ${asset.id}`,
         path: ["sourceAssets", asset.id]
       });
+    }
+
+    if (asset.filePath !== undefined) {
+      const filePathIssue = sourceAssetFilePathIssue(asset.filePath, asset.languageId);
+      if (filePathIssue) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `${filePathIssue}: ${asset.id}`,
+          path: ["sourceAssets", asset.id]
+        });
+      }
     }
   }
 }
@@ -1746,64 +1769,6 @@ function addGovernanceIntegrityIssues(
       });
     }
   }
-}
-
-const privateAuditMetadataKeys = new Set([
-  "answer",
-  "answers",
-  "learneranswer",
-  "learneranswers",
-  "expectedanswer",
-  "expectedanswers",
-  "adversarialanswer",
-  "adversarialanswers",
-  "answerkey",
-  "answerkeys",
-  "gradingexplanation",
-  "providerprompt",
-  "hiddenchainofthought",
-  "chainofthought",
-  "apikey",
-  "authorization",
-  "bearer",
-  "secret",
-  "token"
-]);
-const secretLikeAuditMetadataValuePattern = /\b(?:bearer\s+\S+|sk-[A-Za-z0-9._-]+|(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY)\s*=|api[_-]?key\s*[:=]|secret\s*[:=])/i;
-
-function normalizeAuditMetadataKey(key: string): string {
-  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function auditMetadataPath(path: string[]): string {
-  return path.length > 0 ? path.join(".") : "metadata";
-}
-
-function auditMetadataPrivacyIssue(value: unknown, path: string[] = []): string | undefined {
-  if (typeof value === "string" && secretLikeAuditMetadataValuePattern.test(value)) {
-    return `secret-like value at ${auditMetadataPath(path)}`;
-  }
-
-  if (Array.isArray(value)) {
-    for (let index = 0; index < value.length; index += 1) {
-      const issue = auditMetadataPrivacyIssue(value[index], [...path, String(index)]);
-      if (issue) return issue;
-    }
-    return undefined;
-  }
-
-  if (value && typeof value === "object") {
-    for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      if (privateAuditMetadataKeys.has(normalizeAuditMetadataKey(key))) {
-        return `private field: ${key}`;
-      }
-
-      const issue = auditMetadataPrivacyIssue(nestedValue, [...path, key]);
-      if (issue) return issue;
-    }
-  }
-
-  return undefined;
 }
 
 function addAuditEventIntegrityIssues(

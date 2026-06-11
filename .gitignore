@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+apps/*/node_modules/
+packages/*/node_modules/
+
+# Build output and TypeScript incremental state
+dist/
+apps/*/dist/
+packages/*/dist/
+*.tsbuildinfo
+
+# Test and coverage artifacts
+coverage/
+.nyc_output/
+
+# Local runtime data
+data/local-db.json
+data/ingestion-uploads/
+data/assets/
+data/ocr-cache/
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# Tooling and design scratch space
+.codex-logs/
+.design-artifact/
+.hermes/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log

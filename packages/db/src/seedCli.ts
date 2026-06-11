@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBootstrapState } from "./bootstrap";
-import { JsonStore } from "./store";
+import { createBootstrapState } from "./bootstrap.js";
+import { JsonStore } from "./store.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 export const seedDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");

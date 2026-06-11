@@ -16,8 +16,8 @@ import {
   parseGeneratedNotes,
   type ExerciseGrounding,
   type NoteGrounding
-} from "./generation";
-import type { LlmChatMessage, LlmProvider } from "./llmProvider";
+} from "./generation.js";
+import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
 const language = buildTestLanguage();
 const corpus = buildTestCorpus();

@@ -7,7 +7,7 @@ import {
   toPublicExerciseSubmission,
   toPublicLanguageSnapshot,
   toPublicNote
-} from "./publicLanguageViews";
+} from "./publicLanguageViews.js";
 
 const SHA_256_HEX = /^[a-f0-9]{64}$/;
 const EXPORT_REDACTION_POLICY = [

@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -13,9 +13,9 @@ import {
   type Note
 } from "@assini/db";
 import { draftNotesForLanguage } from "@assini/eval";
-import { resolveRuntimeDbPath } from "./runtimePath";
-import { createServer } from "./server";
-import type { LlmProvider } from "./llmProvider";
+import { resolveRuntimeDbPath } from "./runtimePath.js";
+import { createServer } from "./server.js";
+import type { LlmProvider } from "./llmProvider.js";
 
 const SHA_256_HEX = /^[a-f0-9]{64}$/;
 const EXPORT_REDACTION_POLICY = [
@@ -93,6 +93,44 @@ describe("api server", () => {
     expect(exercises.json()[0]).not.toHaveProperty("gradingExplanation");
     expect(exercises.json()[0]).not.toHaveProperty("adversarialAnswers");
     expect(JSON.stringify(exercises.json())).not.toContain("first-person singular subjects");
+  });
+
+  it("reports readiness when persisted state can be read", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(ready.statusCode).toBe(200);
+    expect(ready.json()).toEqual({
+      ok: true,
+      checks: {
+        storage: {
+          ok: true,
+          schemaVersion: 8
+        }
+      }
+    });
+  });
+
+  it("reports sanitized readiness failure when persisted state cannot be read", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ready-"));
+    const dbPath = join(dir, "local-db.json");
+    await writeFile(dbPath, "{ not valid json", "utf8");
+    const app = createServer({ store: new JsonStore(dbPath) });
+
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(ready.statusCode).toBe(503);
+    expect(ready.json()).toEqual({
+      ok: false,
+      checks: {
+        storage: {
+          ok: false,
+          error: "Storage read failed"
+        }
+      }
+    });
+    expect(JSON.stringify(ready.json())).not.toContain(dbPath);
   });
 
   describe("POST /llm/health-check", () => {
@@ -3438,6 +3476,54 @@ describe("api server", () => {
       expect(Array.isArray(processed.json().warnings)).toBe(true);
     });
 
+    it("persists source processing failures with audit-safe redacted secrets", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "assini-source-failure-"));
+      const store = new JsonStore(join(dir, "local-db.json"));
+      await store.write(buildTestWorkspaceState());
+      const llmProvider: LlmProvider = {
+        name: "secret-failing-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          throw new Error("Remote failure OPENAI_API_KEY=plain-provider-secret Bearer sk-route-secret");
+        }
+      };
+      const app = createServer({ store, llmProvider });
+      const sourceId = await registerWordlistSource(app, "Secret failure word list");
+
+      const processed = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+
+      expect(processed.statusCode).toBe(422);
+      expect(processed.json().error).toBe("Remote failure [redacted-secret] [redacted-secret]");
+      expect(JSON.stringify(processed.json())).not.toContain("plain-provider-secret");
+      expect(JSON.stringify(processed.json())).not.toContain("sk-route-secret");
+
+      const stored = await fetchStoredSource(app, sourceId);
+      expect(stored).toMatchObject({
+        id: sourceId,
+        status: "failed",
+        error: "Remote failure [redacted-secret] [redacted-secret]"
+      });
+
+      const audit = await app.inject({
+        method: "GET",
+        url: "/audit/events",
+        headers: authHeaders("programmer-1")
+      });
+      expect(audit.statusCode).toBe(200);
+      expect(audit.json()).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          action: "source_asset.process_failed",
+          metadata: { reason: "Remote failure [redacted-secret] [redacted-secret]" }
+        })
+      ]));
+    });
+
     it("persists deterministic-mode warnings onto the source asset (sync path)", async () => {
       const app = createServer({ initialState: buildTestWorkspaceState() });
       const sourceId = await registerWordlistSource(app, "Deterministic word list");
@@ -3501,6 +3587,33 @@ describe("api server", () => {
       const stored = await fetchStoredSource(app, sourceId);
       expect(stored.status).toBe("processed");
       expect(stored.warnings).toBeUndefined();
+    });
+  });
+
+  describe("server startup self-healing", () => {
+    it("resets stuck processing source assets to failed on startup ready", async () => {
+      const state = buildTestWorkspaceState();
+      state.sourceAssets.push({
+        id: "stuck-asset-id",
+        languageId: TEST_LANGUAGE_ID,
+        kind: "text",
+        title: "Stuck raw source",
+        status: "processing",
+        createdBy: "reviewer-1",
+        createdAt: new Date().toISOString()
+      });
+
+      const app = createServer({ initialState: state });
+      await app.ready();
+
+      const sources = await app.inject({
+        method: "GET",
+        url: `/languages/${TEST_LANGUAGE_ID}/sources`
+      });
+      const stuck = sources.json().find((item) => item.id === "stuck-asset-id");
+      expect(stuck).toBeDefined();
+      expect(stuck.status).toBe("failed");
+      expect(stuck.error).toContain("Server restarted or crashed");
     });
   });
 });

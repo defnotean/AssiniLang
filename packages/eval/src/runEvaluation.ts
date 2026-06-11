@@ -1,6 +1,6 @@
 import type { AppState, EvaluationRun } from "@assini/db";
-import { scoreLanguageEvaluation } from "./scoring";
-import { draftNotesForLanguage } from "./studyLoop";
+import { scoreLanguageEvaluation } from "./scoring.js";
+import { draftNotesForLanguage } from "./studyLoop.js";
 
 export type EvaluationGateSummary = {
   passed: boolean;
@@ -22,16 +22,20 @@ export const EVALUATION_CATEGORY_THRESHOLDS: Record<string, number> = {
 
 export function runEvaluationForState(state: AppState): EvaluationRun[] {
   return state.languages.map((language) => {
-    const drafted = draftNotesForLanguage(language.id, state);
+    const modelDrafts = state.notes.filter(
+      (note) => note.languageId === language.id && note.id.startsWith("model-draft-")
+    );
+    const useModelDrafts = modelDrafts.length > 0;
+    const drafted = useModelDrafts ? modelDrafts : draftNotesForLanguage(language.id, state);
     const result = scoreLanguageEvaluation(language.id, state, drafted);
     const average =
-      Object.values(result.scores).reduce((sum, score) => sum + score, 0) / Object.values(result.scores).length;
+      (Object.values(result.scores) as number[]).reduce((sum: number, score: number) => sum + score, 0) / Object.values(result.scores).length;
 
     return {
       id: `eval-${language.id}-${Date.now()}`,
       languageId: language.id,
       createdAt: new Date().toISOString(),
-      systemVersion: "deterministic-study-loop-v1",
+      systemVersion: useModelDrafts ? "model-study-loop-v1" : "deterministic-study-loop-v1",
       fixtureVersion: "workspace-corpus-v1",
       scores: result.scores,
       failures: result.failures,

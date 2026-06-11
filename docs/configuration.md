@@ -19,7 +19,7 @@ bash (macOS/Linux):
 ASSINI_LLM_PROVIDER=ollama ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1 npm run dev
 ```
 
-Variables apply to the process you start. You can also keep `ASSINI_*` settings in a repo-root `.env` file instead of re-exporting them every shell: the API calls Node's `process.loadEnvFile()` at startup (no dependency), so a `.env` at the repo root is loaded automatically when the API boots. The repo-root `.env` is git-ignored locally so secrets are never committed. The provider is resolved once at boot, so restart the API after editing `.env` (or any `ASSINI_*` variable) for the change to take effect.
+Variables apply to the process you start. You can also keep `ASSINI_*` settings in a repo-root `.env` file instead of re-exporting them every shell: the API calls Node's `process.loadEnvFile()` at startup (no dependency), so a `.env` at the repo root is loaded automatically when the API boots. Start from `.env.example` for safe local defaults, then keep real secrets in `.env` only. The repo-root `.env` is git-ignored locally so secrets are never committed. The provider is resolved once at boot, so restart the API after editing `.env` (or any `ASSINI_*` variable) for the change to take effect.
 
 ## LLM provider
 
@@ -68,6 +68,9 @@ Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local
 | `ASSINI_API_HOST` | `127.0.0.1` | hostname/IP | Where the Vite `/api` proxy forwards requests (set automatically by the dev launcher). |
 | `ASSINI_API_PORT` | `4321` | port number | Port for the Vite `/api` proxy target (set automatically by the dev launcher). |
 | `ASSINI_DB_PATH` | `data/local-db.json` in the repo | absolute or relative file path | Overrides where the JSON local database lives. Uploaded assets and the OCR cache live next to it. |
+| `ASSINI_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | comma-separated origins | CORS allow-list for the API. Set this explicitly when serving the web app from a deployed origin. |
+| `ASSINI_BODY_LIMIT_BYTES` | `65536` | positive integer | Maximum JSON request body size for Fastify routes. Multipart file uploads keep their separate 25 MB cap. |
+| `ASSINI_API_LOGGER` | unset (off) | `1` or `true` | Enables Fastify's built-in request/error logger for deployed or diagnostic runs. |
 | `ASSINI_DEV_AUTH_TOKEN` | unset (`test` under `NODE_ENV=test`) | secret string | Server token accepted in the `x-assini-dev-token` header for lead/admin server-token calls. |
 | `ASSINI_ENABLE_PROTOTYPE_AUTH` | unset (disabled) | `true` | Enables `POST /auth/prototype-session` for browser prototype sessions. The dev launcher sets this automatically. |
 

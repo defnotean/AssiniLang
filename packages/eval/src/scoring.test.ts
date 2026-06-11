@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
-import { gradeExerciseAnswer, scoreLanguageEvaluation } from "./scoring";
-import { draftNotesForLanguage } from "./studyLoop";
+import { gradeExerciseAnswer, scoreLanguageEvaluation } from "./scoring.js";
+import { draftNotesForLanguage } from "./studyLoop.js";
 
 describe("evaluation scoring", () => {
   it("grades accepted and rejected exercise answers", () => {
@@ -82,14 +82,9 @@ describe("evaluation scoring", () => {
     );
 
     expect(result.scores.noteAccuracy).toBeLessThan(1);
-    expect(result.failures).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          category: "noteAccuracy",
-          itemId: "testlang-note-basic-order"
-        })
-      ])
-    );
+    const failure = result.failures.find((f: any) => f.category === "noteAccuracy" && f.itemId === "testlang-note-basic-order");
+    expect(failure).toBeDefined();
+    expect(failure?.message).toContain("draft confidence:");
   });
 
   it("drafts baseline notes from immutable answer keys instead of reviewed notes", () => {
@@ -101,7 +96,7 @@ describe("evaluation scoring", () => {
     reviewedNote.explanation = "Reviewed wording from the mutable queue.";
 
     const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
-    const draftedNote = drafted.find((note) => note.topic === reviewedNote.topic);
+    const draftedNote = drafted.find((note: any) => note.topic === reviewedNote.topic);
 
     expect(draftedNote?.explanation).toBe(originalExplanation);
   });
@@ -153,7 +148,7 @@ describe("evaluation scoring", () => {
     const result = scoreLanguageEvaluation(
       TEST_LANGUAGE_ID,
       state,
-      drafted.filter((note) => note.id !== missingNote.id)
+      drafted.filter((note: any) => note.id !== missingNote.id)
     );
 
     expect(result.scores.noteCoverage).toBeLessThan(1);
@@ -217,7 +212,7 @@ describe("evaluation scoring", () => {
     const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
 
     expect(result.scores.generationPolicy).toBe(1);
-    expect(result.failures.filter((failure) => failure.itemId === "testlang-ex-003")).toHaveLength(0);
+    expect(result.failures.filter((failure: any) => failure.itemId === "testlang-ex-003")).toHaveLength(0);
   });
 
   it("rejects segment answers that collapse required morpheme boundaries", () => {

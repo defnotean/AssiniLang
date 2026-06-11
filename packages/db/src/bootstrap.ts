@@ -1,5 +1,5 @@
-import { appStateSchema, LOCAL_PROTOTYPE_USERS, type AppState } from "./schema";
-import { createEmptyState } from "./store";
+import { appStateSchema, LOCAL_PROTOTYPE_USERS, type AppState } from "./schema.js";
+import { createEmptyState } from "./store.js";
 
 /**
  * Builds the initial local workspace state: no languages, no corpus,

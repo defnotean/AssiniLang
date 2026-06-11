@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createEmptyState, JsonStore } from "./store";
+import { buildTestWorkspaceState } from "./testing";
 import {
   aiSessionSchema,
   auditEventSchema,
@@ -2817,6 +2818,31 @@ describe("JsonStore", () => {
 
       expect(loaded.sourceAssets).toHaveLength(1);
       expect(loaded.sourceAssets[0]?.warnings).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("round-trips state in SQLite mode when the path does not end in .json", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-sqlite-"));
+    const dbPath = join(dir, "local-db.sqlite");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const state = buildTestWorkspaceState();
+
+      await store.write(state);
+      const loaded = await store.read();
+
+      expect(loaded.languages).toHaveLength(state.languages.length);
+      expect(loaded.languages[0]?.id).toBe(state.languages[0]?.id);
+      expect(loaded.corpus).toHaveLength(state.corpus.length);
+      expect(loaded.corpusAnswerKeys).toHaveLength(state.corpusAnswerKeys?.length ?? 0);
+      expect(loaded.noteAnswerKeys).toHaveLength(state.noteAnswerKeys.length);
+      expect(loaded.notes).toHaveLength(state.notes.length);
+      expect(loaded.exercises).toHaveLength(state.exercises.length);
+      expect(loaded.reviewPolicies).toHaveLength(state.reviewPolicies.length);
+      expect(loaded.users).toHaveLength(state.users.length);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

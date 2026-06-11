@@ -302,7 +302,12 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     if (normalize(drafted.explanation) === normalize(expected.explanation)) {
       contentPass += 1;
     } else {
-      failures.push({ category: "noteAccuracy", languageId, itemId: expected.id, message: `Explanation mismatch for ${topic}` });
+      failures.push({
+        category: "noteAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Explanation mismatch for ${topic} (draft confidence: ${drafted.confidence}).`
+      });
     }
 
     const expectedEvidence = expected.evidencePassageIds.slice().sort().join("|");
@@ -310,7 +315,12 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     if (expectedEvidence === draftedEvidence) {
       evidencePass += 1;
     } else {
-      failures.push({ category: "evidenceAccuracy", languageId, itemId: expected.id, message: `Evidence mismatch for ${topic}` });
+      failures.push({
+        category: "evidenceAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Evidence mismatch for ${topic} (draft confidence: ${drafted.confidence}).`
+      });
     }
   }
 

@@ -1,7 +1,7 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JsonStore } from "@assini/db";
-import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation";
+import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const evalDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");

@@ -1,3 +1,4 @@
-export * from "./studyLoop";
-export * from "./scoring";
-export * from "./runEvaluation";
+export * from "./studyLoop.js";
+export * from "./scoring.js";
+export * from "./runEvaluation.js";
+export * from "./vectorSearch.js";

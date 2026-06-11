@@ -95,7 +95,7 @@ Ingestion-facing collections:
 
 - `languages`: user-created language records. `status` is `active`, `draft`, or `archived`. Each language may carry an optional `phonology` object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) plus optional `createdBy` and `createdAt` fields.
 - `lexemes`: the per-language lexicon. Each lexeme keeps `form`, `gloss`, `partOfSpeech`, `tags`, and `sourceAssetIds` linking it back to the raw materials it came from.
-- `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a `filePath` under `data/`, plus an optional `transcript` for audio.
+- `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a canonical `filePath` under `assets/<languageId>/` inside the configured data directory, plus an optional `transcript` for audio.
 - `extractionDrafts`: reviewable extraction output. `kind` is `lexeme`, `corpus_passage`, or `grammar_note`; each draft carries a `payload`, a `confidence` level, an optional `rationale`, and a `status` of `proposed`, `accepted`, or `rejected` with `reviewedBy`/`reviewedAt` and a `committedEntityId` once accepted.
 
 `consentStatus.use` on corpus passages is an enum (`CONSENT_USE_VALUES`): `testing-only`, `community-approved`, `personal-study`, `research`, `public-domain`, `licensed`, or `pending-review`.
@@ -113,6 +113,8 @@ Source processing lives in `apps/api/src/ingestion.ts` and is driven by the serv
 ## Local persistence
 
 The generated local database lives at `data/local-db.json` (override with `ASSINI_DB_PATH`). `JsonStore` writes through a temporary file and rename so normal writes are atomic.
+
+Persisted source-asset file paths are validated before use. File-backed assets must stay under `assets/<languageId>/` inside the configured data directory; absolute paths, URL-like paths, drive/UNC paths, backslashes, traversal segments, and wrong-language prefixes are rejected on persisted reads and at ingestion resolution time.
 
 The current schema version is 8. Legacy v1-v7 local databases migrate forward automatically on read; older state gains empty `lexemes`, `sourceAssets`, and `extractionDrafts` collections and keeps its existing records.
 

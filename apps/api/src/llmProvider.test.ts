@@ -7,7 +7,7 @@ import {
   createOpenAiCompatibleLlmProvider,
   describeLlmProviderFromEnv,
   probeLlmProviderReachability
-} from "./llmProvider";
+} from "./llmProvider.js";
 
 describe("llm provider", () => {
   afterEach(() => {

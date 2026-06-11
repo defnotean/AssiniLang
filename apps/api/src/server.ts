@@ -4,6 +4,16 @@ import { dirname, join, resolve as resolvePath } from "node:path";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { JobQueue } from "./jobQueue.js";
+import {
+  languageCreatePayloadSchema,
+  languagePatchPayloadSchema,
+  sourceRegistrationPayloadSchema,
+  processSourceOptionsSchema,
+  exerciseSubmissionPayloadSchema,
+  createAiSessionPayloadSchema,
+  elderCorrectionPayloadSchema
+} from "@assini/api-contract";
 import {
   AI_SESSION_MODE_ROLES,
   CONSENT_USE_VALUES,
@@ -51,8 +61,9 @@ import {
   ModelRequiredError,
   type GeneratedExerciseDraft,
   type GeneratedNoteDraft
-} from "./generation";
-import { extractCandidatesForAsset, type SourceExtractionResult } from "./ingestion";
+} from "./generation.js";
+import { extractCandidatesForAsset, type SourceExtractionResult } from "./ingestion.js";
+import { createReadinessReport } from "./readiness.js";
 import {
   buildLlmGenerationInputFromState,
   createLlmProviderFromEnv,
@@ -60,7 +71,7 @@ import {
   probeLlmProviderReachability,
   type LlmGenerationResult,
   type LlmProvider
-} from "./llmProvider";
+} from "./llmProvider.js";
 import {
   buildLanguageProfile,
   toExtractionDraftViews,
@@ -70,7 +81,7 @@ import {
   toPublicLanguageSnapshot,
   toPublicNote,
   toPublicNotes
-} from "./publicLanguageViews";
+} from "./publicLanguageViews.js";
 
 type RateLimitOptions = {
   max: number;
@@ -92,6 +103,8 @@ type ServerOptions = {
   dataDir?: string;
   /** Fetch implementation used for URL sources and transcription; overridable in tests. */
   ingestionFetch?: typeof fetch;
+  logger?: any;
+  concurrency?: number;
 };
 
 type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
@@ -284,7 +297,7 @@ function applySourceProcessCompletion(
     });
   }
 
-  output.drafts = extraction.candidates.map((candidate) => ({
+  output.drafts = extraction.candidates.map((candidate: any) => ({
     id: `draft-${randomUUID()}`,
     languageId: stored.languageId,
     sourceAssetId: stored.id,
@@ -357,8 +370,8 @@ function redactConfiguredSecrets(message: string): string {
 function redactErrorSecrets(message: string): string {
   return redactConfiguredSecrets(message)
     .replace(/\bsk-[A-Za-z0-9._-]+/g, "[redacted-secret]")
-    .replace(/\b(ASSINI_LLM_API_KEY|OPENAI_API_KEY)=\S+/g, "$1=[redacted-secret]")
-    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted-secret]");
+    .replace(/\b(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY)=\S+/g, "[redacted-secret]")
+    .replace(/\bBearer\s+\S+/gi, "[redacted-secret]");
 }
 
 function llmGenerationErrorMessage(error: unknown): string {
@@ -423,17 +436,8 @@ function toPublicAiSession(session: AiSession, actor: User): PublicAiSession {
 }
 
 function parseExerciseSubmissionBody(input: unknown): ExerciseSubmissionBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  if (typeof body.answer !== "string") {
-    return undefined;
-  }
-
-  const answer = body.answer.trim();
-  return answer.length > 0 ? { answer } : undefined;
+  const result = exerciseSubmissionPayloadSchema.safeParse(input);
+  return result.success ? result.data : undefined;
 }
 
 function parseStudyLoopDraftBody(input: unknown): StudyLoopDraftBody | undefined {
@@ -592,80 +596,18 @@ function parseLanguagePhonology(value: unknown): Language["phonology"] | undefin
 }
 
 function parseLanguageCreateBody(input: unknown): LanguageCreateBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
-  const body = input as Record<string, unknown>;
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  const description = typeof body.description === "string" ? body.description.trim() : "";
-  const orthography = typeof body.orthography === "string" ? body.orthography.trim() : "";
-  const typologyResult = languageTypologySchema.safeParse(body.typology ?? "unknown");
-  const phonologyProvided = body.phonology !== undefined && body.phonology !== null;
-  const phonology = parseLanguagePhonology(body.phonology);
-
-  if (!name || !description || !orthography || !typologyResult.success) return undefined;
-  if (phonologyProvided && !phonology) return undefined;
-
-  return { name, description, orthography, typology: typologyResult.data, phonology };
+  const result = languageCreatePayloadSchema.safeParse(input);
+  return result.success ? (result.data as LanguageCreateBody) : undefined;
 }
 
 function parseLanguagePatchBody(input: unknown): LanguagePatchBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
-  const body = input as Record<string, unknown>;
-  const patch: LanguagePatchBody = {};
-  let hasField = false;
-
-  if ("name" in body) {
-    if (typeof body.name !== "string" || body.name.trim().length === 0) return undefined;
-    patch.name = body.name.trim();
-    hasField = true;
-  }
-  if ("description" in body) {
-    if (typeof body.description !== "string" || body.description.trim().length === 0) return undefined;
-    patch.description = body.description.trim();
-    hasField = true;
-  }
-  if ("orthography" in body) {
-    if (typeof body.orthography !== "string" || body.orthography.trim().length === 0) return undefined;
-    patch.orthography = body.orthography.trim();
-    hasField = true;
-  }
-  if ("typology" in body) {
-    const typologyResult = languageTypologySchema.safeParse(body.typology);
-    if (!typologyResult.success) return undefined;
-    patch.typology = typologyResult.data;
-    hasField = true;
-  }
-  if ("phonology" in body) {
-    const phonology = parseLanguagePhonology(body.phonology);
-    if (body.phonology !== null && body.phonology !== undefined && !phonology) return undefined;
-    patch.phonology = phonology;
-    hasField = true;
-  }
-
-  return hasField ? patch : undefined;
+  const result = languagePatchPayloadSchema.safeParse(input);
+  return result.success ? (result.data as LanguagePatchBody) : undefined;
 }
 
 function parseSourceRegistrationBody(input: unknown): SourceRegistrationBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return undefined;
-  const body = input as Record<string, unknown>;
-  const kind = body.kind === "text" || body.kind === "wordlist" || body.kind === "url" ? body.kind : undefined;
-  const title = typeof body.title === "string" ? body.title.trim() : "";
-  const rawText = typeof body.rawText === "string" ? body.rawText : undefined;
-  const url = typeof body.url === "string" ? body.url.trim() : undefined;
-
-  if (!kind || !title) return undefined;
-  if (kind === "url") {
-    if (!url) return undefined;
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return undefined;
-    } catch {
-      return undefined;
-    }
-    return { kind, title, url };
-  }
-
-  if (rawText === undefined || rawText.trim().length === 0) return undefined;
-  return { kind, title, rawText };
+  const result = sourceRegistrationPayloadSchema.safeParse(input);
+  return result.success ? (result.data as SourceRegistrationBody) : undefined;
 }
 
 function sanitizeStoredFileName(name: string): string {
@@ -766,26 +708,8 @@ function parseExerciseAuthoringBody(input: unknown): ExerciseAuthoringBody | und
 }
 
 function parseAiSessionBody(input: unknown): AiSessionBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  const languageId = typeof body.languageId === "string" ? body.languageId.trim() : "";
-  const mode = typeof body.mode === "string" && AI_SESSION_MODES.includes(body.mode as AiSessionMode)
-    ? body.mode as AiSessionMode
-    : undefined;
-  const seedPrompt = typeof body.seedPrompt === "string" && body.seedPrompt.trim().length > 0
-    ? body.seedPrompt.trim()
-    : "Start a local AI knowledge session.";
-  const contextNoteIds = parseStringArray(body.contextNoteIds);
-  const contextPassageIds = parseStringArray(body.contextPassageIds);
-
-  if (!languageId || !mode || !contextNoteIds || !contextPassageIds) {
-    return undefined;
-  }
-
-  return { languageId, mode, seedPrompt, contextNoteIds, contextPassageIds };
+  const result = createAiSessionPayloadSchema.safeParse(input);
+  return result.success ? (result.data as AiSessionBody) : undefined;
 }
 
 function parseAiMessageBody(input: unknown): AiMessageBody | undefined {
@@ -799,30 +723,8 @@ function parseAiMessageBody(input: unknown): AiMessageBody | undefined {
 }
 
 function parseElderCorrectionBody(input: unknown): ElderCorrectionBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  const languageId = typeof body.languageId === "string" ? body.languageId.trim() : "";
-  const noteId = typeof body.noteId === "string" && body.noteId.trim().length > 0 ? body.noteId.trim() : undefined;
-  const passageId = typeof body.passageId === "string" && body.passageId.trim().length > 0 ? body.passageId.trim() : undefined;
-  const correction = typeof body.correction === "string" ? body.correction.trim() : "";
-  const rationale = typeof body.rationale === "string" ? body.rationale.trim() : "";
-  const contextText = typeof body.contextText === "string" && body.contextText.trim().length > 0
-    ? body.contextText.trim()
-    : undefined;
-  const severity = body.severity === undefined
-    ? "minor"
-    : body.severity === "major" || body.severity === "safety" || body.severity === "minor"
-      ? body.severity
-      : undefined;
-
-  if (!languageId || !correction || !rationale || !severity || (!noteId && !passageId && !contextText)) {
-    return undefined;
-  }
-
-  return { languageId, noteId, passageId, correction, rationale, severity, contextText };
+  const result = elderCorrectionPayloadSchema.safeParse(input);
+  return result.success ? (result.data as ElderCorrectionBody) : undefined;
 }
 
 function parseElderCorrectionReviewBody(input: unknown): ElderCorrectionReviewBody | undefined {
@@ -1711,8 +1613,26 @@ function validateAiSessionContext(state: AppState, body: AiSessionBody): string 
 }
 
 export function createServer(options: ServerOptions = {}) {
-  const app = Fastify({ logger: false, bodyLimit: options.bodyLimitBytes ?? 64 * 1024 });
+  const app = Fastify({
+    logger: options.logger
+      ? {
+          level: "info",
+          redact: {
+            paths: [
+              "req.headers.authorization",
+              "req.headers.cookie",
+              "res.headers['set-cookie']",
+              "body.apiKey",
+              "body.password"
+            ],
+            censor: "[REDACTED]"
+          }
+        }
+      : false,
+    bodyLimit: options.bodyLimitBytes ?? 64 * 1024
+  });
   const store = options.store ?? new JsonStore();
+  const jobQueue = new JobQueue(options.concurrency ?? 2, app.log);
   const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? DEFAULT_RATE_LIMIT;
   const authToken = options.authToken ?? process.env.ASSINI_DEV_AUTH_TOKEN ?? (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
@@ -2177,7 +2097,7 @@ export function createServer(options: ServerOptions = {}) {
       return { error: `Language not found: ${asset.languageId}` };
     }
 
-    if (asset.status === "processing") {
+    if (asset.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
       reply.code(409);
       return { error: `Source is already processing: ${sourceId}` };
     }
@@ -2189,7 +2109,7 @@ export function createServer(options: ServerOptions = {}) {
       await updateState((state) => {
         const stored = state.sourceAssets.find((item) => item.id === sourceId);
         if (!stored) return state;
-        if (stored.status === "processing") {
+        if (stored.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
           alreadyProcessing = true;
           return state;
         }
@@ -2220,7 +2140,7 @@ export function createServer(options: ServerOptions = {}) {
       }
 
       const claimedAsset = claimed;
-      const runInBackground = async () => {
+      jobQueue.add(sourceId, async () => {
         let extraction: SourceExtractionResult | undefined;
         let extractionError: string | undefined;
         try {
@@ -2243,13 +2163,6 @@ export function createServer(options: ServerOptions = {}) {
           extraction,
           extractionError
         }, output));
-      };
-
-      // Un-awaited on purpose: the request returns 202 immediately while
-      // extraction continues. The catch guarantees the promise never
-      // rejects unhandled, even if persisting the completion fails.
-      void runInBackground().catch((error) => {
-        app.log.error({ err: error, sourceId }, "Background source processing failed to persist");
       });
 
       reply.code(202);
@@ -3228,9 +3141,9 @@ export function createServer(options: ServerOptions = {}) {
       topic: draft.topic,
       explanation: draft.explanation,
       examples: draft.evidencePassageIds
-        .map((passageId) => passagesById.get(passageId))
-        .filter((passage): passage is CorpusPassage => passage !== undefined)
-        .map((passage) => ({
+        .map((passageId: string) => passagesById.get(passageId))
+        .filter((passage: CorpusPassage | undefined): passage is CorpusPassage => passage !== undefined)
+        .map((passage: CorpusPassage) => ({
           passageId: passage.id,
           target: passage.textTarget,
           translation: passage.textTranslation
@@ -4187,6 +4100,42 @@ export function createServer(options: ServerOptions = {}) {
     }
 
     return sanitizeNeuralMapForActor(buildNeuralMap(state, query.languageId), actor);
+  });
+
+  app.get("/ready", async (request, reply) => {
+    const report = await createReadinessReport(readState);
+    if (!report.ok) {
+      reply.code(503);
+    }
+    return report;
+  });
+
+  app.addHook("onReady", async () => {
+    try {
+      await updateState((state) => {
+        const processingAssets = state.sourceAssets.filter((asset) => asset.status === "processing");
+        if (processingAssets.length === 0) return state;
+
+        app.log.info({ count: processingAssets.length }, "Resetting stuck processing source assets to failed on startup");
+        const updatedSourceAssets = state.sourceAssets.map((asset) => {
+          if (asset.status === "processing") {
+            return {
+              ...asset,
+              status: "failed" as const,
+              error: "Server restarted or crashed while processing this source asset."
+            };
+          }
+          return asset;
+        });
+
+        return {
+          ...state,
+          sourceAssets: updatedSourceAssets
+        };
+      });
+    } catch (error) {
+      app.log.error({ err: error }, "Failed to clean up stuck processing source assets on startup");
+    }
   });
 
   return app;

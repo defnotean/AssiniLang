@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CorpusPassage, Exercise, Language, Lexeme, Note } from "@assini/db";
-import type { LlmChatMessage, LlmProvider } from "./llmProvider";
+import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { retrieveTopKPassages } from "@assini/eval";
 
 type Env = Record<string, string | undefined>;
 
@@ -519,13 +520,24 @@ export async function generateModelDraftNotes(params: {
     throw new ModelRequiredError();
   }
 
+  const env = params.env ?? process.env;
+  const llmConfig = {
+    baseUrl: env.ASSINI_LLM_BASE_URL,
+    apiKey: env.ASSINI_LLM_API_KEY || env.OPENAI_API_KEY,
+    model: env.ASSINI_LLM_MODEL || env.OPENAI_MODEL,
+    provider: env.ASSINI_LLM_PROVIDER
+  };
+
+  const query = `${params.language.name} ${params.language.description} ${params.language.orthography}`;
+  const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 15, llmConfig);
+
   const messages = buildNoteGenerationMessages(params.language, {
-    corpus: params.corpus,
+    corpus: retrievedCorpus,
     lexemes: params.lexemes,
     notes: params.existingNotes
   });
   const content = await params.provider.completeChat(messages);
-  return parseGeneratedNotes(content, buildNoteGrounding(params.corpus, params.existingNotes));
+  return parseGeneratedNotes(content, buildNoteGrounding(retrievedCorpus, params.existingNotes));
 }
 
 export async function generateModelExercise(params: {

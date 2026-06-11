@@ -9,6 +9,7 @@ Every route in `server.ts`. "Public" means no auth required; role lists mean the
 | Method | Path | Auth / roles | Purpose |
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Health check. |
+| GET | `/ready` | Public | Readiness check for schema-valid persistence. |
 | POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. |
 | GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
 | POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
@@ -76,6 +77,12 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 - Audit reads, evaluation artifact reads, programmer AI sessions, and AI observability use the programmer actor. The `GET /observability/neural-map` graph is programmer-token reachable but is not wired into the browser console.
 
 Do not treat prototype auth as production security.
+
+## Health and readiness
+
+`GET /health` is the cheapest liveness check. It returns `{ "ok": true }` when the API process can answer HTTP.
+
+`GET /ready` is the deeper readiness check. It reads the configured state store through the same schema-validation path used by normal API reads. A ready server returns `200` with `{ "ok": true, "checks": { "storage": { "ok": true, "schemaVersion": 8 } } }`. If storage cannot be read or validated, it returns `503` with a sanitized storage failure and does not expose local database paths, exception messages, API keys, or workspace contents.
 
 ## Common response rules
 

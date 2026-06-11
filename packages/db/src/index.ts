@@ -1,5 +1,7 @@
-export * from "./schema";
-export * from "./store";
-export * from "./textIntegrity";
-export * from "./bootstrap";
-export * from "./testing";
+export * from "./schema.js";
+export * from "./store.js";
+export * from "./textIntegrity.js";
+export * from "./sourceAssetPaths.js";
+export * from "./bootstrap.js";
+export * from "./testing.js";
+export * as dbSchema from "./dbSchema.js";

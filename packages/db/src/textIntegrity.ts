@@ -1,4 +1,4 @@
-import type { LanguagePhonology, Morpheme } from "./schema";
+import type { LanguagePhonology, Morpheme } from "./schema.js";
 
 function normalizedText(input: string): string {
   return input.trim().toLowerCase().replace(/\s+/g, " ");

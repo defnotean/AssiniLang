@@ -8,8 +8,8 @@ import {
   type Language,
   type Lexeme,
   type Note
-} from "./schema";
-import { createEmptyState } from "./store";
+} from "./schema.js";
+import { createEmptyState } from "./store.js";
 
 /**
  * Minimal valid workspace used by unit and integration tests across the
