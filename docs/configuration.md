@@ -74,6 +74,7 @@ Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local
 | `ASSINI_DEV_AUTH_TOKEN` | unset (`test` under `NODE_ENV=test`) | secret string | Server token accepted in the `x-assini-dev-token` header for lead/admin server-token calls. |
 | `ASSINI_ENABLE_PROTOTYPE_AUTH` | unset (disabled) | `true` | Enables `POST /auth/prototype-session` for browser prototype sessions. The dev launcher sets this automatically. |
 | `ASSINI_PROTOTYPE_SESSION_TTL_MS` | `28800000` (8 hours) | positive integer (milliseconds) | Prototype session lifetime. Each successful use within the TTL slides the expiry forward; expired sessions return 401 and are evicted lazily and during session creation. Invalid values fail server startup. |
+| `ASSINI_API_URL` | `http://127.0.0.1:4321` | URL | Base API URL used by driver scripts such as `scripts/setupKelevi.mjs` (the synthetic demo-language builder). |
 
 ## Setup recipes
 
