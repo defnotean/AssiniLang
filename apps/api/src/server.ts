@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { JobQueue } from "./jobQueue.js";
+import { recoverInterruptedSources } from "./jobRecovery.js";
 import { JsonStore, type AppState, type User } from "@assini/db";
 import { createLlmProviderFromEnv, type LlmProvider } from "./llmProvider.js";
 import type { PrototypeSessionRecord } from "./routeHelpers.js";
@@ -200,27 +201,10 @@ export function createServer(options: ServerOptions = {}) {
 
   app.addHook("onReady", async () => {
     try {
-      await updateState((state) => {
-        const processingAssets = state.sourceAssets.filter((asset) => asset.status === "processing");
-        if (processingAssets.length === 0) return state;
-
-        app.log.info({ count: processingAssets.length }, "Resetting stuck processing source assets to failed on startup");
-        const updatedSourceAssets = state.sourceAssets.map((asset) => {
-          if (asset.status === "processing") {
-            return {
-              ...asset,
-              status: "failed" as const,
-              error: "Server restarted or crashed while processing this source asset."
-            };
-          }
-          return asset;
-        });
-
-        return {
-          ...state,
-          sourceAssets: updatedSourceAssets
-        };
-      });
+      const recoveredCount = await recoverInterruptedSources({ update: updateState });
+      if (recoveredCount > 0) {
+        app.log.info({ count: recoveredCount }, "Reset interrupted processing source assets to failed on startup");
+      }
     } catch (error) {
       app.log.error({ err: error }, "Failed to clean up stuck processing source assets on startup");
     }

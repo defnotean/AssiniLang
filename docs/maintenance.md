@@ -45,6 +45,19 @@ The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currentl
 4. Tests: `packages/db/src/store.test.ts` covers parse/migrate/reject paths; `packages/db/src/testing.ts` has state-building helpers. Add a migration test (old-version JSON parses and gains the new field/collection) and a rejection test (malformed new data fails with a useful message).
 5. Update the collections list in [architecture.md](architecture.md). The doc test derives the collection names from `appStateSchema` in `schema.ts` and fails if any of them is missing from architecture.md's collections list, and it asserts the `schemaVersion` literal in architecture.md matches the one in `schema.ts` - so adding a collection or bumping the version without touching architecture.md breaks the build.
 
+## Backing up and restoring the local database
+
+`JsonStore` exposes `backupTo(destinationPath)` and `restoreFrom(sourcePath)` for both backends: JSON backups are byte-for-byte copies; SQLite backups use better-sqlite3's online backup API. Restore validates that the backup parses against the current schema before it replaces the live database, and fails loudly (with the database path) otherwise.
+
+From the command line:
+
+```powershell
+npm.cmd run db:backup                       # writes data/backups/local-db-<timestamp>.json
+npm.cmd run db:backup -- path\to\backup.json
+```
+
+Restoring is deliberate (no one-shot script): use `restoreFrom` from a Node REPL or a small script so a bad backup cannot silently replace live data.
+
 ## Editing public response shapes safely
 
 All public projection lives in `apps/api/src/publicLanguageViews.ts`: profiles, public exercises, sanitized snapshots (`language-snapshot-v2`), and evaluation artifacts (`evaluation-artifact-v2`) with their SHA-256 integrity manifests.

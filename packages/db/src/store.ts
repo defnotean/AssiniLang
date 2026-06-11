@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
@@ -477,6 +477,74 @@ export class JsonStore {
       this.snapshot = null;
       db.close();
     }
+  }
+
+  /**
+   * Copies the live database to `destinationPath`. JSON databases are copied
+   * byte-for-byte; SQLite databases use better-sqlite3's online backup API so
+   * the copy is consistent even if other processes hold the file open.
+   */
+  async backupTo(destinationPath: string): Promise<string> {
+    const destination = resolve(destinationPath);
+    await mkdir(dirname(destination), { recursive: true });
+
+    try {
+      if (!this.isSqlite) {
+        await copyFile(this.dbPath, destination);
+        return destination;
+      }
+
+      const db = new Database(this.dbPath);
+      try {
+        this.ensureTables(db);
+        await db.backup(destination);
+      } finally {
+        db.close();
+      }
+      return destination;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to back up local database at ${this.dbPath} to ${destination}: ${message}`, {
+        cause: error
+      });
+    }
+  }
+
+  /**
+   * Replaces the live database with the state stored in `sourcePath`. The
+   * backup is fully parsed (Zod) before the live database is touched; on any
+   * validation failure the live database is left untouched. The snapshot
+   * cache is invalidated so the next read reflects the restored data.
+   */
+  async restoreFrom(sourcePath: string): Promise<AppState> {
+    const source = resolve(sourcePath);
+
+    try {
+      await stat(source);
+    } catch (error) {
+      throw new Error(`Failed to restore local database at ${this.dbPath}: backup not found at ${source}`, {
+        cause: error
+      });
+    }
+
+    let restored: AppState;
+    try {
+      restored = await new JsonStore(source).read();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Failed to restore local database at ${this.dbPath}: backup at ${source} is not a valid database: ${message}`,
+        { cause: error }
+      );
+    }
+
+    // The live file may be corrupt (that is the usual reason to restore), so
+    // remove it before writing through the normal path. write() re-validates
+    // the state and clears the snapshot cache.
+    await rm(this.dbPath, { force: true });
+    this.snapshot = null;
+    await this.write(restored);
+    return restored;
   }
 
   async update(updater: (state: AppState) => AppState): Promise<AppState> {

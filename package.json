@@ -17,6 +17,7 @@
     "check": "tsc -b packages/db packages/eval apps/api apps/web",
     "test": "vitest run --passWithNoTests",
     "seed": "npm --workspace @assini/db run seed",
+    "db:backup": "npm --workspace @assini/db run db:backup",
     "eval": "npm --workspace @assini/eval run eval",
     "verify": "node scripts/verify.mjs",
     "smoke": "tsx scripts/smokeIngestion.mjs",

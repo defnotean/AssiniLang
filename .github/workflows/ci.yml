@@ -13,9 +13,13 @@ permissions:
 
 jobs:
   verify:
-    name: Verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - name: Check out repository
@@ -27,6 +31,16 @@ jobs:
           node-version: 20.19.x
           cache: npm
 
+      - name: Restore TypeScript incremental state
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/*.tsbuildinfo
+            !node_modules/**
+          key: tsc-${{ matrix.os }}-${{ hashFiles('package-lock.json', 'tsconfig.base.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-${{ matrix.os }}-${{ hashFiles('package-lock.json', 'tsconfig.base.json') }}-
+
       - name: Install dependencies
         run: npm ci
 
@@ -35,6 +49,31 @@ jobs:
 
       - name: Run ingestion smoke test
         run: npm run smoke
+
+      - name: Built-dist startup smoke (/health + /ready)
+        shell: bash
+        env:
+          PORT: "4517"
+          HOST: 127.0.0.1
+          ASSINI_DB_PATH: ${{ runner.temp }}/ci-smoke-db.json
+        run: |
+          node apps/api/dist/index.js &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl -fsS "http://127.0.0.1:4517/health" >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "Built dist server never answered /health" >&2
+            exit 1
+          fi
+          curl -fsS "http://127.0.0.1:4517/health"
+          curl -fsS "http://127.0.0.1:4517/ready"
 
       - name: Audit dependencies
         run: npm audit --audit-level=moderate

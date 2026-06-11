@@ -71,6 +71,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run eval` | Deterministic evaluation CLI. |
 | `npm.cmd run build` | Build all workspaces. |
 | `npm.cmd run smoke` | End-to-end ingestion smoke script. |
+| `npm.cmd run db:backup` | Validated backup of the local database to `data/backups/`. |
 | `npm.cmd run demo` | Seed, evaluate, and start the prototype. |
 
 ## Documentation

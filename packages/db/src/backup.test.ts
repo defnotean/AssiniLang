@@ -1,0 +1,92 @@
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { JsonStore } from "./store.js";
+import { buildTestWorkspaceState } from "./testing.js";
+
+let dir: string;
+
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), "assini-store-backup-"));
+});
+
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true });
+});
+
+const backends = [
+  { label: "json", file: "db.json", backupFile: "backup.json" },
+  { label: "sqlite", file: "db.sqlite", backupFile: "backup.sqlite" }
+] as const;
+
+describe.each(backends)("JsonStore backup/restore ($label)", ({ file, backupFile }) => {
+  it("recovers the exact state after a backup -> corruption -> restore round trip", async () => {
+    const dbPath = join(dir, file);
+    const backupPath = join(dir, "backups", backupFile);
+    const store = new JsonStore(dbPath);
+    const fixture = buildTestWorkspaceState();
+    await store.write(fixture);
+    const before = await store.read();
+
+    await store.backupTo(backupPath);
+    await expect(stat(backupPath)).resolves.toBeDefined();
+
+    // Corrupt the live database file in place.
+    await writeFile(dbPath, "this is not a valid database", "utf8");
+    await expect(store.read()).rejects.toThrow(dbPath);
+
+    const restored = await store.restoreFrom(backupPath);
+    expect(restored).toEqual(before);
+
+    // The snapshot cache must reflect the restored data, not the corrupt file.
+    const after = await store.read();
+    expect(after).toEqual(before);
+  });
+
+  it("restores into a fresh store instance on a different path", async () => {
+    const sourceStore = new JsonStore(join(dir, file));
+    const fixture = buildTestWorkspaceState();
+    await sourceStore.write(fixture);
+    const expected = await sourceStore.read();
+
+    const backupPath = join(dir, backupFile);
+    await sourceStore.backupTo(backupPath);
+
+    const targetStore = new JsonStore(join(dir, `restored-${file}`));
+    await targetStore.restoreFrom(backupPath);
+    expect(await targetStore.read()).toEqual(expected);
+  });
+
+  it("fails loudly with the database path when the backup does not parse, leaving live data intact", async () => {
+    const dbPath = join(dir, file);
+    const store = new JsonStore(dbPath);
+    await store.write(buildTestWorkspaceState());
+    const before = await store.read();
+
+    const badBackupPath = join(dir, `bad-${backupFile}`);
+    await writeFile(badBackupPath, "garbage that parses as neither JSON nor SQLite", "utf8");
+
+    await expect(store.restoreFrom(badBackupPath)).rejects.toThrow(dbPath);
+    expect(await store.read()).toEqual(before);
+  });
+
+  it("fails loudly when the backup file does not exist", async () => {
+    const dbPath = join(dir, file);
+    const store = new JsonStore(dbPath);
+    await store.write(buildTestWorkspaceState());
+
+    const missingPath = join(dir, "missing", backupFile);
+    await expect(store.restoreFrom(missingPath)).rejects.toThrow(dbPath);
+  });
+});
+
+it("json backup is a byte-for-byte copy of the live file", async () => {
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+
+  const backupPath = join(dir, "copy.json");
+  await store.backupTo(backupPath);
+  expect(await readFile(backupPath, "utf8")).toBe(await readFile(dbPath, "utf8"));
+});

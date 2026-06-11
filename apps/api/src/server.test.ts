@@ -3613,7 +3613,46 @@ describe("api server", () => {
       const stuck = sources.json().find((item) => item.id === "stuck-asset-id");
       expect(stuck).toBeDefined();
       expect(stuck.status).toBe("failed");
-      expect(stuck.error).toContain("Server restarted or crashed");
+      expect(stuck.error).toContain("interrupted by a server restart");
+
+      const audit = await app.inject({
+        method: "GET",
+        url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+        headers: authHeaders("admin-1")
+      });
+      expect(audit.statusCode).toBe(200);
+      const recoveryEvent = audit.json().find(
+        (item: { action: string; entityId: string }) =>
+          item.action === "source_asset.processing_recovered" && item.entityId === "stuck-asset-id"
+      );
+      expect(recoveryEvent).toBeDefined();
+      expect(recoveryEvent.metadata).toEqual({ sourceId: "stuck-asset-id", previousStatus: "processing" });
+    });
+
+    it("allows a recovered source to be processed again", async () => {
+      const state = buildTestWorkspaceState();
+      state.sourceAssets.push({
+        id: "stuck-asset-id",
+        languageId: TEST_LANGUAGE_ID,
+        kind: "wordlist",
+        title: "Stuck word list",
+        rawText: "mira = river",
+        status: "processing",
+        createdBy: "reviewer-1",
+        createdAt: new Date().toISOString()
+      });
+
+      const app = createServer({ initialState: state });
+      await app.ready();
+
+      const processed = await app.inject({
+        method: "POST",
+        url: "/sources/stuck-asset-id/process",
+        headers: authHeaders("reviewer-1")
+      });
+      expect(processed.statusCode).toBe(200);
+      expect(processed.json().asset.status).toBe("processed");
+      expect(processed.json().asset.error).toBeUndefined();
     });
   });
 });
