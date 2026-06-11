@@ -12,7 +12,7 @@ import {
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { extractionDraftSummary, formatCount } from "../lib/format";
-import { EXTRACTION_DRAFT_DUPLICATE_LABELS, EXTRACTION_DRAFT_KIND_LABELS } from "../lib/viewConfig";
+import { EXTRACTION_DRAFT_DUPLICATE_LABELS, EXTRACTION_DRAFT_GROUNDING_LABELS, EXTRACTION_DRAFT_KIND_LABELS } from "../lib/viewConfig";
 
 export function IngestView({ languageId }: { languageId: string }) {
   const [sources, setSources] = useState<SourceAsset[]>([]);
@@ -511,6 +511,15 @@ export function IngestView({ languageId }: { languageId: string }) {
                         {EXTRACTION_DRAFT_DUPLICATE_LABELS[draft.duplicate.kind]}
                       </span>
                     )}
+                    {draft.grounding?.map((flag) => (
+                      <span
+                        key={`${flag.kind}:${flag.message}`}
+                        className="status-badge contested"
+                        title={flag.message}
+                      >
+                        {EXTRACTION_DRAFT_GROUNDING_LABELS[flag.kind]}
+                      </span>
+                    ))}
                   </div>
                   <strong>{extractionDraftSummary(draft)}</strong>
                   {draft.rationale && <p>{draft.rationale}</p>}

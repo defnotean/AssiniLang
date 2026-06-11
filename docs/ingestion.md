@@ -107,6 +107,16 @@ Audio assets are sent as multipart form data to `<ASSINI_TRANSCRIBE_BASE_URL>/au
 | `topic` | "Duplicate topic" | A grammar-note draft repeats an existing note topic. |
 | `pending` | "Duplicates another pending draft" | A later draft proposes the same thing as an earlier still-proposed draft (`{ kind: "pending", draftId }`). |
 
+## Grounding flags on drafts
+
+The same listing also computes a read-time `grounding` array (`{ kind, message }[]`) on proposed drafts, checking each draft against the accepted lexicon of its language. Like duplicate flags, grounding flags are advisory: computed per request, never persisted, and they never block accept/reject. No flags are produced when the lexicon is empty.
+
+| Flag kind | Badge in the web console | Meaning |
+| --- | --- | --- |
+| `gloss_conflict` | "Conflicts with accepted gloss" | A lexeme draft's form exactly matches an accepted lexeme (case-insensitive trim compare) but proposes a different gloss. |
+| `decomposable_form` | "Form decomposes into accepted lexemes" | A lexeme draft's form is fully covered by a concatenation of 2-3 accepted lexeme forms (e.g. `talune` = `talu` "water" + `ne` "locative case marker"), so the model may have glossed a multi-morpheme word as one new lexeme. |
+| `segmentation_conflict` | "Segment gloss conflicts with lexicon" | A corpus-passage draft's segmentation glosses a surface differently from the accepted lexeme with the same form. |
+
 ## Error catalogue
 
 Errors from processing mark the source `failed` with a sanitized message and return `422` (sync) or land on the asset's `error` field (async). Route-level errors return their listed status.

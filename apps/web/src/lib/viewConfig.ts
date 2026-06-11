@@ -1,5 +1,5 @@
 import type { GovernanceRecord, ReviewDisposition } from "@assini/db";
-import type { ExtractionDraft, ExtractionDraftDuplicate } from "../api";
+import type { DraftGroundingFlag, ExtractionDraft, ExtractionDraftDuplicate } from "../api";
 import type { Language, PublicExercise, ReviewStatus, ViewMode } from "./types";
 
 export const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebrow: string }> = {
@@ -36,6 +36,11 @@ export const EXTRACTION_DRAFT_DUPLICATE_LABELS: Record<ExtractionDraftDuplicate[
   form: "Same form, different gloss",
   topic: "Duplicate topic",
   pending: "Duplicates another pending draft"
+};
+export const EXTRACTION_DRAFT_GROUNDING_LABELS: Record<DraftGroundingFlag["kind"], string> = {
+  gloss_conflict: "Conflicts with accepted gloss",
+  decomposable_form: "Form decomposes into accepted lexemes",
+  segmentation_conflict: "Segment gloss conflicts with lexicon"
 };
 export const REVIEWER_COMMENTS: Record<ReviewStatus, string> = {
   approved: "Approved in local prototype.",

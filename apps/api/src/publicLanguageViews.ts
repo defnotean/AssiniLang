@@ -13,8 +13,10 @@ import type {
 } from "@assini/db";
 import { summarizeEvaluationGate } from "@assini/eval";
 
+import { computeDraftGroundingFlags, type DraftGroundingFlag } from "./draftGrounding.js";
 import { detectParadigmGaps, type ParadigmGap } from "./paradigmGaps.js";
 
+export type { DraftGroundingFlag } from "./draftGrounding.js";
 export type { ParadigmGap } from "./paradigmGaps.js";
 
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
@@ -37,7 +39,15 @@ export type ExtractionDraftDuplicate =
   | { kind: "topic"; entityId: string }
   | { kind: "pending"; draftId: string };
 
-export type ExtractionDraftView = ExtractionDraft & { duplicate?: ExtractionDraftDuplicate };
+export type ExtractionDraftView = ExtractionDraft & {
+  duplicate?: ExtractionDraftDuplicate;
+  /**
+   * Read-time advisory grounding flags computed against the accepted
+   * lexicon (see {@link DraftGroundingFlag}). Never persisted and never
+   * blocks review; only present on proposed drafts with at least one flag.
+   */
+  grounding?: DraftGroundingFlag[];
+};
 
 export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer" | "learnerId">;
 
@@ -610,13 +620,22 @@ export function toExtractionDraftViews(state: AppState, drafts: ExtractionDraft[
   return drafts.map((draft) => {
     if (draft.status !== "proposed") return { ...draft };
 
+    const view: ExtractionDraftView = { ...draft };
+
     const existing = existingEntityDuplicate(state, draft);
-    if (existing) return { ...draft, duplicate: existing };
+    const earlierDraftId = existing ? undefined : pendingDuplicateOf.get(draft.id);
+    if (existing) {
+      view.duplicate = existing;
+    } else if (earlierDraftId) {
+      view.duplicate = { kind: "pending", draftId: earlierDraftId };
+    }
 
-    const earlierDraftId = pendingDuplicateOf.get(draft.id);
-    if (earlierDraftId) return { ...draft, duplicate: { kind: "pending", draftId: earlierDraftId } };
+    const grounding = computeDraftGroundingFlags(draft, state);
+    if (grounding.length > 0) {
+      view.grounding = grounding;
+    }
 
-    return { ...draft };
+    return view;
   });
 }
 

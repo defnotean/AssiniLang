@@ -257,7 +257,20 @@ export type ExtractionDraftDuplicate =
   | { kind: "topic"; entityId: string }
   | { kind: "pending"; draftId: string };
 
-export type ExtractionDraftView = ExtractionDraft & { duplicate?: ExtractionDraftDuplicate };
+/**
+ * Read-time grounding flag computed by the API against the accepted
+ * lexicon when listing extraction drafts. Advisory only; never persisted
+ * and never blocks review.
+ */
+export type DraftGroundingFlag = {
+  kind: "gloss_conflict" | "decomposable_form" | "segmentation_conflict";
+  message: string;
+};
+
+export type ExtractionDraftView = ExtractionDraft & {
+  duplicate?: ExtractionDraftDuplicate;
+  grounding?: DraftGroundingFlag[];
+};
 
 export type AcceptExtractionDraftResult = {
   draft: ExtractionDraft;
