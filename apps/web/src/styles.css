@@ -3072,3 +3072,50 @@ label,
 .assistant-message-body strong {
   color: var(--accent-strong);
 }
+
+/* Assistant conversation setup field */
+.assistant-setup-label {
+  display: block;
+  margin-bottom: 0.42rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.assistant-setup {
+  min-height: 3.6rem;
+  margin-bottom: 0.7rem;
+}
+
+/* Collapsible corpus import form */
+.corpus-import-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  width: 100%;
+  border: 0;
+  padding: 0.1rem 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.corpus-import-toggle:hover:not(:disabled) {
+  transform: none;
+  color: var(--accent-strong);
+}
+
+.corpus-import-toggle .detail-label {
+  display: block;
+  margin-bottom: 0.18rem;
+}
+
+.corpus-import-toggle-title {
+  display: block;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 800;
+}

@@ -707,6 +707,7 @@ describe("App", () => {
     render(<App />);
     await selectAvenik();
 
+    fireEvent.click(screen.getByRole("button", { name: /add source passage/i }));
     fireEvent.change(screen.getByLabelText("Corpus target text"), {
       target: { value: "mira lumo-ke talo-mi-na" }
     });

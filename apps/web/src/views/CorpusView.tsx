@@ -25,6 +25,9 @@ export function CorpusView({
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImportingCorpus, setIsImportingCorpus] = useState(false);
+  // Collapsed by default so the passage list gets the screen; the import form
+  // is an occasional task while browsing is the everyday one.
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const normalized = search.trim().toLowerCase();
   const canImportPassage = canSubmitCorpusImportDraft(importDraft)
     && !isWorkflowBusy
@@ -94,11 +97,21 @@ export function CorpusView({
   return (
     <div className="corpus-view">
       <form className="record-card form-panel compact corpus-import-form" aria-label="Corpus import" onSubmit={handleImportCorpus}>
-        <div>
-          <span className="detail-label">Corpus import</span>
-          <h3>Add source passage</h3>
-        </div>
-        <div className="corpus-import-grid">
+        <button
+          type="button"
+          className="secondary corpus-import-toggle"
+          aria-expanded={isImportOpen}
+          aria-controls="corpus-import-fields"
+          onClick={() => setIsImportOpen((current) => !current)}
+        >
+          <span>
+            <span className="detail-label">Corpus import</span>
+            <span className="corpus-import-toggle-title">Add source passage</span>
+          </span>
+          <span aria-hidden="true">{isImportOpen ? "Hide" : "Open"}</span>
+        </button>
+        {isImportOpen && (
+        <div className="corpus-import-grid" id="corpus-import-fields">
           <div className="form-group wide">
             <label htmlFor="corpus-import-target">Corpus target text</label>
             <input
@@ -182,9 +195,12 @@ export function CorpusView({
             />
           </div>
         </div>
-        <button type="submit" className="secondary" disabled={!canImportPassage}>
-          {isImportingCorpus ? "Importing..." : "Import passage"}
-        </button>
+        )}
+        {isImportOpen && (
+          <button type="submit" className="secondary" disabled={!canImportPassage}>
+            {isImportingCorpus ? "Importing..." : "Import passage"}
+          </button>
+        )}
         {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
         {importError && <p className="result-notice error" role="alert">{importError}</p>}
       </form>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AiSession } from "@assini/db";
-import { continueAiSession, createAiSession } from "../api";
+import { continueAiSession, createAiSession, fetchAiSession } from "../api";
+import { getBrowserThemeStorage } from "../lib/theme";
 import type { AsyncState } from "../lib/types";
 
 export interface AssistantWorkspace {
@@ -14,10 +15,58 @@ export interface AssistantWorkspace {
     languageId: string,
     seedPrompt: string,
     contextNoteIds: string[],
-    contextPassageIds: string[]
+    contextPassageIds: string[],
+    setupInstructions?: string
   ) => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
-  resetConversation: () => void;
+  restoreSession: (languageId: string) => Promise<void>;
+  resetConversation: (languageId?: string | null) => void;
+}
+
+const SESSION_STORAGE_PREFIX = "assistant.session.";
+
+function sessionStorageKey(languageId: string): string {
+  return `${SESSION_STORAGE_PREFIX}${languageId}`;
+}
+
+function rememberSessionId(languageId: string, sessionId: string): void {
+  try {
+    getBrowserThemeStorage()?.setItem(sessionStorageKey(languageId), sessionId);
+  } catch {
+    // Ignore localStorage failures in test runners or locked-down browsers.
+  }
+}
+
+function forgetSessionId(languageId: string): void {
+  try {
+    getBrowserThemeStorage()?.setItem(sessionStorageKey(languageId), "");
+  } catch {
+    // Ignore localStorage failures.
+  }
+}
+
+function storedSessionId(languageId: string): string | null {
+  try {
+    const stored = getBrowserThemeStorage()?.getItem(sessionStorageKey(languageId));
+    return stored && stored.trim().length > 0 ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Composes the seed prompt for a new conversation. Setup instructions ride in
+ * the first user message; because every follow-up turn re-sends the full
+ * conversation history to the model, the instructions keep applying for the
+ * whole session - including after the user corrects the assistant.
+ */
+export function composeSeedPrompt(seedPrompt: string, setupInstructions?: string): string {
+  const instructions = setupInstructions?.trim();
+  if (!instructions) return seedPrompt.trim();
+  return [
+    `Conversation setup - follow these instructions for every reply in this session: ${instructions}`,
+    seedPrompt.trim()
+  ].join("\n\n");
 }
 
 /**
@@ -43,7 +92,8 @@ function latestAssistantMessageId(session: AiSession): string | null {
  * Owns the AI Assistant chat workspace state: the active AI session, the
  * composer input, send/in-flight flags, and per-reply deterministic-fallback
  * detection. Sessions are created in the existing "learner_practice" mode via
- * the same prototype-actor convention as the model smoke test.
+ * the same prototype-actor convention as the model smoke test, and the active
+ * session id is persisted per language so a reload resumes the conversation.
  */
 export function useAssistantWorkspace(): AssistantWorkspace {
   const [sessionState, setSessionState] = useState<AsyncState<AiSession>>({ status: "idle" });
@@ -51,6 +101,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [fallbackMessageIds, setFallbackMessageIds] = useState<ReadonlySet<string>>(new Set());
+  const [restoreAttemptedFor, setRestoreAttemptedFor] = useState<string | null>(null);
 
   function recordFallback(session: AiSession) {
     if (!latestReplyUsedFallback(session)) return;
@@ -63,9 +114,10 @@ export function useAssistantWorkspace(): AssistantWorkspace {
     languageId: string,
     seedPrompt: string,
     contextNoteIds: string[],
-    contextPassageIds: string[]
+    contextPassageIds: string[],
+    setupInstructions?: string
   ): Promise<void> {
-    const prompt = seedPrompt.trim();
+    const prompt = composeSeedPrompt(seedPrompt, setupInstructions);
     if (!prompt) return;
     setSessionState({ status: "loading" });
     setSendError(null);
@@ -80,6 +132,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       });
       recordFallback(session);
       setSessionState({ status: "ready", data: session });
+      rememberSessionId(languageId, session.id);
       setInput("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI session creation failed";
@@ -97,6 +150,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       const session = await continueAiSession(sessionState.data.id, content, sessionState.data.mode);
       recordFallback(session);
       setSessionState({ status: "ready", data: session });
+      rememberSessionId(session.languageId, session.id);
       setInput("");
     } catch (error) {
       const message = error instanceof Error ? error.message : "AI session message failed";
@@ -106,12 +160,35 @@ export function useAssistantWorkspace(): AssistantWorkspace {
     }
   }
 
-  function resetConversation() {
+  async function restoreSession(languageId: string): Promise<void> {
+    if (sessionState.status !== "idle" || restoreAttemptedFor === languageId) return;
+    setRestoreAttemptedFor(languageId);
+    const sessionId = storedSessionId(languageId);
+    if (!sessionId) return;
+    setSessionState({ status: "loading" });
+    try {
+      const session = await fetchAiSession(sessionId, "learner");
+      if (session.languageId !== languageId) {
+        forgetSessionId(languageId);
+        setSessionState({ status: "idle" });
+        return;
+      }
+      setSessionState({ status: "ready", data: session });
+    } catch {
+      // A stale or deleted session must never wedge the workspace.
+      forgetSessionId(languageId);
+      setSessionState({ status: "idle" });
+    }
+  }
+
+  function resetConversation(languageId?: string | null) {
+    if (languageId) forgetSessionId(languageId);
     setSessionState({ status: "idle" });
     setInput("");
     setIsSending(false);
     setSendError(null);
     setFallbackMessageIds(new Set());
+    setRestoreAttemptedFor(null);
   }
 
   return {
@@ -123,6 +200,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
     fallbackMessageIds,
     createSession,
     sendMessage,
+    restoreSession,
     resetConversation
   };
 }

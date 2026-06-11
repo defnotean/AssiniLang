@@ -7,7 +7,8 @@ import { AssistantView } from "./views/AssistantView";
 
 const apiMock = vi.hoisted(() => ({
   createAiSession: vi.fn(),
-  continueAiSession: vi.fn()
+  continueAiSession: vi.fn(),
+  fetchAiSession: vi.fn()
 }));
 
 vi.mock("./api", () => apiMock);
@@ -113,6 +114,22 @@ describe("AssistantView", () => {
     expect(screen.getByText("Avenik verbs stack transparent suffix chains.")).toBeInTheDocument();
     expect(screen.getByText("model reply")).toBeInTheDocument();
     expect(screen.queryByText("deterministic fallback (no model)")).not.toBeInTheDocument();
+  });
+
+  it("folds conversation setup instructions into the seed prompt so they persist via history", async () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Conversation setup instructions"), {
+      target: { value: "Always gloss morphemes with Leipzig abbreviations." }
+    });
+    await startConversation("What does ka mean?");
+
+    expect(apiMock.createAiSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        seedPrompt:
+          "Conversation setup - follow these instructions for every reply in this session: "
+          + "Always gloss morphemes with Leipzig abbreviations.\n\nWhat does ka mean?"
+      })
+    );
   });
 
   it("labels the reply with a fallback chip when the trace flags the deterministic fallback", async () => {

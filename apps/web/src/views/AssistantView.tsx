@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AssistantWorkspace } from "../hooks/useAssistantWorkspace";
 import { formatStatus } from "../lib/format";
 import { renderMarkdownLite } from "../lib/markdownLite";
@@ -30,9 +30,11 @@ export function AssistantView({
     fallbackMessageIds,
     createSession,
     sendMessage,
+    restoreSession,
     resetConversation
   } = assistant;
 
+  const [setupInstructions, setSetupInstructions] = useState("");
   const session = sessionState.status === "ready" ? sessionState.data : null;
   const isStarting = sessionState.status === "loading";
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -43,13 +45,19 @@ export function AssistantView({
     endRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [messageCount, isSending]);
 
+  useEffect(() => {
+    // Resume the last conversation for this language after a reload; the hook
+    // attempts each language at most once and clears stale session ids itself.
+    if (selectedLanguageId) void restoreSession(selectedLanguageId);
+  }, [selectedLanguageId, restoreSession]);
+
   if (!selectedLanguageId) {
     return <NoLanguageNotice />;
   }
 
   function handleStart() {
     if (!selectedLanguageId) return;
-    void createSession(selectedLanguageId, input, contextNoteIds, contextPassageIds);
+    void createSession(selectedLanguageId, input, contextNoteIds, contextPassageIds, setupInstructions);
   }
 
   function handleSend() {
@@ -78,6 +86,19 @@ export function AssistantView({
             {sessionState.message}
           </p>
         )}
+        <label className="assistant-setup-label" htmlFor="assistant-setup">
+          Conversation setup (optional)
+        </label>
+        <textarea
+          id="assistant-setup"
+          className="assistant-setup"
+          aria-label="Conversation setup instructions"
+          placeholder="Standing instructions the assistant follows for the whole conversation, e.g. Always gloss morphemes with Leipzig abbreviations, and quiz me after each answer."
+          value={setupInstructions}
+          rows={2}
+          disabled={isStarting}
+          onChange={(event) => setSetupInstructions(event.target.value)}
+        />
         <div className="assistant-composer">
           <textarea
             aria-label="Seed prompt"
@@ -103,7 +124,12 @@ export function AssistantView({
           <span className="detail-label">Grounded chat</span>
           <h2>{formatStatus(session.mode)} session</h2>
         </div>
-        <button type="button" className="secondary" onClick={resetConversation} disabled={isSending}>
+        <button
+          type="button"
+          className="secondary"
+          onClick={() => resetConversation(selectedLanguageId)}
+          disabled={isSending}
+        >
           New conversation
         </button>
       </div>
