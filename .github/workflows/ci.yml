@@ -31,16 +31,6 @@ jobs:
           node-version: 20.19.x
           cache: npm
 
-      - name: Restore TypeScript incremental state
-        uses: actions/cache@v4
-        with:
-          path: |
-            **/*.tsbuildinfo
-            !node_modules/**
-          key: tsc-${{ matrix.os }}-${{ hashFiles('package-lock.json', 'tsconfig.base.json') }}-${{ github.sha }}
-          restore-keys: |
-            tsc-${{ matrix.os }}-${{ hashFiles('package-lock.json', 'tsconfig.base.json') }}-
-
       - name: Install dependencies
         run: npm ci
 
