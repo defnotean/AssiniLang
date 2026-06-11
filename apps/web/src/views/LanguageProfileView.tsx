@@ -20,7 +20,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
     );
   }
 
-  const { language, stats, phonology, grammarRules, vocabulary, morphemeInventory } = profileState.data;
+  const { language, stats, phonology, grammarRules, vocabulary, morphemeInventory, paradigmGaps = [] } = profileState.data;
 
   return (
     <div className="profile-view">
@@ -190,6 +190,44 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="panel-card paradigm-gaps-panel" aria-label="Paradigm gaps">
+        <div className="record-topline">
+          <div>
+            <span className="detail-label">Paradigm gaps</span>
+            <h2>{formatCount(paradigmGaps.length, "fieldwork to-do")}</h2>
+          </div>
+        </div>
+        {paradigmGaps.length === 0 ? (
+          <p className="empty-state">
+            No paradigm gaps detected - or not enough attested cells to infer paradigms yet.
+          </p>
+        ) : (
+          <div className="detail-list">
+            {paradigmGaps.map((gap) => (
+              <article className="detail-row paradigm-gap-row" key={`${gap.lemma}-${gap.dimension}`}>
+                <div className="paradigm-gap-topline">
+                  <code>{gap.lemma}</code>
+                  <span className="paradigm-gap-dimension">{gap.dimension}</span>
+                  <span className="id-badge">
+                    {formatCount(gap.evidencePassageIds.length, "linked passage")}
+                  </span>
+                </div>
+                <div className="pill-row">
+                  {gap.attested.map((cell) => (
+                    <span className="pill paradigm-cell-attested" key={`${gap.lemma}-attested-${cell}`}>{cell}</span>
+                  ))}
+                  {gap.missing.map((cell) => (
+                    <span className="pill paradigm-cell-missing" key={`${gap.lemma}-missing-${cell}`}>
+                      missing: {cell}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

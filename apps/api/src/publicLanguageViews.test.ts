@@ -101,6 +101,61 @@ describe("public language views", () => {
     expect(sourceNote?.evidencePassageIds).not.toContain("test-passage");
   });
 
+  it("reports no paradigm gaps for the fully covered test workspace", () => {
+    const state = buildTestWorkspaceState();
+    const profile = buildLanguageProfile(state, TEST_LANGUAGE_ID);
+
+    // talo attests both attested person values (1sg, 3sg); nemi only has one
+    // person cell, which is below the two-cell paradigm inference threshold.
+    expect(profile?.paradigmGaps).toEqual([]);
+  });
+
+  it("derives paradigm gaps from corpus segmentation in the profile", () => {
+    const state = buildTestWorkspaceState();
+    const basePassage = state.corpus.find((passage) => passage.languageId === TEST_LANGUAGE_ID);
+    if (!basePassage) throw new Error("Expected a Testlang passage.");
+    state.corpus = [
+      ...state.corpus,
+      {
+        ...basePassage,
+        id: "testlang-c004",
+        textTarget: "saku nemi-na",
+        textTranslation: "I teach the child.",
+        morphologicalSegmentation: [
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
+        ]
+      },
+      {
+        ...basePassage,
+        id: "testlang-c005",
+        textTarget: "saku nemi-su",
+        textTranslation: "You teach the child.",
+        morphologicalSegmentation: [
+          { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+          { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+          { surface: "-su", lemma: "-su", gloss: "2sg", features: ["person"] }
+        ]
+      }
+    ];
+
+    const profile = buildLanguageProfile(state, TEST_LANGUAGE_ID);
+
+    // talo now misses 2sg, which is attested for nemi in this language;
+    // nemi misses nothing (1sg, 2sg, 3sg are all attested for it).
+    expect(profile?.paradigmGaps).toEqual([
+      {
+        lemma: "talo",
+        dimension: "person",
+        attested: ["1sg", "3sg"],
+        missing: ["2sg"],
+        evidencePassageIds: ["testlang-c001", "testlang-c003"]
+      }
+    ]);
+    expect(JSON.stringify(profile?.paradigmGaps)).not.toContain("expectedAnswers");
+  });
+
   it("returns undefined profiles for unknown languages", () => {
     const state = buildTestWorkspaceState();
 

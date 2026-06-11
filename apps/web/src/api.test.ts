@@ -19,6 +19,7 @@ import {
   applyElderCorrection,
   reviewElderCorrection,
   submitExerciseAnswer,
+  fetchRecommendedExercises,
   createAiSession,
   bulkReviewExtractionDrafts
 } from "./api";
@@ -527,5 +528,24 @@ describe("fetchDashboardData", () => {
     await expect(bulkReviewExtractionDrafts("avenik", "accept", ["a"])).rejects.toThrow(
       "Bulk extraction draft review failed (400): Too many draftIds: at most 50 per request."
     );
+  });
+
+  it("opens a learner prototype session before fetching encoded recommended exercises", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exercises: [], rationale: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchRecommendedExercises("avenik/test language");
+
+    expectPrototypeSession(fetchMock, "learner-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/languages/avenik%2Ftest%20language/exercises/recommended",
+      actorRequest
+    );
+    expect(result).toEqual({ exercises: [], rationale: [] });
   });
 });

@@ -34,6 +34,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. |
 | POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
+| GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). |
 | POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. |
 | POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
 | GET | `/exercises/:exerciseId/submissions` | Public | Sanitized submission history. |

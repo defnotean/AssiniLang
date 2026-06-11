@@ -22,6 +22,7 @@ const apiMock = vi.hoisted(() => ({
   fetchDashboardData: vi.fn(),
   fetchEvaluationArtifact: vi.fn(),
   fetchExerciseSubmissions: vi.fn(),
+  fetchRecommendedExercises: vi.fn(),
   fetchGovernance: vi.fn(),
   fetchLanguageProfile: vi.fn(),
   fetchLanguageSnapshot: vi.fn(),
@@ -420,6 +421,7 @@ describe("App", () => {
   beforeEach(() => {
     apiMock.fetchCurrentUser.mockResolvedValue({ id: "local-reviewer", name: "Local Reviewer", role: "reviewer" });
     apiMock.fetchExerciseSubmissions.mockResolvedValue([]);
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
     apiMock.fetchSources.mockResolvedValue([]);
     apiMock.fetchExtractionDrafts.mockResolvedValue([]);
     apiMock.fetchLlmStatus.mockResolvedValue(createDeterministicLlmStatus());

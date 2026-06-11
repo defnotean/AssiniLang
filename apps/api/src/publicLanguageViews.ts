@@ -13,6 +13,10 @@ import type {
 } from "@assini/db";
 import { summarizeEvaluationGate } from "@assini/eval";
 
+import { detectParadigmGaps, type ParadigmGap } from "./paradigmGaps.js";
+
+export type { ParadigmGap } from "./paradigmGaps.js";
+
 export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
 
 /**
@@ -67,6 +71,7 @@ export type LanguageProfile = {
   vocabulary: PublicVocabularyItem[];
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: PublicGrammarRule[];
+  paradigmGaps: ParadigmGap[];
   stats: {
     vocabularyItems: number;
     grammarRules: number;
@@ -500,6 +505,7 @@ export function buildLanguageProfile(state: AppState, languageId: string): Langu
     vocabulary,
     morphemeInventory: buildMorphemeInventory(state, languageId, vocabulary),
     grammarRules,
+    paradigmGaps: detectParadigmGaps(state, languageId),
     stats
   };
 }

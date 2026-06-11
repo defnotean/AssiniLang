@@ -2813,3 +2813,59 @@ label,
     gap: 0.2rem 0.6rem;
   }
 }
+
+/* --- Paradigm gaps panel (language profile fieldwork to-dos) --- */
+.paradigm-gaps-panel {
+  grid-column: 1 / -1;
+}
+
+.paradigm-gap-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.paradigm-gap-topline {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.paradigm-gap-topline code {
+  font-size: 1.02rem;
+}
+
+.paradigm-gap-dimension {
+  color: var(--muted, inherit);
+  font-size: 0.86rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pill.paradigm-cell-missing {
+  border-style: dashed;
+  font-weight: 600;
+}
+
+/* --- Practice next panel (spaced-repetition recommendations) --- */
+.practice-next-panel {
+  grid-column: 1 / -1;
+}
+
+.practice-next-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.practice-next-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.practice-next-prompt {
+  flex: 1;
+  min-width: 0;
+}

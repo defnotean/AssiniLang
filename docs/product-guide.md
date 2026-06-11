@@ -26,6 +26,8 @@ The profile view presents public linguistic metadata derived from workspace stat
 - Grammar rules drawn from the language's public notes.
 - Counts for corpus passages, notes, exercises, source assets, and pending extraction drafts.
 
+The profile also reports paradigm gaps - a fieldwork to-do derived entirely from the language's own data: when a lemma attests at least two cells along a grammatical dimension (say, two person suffixes on one verb root), the missing cells that are attested elsewhere in the language are listed with their evidence passages, so you know exactly which forms to elicit next.
+
 Use this view to understand what forms and rules the selected language currently supports. A new language starts with an empty profile and fills in as sources are processed and drafts are accepted.
 
 ### Sources & intake
@@ -70,6 +72,8 @@ Repeated contested, rejected, deferred, or escalated decisions for the same note
 ### Learning lab
 
 The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.
+
+A "Practice next" panel recommends what to work on using spaced repetition derived from your own submission history: unattempted exercises come first, a correct answer doubles the review interval (1, 2, 4 ... up to 30 days), and a wrong answer resets it, so overdue material resurfaces ahead of comfortable material.
 
 Reviewers can author compact exercises from the web UI. Exercise authoring is validated server-side against:
 

@@ -9,6 +9,7 @@ import {
 } from "@assini/db";
 import { gradeExerciseAnswer } from "@assini/eval";
 import { generateModelExercise, ModelRequiredError, type GeneratedExerciseDraft } from "../generation.js";
+import { rankExercisesForPractice } from "../practiceScheduler.js";
 import { toPublicExercise, toPublicExerciseSubmission } from "../publicLanguageViews.js";
 import {
   appendAuditEvent,
@@ -210,6 +211,33 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
       return { error: `Language not found: ${languageId}` };
     }
     return state.exercises.filter((exercise) => exercise.languageId === languageId).map(toPublicExercise);
+  });
+
+  app.get("/languages/:languageId/exercises/recommended", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const state = await readState();
+
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+
+    if (!state.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
+    const ranked = rankExercisesForPractice(languageExercises, state.exerciseSubmissions, actor.id, new Date())
+      .slice(0, 10);
+
+    return {
+      exercises: ranked.map((entry) => toPublicExercise(entry.exercise)),
+      rationale: ranked.map((entry) => ({
+        exerciseId: entry.exercise.id,
+        status: entry.status,
+        ...(entry.dueAt ? { dueAt: entry.dueAt } : {}),
+        streak: entry.streak
+      }))
+    };
   });
 
   app.post("/languages/:languageId/exercises", async (request, reply) => {

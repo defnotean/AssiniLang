@@ -1224,6 +1224,7 @@ export function App() {
               )}
               {view === "learner" && (
                 <LearnerView
+                  languageId={selectedLanguageId}
                   exercises={data.exercises}
                   selectedExercise={selectedExercise}
                   selectedExerciseId={selectedExerciseId}

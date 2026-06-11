@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   AiSession,
   AiSessionMode,
   AuditEvent,
@@ -90,12 +90,21 @@ export type LanguageProfileStats = {
   exerciseTypes: Partial<Record<Exercise["type"], number>>;
 };
 
+export type ParadigmGap = {
+  lemma: string;
+  dimension: string;
+  attested: string[];
+  missing: string[];
+  evidencePassageIds: string[];
+};
+
 export type LanguageProfile = {
   language: Language;
   phonology: LanguagePhonology | null;
   vocabulary: PublicVocabularyItem[];
   morphemeInventory: MorphemeInventoryItem[];
   grammarRules: PublicGrammarRule[];
+  paradigmGaps?: ParadigmGap[];
   stats: LanguageProfileStats;
 };
 
@@ -729,6 +738,27 @@ export async function submitExerciseAnswer(exerciseId: string, answer: string): 
   await assertOk(response, "Exercise submission failed");
 
   return response.json() as Promise<PublicExerciseSubmission>;
+}
+
+export type PracticeRecommendationStatus = "new" | "overdue" | "scheduled";
+
+export type PracticeRecommendationRationale = {
+  exerciseId: string;
+  status: PracticeRecommendationStatus;
+  dueAt?: string;
+  streak: number;
+};
+
+export type RecommendedExercises = {
+  exercises: PublicExercise[];
+  rationale: PracticeRecommendationRationale[];
+};
+
+export async function fetchRecommendedExercises(languageId: string): Promise<RecommendedExercises> {
+  return getJson<RecommendedExercises>(
+    `/languages/${encodeURIComponent(languageId)}/exercises/recommended`,
+    "learner"
+  );
 }
 
 export async function fetchExerciseSubmissions(exerciseId: string): Promise<PublicExerciseSubmission[]> {

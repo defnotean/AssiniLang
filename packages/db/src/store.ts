@@ -2,7 +2,9 @@ import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import Database from "better-sqlite3";
+import { eq, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { appStateSchema, parseAppState, type AppState, type Note } from "./schema.js";
 import * as schema from "./dbSchema.js";
 
@@ -404,6 +406,66 @@ export class JsonStore {
     }
   }
 
+  /**
+   * Reconciles one SQLite table with the desired records inside the caller's
+   * transaction. Rows are diffed by primary key (taken from the drizzle table
+   * definition, so per-table keys like corpus_answer_keys.passage_id work) and
+   * a stable serialized fingerprint built from the drizzle column list in
+   * declaration order; only differing rows are INSERTed/UPDATEd/DELETEd, so an
+   * unchanged collection produces zero row changes.
+   */
+  private syncTable(
+    drizzleDb: ReturnType<typeof drizzle>,
+    table: SQLiteTable,
+    records: readonly Record<string, unknown>[]
+  ): void {
+    const columns = getTableColumns(table) as Record<string, any>;
+    const columnKeys = Object.keys(columns);
+    const pkKey = columnKeys.find((key) => columns[key].primary);
+    if (!pkKey) {
+      throw new Error("Cannot sync table without a primary key column");
+    }
+    const pkColumn = columns[pkKey];
+
+    // Normalize a record to one value per column (missing/undefined -> null,
+    // matching what an insert of the record would persist), in stable column
+    // order so fingerprints are comparable.
+    const normalize = (record: Record<string, unknown>): Record<string, unknown> => {
+      const row: Record<string, unknown> = {};
+      for (const key of columnKeys) {
+        const value = record[key];
+        row[key] = value === undefined ? null : value;
+      }
+      return row;
+    };
+    const fingerprint = (row: Record<string, unknown>): string =>
+      JSON.stringify(columnKeys.map((key) => (row[key] === undefined ? null : row[key])));
+
+    const existing = new Map<unknown, string>();
+    for (const row of drizzleDb.select().from(table).all() as Record<string, unknown>[]) {
+      existing.set(row[pkKey], fingerprint(row));
+    }
+
+    const seen = new Set<unknown>();
+    for (const record of records) {
+      const row = normalize(record);
+      const pk = row[pkKey];
+      seen.add(pk);
+      const existingFingerprint = existing.get(pk);
+      if (existingFingerprint === undefined) {
+        drizzleDb.insert(table).values(row as any).run();
+      } else if (existingFingerprint !== fingerprint(row)) {
+        drizzleDb.update(table).set(row as any).where(eq(pkColumn, pk)).run();
+      }
+    }
+
+    for (const pk of existing.keys()) {
+      if (!seen.has(pk)) {
+        drizzleDb.delete(table).where(eq(pkColumn, pk)).run();
+      }
+    }
+  }
+
   async write(state: AppState): Promise<void> {
     if (!this.isSqlite) {
       const parsed = appStateSchema.parse(state);
@@ -433,45 +495,25 @@ export class JsonStore {
 
     try {
       db.transaction(() => {
-        drizzleDb.delete(schema.languages).run();
-        drizzleDb.delete(schema.corpus).run();
-        drizzleDb.delete(schema.corpusAnswerKeys).run();
-        drizzleDb.delete(schema.noteAnswerKeys).run();
-        drizzleDb.delete(schema.notes).run();
-        drizzleDb.delete(schema.exercises).run();
-        drizzleDb.delete(schema.exerciseSubmissions).run();
-        drizzleDb.delete(schema.evaluationRuns).run();
-        drizzleDb.delete(schema.governance).run();
-        drizzleDb.delete(schema.users).run();
-        drizzleDb.delete(schema.aiSessions).run();
-        drizzleDb.delete(schema.elderCorrections).run();
-        drizzleDb.delete(schema.auditEvents).run();
-        drizzleDb.delete(schema.reviewPolicies).run();
-        drizzleDb.delete(schema.reviewApprovals).run();
-        drizzleDb.delete(schema.reviewDispositions).run();
-        drizzleDb.delete(schema.lexemes).run();
-        drizzleDb.delete(schema.sourceAssets).run();
-        drizzleDb.delete(schema.extractionDrafts).run();
-
-        if (parsed.languages.length > 0) drizzleDb.insert(schema.languages).values(parsed.languages).run();
-        if (parsed.corpus.length > 0) drizzleDb.insert(schema.corpus).values(parsed.corpus).run();
-        if (parsed.corpusAnswerKeys && parsed.corpusAnswerKeys.length > 0) drizzleDb.insert(schema.corpusAnswerKeys).values(parsed.corpusAnswerKeys).run();
-        if (parsed.noteAnswerKeys.length > 0) drizzleDb.insert(schema.noteAnswerKeys).values(parsed.noteAnswerKeys).run();
-        if (parsed.notes.length > 0) drizzleDb.insert(schema.notes).values(parsed.notes).run();
-        if (parsed.exercises.length > 0) drizzleDb.insert(schema.exercises).values(parsed.exercises).run();
-        if (parsed.exerciseSubmissions.length > 0) drizzleDb.insert(schema.exerciseSubmissions).values(parsed.exerciseSubmissions).run();
-        if (parsed.evaluationRuns.length > 0) drizzleDb.insert(schema.evaluationRuns).values(parsed.evaluationRuns as any).run();
-        if (parsed.governance.length > 0) drizzleDb.insert(schema.governance).values(parsed.governance).run();
-        if (parsed.users.length > 0) drizzleDb.insert(schema.users).values(parsed.users).run();
-        if (parsed.aiSessions.length > 0) drizzleDb.insert(schema.aiSessions).values(parsed.aiSessions as any).run();
-        if (parsed.elderCorrections.length > 0) drizzleDb.insert(schema.elderCorrections).values(parsed.elderCorrections).run();
-        if (parsed.auditEvents.length > 0) drizzleDb.insert(schema.auditEvents).values(parsed.auditEvents as any).run();
-        if (parsed.reviewPolicies.length > 0) drizzleDb.insert(schema.reviewPolicies).values(parsed.reviewPolicies as any).run();
-        if (parsed.reviewApprovals.length > 0) drizzleDb.insert(schema.reviewApprovals).values(parsed.reviewApprovals).run();
-        if (parsed.reviewDispositions.length > 0) drizzleDb.insert(schema.reviewDispositions).values(parsed.reviewDispositions).run();
-        if (parsed.lexemes.length > 0) drizzleDb.insert(schema.lexemes).values(parsed.lexemes as any).run();
-        if (parsed.sourceAssets.length > 0) drizzleDb.insert(schema.sourceAssets).values(parsed.sourceAssets as any).run();
-        if (parsed.extractionDrafts.length > 0) drizzleDb.insert(schema.extractionDrafts).values(parsed.extractionDrafts as any).run();
+        this.syncTable(drizzleDb, schema.languages, parsed.languages);
+        this.syncTable(drizzleDb, schema.corpus, parsed.corpus);
+        this.syncTable(drizzleDb, schema.corpusAnswerKeys, parsed.corpusAnswerKeys ?? []);
+        this.syncTable(drizzleDb, schema.noteAnswerKeys, parsed.noteAnswerKeys);
+        this.syncTable(drizzleDb, schema.notes, parsed.notes);
+        this.syncTable(drizzleDb, schema.exercises, parsed.exercises);
+        this.syncTable(drizzleDb, schema.exerciseSubmissions, parsed.exerciseSubmissions);
+        this.syncTable(drizzleDb, schema.evaluationRuns, parsed.evaluationRuns);
+        this.syncTable(drizzleDb, schema.governance, parsed.governance);
+        this.syncTable(drizzleDb, schema.users, parsed.users);
+        this.syncTable(drizzleDb, schema.aiSessions, parsed.aiSessions);
+        this.syncTable(drizzleDb, schema.elderCorrections, parsed.elderCorrections);
+        this.syncTable(drizzleDb, schema.auditEvents, parsed.auditEvents);
+        this.syncTable(drizzleDb, schema.reviewPolicies, parsed.reviewPolicies);
+        this.syncTable(drizzleDb, schema.reviewApprovals, parsed.reviewApprovals);
+        this.syncTable(drizzleDb, schema.reviewDispositions, parsed.reviewDispositions);
+        this.syncTable(drizzleDb, schema.lexemes, parsed.lexemes);
+        this.syncTable(drizzleDb, schema.sourceAssets, parsed.sourceAssets);
+        this.syncTable(drizzleDb, schema.extractionDrafts, parsed.extractionDrafts);
       })();
     } finally {
       this.snapshot = null;

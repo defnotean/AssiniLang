@@ -1,10 +1,25 @@
-import { useState, type FormEvent } from "react";
-import type { ExerciseAuthoringPayload, GeneratedExerciseDraft, PublicExerciseSubmission } from "../api";
+import { useEffect, useState, type FormEvent } from "react";
+import {
+  fetchRecommendedExercises,
+  type ExerciseAuthoringPayload,
+  type GeneratedExerciseDraft,
+  type PublicExerciseSubmission,
+  type RecommendedExercises
+} from "../api";
 import { formatSubmissionStatus, parseAuthoringList } from "../lib/format";
 import { EXERCISE_TYPE_LABELS } from "../lib/viewConfig";
-import type { PublicExercise } from "../lib/types";
+import type { AsyncState, PublicExercise } from "../lib/types";
+
+const PRACTICE_NEXT_LIMIT = 3;
+
+const PRACTICE_STATUS_LABELS: Record<RecommendedExercises["rationale"][number]["status"], string> = {
+  new: "New",
+  overdue: "Overdue",
+  scheduled: "Scheduled"
+};
 
 export function LearnerView({
+  languageId,
   exercises,
   selectedExercise,
   selectedExerciseId,
@@ -20,6 +35,7 @@ export function LearnerView({
   onCreateExercise,
   onGenerateExercise
 }: {
+  languageId: string | null;
   exercises: PublicExercise[];
   selectedExercise: PublicExercise | null;
   selectedExerciseId: string | null;
@@ -51,6 +67,33 @@ export function LearnerView({
   const [authoringError, setAuthoringError] = useState<string | null>(null);
   const [isCreatingExercise, setIsCreatingExercise] = useState(false);
   const [isGeneratingExercise, setIsGeneratingExercise] = useState(false);
+  const [practiceState, setPracticeState] = useState<AsyncState<RecommendedExercises>>({ status: "idle" });
+
+  useEffect(() => {
+    if (!languageId) {
+      setPracticeState({ status: "idle" });
+      return;
+    }
+
+    let cancelled = false;
+    setPracticeState({ status: "loading" });
+    fetchRecommendedExercises(languageId)
+      .then((data) => {
+        if (!cancelled) setPracticeState({ status: "ready", data });
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setPracticeState({
+            status: "error",
+            message: error instanceof Error ? error.message : "Failed to load practice recommendations."
+          });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [languageId]);
   const hasTwoAdversarialProbes = authoringAdversarialAnswerOne.trim().length > 0
     && authoringAdversarialReasonOne.trim().length > 0
     && authoringAdversarialAnswerTwo.trim().length > 0
@@ -132,8 +175,61 @@ export function LearnerView({
     }
   }
 
+  function renderPracticeNext() {
+    if (practiceState.status === "idle" || practiceState.status === "loading") {
+      return (
+        <p className="inline-empty" role="status" aria-live="polite">
+          Loading practice recommendations.
+        </p>
+      );
+    }
+
+    if (practiceState.status === "error") {
+      return (
+        <p className="result-notice error" role="alert">
+          {practiceState.message}
+        </p>
+      );
+    }
+
+    const { exercises: recommended, rationale } = practiceState.data;
+    if (recommended.length === 0) {
+      return <p className="inline-empty">No practice recommendations yet.</p>;
+    }
+
+    return (
+      <div className="practice-next-list">
+        {recommended.slice(0, PRACTICE_NEXT_LIMIT).map((exercise) => {
+          const entry = rationale.find((item) => item.exerciseId === exercise.id);
+          const status = entry?.status ?? "new";
+          return (
+            <div key={exercise.id} className="practice-next-item">
+              <span className={`pill practice-status practice-status-${status}`}>
+                {PRACTICE_STATUS_LABELS[status]}
+              </span>
+              <span className="practice-next-prompt">{exercise.prompt}</span>
+              <button
+                type="button"
+                className="secondary"
+                disabled={isWorkflowBusy}
+                onClick={() => onSelectExercise(exercise.id)}
+              >
+                Practice
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="exercise-workbench">
+      <section className="record-card practice-next-panel" aria-label="Practice next">
+        <h3>Practice next</h3>
+        {renderPracticeNext()}
+      </section>
+
       <section className="exercise-list" aria-label="Exercise selector">
         <div className="panel-heading">{exercises.length} exercises</div>
         {exercises.length === 0 ? (
