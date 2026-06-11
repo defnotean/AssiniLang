@@ -2869,3 +2869,25 @@ label,
   flex: 1;
   min-width: 0;
 }
+
+/* Prototype session sign-out (sidebar user-card) */
+.sign-out-button {
+  margin-top: 0.4rem;
+  align-self: flex-start;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.78rem;
+  border: 1px solid var(--border, currentColor);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sign-out-button:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.sign-out-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

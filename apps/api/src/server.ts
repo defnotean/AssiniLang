@@ -6,7 +6,11 @@ import { JobQueue } from "./jobQueue.js";
 import { recoverInterruptedSources } from "./jobRecovery.js";
 import { JsonStore, type AppState, type User } from "@assini/db";
 import { createLlmProviderFromEnv, type LlmProvider } from "./llmProvider.js";
-import type { PrototypeSessionRecord } from "./routeHelpers.js";
+import {
+  readPrototypeSessionTtlMs,
+  type PrototypeSessionMap,
+  type PrototypeSessionRecord
+} from "./routeHelpers.js";
 import type { RouteContext } from "./routes/context.js";
 import { registerAiSessionRoutes } from "./routes/aiSessions.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -40,6 +44,10 @@ type ServerOptions = {
   /** Server-only token used by tests or explicitly configured internal tools. Never bundle this into the browser. */
   authToken?: string;
   enablePrototypeAuth?: boolean;
+  /** Prototype-session lifetime in ms. Defaults to ASSINI_PROTOTYPE_SESSION_TTL_MS or 8 hours. */
+  prototypeSessionTtlMs?: number;
+  /** Injectable clock for session lifecycle tests. */
+  now?: () => number;
   llmProvider?: LlmProvider;
   /** Directory where uploaded source-asset files are stored. Defaults to ./data next to the local database. */
   dataDir?: string;
@@ -82,7 +90,10 @@ export function createServer(options: ServerOptions = {}) {
   const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? DEFAULT_RATE_LIMIT;
   const authToken = options.authToken ?? process.env.ASSINI_DEV_AUTH_TOKEN ?? (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
-  const prototypeSessions = new Map<string, PrototypeSessionRecord>();
+  const prototypeSessions: PrototypeSessionMap = new Map<string, PrototypeSessionRecord>();
+  const prototypeSessionTtlMs = options.prototypeSessionTtlMs ?? readPrototypeSessionTtlMs(process.env);
+  const now = options.now ?? Date.now;
+  prototypeSessions.now = now;
   const llmProvider = options.llmProvider ?? createLlmProviderFromEnv();
   const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
   const ingestionFetch = options.ingestionFetch ?? globalThis.fetch;
@@ -176,6 +187,8 @@ export function createServer(options: ServerOptions = {}) {
     authToken,
     prototypeSessions,
     enablePrototypeAuth,
+    prototypeSessionTtlMs,
+    now,
     llmProvider,
     dataDir,
     ingestionFetch,

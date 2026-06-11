@@ -7,8 +7,35 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { appStateSchema, parseAppState, type AppState, type Note } from "./schema.js";
 import * as schema from "./dbSchema.js";
+import { runSqliteMigrations } from "./sqliteMigrations.js";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
+
+export type StoreBackend = "json" | "sqlite";
+
+export interface JsonStoreOptions {
+  /**
+   * Explicit storage backend. When provided it wins over the path extension;
+   * when omitted the backend is inferred from the path (`.json` -> JSON file,
+   * anything else -> SQLite).
+   */
+  backend?: StoreBackend;
+}
+
+function inferBackend(dbPath: string): StoreBackend {
+  return dbPath.endsWith(".json") ? "json" : "sqlite";
+}
+
+function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBackend {
+  const backend = options?.backend;
+  if (backend === undefined) {
+    return inferBackend(dbPath);
+  }
+  if (backend !== "json" && backend !== "sqlite") {
+    throw new Error(`Invalid store backend "${String(backend)}": expected "json" or "sqlite".`);
+  }
+  return backend;
+}
 
 export function createEmptyState(): AppState {
   return {
@@ -70,14 +97,17 @@ type SnapshotKey = { mtimeMs: number; size: number };
 
 export class JsonStore {
   private updateQueue: Promise<void> = Promise.resolve();
+  /** The storage backend in use: explicit via options, otherwise inferred from the path extension. */
+  readonly backend: StoreBackend;
   private readonly isSqlite: boolean;
   // Parsed-state snapshot keyed by the database file's mtime+size. Reads of an
   // unchanged file cost one stat() instead of a full table scan + Zod parse;
   // any external write changes the key and forces a real re-read.
   private snapshot: (SnapshotKey & { state: AppState }) | null = null;
 
-  constructor(private readonly dbPath = DEFAULT_DB_PATH) {
-    this.isSqlite = !this.dbPath.endsWith(".json");
+  constructor(private readonly dbPath = DEFAULT_DB_PATH, options?: JsonStoreOptions) {
+    this.backend = resolveBackend(this.dbPath, options);
+    this.isSqlite = this.backend === "sqlite";
   }
 
   private async snapshotKey(): Promise<SnapshotKey | null> {
@@ -93,7 +123,7 @@ export class JsonStore {
     this.snapshot = key ? { ...key, state: structuredClone(state) } : null;
   }
 
-  private ensureTables(db: any): void {
+  private ensureTables(db: Database.Database): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS languages (
         id TEXT PRIMARY KEY,
@@ -318,6 +348,7 @@ export class JsonStore {
         committed_entity_id TEXT
       );
     `);
+    runSqliteMigrations(db, this.dbPath);
   }
 
   async read(): Promise<AppState> {
@@ -626,4 +657,12 @@ export class JsonStore {
     }
     return updated;
   }
+}
+
+/**
+ * Convenience factory for {@link JsonStore}. Equivalent to
+ * `new JsonStore(path, options)`.
+ */
+export function openStore(path?: string, options?: JsonStoreOptions): JsonStore {
+  return new JsonStore(path, options);
 }

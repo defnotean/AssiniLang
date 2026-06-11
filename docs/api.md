@@ -10,7 +10,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Health check. |
 | GET | `/ready` | Public | Readiness check for schema-valid persistence. |
-| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. |
+| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use; creating a session also sweeps expired session records. |
+| DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. |
 | GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
 | POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
 | GET | `/users/me` | Any actor | Current prototype user. |

@@ -1,78 +1,40 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { AiSession, AuditEvent, ElderCorrection, GovernanceRecord, ReviewDisposition, ReviewPolicy, User } from "@assini/db";
+import { useEffect, useMemo, useState } from "react";
+import type { User } from "@assini/db";
 import type {
-  DashboardData,
-  ElderContext,
-  ElderCorrectionPayload,
-  ExerciseAuthoringPayload,
-  GeneratedExerciseDraft,
   CorpusImportPayload,
-  GovernancePayload,
   LanguageCreatePayload,
-  LanguageProfile,
-  LlmReachability,
-  LlmStatus,
-  ObservabilityData,
-  PublicExerciseSubmission,
-  ElderCorrectionReviewStatus,
-  ReviewPolicyPayload
+  LanguageProfile
 } from "./api";
 import {
-  applyElderCorrection,
-  checkLlmReachability,
-  createAiSession,
-  createExercise,
-  createGovernanceRecord,
   createLanguage,
-  fetchAuditEvents,
   fetchCurrentUser,
   fetchDashboardData,
-  fetchElderContext,
-  fetchEvaluationArtifact,
-  fetchExerciseSubmissions,
-  fetchGovernance,
   fetchLanguageProfile,
-  fetchLanguageSnapshot,
-  fetchLlmStatus,
-  fetchObservability,
-  fetchReviewDispositions,
-  fetchReviewPolicy,
   generateDraftNotes,
   generateModelDraftNotes,
-  generateModelExercise,
   importCorpusPassage,
-  resolveReviewDisposition,
-  reviewElderCorrection,
   reviewNote,
-  runEvaluation,
-  submitElderCorrection,
-  submitExerciseAnswer,
-  updateReviewPolicy
+  runEvaluation
 } from "./api";
 import { CommandPalette, type PaletteCommand } from "./components/CommandPalette";
+import { SignOutButton } from "./components/SignOutButton";
 import { StatusScreen } from "./components/StatusScreen";
 import { CompassMark, DiamondBand, TypologyMark, ViewGlyph } from "./components/marks";
-import {
-  buildEvaluationArtifactDownload,
-  buildSnapshotDownload,
-  formatOrthographyMeta,
-  isRealModelProvider,
-  latestAssistantMessage,
-  parseReviewerIds,
-  sessionUsedDeterministicFallback
-} from "./lib/format";
+import { formatOrthographyMeta } from "./lib/format";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
   AsyncState,
   DashboardLoadState,
-  PublicExercise,
   ReviewStatus,
-  SnapshotDownload,
   Theme,
   ViewMode
 } from "./lib/types";
 import { REVIEWER_COMMENTS, VIEW_CONFIG, VIEW_ORDER } from "./lib/viewConfig";
+import { useElderWorkspace } from "./hooks/useElderWorkspace";
+import { useGovernanceWorkspace } from "./hooks/useGovernanceWorkspace";
+import { useLearnerWorkspace } from "./hooks/useLearnerWorkspace";
+import { useModelWorkspace } from "./hooks/useModelWorkspace";
 import { CorpusView } from "./views/CorpusView";
 import { CreateLanguageForm } from "./views/CreateLanguageForm";
 import { ElderWorkspace } from "./views/ElderWorkspace";
@@ -106,64 +68,14 @@ export function App() {
   const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
 
-  const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
-  const [exerciseAnswer, setExerciseAnswer] = useState("");
-  const [isGrading, setIsGrading] = useState(false);
-  const [isLoadingSubmissions, setIsLoadingSubmissions] = useState(false);
-  const [exerciseResult, setExerciseResult] = useState<string | null>(null);
-  const [submissionHistory, setSubmissionHistory] = useState<PublicExerciseSubmission[]>([]);
-
   const [isElderMode, setIsElderMode] = useState(false);
-  const [elderContext, setElderContext] = useState<ElderContext | null>(null);
-  const [isLoadingElder, setIsLoadingElder] = useState(false);
-  const [correctionSuccess, setCorrectionSuccess] = useState<string | null>(null);
-  const [correctionError, setCorrectionError] = useState<string | null>(null);
-  const [formNoteId, setFormNoteId] = useState("");
-  const [formPassageId, setFormPassageId] = useState("");
-  const [formSeverity, setFormSeverity] = useState<ElderCorrection["severity"]>("minor");
-  const [formCorrection, setFormCorrection] = useState("");
-  const [formRationale, setFormRationale] = useState("");
-  const [formContextText, setFormContextText] = useState("");
-  const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false);
-  const [reviewingCorrectionId, setReviewingCorrectionId] = useState<string | null>(null);
-  const [applyingCorrectionId, setApplyingCorrectionId] = useState<string | null>(null);
-  const [correctionApplyDrafts, setCorrectionApplyDrafts] = useState<Record<string, string>>({});
 
-  const [governanceState, setGovernanceState] = useState<AsyncState<GovernanceRecord[]>>({ status: "idle" });
-  const [policyType, setPolicyType] = useState<GovernanceRecord["policyType"]>("generation");
-  const [policyEffectiveDate, setPolicyEffectiveDate] = useState("");
-  const [policyContent, setPolicyContent] = useState("");
-  const [governanceSuccess, setGovernanceSuccess] = useState<string | null>(null);
-  const [governanceError, setGovernanceError] = useState<string | null>(null);
-  const [isSubmittingGovernance, setIsSubmittingGovernance] = useState(false);
-  const [auditEventState, setAuditEventState] = useState<AsyncState<AuditEvent[]>>({ status: "idle" });
-  const [reviewPolicyState, setReviewPolicyState] = useState<AsyncState<ReviewPolicy>>({ status: "idle" });
-  const [reviewPolicyReviewerIds, setReviewPolicyReviewerIds] = useState("");
-  const [reviewPolicyApprovalThreshold, setReviewPolicyApprovalThreshold] = useState("1");
-  const [reviewPolicyRequiresAssigned, setReviewPolicyRequiresAssigned] = useState(true);
-  const [reviewPolicySuccess, setReviewPolicySuccess] = useState<string | null>(null);
-  const [reviewPolicyError, setReviewPolicyError] = useState<string | null>(null);
-  const [isSubmittingReviewPolicy, setIsSubmittingReviewPolicy] = useState(false);
-  const [reviewDispositionState, setReviewDispositionState] = useState<AsyncState<ReviewDisposition[]>>({ status: "idle" });
-  const [reviewDispositionDrafts, setReviewDispositionDrafts] = useState<Record<string, string>>({});
-  const [reviewDispositionSuccess, setReviewDispositionSuccess] = useState<string | null>(null);
-  const [reviewDispositionError, setReviewDispositionError] = useState<string | null>(null);
-  const [resolvingReviewDispositionId, setResolvingReviewDispositionId] = useState<string | null>(null);
-  const [snapshotDownload, setSnapshotDownload] = useState<SnapshotDownload | null>(null);
-  const [snapshotError, setSnapshotError] = useState<string | null>(null);
-  const [isExportingSnapshot, setIsExportingSnapshot] = useState(false);
-  const [evaluationArtifactDownload, setEvaluationArtifactDownload] = useState<SnapshotDownload | null>(null);
-  const [evaluationArtifactError, setEvaluationArtifactError] = useState<string | null>(null);
-  const [isExportingEvaluationArtifact, setIsExportingEvaluationArtifact] = useState(false);
+  const data = loadState.status === "ready" ? loadState.data : null;
 
-  const [llmState, setLlmState] = useState<AsyncState<LlmStatus>>({ status: "idle" });
-  const [observabilityState, setObservabilityState] = useState<AsyncState<ObservabilityData>>({ status: "idle" });
-  const [isTestingModel, setIsTestingModel] = useState(false);
-  const [modelTestResult, setModelTestResult] = useState<string | null>(null);
-  const [modelTestIsPlaceholder, setModelTestIsPlaceholder] = useState(false);
-  const [isCheckingReachability, setIsCheckingReachability] = useState(false);
-  const [reachabilityResult, setReachabilityResult] = useState<LlmReachability | null>(null);
-  const [reachabilityError, setReachabilityError] = useState<string | null>(null);
+  const model = useModelWorkspace(view, selectedLanguageId, data);
+  const elder = useElderWorkspace(selectedLanguageId, isElderMode, refreshDashboard, model.refreshModelObservability);
+  const learner = useLearnerWorkspace(view, selectedLanguageId, data, refreshDashboard);
+  const governance = useGovernanceWorkspace(selectedLanguageId, view, refreshDashboard);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -217,11 +129,11 @@ export function App() {
   useEffect(() => {
     let isCurrent = true;
     setLoadState({ status: "loading" });
-    setExerciseResult(null);
-    setExerciseAnswer("");
-    setSelectedExerciseId(null);
+    learner.setExerciseResult(null);
+    learner.setExerciseAnswer("");
+    learner.setSelectedExerciseId(null);
     setSelectedNoteId(null);
-    setSubmissionHistory([]);
+    learner.setSubmissionHistory([]);
 
     fetchDashboardData(selectedLanguageId ?? undefined)
       .then((data) => {
@@ -234,6 +146,7 @@ export function App() {
     return () => {
       isCurrent = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLanguageId]);
 
   useEffect(() => {
@@ -259,66 +172,24 @@ export function App() {
     };
   }, [selectedLanguageId, view]);
 
-  useEffect(() => {
-    let isCurrent = true;
-    if (!isElderMode || !selectedLanguageId) {
-      setElderContext(null);
-      return () => {
-        isCurrent = false;
-      };
-    }
-
-    setIsLoadingElder(true);
-    setCorrectionSuccess(null);
-    setCorrectionError(null);
-
-    fetchElderContext(selectedLanguageId)
-      .then((context) => {
-        if (isCurrent) setElderContext(context);
-      })
-      .catch(() => {
-        if (isCurrent) setElderContext(null);
-      })
-      .finally(() => {
-        if (isCurrent) setIsLoadingElder(false);
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedLanguageId, isElderMode]);
-
-  useEffect(() => {
-    setFormNoteId("");
-    setFormPassageId("");
-    setFormSeverity("minor");
-    setFormCorrection("");
-    setFormRationale("");
-    setFormContextText("");
-    setCorrectionApplyDrafts({});
-    setCorrectionSuccess(null);
-    setCorrectionError(null);
-  }, [selectedLanguageId, isElderMode]);
-
-  const data = loadState.status === "ready" ? loadState.data : null;
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId) ?? null;
   const selectedNote = data?.notes.find((note) => note.id === selectedNoteId) ?? data?.notes[0] ?? null;
-  const selectedExercise = data?.exercises.find((exercise) => exercise.id === selectedExerciseId) ?? data?.exercises[0] ?? null;
+  const selectedExercise = learner.selectedExercise;
   const activeView = VIEW_CONFIG[view];
   const isWorkflowBusy = isEvaluating
     || isDrafting
     || isModelDrafting
     || reviewingNoteId !== null
-    || isGrading
-    || isSubmittingCorrection
-    || reviewingCorrectionId !== null
-    || applyingCorrectionId !== null
-    || isSubmittingGovernance
-    || isSubmittingReviewPolicy
-    || resolvingReviewDispositionId !== null
-    || isExportingSnapshot
-    || isExportingEvaluationArtifact
-    || isTestingModel;
+    || learner.isGrading
+    || elder.isSubmittingCorrection
+    || elder.reviewingCorrectionId !== null
+    || elder.applyingCorrectionId !== null
+    || governance.isSubmittingGovernance
+    || governance.isSubmittingReviewPolicy
+    || governance.resolvingReviewDispositionId !== null
+    || governance.isExportingSnapshot
+    || governance.isExportingEvaluationArtifact
+    || model.isTestingModel;
 
   const overviewStats = useMemo(() => {
     if (!data) return [];
@@ -353,161 +224,9 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  useEffect(() => {
-    let isCurrent = true;
-    setExerciseAnswer("");
-    setExerciseResult(null);
-
-    if (view !== "learner" || !selectedExercise) {
-      setSubmissionHistory([]);
-      setIsLoadingSubmissions(false);
-      return () => {
-        isCurrent = false;
-      };
-    }
-
-    setIsLoadingSubmissions(true);
-    fetchExerciseSubmissions(selectedExercise.id)
-      .then((history) => {
-        if (isCurrent) setSubmissionHistory(history);
-      })
-      .catch(() => {
-        if (isCurrent) setSubmissionHistory([]);
-      })
-      .finally(() => {
-        if (isCurrent) setIsLoadingSubmissions(false);
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [selectedExercise?.id, view]);
-
-  useEffect(() => {
-    let isCurrent = true;
-    if (view !== "model") return () => {
-      isCurrent = false;
-    };
-
-    setLlmState({ status: "loading" });
-    setObservabilityState({ status: "loading" });
-    setModelTestResult(null);
-    fetchLlmStatus()
-      .then((status) => {
-        if (isCurrent) setLlmState({ status: "ready", data: status });
-      })
-      .catch((error: Error) => {
-        if (isCurrent) setLlmState({ status: "error", message: error.message });
-      });
-    fetchObservability()
-      .then((observability) => {
-        if (isCurrent) setObservabilityState({ status: "ready", data: observability });
-      })
-      .catch((error: Error) => {
-        if (isCurrent) setObservabilityState({ status: "error", message: error.message });
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [view]);
-
-  useEffect(() => {
-    let isCurrent = true;
-    if (view !== "governance" || !selectedLanguageId) {
-      return () => {
-        isCurrent = false;
-      };
-    }
-
-    setGovernanceState({ status: "loading" });
-    setAuditEventState({ status: "loading" });
-    setReviewPolicyState({ status: "loading" });
-    setReviewDispositionState({ status: "loading" });
-    setGovernanceSuccess(null);
-    setGovernanceError(null);
-    setReviewPolicySuccess(null);
-    setReviewPolicyError(null);
-    setReviewDispositionSuccess(null);
-    setReviewDispositionError(null);
-    fetchGovernance()
-      .then((records) => {
-        if (isCurrent) setGovernanceState({ status: "ready", data: records });
-      })
-      .catch((error: Error) => {
-        if (isCurrent) setGovernanceState({ status: "error", message: error.message });
-      });
-    const reviewPolicyRequest = fetchReviewPolicy(selectedLanguageId)
-      .then((policy) => {
-        if (!isCurrent) return;
-        setReviewPolicyState({ status: "ready", data: policy });
-        setReviewPolicyReviewerIds(policy.assignedReviewerIds.join(", "));
-        setReviewPolicyApprovalThreshold(policy.approvalThreshold.toString());
-        setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
-      })
-      .catch((error: Error) => {
-        if (isCurrent) setReviewPolicyState({ status: "error", message: error.message });
-      });
-    const reviewDispositionRequest = fetchReviewDispositions(selectedLanguageId)
-      .then((dispositions) => {
-        if (isCurrent) setReviewDispositionState({ status: "ready", data: dispositions });
-      })
-      .catch((error: Error) => {
-        if (isCurrent) setReviewDispositionState({ status: "error", message: error.message });
-      });
-    Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest])
-      .then(() => {
-        if (!isCurrent) return undefined;
-        return fetchAuditEvents(selectedLanguageId)
-          .then((events) => {
-            if (isCurrent) setAuditEventState({ status: "ready", data: events });
-          })
-          .catch((error: Error) => {
-            if (isCurrent) setAuditEventState({ status: "error", message: error.message });
-          });
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [view, selectedLanguageId]);
-
-  useEffect(() => {
-    setPolicyType("generation");
-    setPolicyEffectiveDate("");
-    setPolicyContent("");
-    setGovernanceSuccess(null);
-    setGovernanceError(null);
-    setAuditEventState({ status: "idle" });
-    setReviewPolicyState({ status: "idle" });
-    setReviewPolicyReviewerIds("");
-    setReviewPolicyApprovalThreshold("1");
-    setReviewPolicyRequiresAssigned(true);
-    setReviewPolicySuccess(null);
-    setReviewPolicyError(null);
-    setReviewDispositionState({ status: "idle" });
-    setReviewDispositionDrafts({});
-    setReviewDispositionSuccess(null);
-    setReviewDispositionError(null);
-    setSnapshotDownload(null);
-    setSnapshotError(null);
-    setEvaluationArtifactDownload(null);
-    setEvaluationArtifactError(null);
-  }, [selectedLanguageId]);
-
   async function refreshDashboard() {
     const refreshed = await fetchDashboardData(selectedLanguageId ?? undefined);
     setLoadState({ status: "ready", data: refreshed });
-  }
-
-  async function refreshModelObservability() {
-    setObservabilityState({ status: "loading" });
-    try {
-      setObservabilityState({ status: "ready", data: await fetchObservability() });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Model observability failed";
-      setObservabilityState({ status: "error", message });
-    }
   }
 
   function handleLanguageSelect(languageId: string) {
@@ -616,369 +335,12 @@ export function App() {
     }
   }
 
-  async function handleGrade() {
-    const submittedAnswer = exerciseAnswer.trim();
-    if (!selectedExercise || submittedAnswer.length === 0) return;
-
-    setIsGrading(true);
-    setExerciseResult(null);
-    try {
-      const submission = await submitExerciseAnswer(selectedExercise.id, submittedAnswer);
-      setExerciseResult(submission.explanation);
-      setSubmissionHistory(await fetchExerciseSubmissions(selectedExercise.id));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Exercise submission failed";
-      setExerciseResult(message);
-    } finally {
-      setIsGrading(false);
-    }
-  }
-
-  async function handleCreateExercise(payload: ExerciseAuthoringPayload) {
-    if (!selectedLanguageId) {
-      throw new Error("Select or create a language first.");
-    }
-    const created = await createExercise(selectedLanguageId, payload);
-    await refreshDashboard();
-    setSelectedExerciseId(created.id);
-    setExerciseAnswer("");
-    setExerciseResult(null);
-    setSubmissionHistory([]);
-  }
-
-  async function handleGenerateExercise(
-    options?: { type?: string }
-  ): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
-    if (!selectedLanguageId) {
-      throw new Error("Select or create a language first.");
-    }
-    return generateModelExercise(selectedLanguageId, options);
-  }
-
   async function handleImportCorpusPassage(payload: CorpusImportPayload) {
     if (!selectedLanguageId) {
       throw new Error("Select or create a language first.");
     }
     await importCorpusPassage(selectedLanguageId, payload);
     await refreshDashboard();
-  }
-
-  async function handleSubmitCorrection(event: FormEvent) {
-    event.preventDefault();
-    if (!formCorrection.trim() || !formRationale.trim()) {
-      setCorrectionError("Please describe both the correction and the rationale.");
-      return;
-    }
-
-    if (!formNoteId && !formPassageId && !formContextText.trim()) {
-      setCorrectionError("Linguistic Rule: You must bind the correction to at least one context indicator (choose a Note, choose a Passage, or provide a Custom Context snippet).");
-      return;
-    }
-
-    if (!selectedLanguageId) {
-      setCorrectionError("Select or create a language first.");
-      return;
-    }
-
-    setIsSubmittingCorrection(true);
-    setCorrectionSuccess(null);
-    setCorrectionError(null);
-
-    const payload: ElderCorrectionPayload = {
-      languageId: selectedLanguageId,
-      noteId: formNoteId || undefined,
-      passageId: formPassageId || undefined,
-      correction: formCorrection.trim(),
-      rationale: formRationale.trim(),
-      severity: formSeverity,
-      contextText: formContextText.trim() || undefined
-    };
-
-    try {
-      await submitElderCorrection(payload);
-      setCorrectionSuccess("Elder Correction submitted successfully!");
-      setFormCorrection("");
-      setFormRationale("");
-      setFormContextText("");
-      setFormNoteId("");
-      setFormPassageId("");
-      setElderContext(await fetchElderContext(selectedLanguageId));
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction submission failed";
-      setCorrectionError(message);
-    } finally {
-      setIsSubmittingCorrection(false);
-    }
-  }
-
-  async function handleReviewCorrection(correctionId: string, status: ElderCorrectionReviewStatus) {
-    if (!selectedLanguageId) return;
-    setReviewingCorrectionId(correctionId);
-    setCorrectionSuccess(null);
-    setCorrectionError(null);
-    try {
-      await reviewElderCorrection(correctionId, status);
-      setCorrectionSuccess(status === "accepted" ? "Elder correction accepted." : "Elder correction rejected.");
-      setElderContext(await fetchElderContext(selectedLanguageId));
-      await refreshModelObservability();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction review failed";
-      setCorrectionError(message);
-    } finally {
-      setReviewingCorrectionId(null);
-    }
-  }
-
-  async function handleApplyCorrection(correctionId: string, explanation: string) {
-    const revisedExplanation = explanation.trim();
-    if (!revisedExplanation) {
-      setCorrectionSuccess(null);
-      setCorrectionError("Please provide a revised explanation before applying the correction.");
-      return;
-    }
-
-    if (!selectedLanguageId) {
-      setCorrectionSuccess(null);
-      setCorrectionError("Select or create a language first.");
-      return;
-    }
-
-    setApplyingCorrectionId(correctionId);
-    setCorrectionSuccess(null);
-    setCorrectionError(null);
-    try {
-      await applyElderCorrection(correctionId, revisedExplanation);
-      setCorrectionSuccess("Elder correction applied to linked note.");
-      setCorrectionApplyDrafts((current) => {
-        const next = { ...current };
-        delete next[correctionId];
-        return next;
-      });
-      setElderContext(await fetchElderContext(selectedLanguageId));
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction apply failed";
-      setCorrectionError(message);
-    } finally {
-      setApplyingCorrectionId(null);
-    }
-  }
-
-  async function handleSubmitGovernance(event: FormEvent) {
-    event.preventDefault();
-    const content = policyContent.trim();
-    const effectiveDate = policyEffectiveDate.trim();
-
-    if (!content || !effectiveDate) {
-      setGovernanceSuccess(null);
-      setGovernanceError("Please provide policy content and an effective date.");
-      return;
-    }
-
-    if (!selectedLanguageId) {
-      setGovernanceSuccess(null);
-      setGovernanceError("Select or create a language first.");
-      return;
-    }
-
-    setIsSubmittingGovernance(true);
-    setGovernanceSuccess(null);
-    setGovernanceError(null);
-
-    const payload: GovernancePayload = {
-      languageId: selectedLanguageId,
-      policyType,
-      content,
-      effectiveDate
-    };
-
-    try {
-      await createGovernanceRecord(payload);
-      setPolicyContent("");
-      setGovernanceSuccess("Governance policy recorded.");
-      setGovernanceState({ status: "ready", data: await fetchGovernance() });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Governance policy creation failed";
-      setGovernanceError(message);
-    } finally {
-      setIsSubmittingGovernance(false);
-    }
-  }
-
-  async function handleSubmitReviewPolicy(event: FormEvent) {
-    event.preventDefault();
-    const assignedReviewerIds = parseReviewerIds(reviewPolicyReviewerIds);
-    const approvalThreshold = Number.parseInt(reviewPolicyApprovalThreshold, 10);
-
-    if (assignedReviewerIds.length === 0) {
-      setReviewPolicySuccess(null);
-      setReviewPolicyError("Please provide at least one assigned reviewer ID.");
-      return;
-    }
-
-    if (!Number.isInteger(approvalThreshold) || approvalThreshold < 1) {
-      setReviewPolicySuccess(null);
-      setReviewPolicyError("Approval threshold must be a positive whole number.");
-      return;
-    }
-
-    if (reviewPolicyRequiresAssigned && approvalThreshold > assignedReviewerIds.length) {
-      setReviewPolicySuccess(null);
-      setReviewPolicyError("Approval threshold cannot exceed assigned reviewers.");
-      return;
-    }
-
-    if (!selectedLanguageId) {
-      setReviewPolicySuccess(null);
-      setReviewPolicyError("Select or create a language first.");
-      return;
-    }
-
-    const payload: ReviewPolicyPayload = {
-      assignedReviewerIds,
-      approvalThreshold,
-      requiresAssignedReviewer: reviewPolicyRequiresAssigned
-    };
-
-    setIsSubmittingReviewPolicy(true);
-    setReviewPolicySuccess(null);
-    setReviewPolicyError(null);
-
-    try {
-      const policy = await updateReviewPolicy(selectedLanguageId, payload);
-      setReviewPolicyState({ status: "ready", data: policy });
-      setReviewPolicyReviewerIds(policy.assignedReviewerIds.join(", "));
-      setReviewPolicyApprovalThreshold(policy.approvalThreshold.toString());
-      setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
-      setReviewPolicySuccess("Review policy updated.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Review policy update failed";
-      setReviewPolicyError(message);
-    } finally {
-      setIsSubmittingReviewPolicy(false);
-    }
-  }
-
-  async function handleResolveReviewDisposition(dispositionId: string) {
-    const resolutionSummary = (reviewDispositionDrafts[dispositionId] ?? "").trim();
-    if (resolutionSummary.length === 0) {
-      setReviewDispositionSuccess(null);
-      setReviewDispositionError("Resolution summary is required.");
-      return;
-    }
-
-    if (!selectedLanguageId) {
-      setReviewDispositionSuccess(null);
-      setReviewDispositionError("Select or create a language first.");
-      return;
-    }
-
-    setResolvingReviewDispositionId(dispositionId);
-    setReviewDispositionSuccess(null);
-    setReviewDispositionError(null);
-    try {
-      await resolveReviewDisposition(dispositionId, resolutionSummary);
-      const [dispositions] = await Promise.all([
-        fetchReviewDispositions(selectedLanguageId),
-        refreshDashboard()
-      ]);
-      setReviewDispositionState({ status: "ready", data: dispositions });
-      setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: "" }));
-      setReviewDispositionSuccess("Review disposition resolved.");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Review disposition resolution failed";
-      setReviewDispositionError(message);
-    } finally {
-      setResolvingReviewDispositionId(null);
-    }
-  }
-
-  async function handleExportSnapshot() {
-    if (!selectedLanguageId) {
-      setSnapshotDownload(null);
-      setSnapshotError("Select or create a language first.");
-      return;
-    }
-
-    setIsExportingSnapshot(true);
-    setSnapshotDownload(null);
-    setSnapshotError(null);
-
-    try {
-      const snapshot = await fetchLanguageSnapshot(selectedLanguageId);
-      setSnapshotDownload(buildSnapshotDownload(snapshot));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Snapshot export failed";
-      setSnapshotError(message);
-    } finally {
-      setIsExportingSnapshot(false);
-    }
-  }
-
-  async function handleExportEvaluationArtifact() {
-    setIsExportingEvaluationArtifact(true);
-    setEvaluationArtifactDownload(null);
-    setEvaluationArtifactError(null);
-
-    try {
-      const artifact = await fetchEvaluationArtifact();
-      setEvaluationArtifactDownload(buildEvaluationArtifactDownload(artifact));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Evaluation artifact export failed";
-      setEvaluationArtifactError(message);
-    } finally {
-      setIsExportingEvaluationArtifact(false);
-    }
-  }
-
-  async function handleModelSmokeTest() {
-    if (!data) return;
-    if (!selectedLanguageId) {
-      setModelTestResult("Select or create a language first.");
-      return;
-    }
-    setIsTestingModel(true);
-    setModelTestResult(null);
-    setModelTestIsPlaceholder(false);
-    try {
-      const session = await createAiSession({
-        languageId: selectedLanguageId,
-        mode: "learner_practice",
-        seedPrompt: "Create one concise, safe practice prompt using only the provided public workspace context.",
-        contextNoteIds: data.notes.slice(0, 2).map((note) => note.id),
-        contextPassageIds: data.corpus.slice(0, 2).map((passage) => passage.id)
-      });
-      setModelTestResult(latestAssistantMessage(session));
-      const refreshedStatus = await fetchLlmStatus();
-      setLlmState({ status: "ready", data: refreshedStatus });
-      // The reply is a genuine model answer only when a real provider is
-      // configured. Deterministic/invalid modes return a canned offline string,
-      // and the session trace may flag the deterministic fallback as well.
-      setModelTestIsPlaceholder(!isRealModelProvider(refreshedStatus) || sessionUsedDeterministicFallback(session));
-      await refreshModelObservability();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Model smoke test failed";
-      setModelTestResult(message);
-      setModelTestIsPlaceholder(false);
-      await refreshModelObservability();
-    } finally {
-      setIsTestingModel(false);
-    }
-  }
-
-  async function handleTestConnection() {
-    setIsCheckingReachability(true);
-    setReachabilityError(null);
-    setReachabilityResult(null);
-    try {
-      setReachabilityResult(await checkLlmReachability());
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "LLM reachability check failed";
-      setReachabilityError(message);
-    } finally {
-      setIsCheckingReachability(false);
-    }
   }
 
   if (loadState.status === "loading") {
@@ -1087,6 +449,7 @@ export function App() {
           <div className="user-card">
             <span>Signed in</span>
             <strong>{currentUser?.name ?? "Local User"}</strong>
+            <SignOutButton />
           </div>
         </div>
       </aside>
@@ -1162,39 +525,39 @@ export function App() {
           {isElderMode ? (
             <ElderWorkspace
               data={data}
-              elderContext={elderContext}
-              isLoadingElder={isLoadingElder}
-              formNoteId={formNoteId}
-              formPassageId={formPassageId}
-              formSeverity={formSeverity}
-              formCorrection={formCorrection}
-              formRationale={formRationale}
-              formContextText={formContextText}
-              correctionSuccess={correctionSuccess}
-              correctionError={correctionError}
+              elderContext={elder.elderContext}
+              isLoadingElder={elder.isLoadingElder}
+              formNoteId={elder.formNoteId}
+              formPassageId={elder.formPassageId}
+              formSeverity={elder.formSeverity}
+              formCorrection={elder.formCorrection}
+              formRationale={elder.formRationale}
+              formContextText={elder.formContextText}
+              correctionSuccess={elder.correctionSuccess}
+              correctionError={elder.correctionError}
               isWorkflowBusy={isWorkflowBusy}
-              isSubmittingCorrection={isSubmittingCorrection}
-              reviewingCorrectionId={reviewingCorrectionId}
-              applyingCorrectionId={applyingCorrectionId}
-              correctionApplyDrafts={correctionApplyDrafts}
-              onSubmit={handleSubmitCorrection}
+              isSubmittingCorrection={elder.isSubmittingCorrection}
+              reviewingCorrectionId={elder.reviewingCorrectionId}
+              applyingCorrectionId={elder.applyingCorrectionId}
+              correctionApplyDrafts={elder.correctionApplyDrafts}
+              onSubmit={elder.handleSubmitCorrection}
               onNoteChange={(value) => {
-                setFormNoteId(value);
-                if (value) setFormPassageId("");
+                elder.setFormNoteId(value);
+                if (value) elder.setFormPassageId("");
               }}
               onPassageChange={(value) => {
-                setFormPassageId(value);
-                if (value) setFormNoteId("");
+                elder.setFormPassageId(value);
+                if (value) elder.setFormNoteId("");
               }}
-              onSeverityChange={setFormSeverity}
-              onCorrectionChange={setFormCorrection}
-              onRationaleChange={setFormRationale}
-              onContextChange={setFormContextText}
-              onReviewCorrection={handleReviewCorrection}
+              onSeverityChange={elder.setFormSeverity}
+              onCorrectionChange={elder.setFormCorrection}
+              onRationaleChange={elder.setFormRationale}
+              onContextChange={elder.setFormContextText}
+              onReviewCorrection={elder.handleReviewCorrection}
               onApplyDraftChange={(correctionId, explanation) => {
-                setCorrectionApplyDrafts((current) => ({ ...current, [correctionId]: explanation }));
+                elder.setCorrectionApplyDrafts((current) => ({ ...current, [correctionId]: explanation }));
               }}
-              onApplyCorrection={handleApplyCorrection}
+              onApplyCorrection={elder.handleApplyCorrection}
             />
           ) : (
             <>
@@ -1227,18 +590,18 @@ export function App() {
                   languageId={selectedLanguageId}
                   exercises={data.exercises}
                   selectedExercise={selectedExercise}
-                  selectedExerciseId={selectedExerciseId}
+                  selectedExerciseId={learner.selectedExerciseId}
                   isWorkflowBusy={isWorkflowBusy}
-                  exerciseAnswer={exerciseAnswer}
-                  isGrading={isGrading}
-                  exerciseResult={exerciseResult}
-                  isLoadingSubmissions={isLoadingSubmissions}
-                  submissionHistory={submissionHistory}
-                  onSelectExercise={setSelectedExerciseId}
-                  onAnswerChange={setExerciseAnswer}
-                  onGrade={handleGrade}
-                  onCreateExercise={handleCreateExercise}
-                  onGenerateExercise={handleGenerateExercise}
+                  exerciseAnswer={learner.exerciseAnswer}
+                  isGrading={learner.isGrading}
+                  exerciseResult={learner.exerciseResult}
+                  isLoadingSubmissions={learner.isLoadingSubmissions}
+                  submissionHistory={learner.submissionHistory}
+                  onSelectExercise={learner.setSelectedExerciseId}
+                  onAnswerChange={learner.setExerciseAnswer}
+                  onGrade={learner.handleGrade}
+                  onCreateExercise={learner.handleCreateExercise}
+                  onGenerateExercise={learner.handleGenerateExercise}
                 />
               )}
               {view === "eval" && (
@@ -1247,66 +610,66 @@ export function App() {
                   languages={data.languages}
                   selectedLanguageId={selectedLanguageId}
                   isWorkflowBusy={isWorkflowBusy}
-                  artifactDownload={evaluationArtifactDownload}
-                  artifactError={evaluationArtifactError}
-                  isExportingArtifact={isExportingEvaluationArtifact}
-                  onExportArtifact={handleExportEvaluationArtifact}
+                  artifactDownload={governance.evaluationArtifactDownload}
+                  artifactError={governance.evaluationArtifactError}
+                  isExportingArtifact={governance.isExportingEvaluationArtifact}
+                  onExportArtifact={governance.handleExportEvaluationArtifact}
                 />
               )}
               {view === "governance" && !selectedLanguageId && <NoLanguageNotice />}
               {view === "governance" && selectedLanguageId && (
                 <GovernanceView
                   selectedLanguageId={selectedLanguageId}
-                  governanceState={governanceState}
-                  auditEventState={auditEventState}
-                  policyType={policyType}
-                  policyEffectiveDate={policyEffectiveDate}
-                  policyContent={policyContent}
-                  governanceSuccess={governanceSuccess}
-                  governanceError={governanceError}
-                  isSubmittingGovernance={isSubmittingGovernance}
-                  reviewPolicyState={reviewPolicyState}
-                  reviewPolicyReviewerIds={reviewPolicyReviewerIds}
-                  reviewPolicyApprovalThreshold={reviewPolicyApprovalThreshold}
-                  reviewPolicyRequiresAssigned={reviewPolicyRequiresAssigned}
-                  reviewPolicySuccess={reviewPolicySuccess}
-                  reviewPolicyError={reviewPolicyError}
-                  isSubmittingReviewPolicy={isSubmittingReviewPolicy}
-                  reviewDispositionState={reviewDispositionState}
-                  reviewDispositionDrafts={reviewDispositionDrafts}
-                  reviewDispositionSuccess={reviewDispositionSuccess}
-                  reviewDispositionError={reviewDispositionError}
-                  resolvingReviewDispositionId={resolvingReviewDispositionId}
-                  snapshotDownload={snapshotDownload}
-                  snapshotError={snapshotError}
-                  isExportingSnapshot={isExportingSnapshot}
-                  onPolicyTypeChange={setPolicyType}
-                  onEffectiveDateChange={setPolicyEffectiveDate}
-                  onContentChange={setPolicyContent}
-                  onSubmit={handleSubmitGovernance}
-                  onReviewPolicyReviewerIdsChange={setReviewPolicyReviewerIds}
-                  onReviewPolicyApprovalThresholdChange={setReviewPolicyApprovalThreshold}
-                  onReviewPolicyRequiresAssignedChange={setReviewPolicyRequiresAssigned}
-                  onReviewPolicySubmit={handleSubmitReviewPolicy}
+                  governanceState={governance.governanceState}
+                  auditEventState={governance.auditEventState}
+                  policyType={governance.policyType}
+                  policyEffectiveDate={governance.policyEffectiveDate}
+                  policyContent={governance.policyContent}
+                  governanceSuccess={governance.governanceSuccess}
+                  governanceError={governance.governanceError}
+                  isSubmittingGovernance={governance.isSubmittingGovernance}
+                  reviewPolicyState={governance.reviewPolicyState}
+                  reviewPolicyReviewerIds={governance.reviewPolicyReviewerIds}
+                  reviewPolicyApprovalThreshold={governance.reviewPolicyApprovalThreshold}
+                  reviewPolicyRequiresAssigned={governance.reviewPolicyRequiresAssigned}
+                  reviewPolicySuccess={governance.reviewPolicySuccess}
+                  reviewPolicyError={governance.reviewPolicyError}
+                  isSubmittingReviewPolicy={governance.isSubmittingReviewPolicy}
+                  reviewDispositionState={governance.reviewDispositionState}
+                  reviewDispositionDrafts={governance.reviewDispositionDrafts}
+                  reviewDispositionSuccess={governance.reviewDispositionSuccess}
+                  reviewDispositionError={governance.reviewDispositionError}
+                  resolvingReviewDispositionId={governance.resolvingReviewDispositionId}
+                  snapshotDownload={governance.snapshotDownload}
+                  snapshotError={governance.snapshotError}
+                  isExportingSnapshot={governance.isExportingSnapshot}
+                  onPolicyTypeChange={governance.setPolicyType}
+                  onEffectiveDateChange={governance.setPolicyEffectiveDate}
+                  onContentChange={governance.setPolicyContent}
+                  onSubmit={governance.handleSubmitGovernance}
+                  onReviewPolicyReviewerIdsChange={governance.setReviewPolicyReviewerIds}
+                  onReviewPolicyApprovalThresholdChange={governance.setReviewPolicyApprovalThreshold}
+                  onReviewPolicyRequiresAssignedChange={governance.setReviewPolicyRequiresAssigned}
+                  onReviewPolicySubmit={governance.handleSubmitReviewPolicy}
                   onReviewDispositionDraftChange={(dispositionId, summary) => {
-                    setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: summary }));
+                    governance.setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: summary }));
                   }}
-                  onResolveReviewDisposition={handleResolveReviewDisposition}
-                  onExportSnapshot={handleExportSnapshot}
+                  onResolveReviewDisposition={governance.handleResolveReviewDisposition}
+                  onExportSnapshot={governance.handleExportSnapshot}
                 />
               )}
               {view === "model" && (
                 <ModelSetupView
-                  llmState={llmState}
-                  observabilityState={observabilityState}
-                  isTestingModel={isTestingModel}
-                  modelTestResult={modelTestResult}
-                  modelTestIsPlaceholder={modelTestIsPlaceholder}
-                  onSmokeTest={handleModelSmokeTest}
-                  isCheckingReachability={isCheckingReachability}
-                  reachabilityResult={reachabilityResult}
-                  reachabilityError={reachabilityError}
-                  onTestConnection={handleTestConnection}
+                  llmState={model.llmState}
+                  observabilityState={model.observabilityState}
+                  isTestingModel={model.isTestingModel}
+                  modelTestResult={model.modelTestResult}
+                  modelTestIsPlaceholder={model.modelTestIsPlaceholder}
+                  onSmokeTest={model.handleModelSmokeTest}
+                  isCheckingReachability={model.isCheckingReachability}
+                  reachabilityResult={model.reachabilityResult}
+                  reachabilityError={model.reachabilityError}
+                  onTestConnection={model.handleTestConnection}
                 />
               )}
             </>

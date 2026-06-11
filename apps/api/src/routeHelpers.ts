@@ -15,12 +15,37 @@ export const MODEL_REQUIRED_MESSAGE =
   "A configured model is required to generate draft notes. Set ASSINI_LLM_* (see the configuration reference) and retry.";
 export const PROTOTYPE_SESSION_COOKIE = "assini_prototype_session";
 export const PROTOTYPE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
+export const DEFAULT_PROTOTYPE_SESSION_TTL_MS = PROTOTYPE_SESSION_MAX_AGE_SECONDS * 1000;
+export const PROTOTYPE_SESSION_TTL_ENV_NAME = "ASSINI_PROTOTYPE_SESSION_TTL_MS";
 const SECRET_ENV_NAMES = ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"] as const;
 
 export type PrototypeSessionRecord = {
   userId: string;
   createdAt: number;
+  /** Absolute epoch-ms deadline. Refreshed on every successful session use (sliding renewal). */
+  expiresAt: number;
+  /** TTL captured at session creation so renewal keeps the configured window. */
+  ttlMs: number;
 };
+
+/**
+ * Session map with an optional injectable clock attached at creation time
+ * (createServer options.now). Keeps every requireActor/resolveActor call site
+ * unchanged while letting lifecycle tests control time deterministically.
+ */
+export type PrototypeSessionMap = Map<string, PrototypeSessionRecord> & { now?: () => number };
+
+/** Reads ASSINI_PROTOTYPE_SESSION_TTL_MS following the readPositiveInteger pattern in runtimeConfig.ts. */
+export function readPrototypeSessionTtlMs(env: Record<string, string | undefined> = process.env): number {
+  const raw = env[PROTOTYPE_SESSION_TTL_ENV_NAME]?.trim();
+  if (!raw) return DEFAULT_PROTOTYPE_SESSION_TTL_MS;
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > Number.MAX_SAFE_INTEGER) {
+    throw new Error(`${PROTOTYPE_SESSION_TTL_ENV_NAME} must be an integer between 1 and ${Number.MAX_SAFE_INTEGER}`);
+  }
+  return value;
+}
 
 export type ResolvedActor = {
   actor: User;
@@ -206,18 +231,26 @@ export function cookieValue(request: FastifyRequest, name: string): string | und
   return undefined;
 }
 
-export function serializePrototypeSessionCookie(sessionId: string): string {
+export function serializePrototypeSessionCookie(
+  sessionId: string,
+  maxAgeSeconds: number = PROTOTYPE_SESSION_MAX_AGE_SECONDS
+): string {
   return [
     `${PROTOTYPE_SESSION_COOKIE}=${encodeURIComponent(sessionId)}`,
     "HttpOnly",
     "SameSite=Strict",
     "Path=/",
-    `Max-Age=${PROTOTYPE_SESSION_MAX_AGE_SECONDS}`
+    `Max-Age=${maxAgeSeconds}`
   ].join("; ");
 }
 
+/** Same attributes as the create path, but Max-Age=0 so the browser drops the cookie immediately. */
+export function serializeExpiredPrototypeSessionCookie(): string {
+  return serializePrototypeSessionCookie("", 0);
+}
+
 export function isPrototypeSessionActive(session: PrototypeSessionRecord, now = Date.now()): boolean {
-  return now - session.createdAt <= PROTOTYPE_SESSION_MAX_AGE_SECONDS * 1000;
+  return now <= session.expiresAt;
 }
 
 export function pruneExpiredPrototypeSessions(
@@ -235,16 +268,23 @@ export function resolveActorContext(
   state: AppState,
   request: FastifyRequest,
   authToken: string | undefined,
-  prototypeSessions: Map<string, PrototypeSessionRecord>
+  prototypeSessions: PrototypeSessionMap,
+  now?: () => number
 ): ResolvedActor | undefined {
   const sessionId = cookieValue(request, PROTOTYPE_SESSION_COOKIE);
   const prototypeSession = sessionId ? prototypeSessions.get(sessionId) : undefined;
   if (sessionId && prototypeSession) {
-    if (!isPrototypeSessionActive(prototypeSession)) {
+    const currentTime = (now ?? prototypeSessions.now ?? Date.now)();
+    if (!isPrototypeSessionActive(prototypeSession, currentTime)) {
+      // Lazy eviction: expired sessions are treated as absent and removed.
       prototypeSessions.delete(sessionId);
     } else {
       const sessionActor = actorById(state, prototypeSession.userId);
-      if (sessionActor) return { actor: sessionActor, authMethod: "prototype-session" };
+      if (sessionActor) {
+        // Sliding renewal: each successful use within the TTL extends the deadline.
+        prototypeSession.expiresAt = currentTime + prototypeSession.ttlMs;
+        return { actor: sessionActor, authMethod: "prototype-session" };
+      }
     }
   }
 
@@ -263,9 +303,10 @@ export function resolveActor(
   state: AppState,
   request: FastifyRequest,
   authToken: string | undefined,
-  prototypeSessions: Map<string, PrototypeSessionRecord>
+  prototypeSessions: PrototypeSessionMap,
+  now?: () => number
 ): User | undefined {
-  return resolveActorContext(state, request, authToken, prototypeSessions)?.actor;
+  return resolveActorContext(state, request, authToken, prototypeSessions, now)?.actor;
 }
 
 export function actorCan(actor: User, allowedRoles: readonly UserRole[]): boolean {
@@ -279,9 +320,10 @@ export function requireActor(
   authToken: string | undefined,
   prototypeSessions: Map<string, PrototypeSessionRecord>,
   allowedRoles?: readonly UserRole[],
-  prototypeSessionAdditionalRoles: readonly UserRole[] = []
+  prototypeSessionAdditionalRoles: readonly UserRole[] = [],
+  now?: () => number
 ): User | undefined {
-  const resolved = resolveActorContext(state, request, authToken, prototypeSessions);
+  const resolved = resolveActorContext(state, request, authToken, prototypeSessions, now);
   if (!resolved) {
     reply.code(401);
     return undefined;

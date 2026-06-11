@@ -392,6 +392,20 @@ async function openPrototypeSession(actor: LocalActor): Promise<void> {
   await assertOk(response, `Prototype session failed for ${actor}`);
 }
 
+/** Logs out of the local prototype session: clears the server record and expires the HttpOnly cookie. */
+export async function closePrototypeSession(): Promise<void> {
+  if (!import.meta.env.DEV) {
+    throw prototypeAuthUnavailable();
+  }
+
+  const response = await fetch("/api/auth/prototype-session", {
+    method: "DELETE",
+    credentials: "include"
+  });
+
+  await assertOk(response, "Prototype sign-out failed");
+}
+
 async function actorRequest(actor: LocalActor, json = false): Promise<RequestInit> {
   await openPrototypeSession(actor);
   return {

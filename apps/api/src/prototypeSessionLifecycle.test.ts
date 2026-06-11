@@ -1,0 +1,179 @@
+import { describe, expect, it } from "vitest";
+import { buildTestWorkspaceState } from "@assini/db";
+import { createServer } from "./server.js";
+import { DEFAULT_PROTOTYPE_SESSION_TTL_MS, readPrototypeSessionTtlMs } from "./routeHelpers.js";
+
+const HOUR_MS = 60 * 60 * 1000;
+
+type TestClock = { now: () => number; advance: (ms: number) => void };
+
+function createClock(start = 1_750_000_000_000): TestClock {
+  let current = start;
+  return {
+    now: () => current,
+    advance: (ms: number) => {
+      current += ms;
+    }
+  };
+}
+
+function createSessionServer(clock: TestClock, prototypeSessionTtlMs?: number) {
+  return createServer({
+    initialState: buildTestWorkspaceState(),
+    enablePrototypeAuth: true,
+    rateLimit: false,
+    now: clock.now,
+    prototypeSessionTtlMs
+  });
+}
+
+async function openSession(app: ReturnType<typeof createServer>, userId = "learner-1"): Promise<string> {
+  const response = await app.inject({
+    method: "POST",
+    url: "/auth/prototype-session",
+    payload: { userId }
+  });
+  expect(response.statusCode).toBe(200);
+  const setCookie = response.headers["set-cookie"];
+  const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+  expect(cookieHeader).toContain("assini_prototype_session=");
+  return cookieHeader!.split(";")[0];
+}
+
+describe("prototype session lifecycle", () => {
+  it("rejects requests with an expired session cookie and lazily evicts the record", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+    const cookie = await openSession(app);
+
+    // Just inside the default 8h TTL the session still works.
+    clock.advance(DEFAULT_PROTOTYPE_SESSION_TTL_MS - 1);
+    const fresh = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(fresh.statusCode).toBe(200);
+
+    // Sliding renewal restarted the window above; jump past a full TTL to expire it.
+    clock.advance(DEFAULT_PROTOTYPE_SESSION_TTL_MS + 1);
+    const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(expired.statusCode).toBe(401);
+
+    // Lazy eviction: the expired record was deleted, so a retry is still 401.
+    const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(retried.statusCode).toBe(401);
+  });
+
+  it("slides the session expiry forward on each successful use (documented sliding renewal)", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+    const cookie = await openSession(app);
+
+    // Use the session every 6 hours: each use renews expiresAt to now + TTL,
+    // so total lifetime exceeds the 8h TTL as long as use keeps occurring.
+    for (let i = 0; i < 4; i += 1) {
+      clock.advance(6 * HOUR_MS);
+      const response = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+      expect(response.statusCode).toBe(200);
+    }
+
+    // 24 hours since the last renewal exceeds the TTL: the session is gone.
+    clock.advance(24 * HOUR_MS);
+    const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(expired.statusCode).toBe(401);
+  });
+
+  it("clears the session record and expires the cookie on logout", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+    const cookie = await openSession(app);
+
+    const logout = await app.inject({
+      method: "DELETE",
+      url: "/auth/prototype-session",
+      headers: { cookie }
+    });
+    expect(logout.statusCode).toBe(204);
+    const setCookie = logout.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    expect(cookieHeader).toContain("assini_prototype_session=");
+    expect(cookieHeader).toContain("Max-Age=0");
+    expect(cookieHeader).toContain("HttpOnly");
+    expect(cookieHeader).toContain("SameSite=Strict");
+    expect(cookieHeader).toContain("Path=/");
+
+    // The server-side record is gone: the old cookie no longer authenticates.
+    const afterLogout = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(afterLogout.statusCode).toBe(401);
+  });
+
+  it("treats logout as idempotent when no session exists", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+
+    const withoutCookie = await app.inject({ method: "DELETE", url: "/auth/prototype-session" });
+    expect(withoutCookie.statusCode).toBe(204);
+
+    const withUnknownCookie = await app.inject({
+      method: "DELETE",
+      url: "/auth/prototype-session",
+      headers: { cookie: "assini_prototype_session=does-not-exist" }
+    });
+    expect(withUnknownCookie.statusCode).toBe(204);
+  });
+
+  it("purges expired sessions opportunistically when a new session is created", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+
+    const staleCookie = await openSession(app, "learner-1");
+    clock.advance(DEFAULT_PROTOTYPE_SESSION_TTL_MS + 1);
+
+    // Creating a fresh session sweeps the expired one from the map.
+    const freshCookie = await openSession(app, "elder-1");
+
+    const stale = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: staleCookie } });
+    expect(stale.statusCode).toBe(401);
+    const fresh = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: freshCookie } });
+    expect(fresh.statusCode).toBe(200);
+  });
+
+  it("honors a short TTL override and expires sessions accordingly", async () => {
+    const clock = createClock();
+    const ttlMs = 1_000;
+    const app = createSessionServer(clock, ttlMs);
+    const cookie = await openSession(app);
+
+    clock.advance(ttlMs - 1);
+    const fresh = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(fresh.statusCode).toBe(200);
+
+    clock.advance(ttlMs + 1);
+    const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(expired.statusCode).toBe(401);
+  });
+
+  it("reads ASSINI_PROTOTYPE_SESSION_TTL_MS and rejects invalid values", () => {
+    expect(readPrototypeSessionTtlMs({})).toBe(DEFAULT_PROTOTYPE_SESSION_TTL_MS);
+    expect(readPrototypeSessionTtlMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: " " })).toBe(DEFAULT_PROTOTYPE_SESSION_TTL_MS);
+    expect(readPrototypeSessionTtlMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: "60000" })).toBe(60_000);
+
+    for (const invalid of ["0", "-1", "1.5", "abc", "1e3kb"]) {
+      expect(() => readPrototypeSessionTtlMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: invalid })).toThrow(
+        /ASSINI_PROTOTYPE_SESSION_TTL_MS must be an integer/
+      );
+    }
+  });
+
+  it("issues a session cookie whose Max-Age matches the configured TTL", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock, 90_000);
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/prototype-session",
+      payload: { userId: "learner-1" }
+    });
+    expect(response.statusCode).toBe(200);
+    const setCookie = response.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    expect(cookieHeader).toContain("Max-Age=90");
+  });
+});

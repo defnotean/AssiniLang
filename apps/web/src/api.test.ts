@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  closePrototypeSession,
   fetchCurrentUser,
   fetchAuditEvents,
   fetchDashboardData,
@@ -547,5 +548,37 @@ describe("fetchDashboardData", () => {
       actorRequest
     );
     expect(result).toEqual({ exercises: [], rationale: [] });
+  });
+
+  it("closes the prototype session with a credentialed DELETE request", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 204,
+      json: async () => undefined
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await closePrototypeSession();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/prototype-session", {
+      method: "DELETE",
+      credentials: "include"
+    });
+  });
+
+  it("includes server error details when prototype sign-out fails", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({ error: "session store unavailable" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(closePrototypeSession()).rejects.toThrow(
+      "Prototype sign-out failed (500): session store unavailable"
+    );
   });
 });
