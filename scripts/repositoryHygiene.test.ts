@@ -27,7 +27,7 @@ describe("repository production hygiene", () => {
     expect(workflow).toContain("name: CI");
     expect(workflow).toContain("actions/checkout@v4");
     expect(workflow).toContain("actions/setup-node@v4");
-    expect(workflow).toContain("node-version: 20.19.x");
+    expect(workflow).toContain("node-version: 24.x");
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("npm run verify");
     expect(workflow).toContain("npm run smoke");
