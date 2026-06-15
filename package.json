@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "npm@11.11.1",
   "engines": {
-    "node": ">=20.19.0",
+    "node": "^20.19.0 || >=22.12.0",
     "npm": ">=10"
   },
   "workspaces": [
@@ -30,13 +30,13 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
-    "@vitejs/plugin-react": "^4.3.4",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
     "jsdom": "^25.0.1",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vite": "^7.2.7",
-    "vitest": "^4.1.8"
+    "vite": "^8.0.16",
+    "vitest": "^4.1.9"
   },
   "overrides": {
     "@vitest/coverage-v8": "$@vitest/coverage-v8",

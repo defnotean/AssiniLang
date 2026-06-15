@@ -1,8 +1,10 @@
 # Maximized Functionality Improvement Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status (2026-06-15): superseded.** Do not use this dated wave plan as the active roadmap. The current production-readiness status and remaining blockers live in [`docs/roadmap.md`](../../roadmap.md). This file is retained as historical planning context only; unchecked boxes below are the original task list, not an instruction to start work without checking the active roadmap.
+>
+> Implemented or partially implemented since this plan was written: model-draft grounding/scoring and model-draft evaluation selection (partial: not persisted as provider/model baselines), SQLite `schema_meta` migrations plus backup/restore, startup recovery for interrupted processing (partial: no durable heartbeat/resume/attempt counts), bulk draft review, and most CI hardening (Windows/Linux matrix, verify, smoke, built-dist health/ready, audit gate).
 
-**Goal:** Take AssiniLang from a verified local prototype to a significantly more capable, robust, and production-leaning platform — closing the study loop, hardening the new SQLite persistence layer, expanding evaluation, and improving everyday usability — while preserving the synthetic-only data gate.
+**Goal (historical):** Take AssiniLang from a verified local prototype to a significantly more capable, robust, and production-leaning platform — closing the study loop, hardening the new SQLite persistence layer, expanding evaluation, and improving everyday usability — while preserving the synthetic-only data gate.
 
 **Architecture:** Keep the Fastify + React + Zod + npm-workspaces shape. Build on the freshly landed runtime envelope (validated config, graceful shutdown, dist/ entrypoints), the SQLite/drizzle-orm store (schema v8), the `/ready` probe, and the `@assini/api-contract` package. New work should extend these seams rather than introduce parallel ones.
 

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { resolve as resolvePath } from "node:path";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
@@ -61,13 +62,32 @@ const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173
 const TEST_ONLY_AUTH_TOKEN = "test";
 const DEFAULT_RATE_LIMIT: RateLimitOptions = { max: 120, windowMs: 60_000 };
 const RATE_LIMITED_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
+const REQUEST_ID_HEADER = "x-request-id";
+const SAFE_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: readonly string[]): boolean {
   return origin === undefined || allowedOrigins.includes(origin);
 }
 
+function singleHeaderValue(value: string | string[] | undefined): string | undefined {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && value.length === 1) return value[0];
+  return undefined;
+}
+
+function safeRequestIdFromHeader(value: string | string[] | undefined): string | undefined {
+  const requestId = singleHeaderValue(value);
+  return requestId && SAFE_REQUEST_ID_PATTERN.test(requestId) ? requestId : undefined;
+}
+
+function requestIdForResponse(request: FastifyRequest): string {
+  return SAFE_REQUEST_ID_PATTERN.test(request.id) ? request.id : randomUUID();
+}
+
 export function createServer(options: ServerOptions = {}) {
   const app = Fastify({
+    requestIdHeader: false,
+    genReqId: (request) => safeRequestIdFromHeader(request.headers[REQUEST_ID_HEADER]) ?? randomUUID(),
     logger: options.logger
       ? {
           level: "info",
@@ -101,6 +121,10 @@ export function createServer(options: ServerOptions = {}) {
   let memoryState = options.initialState;
   const usesMemoryState = options.initialState !== undefined;
   let memoryUpdateQueue: Promise<void> = Promise.resolve();
+
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header(REQUEST_ID_HEADER, requestIdForResponse(request));
+  });
 
   const readState = async (): Promise<AppState> => {
     if (!usesMemoryState) {
@@ -157,10 +181,13 @@ export function createServer(options: ServerOptions = {}) {
     return true;
   };
 
-  app.setErrorHandler((error, _, reply) => {
+  app.setErrorHandler((error, request, reply) => {
+    const requestId = requestIdForResponse(request);
+    reply.header(REQUEST_ID_HEADER, requestId);
+
     const maybeStatusError = error as { statusCode?: number };
     if (maybeStatusError.statusCode === 413) {
-      reply.code(413).send({ error: "Payload too large" });
+      reply.code(413).send({ error: "Payload too large", requestId });
       return;
     }
 
