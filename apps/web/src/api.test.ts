@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  ApiError,
   closePrototypeSession,
   fetchCurrentUser,
   fetchAuditEvents,
@@ -48,6 +49,25 @@ describe("fetchDashboardData", () => {
     credentials: "include" as const,
     headers: {}
   };
+
+  async function expectApiError(
+    promise: Promise<unknown>,
+    expected: { message: string; status: number; requestId?: string }
+  ) {
+    let caught: unknown;
+
+    try {
+      await promise;
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ApiError);
+    const error = caught as ApiError;
+    expect(error.message).toBe(expected.message);
+    expect(error.status).toBe(expected.status);
+    expect(error.requestId).toBe(expected.requestId);
+  }
 
   it("encodes language ids before building language routes", async () => {
     const fetchMock = vi.fn(async () => ({
@@ -251,7 +271,7 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/profile", undefined);
   });
 
-  it("includes server error bodies and status codes in query failures", async () => {
+  it("includes server error bodies and status codes in query failures without request ids", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: false,
       status: 503,
@@ -260,7 +280,44 @@ describe("fetchDashboardData", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchLlmStatus()).rejects.toThrow("Request failed: /llm/status (503): LLM provider is offline");
+    await expectApiError(fetchLlmStatus(), {
+      message: "Request failed: /llm/status (503): LLM provider is offline",
+      status: 503,
+      requestId: undefined
+    });
+  });
+
+  it("includes x-request-id response headers in API error messages and properties", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 503,
+      headers: new Headers({ "x-request-id": "req-header-123" }),
+      json: async () => ({ error: "LLM provider is offline" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expectApiError(fetchLlmStatus(), {
+      message: "Request failed: /llm/status (503): LLM provider is offline (request id: req-header-123)",
+      status: 503,
+      requestId: "req-header-123"
+    });
+  });
+
+  it("uses JSON requestId fields when API error headers are absent", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 413,
+      json: async () => ({ error: "Payload is too large", requestId: "req-body-413" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expectApiError(fetchLlmStatus(), {
+      message: "Request failed: /llm/status (413): Payload is too large (request id: req-body-413)",
+      status: 413,
+      requestId: "req-body-413"
+    });
   });
 
   it("creates AI sessions with role-aware prototype auth and no browser API key", async () => {

@@ -18,6 +18,7 @@ import { createServer } from "./server.js";
 import type { LlmProvider } from "./llmProvider.js";
 
 const SHA_256_HEX = /^[a-f0-9]{64}$/;
+const SAFE_REQUEST_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const EXPORT_REDACTION_POLICY = [
   "answer-keys-omitted",
   "adversarial-exercise-probes-omitted",
@@ -95,6 +96,48 @@ describe("api server", () => {
     expect(JSON.stringify(exercises.json())).not.toContain("first-person singular subjects");
   });
 
+  it("correlates responses with a safe x-request-id", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const suppliedRequestId = "client.abc-123:xyz_01";
+
+    const supplied = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { "x-request-id": suppliedRequestId }
+    });
+    expect(supplied.statusCode).toBe(200);
+    expect(supplied.headers["x-request-id"]).toBe(suppliedRequestId);
+
+    const generated = await app.inject({ method: "GET", url: "/health" });
+    const generatedRequestId = generated.headers["x-request-id"];
+    expect(generatedRequestId).toEqual(expect.any(String));
+    if (typeof generatedRequestId !== "string") throw new Error("Expected generated x-request-id header");
+    expect(generatedRequestId).toMatch(SAFE_REQUEST_ID);
+  });
+
+  it("replaces unsafe x-request-id values and includes the safe id in central error payloads", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState(), bodyLimitBytes: 8 });
+    const unsafeRequestId = "bad request/id";
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/languages",
+      headers: {
+        "content-type": "application/json",
+        "x-request-id": unsafeRequestId
+      },
+      payload: JSON.stringify({ oversized: "payload" })
+    });
+
+    expect(response.statusCode).toBe(413);
+    const responseRequestId = response.headers["x-request-id"];
+    expect(responseRequestId).toEqual(expect.any(String));
+    if (typeof responseRequestId !== "string") throw new Error("Expected safe x-request-id header");
+    expect(responseRequestId).toMatch(SAFE_REQUEST_ID);
+    expect(responseRequestId).not.toBe(unsafeRequestId);
+    expect(response.json()).toEqual({ error: "Payload too large", requestId: responseRequestId });
+  });
+
   it("reports readiness when persisted state can be read", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
@@ -107,6 +150,11 @@ describe("api server", () => {
         storage: {
           ok: true,
           schemaVersion: 8
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
         }
       }
     });
@@ -127,6 +175,11 @@ describe("api server", () => {
         storage: {
           ok: false,
           error: "Storage read failed"
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
         }
       }
     });

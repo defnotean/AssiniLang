@@ -4,7 +4,7 @@ This guide covers local setup, the quality gate, browser verification, and a wal
 
 ## Requirements
 
-- Node.js compatible with the repository lockfile (`>=20.19.0`).
+- Node.js compatible with the repository lockfile (`^20.19.0 || >=22.12.0`; CI currently exercises Node 24.x).
 - npm `>=10` (the repo pins `npm@11.11.1` via `packageManager`).
 - PowerShell on Windows, or any shell that can run the equivalent npm commands.
 

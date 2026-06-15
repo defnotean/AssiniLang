@@ -25,7 +25,7 @@
 - Create: `.github/workflows/ci.yml`
 
 - [x] Add a workflow named `CI` for pushes and pull requests to `master`.
-- [x] Use `actions/checkout@v4` and `actions/setup-node@v4` with Node `20.19.x` and npm cache.
+- [x] Use `actions/checkout@v4` and `actions/setup-node@v4` with Node `24.x` and npm cache.
 - [x] Run `npm ci`, `npm run verify`, `npm run smoke`, and `npm audit --audit-level=moderate`.
 
 ## Task 3: Environment Example

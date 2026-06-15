@@ -4,7 +4,7 @@ import { resolveActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, authToken, prototypeSessions } = ctx;
+  const { readState, authToken, prototypeSessions, jobQueue } = ctx;
 
   app.get("/health", async () => ({ ok: true }));
 
@@ -19,7 +19,7 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): v
   });
 
   app.get("/ready", async (request, reply) => {
-    const report = await createReadinessReport(readState);
+    const report = await createReadinessReport(readState, () => jobQueue.getStatus());
     if (!report.ok) {
       reply.code(503);
     }
