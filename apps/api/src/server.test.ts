@@ -150,6 +150,11 @@ describe("api server", () => {
         storage: {
           ok: true,
           schemaVersion: 8
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
         }
       }
     });
@@ -170,6 +175,11 @@ describe("api server", () => {
         storage: {
           ok: false,
           error: "Storage read failed"
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
         }
       }
     });

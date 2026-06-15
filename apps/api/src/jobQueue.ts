@@ -3,6 +3,11 @@ type Job = {
   fn: () => Promise<void>;
 };
 
+export type JobQueueStatus = {
+  pending: number;
+  active: number;
+};
+
 export class JobQueue {
   private queue: Job[] = [];
   private activeJobs = new Set<string>();
@@ -43,6 +48,13 @@ export class JobQueue {
 
   isQueuedOrActive(id: string): boolean {
     return this.activeJobs.has(id) || this.queue.some((j) => j.id === id);
+  }
+
+  getStatus(): JobQueueStatus {
+    return {
+      pending: this.queue.length,
+      active: this.activeJobs.size
+    };
   }
 
   getPendingAndActiveIds(): { pending: string[]; active: string[] } {

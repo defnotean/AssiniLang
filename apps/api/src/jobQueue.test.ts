@@ -110,6 +110,7 @@ describe("JobQueue", () => {
     const state = queue.getPendingAndActiveIds();
     expect(state.active).toEqual(["1"]);
     expect(state.pending).toEqual(["2"]);
+    expect(queue.getStatus()).toEqual({ pending: 1, active: 1 });
     expect(queue.isQueuedOrActive("1")).toBe(true);
     expect(queue.isQueuedOrActive("2")).toBe(true);
     expect(queue.isQueuedOrActive("3")).toBe(false);
@@ -120,6 +121,7 @@ describe("JobQueue", () => {
     const stateMiddle = queue.getPendingAndActiveIds();
     expect(stateMiddle.active).toEqual(["2"]);
     expect(stateMiddle.pending).toEqual([]);
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 1 });
 
     resolve2();
     await sleep(10);
@@ -127,5 +129,6 @@ describe("JobQueue", () => {
     const stateEnd = queue.getPendingAndActiveIds();
     expect(stateEnd.active).toEqual([]);
     expect(stateEnd.pending).toEqual([]);
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
   });
 });

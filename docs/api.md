@@ -59,6 +59,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/ai/sessions` | Mode-based: learner_practice = learner/elder/reviewer/lead/admin; elder_review = elder/lead/admin; programmer_debug = programmer/admin | Create an AI session with public language context. |
 | GET | `/ai/sessions/:sessionId` | Any actor | Return one AI session. |
 | POST | `/ai/sessions/:sessionId/messages` | Any actor | Add a message to an AI session. |
+| GET | `/observability/metrics` | programmer, admin, lead | Small safe server metrics snapshot. |
 | GET | `/observability/ai-sessions` | programmer, admin, lead | Sanitized AI-session observability. |
 | GET | `/observability/neural-map` | programmer, admin, lead | Role-gated sanitized context graph. |
 
@@ -77,7 +78,7 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 - Learner practice and learner-mode AI sessions use the learner actor.
 - Language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review-policy editing, and review-disposition workflows use the reviewer actor.
 - Governance writes and elder-correction review/apply flows use the Elder actor.
-- Audit reads, evaluation artifact reads, programmer AI sessions, and AI observability use the programmer actor. The `GET /observability/neural-map` graph is programmer-token reachable but is not wired into the browser console.
+- Audit reads, evaluation artifact reads, programmer AI sessions, operational metrics, and AI observability use the programmer actor. The `GET /observability/neural-map` graph is programmer-token reachable but is not wired into the browser console.
 
 Do not treat prototype auth as production security.
 
@@ -85,7 +86,9 @@ Do not treat prototype auth as production security.
 
 `GET /health` is the cheapest liveness check. It returns `{ "ok": true }` when the API process can answer HTTP.
 
-`GET /ready` is the deeper readiness check. It reads the configured state store through the same schema-validation path used by normal API reads. A ready server returns `200` with `{ "ok": true, "checks": { "storage": { "ok": true, "schemaVersion": 8 } } }`. If storage cannot be read or validated, it returns `503` with a sanitized storage failure and does not expose local database paths, exception messages, API keys, or workspace contents.
+`GET /ready` is the deeper readiness check. It reads the configured state store through the same schema-validation path used by normal API reads and reports safe job-queue counts. A ready server returns `200` with `{ "ok": true, "checks": { "storage": { "ok": true, "schemaVersion": 8 }, "jobQueue": { "ok": true, "pending": 0, "active": 0 } } }`. If storage cannot be read or validated, or if the queue status cannot be inspected, it returns `503` with sanitized check failures and does not expose local database paths, exception messages, job IDs, API keys, or workspace contents.
+
+`GET /observability/metrics` is a privileged operational snapshot for programmer, lead, and admin actors. It returns a small safe shape: `uptimeMs`, ISO `serverTime`, aggregate `requests` counts by status class, `jobQueue` pending/active counts, and sanitized `storage` status/schema version. It intentionally omits route paths, local filesystem paths, prompts, source text, model content, answer keys, learner answers, user PII, raw errors, and secret values. If storage cannot be read, the response reports `{ "storage": { "ok": false, "error": "Storage read failed" } }` without exposing the underlying exception.
 
 ## Common response rules
 

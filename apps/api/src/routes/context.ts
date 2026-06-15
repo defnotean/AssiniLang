@@ -4,6 +4,16 @@ import type { JobQueue } from "../jobQueue.js";
 import type { LlmProvider } from "../llmProvider.js";
 import type { PrototypeSessionMap } from "../routeHelpers.js";
 
+export type RequestStatusClass = "1xx" | "2xx" | "3xx" | "4xx" | "5xx";
+
+export type RequestMetrics = {
+  startedAtMs: number;
+  requests: {
+    total: number;
+    byStatusClass: Record<RequestStatusClass, number>;
+  };
+};
+
 /**
  * Shared dependencies handed to every domain route module. Built once in
  * createServer() so all modules observe the same state accessors, auth
@@ -24,4 +34,5 @@ export type RouteContext = {
   dataDir: string;
   ingestionFetch: typeof fetch;
   jobQueue: JobQueue;
+  requestMetrics: RequestMetrics;
 };

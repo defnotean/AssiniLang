@@ -326,6 +326,23 @@ export type CreateAiSessionPayload = {
 
 type LocalActor = "learner" | "elder" | "programmer" | "reviewer";
 
+type ErrorDetails = {
+  detail?: string;
+  requestId?: string;
+};
+
+export class ApiError extends Error {
+  readonly status?: number;
+  readonly requestId?: string;
+
+  constructor(message: string, options: { status?: number; requestId?: string } = {}) {
+    super(message);
+    this.name = "ApiError";
+    this.status = options.status;
+    this.requestId = options.requestId;
+  }
+}
+
 function jsonHeaders(json = false): HeadersInit {
   return json ? { "Content-Type": "application/json" } : {};
 }
@@ -334,37 +351,65 @@ function prototypeAuthUnavailable(): Error {
   return new Error("Prototype session auth is available only in the local Vite dev server.");
 }
 
-function errorDetailFromBody(body: unknown): string | undefined {
-  if (typeof body === "string" && body.trim().length > 0) return body.trim();
-  if (!body || typeof body !== "object") return undefined;
+function requestIdFromValue(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function requestIdFromHeaders(response: Response): string | undefined {
+  try {
+    return requestIdFromValue(response.headers?.get("x-request-id") ?? response.headers?.get("X-Request-Id"));
+  } catch {
+    return undefined;
+  }
+}
+
+function errorDetailsFromBody(body: unknown): ErrorDetails {
+  if (typeof body === "string" && body.trim().length > 0) return { detail: body.trim() };
+  if (!body || typeof body !== "object") return {};
 
   const record = body as Record<string, unknown>;
+  const details: ErrorDetails = {
+    requestId: requestIdFromValue(record.requestId)
+  };
+
   for (const key of ["error", "message", "details"]) {
     const value = record[key];
     if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
+      details.detail = value.trim();
+      break;
     }
   }
 
-  return undefined;
+  return details;
 }
 
-async function readErrorDetail(response: Response): Promise<string | undefined> {
+async function readErrorDetails(response: Response): Promise<ErrorDetails> {
   try {
-    return errorDetailFromBody(await response.json());
+    return errorDetailsFromBody(await response.json());
   } catch {
     try {
-      return errorDetailFromBody(await response.text());
+      return errorDetailsFromBody(await response.text());
     } catch {
-      return undefined;
+      return {};
     }
   }
 }
 
 async function errorFromResponse(response: Response, fallback: string): Promise<Error> {
   const status = response.status ? ` (${response.status})` : "";
-  const detail = await readErrorDetail(response);
-  return new Error(detail ? `${fallback}${status}: ${detail}` : `${fallback}${status}`);
+  const details = await readErrorDetails(response);
+  const requestId = requestIdFromHeaders(response) ?? details.requestId;
+  const requestIdSuffix = requestId ? ` (request id: ${requestId})` : "";
+  const message = details.detail
+    ? `${fallback}${status}: ${details.detail}${requestIdSuffix}`
+    : `${fallback}${status}${requestIdSuffix}`;
+
+  return new ApiError(message, {
+    status: response.status || undefined,
+    requestId
+  });
 }
 
 async function assertOk(response: Response, fallback: string): Promise<void> {
