@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AiSession } from "@assini/db";
 import { continueAiSession, createAiSession, fetchAiSession } from "../api";
+import { useI18n } from "../i18n";
 import { getBrowserThemeStorage } from "../lib/theme";
 import type { AsyncState } from "../lib/types";
 
@@ -96,6 +97,7 @@ function latestAssistantMessageId(session: AiSession): string | null {
  * session id is persisted per language so a reload resumes the conversation.
  */
 export function useAssistantWorkspace(): AssistantWorkspace {
+  const { t } = useI18n();
   const [sessionState, setSessionState] = useState<AsyncState<AiSession>>({ status: "idle" });
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -135,7 +137,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       rememberSessionId(languageId, session.id);
       setInput("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "AI session creation failed";
+      const message = error instanceof Error ? error.message : t("assistant.errSessionCreateFailed");
       setSessionState({ status: "error", message });
     }
   }
@@ -153,7 +155,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       rememberSessionId(session.languageId, session.id);
       setInput("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "AI session message failed";
+      const message = error instanceof Error ? error.message : t("assistant.errSessionMessageFailed");
       setSendError(message);
     } finally {
       setIsSending(false);

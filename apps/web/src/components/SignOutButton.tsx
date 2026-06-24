@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { closePrototypeSession } from "../api";
+import { useI18n } from "../i18n";
 
 /**
  * Sidebar sign-out control for the local prototype session. Clears the
@@ -7,6 +8,7 @@ import { closePrototypeSession } from "../api";
  * is rebuilt without the old session.
  */
 export function SignOutButton() {
+  const { t } = useI18n();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSignOut = async () => {
@@ -21,7 +23,7 @@ export function SignOutButton() {
 
   return (
     <button type="button" className="sign-out-button" onClick={handleSignOut} disabled={isSigningOut}>
-      {isSigningOut ? "Signing out…" : "Sign out"}
+      {isSigningOut ? t("signout.signingOut") : t("signout.signOut")}
     </button>
   );
 }

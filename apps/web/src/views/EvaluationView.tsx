@@ -3,12 +3,21 @@ import {
   averageScore,
   evaluationTrendsForRuns,
   latestRunsByLanguage,
-  type EvaluationRun
+  type EvaluationRun,
+  type EvaluationTrendStatus
 } from "../evaluationTrends";
 import { ScoreBar } from "../components/ScoreBar";
 import { ScoreRing } from "../components/ScoreRing";
-import { formatCount, formatSignedTrendPoints, formatTrendPoints, scoreTone, trendVerb } from "../lib/format";
+import { formatCount, formatSignedTrendPoints, formatTrendPoints, scoreTone } from "../lib/format";
+import { useI18n, type MessageKey } from "../i18n";
 import type { Language, SnapshotDownload } from "../lib/types";
+
+const TREND_VERB_KEY: Record<EvaluationTrendStatus, MessageKey> = {
+  improved: "eval.trendImproved",
+  regressed: "eval.trendRegressed",
+  stable: "eval.trendHeldSteady",
+  "single-run": "eval.trendHeldSteady"
+};
 
 export function EvaluationView({
   evaluations,
@@ -29,6 +38,7 @@ export function EvaluationView({
   isExportingArtifact: boolean;
   onExportArtifact: () => void;
 }) {
+  const { t } = useI18n();
   const [activeLanguageId, setActiveLanguageId] = useState<string | null>(selectedLanguageId);
   useEffect(() => {
     setActiveLanguageId(selectedLanguageId);
@@ -41,7 +51,7 @@ export function EvaluationView({
   const activeLanguage = languages.find((language) => language.id === (activeRun?.languageId ?? activeLanguageId));
 
   if (evaluations.length === 0) {
-    return <p className="empty-state panel-card">No evaluation runs yet.</p>;
+    return <p className="empty-state panel-card">{t("eval.noRuns")}</p>;
   }
 
   return (
@@ -55,7 +65,7 @@ export function EvaluationView({
             <button
               type="button"
               key={language.id}
-              aria-label={`${language.name} evaluation score`}
+              aria-label={t("eval.languageScoreAria", { name: language.name })}
               className={`eval-language-card ${scoreTone(score)}${isActive ? " active" : ""}`}
               onClick={() => setActiveLanguageId(language.id)}
             >
@@ -69,18 +79,18 @@ export function EvaluationView({
         })}
       </div>
 
-      <section className="panel-card evaluation-export-card" aria-label="Evaluation artifact export">
+      <section className="panel-card evaluation-export-card" aria-label={t("eval.exportAria")}>
         <div>
-          <span className="detail-label">Evaluation export</span>
-          <h2>Portable quality artifact</h2>
+          <span className="detail-label">{t("eval.exportLabel")}</span>
+          <h2>{t("eval.portableArtifact")}</h2>
         </div>
         <div className="snapshot-actions">
           <button type="button" onClick={onExportArtifact} disabled={isWorkflowBusy || isExportingArtifact}>
-            {isExportingArtifact ? "Exporting..." : "Export evaluation artifact"}
+            {isExportingArtifact ? t("eval.exporting") : t("eval.exportArtifact")}
           </button>
           {artifactDownload && (
             <a className="download-link" href={artifactDownload.href} download={artifactDownload.fileName}>
-              Download evaluation artifact JSON
+              {t("eval.downloadArtifact")}
             </a>
           )}
         </div>
@@ -92,13 +102,13 @@ export function EvaluationView({
         {artifactError && <p className="result-notice error">{artifactError}</p>}
       </section>
 
-      <section className="panel-card evaluation-trend-card" aria-label="Evaluation trends">
+      <section className="panel-card evaluation-trend-card" aria-label={t("eval.trendsAria")}>
         <div>
-          <span className="detail-label">Regression watch</span>
+          <span className="detail-label">{t("eval.regressionWatch")}</span>
           <h2>{formatCount(comparableTrends.length, "comparison")}</h2>
         </div>
         {comparableTrends.length === 0 ? (
-          <p className="empty-state">Run evaluations more than once to show score movement.</p>
+          <p className="empty-state">{t("eval.runMoreThanOnce")}</p>
         ) : (
           <div className="trend-grid">
             {comparableTrends.map((trend) => {
@@ -106,7 +116,11 @@ export function EvaluationView({
               const languageName = language?.name ?? trend.languageId;
               return (
                 <article className={`trend-card ${trend.status}`} key={trend.languageId}>
-                  <p>{languageName} {trendVerb(trend.status)} by {formatTrendPoints(trend.averageDelta)} since previous run.</p>
+                  <p>{t("eval.trendSentence", {
+                    name: languageName,
+                    verb: t(TREND_VERB_KEY[trend.status]),
+                    points: formatTrendPoints(trend.averageDelta)
+                  })}</p>
                   <div className="pill-row">
                     {Object.entries(trend.categoryDeltas)
                       .filter(([, delta]) => delta.delta !== null)
@@ -127,8 +141,8 @@ export function EvaluationView({
         <article className="panel-card eval-breakdown">
           <div className="record-topline">
             <div>
-              <span className="detail-label">Latest run</span>
-              <h2>{activeLanguage?.name ?? activeRun.languageId} score breakdown</h2>
+              <span className="detail-label">{t("eval.latestRun")}</span>
+              <h2>{t("eval.scoreBreakdown", { name: activeLanguage?.name ?? activeRun.languageId })}</h2>
             </div>
             <span className="id-badge">{new Date(activeRun.createdAt).toLocaleString()}</span>
           </div>

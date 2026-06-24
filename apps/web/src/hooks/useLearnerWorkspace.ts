@@ -7,6 +7,7 @@ import type {
 } from "../api";
 import { createExercise, fetchExerciseSubmissions, generateModelExercise, submitExerciseAnswer } from "../api";
 import type { PublicExercise, ViewMode } from "../lib/types";
+import { useI18n } from "../i18n";
 
 export interface LearnerWorkspace {
   selectedExercise: PublicExercise | null;
@@ -38,6 +39,7 @@ export function useLearnerWorkspace(
   data: DashboardData | null,
   refreshDashboard: () => Promise<void>
 ): LearnerWorkspace {
+  const { t } = useI18n();
   const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
   const [exerciseAnswer, setExerciseAnswer] = useState("");
   const [isGrading, setIsGrading] = useState(false);
@@ -88,7 +90,7 @@ export function useLearnerWorkspace(
       setExerciseResult(submission.explanation);
       setSubmissionHistory(await fetchExerciseSubmissions(selectedExercise.id));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Exercise submission failed";
+      const message = error instanceof Error ? error.message : t("learner.errSubmissionFailed");
       setExerciseResult(message);
     } finally {
       setIsGrading(false);
@@ -97,7 +99,7 @@ export function useLearnerWorkspace(
 
   async function handleCreateExercise(payload: ExerciseAuthoringPayload) {
     if (!selectedLanguageId) {
-      throw new Error("Select or create a language first.");
+      throw new Error(t("errors.selectOrCreateLanguage"));
     }
     const created = await createExercise(selectedLanguageId, payload);
     await refreshDashboard();
@@ -111,7 +113,7 @@ export function useLearnerWorkspace(
     options?: { type?: string }
   ): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
     if (!selectedLanguageId) {
-      throw new Error("Select or create a language first.");
+      throw new Error(t("errors.selectOrCreateLanguage"));
     }
     return generateModelExercise(selectedLanguageId, options);
   }

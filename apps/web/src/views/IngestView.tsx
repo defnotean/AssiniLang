@@ -12,9 +12,10 @@ import {
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { extractionDraftSummary, formatCount } from "../lib/format";
-import { EXTRACTION_DRAFT_DUPLICATE_LABELS, EXTRACTION_DRAFT_GROUNDING_LABELS, EXTRACTION_DRAFT_KIND_LABELS } from "../lib/viewConfig";
+import { useI18n } from "../i18n";
 
 export function IngestView({ languageId }: { languageId: string }) {
+  const { t } = useI18n();
   const [sources, setSources] = useState<SourceAsset[]>([]);
   const [drafts, setDrafts] = useState<ExtractionDraftView[]>([]);
   const [isLoadingIntake, setIsLoadingIntake] = useState(true);
@@ -100,13 +101,13 @@ export function IngestView({ languageId }: { languageId: string }) {
 
     if (!title) {
       setRegisterNotice(null);
-      setRegisterError("Please provide a source title.");
+      setRegisterError(t("ingest.errorTitleRequired"));
       return;
     }
 
     if (registerKind === "url" ? !url : !rawText) {
       setRegisterNotice(null);
-      setRegisterError(registerKind === "url" ? "Please provide the source URL." : "Please paste the source text.");
+      setRegisterError(registerKind === "url" ? t("ingest.errorUrlRequired") : t("ingest.errorTextRequired"));
       return;
     }
 
@@ -122,10 +123,10 @@ export function IngestView({ languageId }: { languageId: string }) {
       setRegisterTitle("");
       setRegisterText("");
       setRegisterUrl("");
-      setRegisterNotice(`Source registered: ${registered.title}.`);
+      setRegisterNotice(t("ingest.sourceRegistered", { title: registered.title }));
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Source registration failed";
+      const message = error instanceof Error ? error.message : t("ingest.sourceRegistrationFailed");
       setRegisterError(message);
     } finally {
       setIsRegisteringSource(false);
@@ -137,7 +138,7 @@ export function IngestView({ languageId }: { languageId: string }) {
     const form = event.currentTarget;
     if (!uploadFile) {
       setRegisterNotice(null);
-      setRegisterError("Choose a file to upload.");
+      setRegisterError(t("ingest.errorChooseFile"));
       return;
     }
 
@@ -149,10 +150,10 @@ export function IngestView({ languageId }: { languageId: string }) {
       setUploadFile(null);
       setUploadTitle("");
       form.reset();
-      setRegisterNotice(`File uploaded as ${uploaded.kind} source: ${uploaded.title}.`);
+      setRegisterNotice(t("ingest.fileUploaded", { kind: uploaded.kind, title: uploaded.title }));
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Source upload failed";
+      const message = error instanceof Error ? error.message : t("ingest.sourceUploadFailed");
       setRegisterError(message);
     } finally {
       setIsUploadingSource(false);
@@ -183,9 +184,9 @@ export function IngestView({ languageId }: { languageId: string }) {
         setPollingSource(null);
         setProcessingSourceId(null);
         if (asset && asset.status === "failed") {
-          setProcessError(asset.error ?? `Processing ${pollingSource.title} failed.`);
+          setProcessError(asset.error ?? t("ingest.processingFailed", { title: pollingSource.title }));
         } else {
-          setProcessNotice(`Processing ${pollingSource.title} finished.`);
+          setProcessNotice(t("ingest.processingFinished", { title: pollingSource.title }));
         }
 
         const loadedDrafts = await fetchExtractionDrafts(languageId, "proposed");
@@ -216,7 +217,7 @@ export function IngestView({ languageId }: { languageId: string }) {
       setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
       setPollingSource({ id: result.asset.id, title: result.asset.title });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Source processing failed";
+      const message = error instanceof Error ? error.message : t("ingest.sourceProcessingFailed");
       setProcessError(message);
       setProcessingSourceId(null);
     }
@@ -229,14 +230,14 @@ export function IngestView({ languageId }: { languageId: string }) {
     try {
       if (decision === "accept") {
         const result = await acceptExtractionDraft(draftId);
-        setDraftNotice(`Draft accepted: ${EXTRACTION_DRAFT_KIND_LABELS[result.draft.kind]} committed.`);
+        setDraftNotice(t("ingest.draftAccepted", { label: t(`draftKind.${result.draft.kind}`) }));
       } else {
         const rejected = await rejectExtractionDraft(draftId);
-        setDraftNotice(`Draft rejected: ${EXTRACTION_DRAFT_KIND_LABELS[rejected.kind]}.`);
+        setDraftNotice(t("ingest.draftRejected", { label: t(`draftKind.${rejected.kind}`) }));
       }
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Extraction draft review failed";
+      const message = error instanceof Error ? error.message : t("ingest.draftReviewFailed");
       setDraftError(message);
     } finally {
       setReviewingDraftId(null);
@@ -270,20 +271,21 @@ export function IngestView({ languageId }: { languageId: string }) {
     try {
       const result = await bulkReviewExtractionDrafts(languageId, action, selectedDraftIds);
       const succeeded = action === "accept" ? result.accepted : result.rejected;
-      const summary = `Bulk review finished: ${succeeded} ${action === "accept" ? "accepted" : "rejected"}, ${result.failed} failed.`;
+      const verb = action === "accept" ? t("ingest.bulkVerbAccepted") : t("ingest.bulkVerbRejected");
+      const summary = t("ingest.bulkReviewFinished", { succeeded, verb, failed: result.failed });
       if (result.failed > 0) {
         setDraftError(summary);
         setBulkFailures(
           result.results
             .filter((item) => !item.ok)
-            .map((item) => ({ draftId: item.draftId, error: item.error ?? "Unknown failure" }))
+            .map((item) => ({ draftId: item.draftId, error: item.error ?? t("ingest.unknownFailure") }))
         );
       } else {
         setDraftNotice(summary);
       }
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Bulk extraction draft review failed";
+      const message = error instanceof Error ? error.message : t("ingest.bulkReviewFailed");
       setDraftError(message);
     } finally {
       setIsBulkReviewing(false);
@@ -293,7 +295,7 @@ export function IngestView({ languageId }: { languageId: string }) {
   if (isLoadingIntake) {
     return (
       <div className="panel-card" role="status" aria-live="polite">
-        Loading sources and intake queue...
+        {t("ingest.loadingIntake")}
       </div>
     );
   }
@@ -308,67 +310,67 @@ export function IngestView({ languageId }: { languageId: string }) {
 
   return (
     <div className="ingest-view">
-      <form className="record-card form-panel compact" aria-label="Register source" onSubmit={handleRegisterSource}>
+      <form className="record-card form-panel compact" aria-label={t("ingest.registerSourceAria")} onSubmit={handleRegisterSource}>
         <div>
-          <span className="detail-label">Source intake</span>
-          <h3>Add source</h3>
+          <span className="detail-label">{t("ingest.sourceIntake")}</span>
+          <h3>{t("ingest.addSource")}</h3>
         </div>
         {registerNotice && <p className="result-notice" role="status" aria-live="polite">{registerNotice}</p>}
         {registerError && <p className="result-notice error" role="alert">{registerError}</p>}
         <div className="form-group">
-          <label htmlFor="ingest-source-kind">Source kind</label>
+          <label htmlFor="ingest-source-kind">{t("ingest.sourceKind")}</label>
           <select
             id="ingest-source-kind"
             value={registerKind}
             onChange={(event) => setRegisterKind(event.target.value as SourceRegistrationPayload["kind"])}
           >
-            <option value="text">Text</option>
-            <option value="wordlist">Word list</option>
-            <option value="url">URL</option>
+            <option value="text">{t("ingest.sourceKindText")}</option>
+            <option value="wordlist">{t("ingest.sourceKindWordlist")}</option>
+            <option value="url">{t("ingest.sourceKindUrl")}</option>
           </select>
         </div>
         <div className="form-group">
-          <label htmlFor="ingest-source-title">Source title</label>
+          <label htmlFor="ingest-source-title">{t("ingest.sourceTitle")}</label>
           <input id="ingest-source-title" value={registerTitle} onChange={(event) => setRegisterTitle(event.target.value)} />
         </div>
         {registerKind === "url" ? (
           <div className="form-group">
-            <label htmlFor="ingest-source-url">Source URL</label>
+            <label htmlFor="ingest-source-url">{t("ingest.sourceUrl")}</label>
             <input
               id="ingest-source-url"
               type="url"
               value={registerUrl}
               onChange={(event) => setRegisterUrl(event.target.value)}
-              placeholder="https://example.org/wordlist"
+              placeholder={t("ingest.sourceUrlPlaceholder")}
             />
           </div>
         ) : (
           <div className="form-group">
-            <label htmlFor="ingest-source-text">Raw text</label>
+            <label htmlFor="ingest-source-text">{t("ingest.rawText")}</label>
             <textarea
               id="ingest-source-text"
               value={registerText}
               onChange={(event) => setRegisterText(event.target.value)}
-              placeholder="Paste raw text or word list lines"
+              placeholder={t("ingest.rawTextPlaceholder")}
             />
           </div>
         )}
         <button type="submit" className="secondary" disabled={isRegisteringSource}>
-          {isRegisteringSource ? "Registering..." : "Register source"}
+          {isRegisteringSource ? t("ingest.registering") : t("ingest.registerSource")}
         </button>
       </form>
 
-      <form className="record-card form-panel compact" aria-label="Upload source file" onSubmit={handleUploadSource}>
+      <form className="record-card form-panel compact" aria-label={t("ingest.uploadSourceFileAria")} onSubmit={handleUploadSource}>
         <div>
-          <span className="detail-label">File intake</span>
-          <h3>Upload image, audio, or document</h3>
+          <span className="detail-label">{t("ingest.fileIntake")}</span>
+          <h3>{t("ingest.uploadHeading")}</h3>
         </div>
         <div className="form-group">
-          <label htmlFor="ingest-upload-title">Upload title (optional)</label>
+          <label htmlFor="ingest-upload-title">{t("ingest.uploadTitle")}</label>
           <input id="ingest-upload-title" value={uploadTitle} onChange={(event) => setUploadTitle(event.target.value)} />
         </div>
         <div className="form-group">
-          <label htmlFor="ingest-upload-file">Source file</label>
+          <label htmlFor="ingest-upload-file">{t("ingest.sourceFile")}</label>
           <input
             id="ingest-upload-file"
             type="file"
@@ -376,14 +378,14 @@ export function IngestView({ languageId }: { languageId: string }) {
           />
         </div>
         <button type="submit" className="secondary" disabled={isUploadingSource || !uploadFile}>
-          {isUploadingSource ? "Uploading..." : "Upload source file"}
+          {isUploadingSource ? t("ingest.uploading") : t("ingest.uploadSourceFile")}
         </button>
       </form>
 
-      <section className="panel-card" aria-label="Registered sources">
+      <section className="panel-card" aria-label={t("ingest.registeredSourcesAria")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Registered sources</span>
+            <span className="detail-label">{t("ingest.registeredSources")}</span>
             <h2>{formatCount(sources.length, "source")}</h2>
           </div>
         </div>
@@ -397,24 +399,24 @@ export function IngestView({ languageId }: { languageId: string }) {
           </div>
         )}
         {sources.length === 0 ? (
-          <p className="empty-state">No sources registered yet. Add raw text, a word list, a URL, or upload a file.</p>
+          <p className="empty-state">{t("ingest.noSources")}</p>
         ) : (
           <div className="detail-list">
             {sources.map((source) => (
-              <article className="detail-row source-row" key={source.id} aria-label={`Source ${source.title}`}>
+              <article className="detail-row source-row" key={source.id} aria-label={t("ingest.sourceRowAria", { title: source.title })}>
                 <div>
                   <strong>{source.title}</strong>
                   <div className="pill-row">
                     <span className="pill">{source.kind}</span>
                     <StatusBadge status={source.status} />
                     {source.kind === "audio" && (
-                      <span className="pill">{source.transcript ? "transcript ready" : "no transcript yet"}</span>
+                      <span className="pill">{source.transcript ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}</span>
                     )}
                   </div>
-                  <small className="muted">Added by {source.createdBy} at {source.createdAt}</small>
+                  <small className="muted">{t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}</small>
                   {source.error && <p className="result-notice error">{source.error}</p>}
                   {source.warnings && source.warnings.length > 0 && (
-                    <ul className="source-warnings" aria-label={`Processing warnings for ${source.title}`}>
+                    <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>
                       {source.warnings.map((warning) => (
                         <li key={warning}>{warning}</li>
                       ))}
@@ -427,7 +429,7 @@ export function IngestView({ languageId }: { languageId: string }) {
                   disabled={processingSourceId !== null}
                   onClick={() => handleProcessSource(source.id)}
                 >
-                  {processingSourceId === source.id ? "Processing..." : `Process ${source.title}`}
+                  {processingSourceId === source.id ? t("ingest.processing") : t("ingest.processSource", { title: source.title })}
                 </button>
               </article>
             ))}
@@ -435,38 +437,38 @@ export function IngestView({ languageId }: { languageId: string }) {
         )}
       </section>
 
-      <section className="panel-card" aria-label="Extraction draft queue">
+      <section className="panel-card" aria-label={t("ingest.extractionDraftQueueAria")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Extraction drafts</span>
+            <span className="detail-label">{t("ingest.extractionDrafts")}</span>
             <h2>{formatCount(drafts.length, "proposed draft")}</h2>
           </div>
         </div>
         {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}
         {draftError && <p className="result-notice error" role="alert">{draftError}</p>}
         {bulkFailures.length > 0 && (
-          <ul className="warning-list" aria-label="Bulk review failures">
+          <ul className="warning-list" aria-label={t("ingest.bulkReviewFailuresAria")}>
             {bulkFailures.map((failure) => (
               <li key={failure.draftId}>{failure.draftId}: {failure.error}</li>
             ))}
           </ul>
         )}
         {drafts.length === 0 ? (
-          <p className="empty-state">No proposed extraction drafts. Process a source to propose lexemes, passages, and grammar notes.</p>
+          <p className="empty-state">{t("ingest.noDrafts")}</p>
         ) : (
           <>
-            <div className="pill-row bulk-review-bar" aria-label="Bulk draft review">
+            <div className="pill-row bulk-review-bar" aria-label={t("ingest.bulkDraftReviewAria")}>
               <label>
                 <input
                   type="checkbox"
-                  aria-label="Select all proposed drafts"
+                  aria-label={t("ingest.selectAllProposedAria")}
                   checked={drafts.length > 0 && selectedDraftIds.length === drafts.length}
                   disabled={isBulkReviewing}
                   onChange={toggleSelectAllProposed}
                 />
-                {" "}Select all proposed
+                {" "}{t("ingest.selectAllProposed")}
               </label>
-              <span className="muted">{selectedDraftIds.length} selected</span>
+              <span className="muted">{t("ingest.selectedCount", { count: selectedDraftIds.length })}</span>
               <button
                 type="button"
                 className="secondary"
@@ -474,10 +476,10 @@ export function IngestView({ languageId }: { languageId: string }) {
                 onClick={() => { void handleBulkReview("accept"); }}
               >
                 {isBulkReviewing
-                  ? "Reviewing selected..."
+                  ? t("ingest.reviewingSelected")
                   : pendingBulkAction === "accept"
-                    ? "Confirm accept selected"
-                    : "Accept selected"}
+                    ? t("ingest.confirmAcceptSelected")
+                    : t("ingest.acceptSelected")}
               </button>
               <button
                 type="button"
@@ -486,29 +488,29 @@ export function IngestView({ languageId }: { languageId: string }) {
                 onClick={() => { void handleBulkReview("reject"); }}
               >
                 {isBulkReviewing
-                  ? "Reviewing selected..."
+                  ? t("ingest.reviewingSelected")
                   : pendingBulkAction === "reject"
-                    ? "Confirm reject selected"
-                    : "Reject selected"}
+                    ? t("ingest.confirmRejectSelected")
+                    : t("ingest.rejectSelected")}
               </button>
             </div>
             <div className="detail-list">
             {drafts.map((draft) => (
-              <article className="detail-row draft-row" key={draft.id} aria-label={`Extraction draft ${draft.id}`}>
+              <article className="detail-row draft-row" key={draft.id} aria-label={t("ingest.extractionDraftRowAria", { id: draft.id })}>
                 <div>
                   <div className="pill-row">
                     <input
                       type="checkbox"
-                      aria-label={`Select draft ${draft.id}`}
+                      aria-label={t("ingest.selectDraftAria", { id: draft.id })}
                       checked={selectedDraftIds.includes(draft.id)}
                       disabled={isBulkReviewing}
                       onChange={() => toggleDraftSelection(draft.id)}
                     />
-                    <span className="pill">{EXTRACTION_DRAFT_KIND_LABELS[draft.kind]}</span>
+                    <span className="pill">{t(`draftKind.${draft.kind}`)}</span>
                     <ConfidenceBadge confidence={draft.confidence} />
                     {draft.duplicate && (
                       <span className={`status-badge ${draft.duplicate.kind === "pending" ? "under_review" : "contested"}`}>
-                        {EXTRACTION_DRAFT_DUPLICATE_LABELS[draft.duplicate.kind]}
+                        {t(`draftDuplicate.${draft.duplicate.kind}`)}
                       </span>
                     )}
                     {draft.grounding?.map((flag) => (
@@ -517,7 +519,7 @@ export function IngestView({ languageId }: { languageId: string }) {
                         className="status-badge contested"
                         title={flag.message}
                       >
-                        {EXTRACTION_DRAFT_GROUNDING_LABELS[flag.kind]}
+                        {t(`draftGrounding.${flag.kind}`)}
                       </span>
                     ))}
                   </div>
@@ -528,20 +530,20 @@ export function IngestView({ languageId }: { languageId: string }) {
                   <button
                     type="button"
                     className="secondary"
-                    aria-label={`Accept draft ${draft.id}`}
+                    aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
                     disabled={reviewingDraftId !== null}
                     onClick={() => handleDraftDecision(draft.id, "accept")}
                   >
-                    {reviewingDraftId === draft.id ? "Reviewing..." : "Accept"}
+                    {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
                   </button>
                   <button
                     type="button"
                     className="contest"
-                    aria-label={`Reject draft ${draft.id}`}
+                    aria-label={t("ingest.rejectDraftAria", { id: draft.id })}
                     disabled={reviewingDraftId !== null}
                     onClick={() => handleDraftDecision(draft.id, "reject")}
                   >
-                    Reject
+                    {t("ingest.reject")}
                   </button>
                 </div>
               </article>

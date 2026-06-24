@@ -7,16 +7,12 @@ import {
   type RecommendedExercises
 } from "../api";
 import { formatSubmissionStatus, parseAuthoringList } from "../lib/format";
-import { EXERCISE_TYPE_LABELS } from "../lib/viewConfig";
+import { useI18n } from "../i18n";
 import type { AsyncState, PublicExercise } from "../lib/types";
 
 const PRACTICE_NEXT_LIMIT = 3;
 
-const PRACTICE_STATUS_LABELS: Record<RecommendedExercises["rationale"][number]["status"], string> = {
-  new: "New",
-  overdue: "Overdue",
-  scheduled: "Scheduled"
-};
+const EXERCISE_TYPES = ["translate_to_target", "translate_to_english", "segment", "choose_particle"] as const;
 
 export function LearnerView({
   languageId,
@@ -53,6 +49,7 @@ export function LearnerView({
     options?: { type?: string }
   ) => Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
 }) {
+  const { t } = useI18n();
   const [authoringType, setAuthoringType] = useState<PublicExercise["type"]>("translate_to_target");
   const [authoringPrompt, setAuthoringPrompt] = useState("");
   const [authoringVocabulary, setAuthoringVocabulary] = useState("");
@@ -85,7 +82,7 @@ export function LearnerView({
         if (!cancelled) {
           setPracticeState({
             status: "error",
-            message: error instanceof Error ? error.message : "Failed to load practice recommendations."
+            message: error instanceof Error ? error.message : t("learner.practiceRecommendationsLoadError")
           });
         }
       });
@@ -93,7 +90,7 @@ export function LearnerView({
     return () => {
       cancelled = true;
     };
-  }, [languageId]);
+  }, [languageId, t]);
   const hasTwoAdversarialProbes = authoringAdversarialAnswerOne.trim().length > 0
     && authoringAdversarialReasonOne.trim().length > 0
     && authoringAdversarialAnswerTwo.trim().length > 0
@@ -134,9 +131,9 @@ export function LearnerView({
         adversarialAnswers,
         gradingExplanation: authoringExplanation.trim()
       });
-      setAuthoringMessage("Exercise authored.");
+      setAuthoringMessage(t("learner.exerciseAuthored"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Exercise authoring failed";
+      const message = error instanceof Error ? error.message : t("learner.exerciseAuthoringFailed");
       setAuthoringError(message);
     } finally {
       setIsCreatingExercise(false);
@@ -152,7 +149,7 @@ export function LearnerView({
     try {
       const { exercise, warnings } = await onGenerateExercise({ type: authoringType });
 
-      if (exercise.type in EXERCISE_TYPE_LABELS) {
+      if ((EXERCISE_TYPES as readonly string[]).includes(exercise.type)) {
         setAuthoringType(exercise.type as PublicExercise["type"]);
       }
       setAuthoringPrompt(exercise.prompt);
@@ -165,10 +162,10 @@ export function LearnerView({
       setAuthoringAdversarialReasonTwo(exercise.adversarialAnswers[1]?.reason ?? "");
       setAuthoringExplanation(exercise.gradingExplanation);
 
-      const base = "Draft generated — review before saving.";
+      const base = t("learner.draftGenerated");
       setAuthoringMessage(warnings.length > 0 ? `${base} ${warnings.join(" ")}` : base);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Model exercise generation failed";
+      const message = error instanceof Error ? error.message : t("learner.modelExerciseGenerationFailed");
       setAuthoringError(message);
     } finally {
       setIsGeneratingExercise(false);
@@ -179,7 +176,7 @@ export function LearnerView({
     if (practiceState.status === "idle" || practiceState.status === "loading") {
       return (
         <p className="inline-empty" role="status" aria-live="polite">
-          Loading practice recommendations.
+          {t("learner.loadingPracticeRecommendations")}
         </p>
       );
     }
@@ -194,7 +191,7 @@ export function LearnerView({
 
     const { exercises: recommended, rationale } = practiceState.data;
     if (recommended.length === 0) {
-      return <p className="inline-empty">No practice recommendations yet.</p>;
+      return <p className="inline-empty">{t("learner.noPracticeRecommendationsYet")}</p>;
     }
 
     return (
@@ -205,7 +202,7 @@ export function LearnerView({
           return (
             <div key={exercise.id} className="practice-next-item">
               <span className={`pill practice-status practice-status-${status}`}>
-                {PRACTICE_STATUS_LABELS[status]}
+                {t(`learner.practiceStatus.${status}`)}
               </span>
               <span className="practice-next-prompt">{exercise.prompt}</span>
               <button
@@ -214,7 +211,7 @@ export function LearnerView({
                 disabled={isWorkflowBusy}
                 onClick={() => onSelectExercise(exercise.id)}
               >
-                Practice
+                {t("learner.practice")}
               </button>
             </div>
           );
@@ -225,15 +222,15 @@ export function LearnerView({
 
   return (
     <div className="exercise-workbench">
-      <section className="record-card practice-next-panel" aria-label="Practice next">
-        <h3>Practice next</h3>
+      <section className="record-card practice-next-panel" aria-label={t("learner.practiceNext")}>
+        <h3>{t("learner.practiceNext")}</h3>
         {renderPracticeNext()}
       </section>
 
-      <section className="exercise-list" aria-label="Exercise selector">
-        <div className="panel-heading">{exercises.length} exercises</div>
+      <section className="exercise-list" aria-label={t("learner.exerciseSelector")}>
+        <div className="panel-heading">{t("learner.exercisesCount", { count: exercises.length })}</div>
         {exercises.length === 0 ? (
-          <p className="empty-state">No exercises available.</p>
+          <p className="empty-state">{t("learner.noExercisesAvailable")}</p>
         ) : (
           exercises.map((exercise) => (
             <button
@@ -245,20 +242,20 @@ export function LearnerView({
               onClick={() => onSelectExercise(exercise.id)}
             >
               <span>{exercise.prompt}</span>
-              <small>{EXERCISE_TYPE_LABELS[exercise.type]}</small>
+              <small>{t(`exerciseType.${exercise.type}`)}</small>
             </button>
           ))
         )}
       </section>
 
-      <section className="detail-panel exercise-detail" aria-label="Exercise detail panel">
+      <section className="detail-panel exercise-detail" aria-label={t("learner.exerciseDetailPanel")}>
         {selectedExercise ? (
-          <article className="record-card" aria-label="Selected exercise detail">
-            <span className="pill">{EXERCISE_TYPE_LABELS[selectedExercise.type]}</span>
+          <article className="record-card" aria-label={t("learner.selectedExerciseDetail")}>
+            <span className="pill">{t(`exerciseType.${selectedExercise.type}`)}</span>
             <h2>{selectedExercise.prompt}</h2>
             <dl className="detail-grid exercise-context">
               <div>
-                <dt>Allowed vocabulary</dt>
+                <dt>{t("learner.allowedVocabulary")}</dt>
                 <dd className="token-list">
                   {selectedExercise.allowedVocabulary.map((token) => (
                     <code key={token}>{token}</code>
@@ -266,7 +263,7 @@ export function LearnerView({
                 </dd>
               </div>
               <div>
-                <dt>Rules</dt>
+                <dt>{t("learner.rules")}</dt>
                 <dd className="token-list">
                   {selectedExercise.allowedRuleIds.map((rule) => (
                     <span className="pill" key={rule}>{rule}</span>
@@ -276,16 +273,16 @@ export function LearnerView({
             </dl>
 
             <label className="field-label" htmlFor="exercise-answer">
-              Exercise answer
+              {t("learner.exerciseAnswer")}
             </label>
             <textarea
               id="exercise-answer"
               value={exerciseAnswer}
               onChange={(event) => onAnswerChange(event.target.value)}
-              placeholder="Type your answer here"
+              placeholder={t("learner.typeYourAnswerHere")}
             />
             <button type="button" className="full-width" onClick={onGrade} disabled={isGrading || exerciseAnswer.trim().length === 0}>
-              {isGrading ? "Grading..." : "Grade"}
+              {isGrading ? t("learner.grading") : t("learner.grade")}
             </button>
             {exerciseResult && (
               <p className="result-notice" role="status" aria-live="polite">
@@ -293,14 +290,14 @@ export function LearnerView({
               </p>
             )}
 
-            <section className="submission-history" aria-label="Exercise submission history">
-              <h3>Submission History</h3>
+            <section className="submission-history" aria-label={t("learner.exerciseSubmissionHistory")}>
+              <h3>{t("learner.submissionHistory")}</h3>
               {isLoadingSubmissions ? (
                 <p className="inline-empty" role="status" aria-live="polite">
-                  Loading submissions.
+                  {t("learner.loadingSubmissions")}
                 </p>
               ) : submissionHistory.length === 0 ? (
-                <p className="inline-empty">No submissions yet.</p>
+                <p className="inline-empty">{t("learner.noSubmissionsYet")}</p>
               ) : (
                 <div className="detail-list">
                   {submissionHistory.map((submission) => (
@@ -315,16 +312,16 @@ export function LearnerView({
             </section>
           </article>
         ) : (
-          <p className="empty-state">No exercises available.</p>
+          <p className="empty-state">{t("learner.noExercisesAvailable")}</p>
         )}
 
-        <form className="record-card form-panel compact exercise-authoring-form" aria-label="Exercise authoring" onSubmit={handleCreateExercise}>
+        <form className="record-card form-panel compact exercise-authoring-form" aria-label={t("learner.exerciseAuthoring")} onSubmit={handleCreateExercise}>
           <div>
-            <span className="detail-label">Exercise authoring</span>
-            <h3>Create learner task</h3>
+            <span className="detail-label">{t("learner.exerciseAuthoring")}</span>
+            <h3>{t("learner.createLearnerTask")}</h3>
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-type">Exercise type</label>
+            <label htmlFor="exercise-author-type">{t("learner.exerciseType")}</label>
             <select
               id="exercise-author-type"
               value={authoringType}
@@ -333,13 +330,13 @@ export function LearnerView({
                 clearAuthoringNotice();
               }}
             >
-              {Object.entries(EXERCISE_TYPE_LABELS).map(([type, label]) => (
-                <option key={type} value={type}>{label}</option>
+              {EXERCISE_TYPES.map((type) => (
+                <option key={type} value={type}>{t(`exerciseType.${type}`)}</option>
               ))}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-prompt">Exercise prompt</label>
+            <label htmlFor="exercise-author-prompt">{t("learner.exercisePrompt")}</label>
             <textarea
               id="exercise-author-prompt"
               value={authoringPrompt}
@@ -350,7 +347,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-vocabulary">Allowed vocabulary</label>
+            <label htmlFor="exercise-author-vocabulary">{t("learner.allowedVocabulary")}</label>
             <input
               id="exercise-author-vocabulary"
               value={authoringVocabulary}
@@ -361,7 +358,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-rules">Allowed rule IDs</label>
+            <label htmlFor="exercise-author-rules">{t("learner.allowedRuleIds")}</label>
             <input
               id="exercise-author-rules"
               value={authoringRules}
@@ -372,7 +369,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-answers">Expected answers</label>
+            <label htmlFor="exercise-author-answers">{t("learner.expectedAnswers")}</label>
             <textarea
               id="exercise-author-answers"
               value={authoringAnswers}
@@ -383,7 +380,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-answer-one">Adversarial answer 1</label>
+            <label htmlFor="exercise-author-adversarial-answer-one">{t("learner.adversarialAnswer1")}</label>
             <input
               id="exercise-author-adversarial-answer-one"
               value={authoringAdversarialAnswerOne}
@@ -394,7 +391,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-reason-one">Adversarial reason 1</label>
+            <label htmlFor="exercise-author-adversarial-reason-one">{t("learner.adversarialReason1")}</label>
             <input
               id="exercise-author-adversarial-reason-one"
               value={authoringAdversarialReasonOne}
@@ -405,7 +402,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-answer-two">Adversarial answer 2</label>
+            <label htmlFor="exercise-author-adversarial-answer-two">{t("learner.adversarialAnswer2")}</label>
             <input
               id="exercise-author-adversarial-answer-two"
               value={authoringAdversarialAnswerTwo}
@@ -416,7 +413,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-reason-two">Adversarial reason 2</label>
+            <label htmlFor="exercise-author-adversarial-reason-two">{t("learner.adversarialReason2")}</label>
             <input
               id="exercise-author-adversarial-reason-two"
               value={authoringAdversarialReasonTwo}
@@ -427,7 +424,7 @@ export function LearnerView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="exercise-author-explanation">Grading explanation</label>
+            <label htmlFor="exercise-author-explanation">{t("learner.gradingExplanation")}</label>
             <textarea
               id="exercise-author-explanation"
               value={authoringExplanation}
@@ -444,10 +441,10 @@ export function LearnerView({
               onClick={handleGenerateWithModel}
               disabled={isWorkflowBusy || isCreatingExercise || isGeneratingExercise}
             >
-              {isGeneratingExercise ? "Generating..." : "Generate with model"}
+              {isGeneratingExercise ? t("learner.generating") : t("learner.generateWithModel")}
             </button>
             <button type="submit" className="secondary" disabled={!canCreateExercise}>
-              {isCreatingExercise ? "Creating..." : "Create exercise"}
+              {isCreatingExercise ? t("learner.creating") : t("learner.createExercise")}
             </button>
           </div>
           {authoringMessage && <p className="result-notice" role="status" aria-live="polite">{authoringMessage}</p>}

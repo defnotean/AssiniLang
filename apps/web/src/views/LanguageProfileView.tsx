@@ -2,12 +2,14 @@ import type { LanguageProfile } from "../api";
 import { ConfidenceBadge } from "../components/badges";
 import { formatCount } from "../lib/format";
 import type { AsyncState } from "../lib/types";
+import { useI18n } from "../i18n";
 
 export function LanguageProfileView({ profileState }: { profileState: AsyncState<LanguageProfile> }) {
+  const { t } = useI18n();
   if (profileState.status === "loading" || profileState.status === "idle") {
     return (
       <div className="panel-card" role="status" aria-live="polite">
-        Loading language profile...
+        {t("profile.loadingProfile")}
       </div>
     );
   }
@@ -24,10 +26,10 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
 
   return (
     <div className="profile-view">
-      <section className="panel-card profile-summary" aria-label="Language profile summary">
+      <section className="panel-card profile-summary" aria-label={t("profile.summaryAriaLabel")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Language profile</span>
+            <span className="detail-label">{t("profile.languageProfile")}</span>
             <h2>{language.name}</h2>
           </div>
           <span className="id-badge">{language.id}</span>
@@ -35,61 +37,61 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <p className="explanation">{language.description}</p>
         <dl className="detail-grid">
           <div>
-            <dt>Typology</dt>
+            <dt>{t("profile.typology")}</dt>
             <dd>{language.typology}</dd>
           </div>
           <div>
-            <dt>Vocabulary</dt>
+            <dt>{t("profile.vocabulary")}</dt>
             <dd>{stats.vocabularyItems}</dd>
           </div>
           <div>
-            <dt>Grammar rules</dt>
+            <dt>{t("profile.grammarRules")}</dt>
             <dd>{stats.grammarRules}</dd>
           </div>
           <div>
-            <dt>Exercise types</dt>
+            <dt>{t("profile.exerciseTypes")}</dt>
             <dd>{Object.keys(stats.exerciseTypes).length}</dd>
           </div>
           <div>
-            <dt>Corpus passages</dt>
+            <dt>{t("profile.corpusPassages")}</dt>
             <dd>{stats.corpusPassages}</dd>
           </div>
           <div>
-            <dt>Notes</dt>
+            <dt>{t("profile.notes")}</dt>
             <dd>{stats.notes}</dd>
           </div>
           <div>
-            <dt>Exercises</dt>
+            <dt>{t("profile.exercises")}</dt>
             <dd>{stats.exercises}</dd>
           </div>
           <div>
-            <dt>Source assets</dt>
+            <dt>{t("profile.sourceAssets")}</dt>
             <dd>{stats.sourceAssets}</dd>
           </div>
           <div>
-            <dt>Pending extraction drafts</dt>
+            <dt>{t("profile.pendingExtractionDrafts")}</dt>
             <dd>{stats.pendingExtractionDrafts}</dd>
           </div>
         </dl>
       </section>
 
       {phonology ? (
-        <section className="panel-card phonology-panel" aria-label="Phonology profile">
+        <section className="panel-card phonology-panel" aria-label={t("profile.phonologyAriaLabel")}>
           <div className="record-topline">
             <div>
-              <span className="detail-label">Phonology profile</span>
-              <h2>{phonology.syllableTemplate ?? "Syllable template not set"}</h2>
+              <span className="detail-label">{t("profile.phonologyProfile")}</span>
+              <h2>{phonology.syllableTemplate ?? t("profile.syllableTemplateNotSet")}</h2>
             </div>
             {phonology.stress && <span className="id-badge">{phonology.stress}</span>}
           </div>
           <dl className="detail-grid">
             <div>
-              <dt>Consonants</dt>
-              <dd>{phonology.consonants.length > 0 ? phonology.consonants.join(" ") : "None recorded"}</dd>
+              <dt>{t("profile.consonants")}</dt>
+              <dd>{phonology.consonants.length > 0 ? phonology.consonants.join(" ") : t("profile.noneRecorded")}</dd>
             </div>
             <div>
-              <dt>Vowels</dt>
-              <dd>{phonology.vowels.length > 0 ? phonology.vowels.join(" ") : "None recorded"}</dd>
+              <dt>{t("profile.vowels")}</dt>
+              <dd>{phonology.vowels.length > 0 ? phonology.vowels.join(" ") : t("profile.noneRecorded")}</dd>
             </div>
           </dl>
           <div className="detail-list">
@@ -99,21 +101,21 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </section>
       ) : (
-        <section className="panel-card phonology-panel" aria-label="Phonology profile">
+        <section className="panel-card phonology-panel" aria-label={t("profile.phonologyAriaLabel")}>
           <div className="record-topline">
             <div>
-              <span className="detail-label">Phonology profile</span>
-              <h2>No phonology declared yet</h2>
+              <span className="detail-label">{t("profile.phonologyProfile")}</span>
+              <h2>{t("profile.noPhonologyDeclared")}</h2>
             </div>
           </div>
-          <p className="empty-state">Add phonology details to the language record to populate this panel.</p>
+          <p className="empty-state">{t("profile.phonologyEmptyState")}</p>
         </section>
       )}
 
-      <section className="panel-card grammar-panel" aria-label="Grammar inventory">
+      <section className="panel-card grammar-panel" aria-label={t("profile.grammarInventory")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Grammar inventory</span>
+            <span className="detail-label">{t("profile.grammarInventory")}</span>
             <h2>{formatCount(grammarRules.length, "rule")}</h2>
           </div>
         </div>
@@ -135,10 +137,10 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
       </section>
 
-      <section className="panel-card vocabulary-panel" aria-label="Vocabulary inventory">
+      <section className="panel-card vocabulary-panel" aria-label={t("profile.vocabularyInventory")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Vocabulary inventory</span>
+            <span className="detail-label">{t("profile.vocabularyInventory")}</span>
             <h2>{formatCount(vocabulary.length, "entry", "entries")}</h2>
           </div>
         </div>
@@ -158,10 +160,10 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
       </section>
 
-      <section className="panel-card morpheme-panel" aria-label="Morpheme inventory">
+      <section className="panel-card morpheme-panel" aria-label={t("profile.morphemeInventory")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Morpheme inventory</span>
+            <span className="detail-label">{t("profile.morphemeInventory")}</span>
             <h2>{formatCount(morphemeInventory.length, "morpheme")}</h2>
           </div>
         </div>
@@ -192,16 +194,16 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
       </section>
 
-      <section className="panel-card paradigm-gaps-panel" aria-label="Paradigm gaps">
+      <section className="panel-card paradigm-gaps-panel" aria-label={t("profile.paradigmGaps")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Paradigm gaps</span>
+            <span className="detail-label">{t("profile.paradigmGaps")}</span>
             <h2>{formatCount(paradigmGaps.length, "fieldwork to-do")}</h2>
           </div>
         </div>
         {paradigmGaps.length === 0 ? (
           <p className="empty-state">
-            No paradigm gaps detected - or not enough attested cells to infer paradigms yet.
+            {t("profile.paradigmGapsEmptyState")}
           </p>
         ) : (
           <div className="detail-list">
@@ -220,7 +222,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
                   ))}
                   {gap.missing.map((cell) => (
                     <span className="pill paradigm-cell-missing" key={`${gap.lemma}-missing-${cell}`}>
-                      missing: {cell}
+                      {t("profile.missingCell", { cell })}
                     </span>
                   ))}
                 </div>

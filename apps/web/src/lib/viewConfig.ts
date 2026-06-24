@@ -10,11 +10,12 @@ export const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebr
   learner: { label: "Learning Lab", title: "Learner Exercise Preview", eyebrow: "Practice" },
   eval: { label: "Evaluation Dashboard", title: "Evaluation Dashboard", eyebrow: "Quality gates" },
   governance: { label: "Governance", title: "Governance & Policy", eyebrow: "Policy" },
+  elder: { label: "Elder corrections", title: "Help us fix the words", eyebrow: "Community elders" },
   assistant: { label: "AI Assistant", title: "AI Assistant", eyebrow: "Grounded chat" },
   model: { label: "Model Setup", title: "Model Setup", eyebrow: "Local LLM readiness" }
 };
 
-export const VIEW_ORDER: ViewMode[] = ["profile", "ingest", "corpus", "review", "learner", "eval", "governance", "assistant", "model"];
+export const VIEW_ORDER: ViewMode[] = ["profile", "ingest", "corpus", "review", "learner", "eval", "governance", "elder", "assistant", "model"];
 
 export const LANGUAGE_TYPOLOGY_OPTIONS: Language["typology"][] = [
   "unknown",

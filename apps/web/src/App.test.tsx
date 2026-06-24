@@ -1706,14 +1706,14 @@ describe("App", () => {
     apiMock.reviewElderCorrection.mockResolvedValue(acceptedCorrection);
 
     await renderReady();
-    fireEvent.click(screen.getByRole("button", { name: "Elder workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Elder corrections" }));
 
     expect(await screen.findByText("Mention suffix order before approval.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Accept correction elder-correction-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve this fix" }));
 
     await waitFor(() => expect(apiMock.reviewElderCorrection).toHaveBeenCalledWith("elder-correction-1", "accepted"));
-    expect(await screen.findByText("Status: accepted")).toBeInTheDocument();
-    expect(screen.getByText("Reviewed by lead-1")).toBeInTheDocument();
+    expect(await screen.findByText("Approved — we are using this")).toBeInTheDocument();
+    expect(screen.getByText("Looked at by lead-1")).toBeInTheDocument();
   });
 
   it("applies accepted elder corrections to linked notes from the correction ledger", async () => {
@@ -1758,16 +1758,16 @@ describe("App", () => {
     });
 
     await renderReady();
-    fireEvent.click(screen.getByRole("button", { name: "Elder workspace" }));
+    fireEvent.click(screen.getByRole("button", { name: "Elder corrections" }));
 
-    const explanationInput = await screen.findByLabelText("Revised explanation for elder-correction-1");
+    const explanationInput = await screen.findByLabelText("Updated wording for the lesson");
     fireEvent.change(explanationInput, { target: { value: revisedExplanation } });
-    fireEvent.click(screen.getByRole("button", { name: "Apply correction elder-correction-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save into the lesson" }));
 
     await waitFor(() =>
       expect(apiMock.applyElderCorrection).toHaveBeenCalledWith("elder-correction-1", revisedExplanation)
     );
-    expect(await screen.findByText("Status: applied")).toBeInTheDocument();
+    expect(await screen.findByText("Saved into the lesson")).toBeInTheDocument();
     expect(screen.getByText("Elder correction applied to linked note.")).toBeInTheDocument();
   });
 

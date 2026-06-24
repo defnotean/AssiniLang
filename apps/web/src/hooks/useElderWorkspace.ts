@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction
 import type { ElderCorrection } from "@assini/db";
 import type { ElderContext, ElderCorrectionPayload, ElderCorrectionReviewStatus } from "../api";
 import { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "../api";
+import { useI18n } from "../i18n";
 
 export interface ElderWorkspaceState {
   elderContext: ElderContext | null;
@@ -41,6 +42,7 @@ export function useElderWorkspace(
   refreshDashboard: () => Promise<void>,
   refreshModelObservability: () => Promise<void>
 ): ElderWorkspaceState {
+  const { t } = useI18n();
   const [elderContext, setElderContext] = useState<ElderContext | null>(null);
   const [isLoadingElder, setIsLoadingElder] = useState(false);
   const [correctionSuccess, setCorrectionSuccess] = useState<string | null>(null);
@@ -100,17 +102,17 @@ export function useElderWorkspace(
   async function handleSubmitCorrection(event: FormEvent) {
     event.preventDefault();
     if (!formCorrection.trim() || !formRationale.trim()) {
-      setCorrectionError("Please describe both the correction and the rationale.");
+      setCorrectionError(t("elderWs.errMissingCorrectionOrRationale"));
       return;
     }
 
     if (!formNoteId && !formPassageId && !formContextText.trim()) {
-      setCorrectionError("Linguistic Rule: You must bind the correction to at least one context indicator (choose a Note, choose a Passage, or provide a Custom Context snippet).");
+      setCorrectionError(t("elderWs.errMissingContextBinding"));
       return;
     }
 
     if (!selectedLanguageId) {
-      setCorrectionError("Select or create a language first.");
+      setCorrectionError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -130,7 +132,7 @@ export function useElderWorkspace(
 
     try {
       await submitElderCorrection(payload);
-      setCorrectionSuccess("Elder Correction submitted successfully!");
+      setCorrectionSuccess(t("elderWs.msgSubmitSuccess"));
       setFormCorrection("");
       setFormRationale("");
       setFormContextText("");
@@ -139,7 +141,7 @@ export function useElderWorkspace(
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction submission failed";
+      const message = error instanceof Error ? error.message : t("elderWs.errSubmitFailed");
       setCorrectionError(message);
     } finally {
       setIsSubmittingCorrection(false);
@@ -153,11 +155,11 @@ export function useElderWorkspace(
     setCorrectionError(null);
     try {
       await reviewElderCorrection(correctionId, status);
-      setCorrectionSuccess(status === "accepted" ? "Elder correction accepted." : "Elder correction rejected.");
+      setCorrectionSuccess(status === "accepted" ? t("elderWs.msgReviewAccepted") : t("elderWs.msgReviewRejected"));
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshModelObservability();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction review failed";
+      const message = error instanceof Error ? error.message : t("elderWs.errReviewFailed");
       setCorrectionError(message);
     } finally {
       setReviewingCorrectionId(null);
@@ -168,13 +170,13 @@ export function useElderWorkspace(
     const revisedExplanation = explanation.trim();
     if (!revisedExplanation) {
       setCorrectionSuccess(null);
-      setCorrectionError("Please provide a revised explanation before applying the correction.");
+      setCorrectionError(t("elderWs.errMissingRevisedExplanation"));
       return;
     }
 
     if (!selectedLanguageId) {
       setCorrectionSuccess(null);
-      setCorrectionError("Select or create a language first.");
+      setCorrectionError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -183,7 +185,7 @@ export function useElderWorkspace(
     setCorrectionError(null);
     try {
       await applyElderCorrection(correctionId, revisedExplanation);
-      setCorrectionSuccess("Elder correction applied to linked note.");
+      setCorrectionSuccess(t("elderWs.msgApplySuccess"));
       setCorrectionApplyDrafts((current) => {
         const next = { ...current };
         delete next[correctionId];
@@ -192,7 +194,7 @@ export function useElderWorkspace(
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Elder correction apply failed";
+      const message = error instanceof Error ? error.message : t("elderWs.errApplyFailed");
       setCorrectionError(message);
     } finally {
       setApplyingCorrectionId(null);

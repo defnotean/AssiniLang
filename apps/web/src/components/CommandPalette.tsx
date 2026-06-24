@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useI18n } from "../i18n";
 
 export type PaletteCommand = {
   id: string;
@@ -26,6 +27,7 @@ export function CommandPalette({
   commands: PaletteCommand[];
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -83,12 +85,12 @@ export function CommandPalette({
         className="command-palette"
         role="dialog"
         aria-modal="true"
-        aria-label="Command palette"
+        aria-label={t("palette.aria")}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
         <label className="visually-hidden" htmlFor="command-palette-input">
-          Search commands
+          {t("palette.searchLabel")}
         </label>
         <input
           id="command-palette-input"
@@ -99,17 +101,17 @@ export function CommandPalette({
           aria-controls="command-palette-list"
           aria-activedescendant={activeOptionId}
           autoComplete="off"
-          placeholder="Type a command..."
+          placeholder={t("palette.placeholder")}
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
             setSelectedIndex(0);
           }}
         />
-        <ul className="palette-list" id="command-palette-list" role="listbox" aria-label="Commands">
+        <ul className="palette-list" id="command-palette-list" role="listbox" aria-label={t("palette.listAria")}>
           {filtered.length === 0 ? (
             <li className="palette-empty" aria-disabled="true">
-              No matching commands
+              {t("palette.empty")}
             </li>
           ) : (
             filtered.map((command, index) => (

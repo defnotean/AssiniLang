@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AssistantWorkspace } from "../hooks/useAssistantWorkspace";
 import { formatStatus } from "../lib/format";
 import { renderMarkdownLite } from "../lib/markdownLite";
+import { useI18n } from "../i18n";
 import { NoLanguageNotice } from "./NoLanguageNotice";
 
 /**
@@ -21,6 +22,7 @@ export function AssistantView({
   contextPassageIds: string[];
   assistant: AssistantWorkspace;
 }) {
+  const { t } = useI18n();
   const {
     sessionState,
     input,
@@ -73,13 +75,11 @@ export function AssistantView({
 
   if (!session) {
     return (
-      <section className="panel-card assistant-empty" aria-label="Start an assistant conversation">
-        <span className="detail-label">Grounded chat</span>
-        <h2>Chat with the local model</h2>
+      <section className="panel-card assistant-empty" aria-label={t("assistant.startConversationAriaLabel")}>
+        <span className="detail-label">{t("assistant.groundedChat")}</span>
+        <h2>{t("assistant.chatWithLocalModelHeading")}</h2>
         <p className="assistant-explainer">
-          Chat with the configured local model using only public workspace context. The selected language&apos;s public
-          notes and corpus passages are attached as observable evidence, hidden chain-of-thought is never exposed, and
-          replies are clearly labeled when the deterministic offline fallback answered instead of a real model.
+          {t("assistant.explainer")}
         </p>
         {sessionState.status === "error" && (
           <p className="result-notice error" role="alert">
@@ -87,13 +87,13 @@ export function AssistantView({
           </p>
         )}
         <label className="assistant-setup-label" htmlFor="assistant-setup">
-          Conversation setup (optional)
+          {t("assistant.conversationSetupLabel")}
         </label>
         <textarea
           id="assistant-setup"
           className="assistant-setup"
-          aria-label="Conversation setup instructions"
-          placeholder="Standing instructions the assistant follows for the whole conversation, e.g. Always gloss morphemes with Leipzig abbreviations, and quiz me after each answer."
+          aria-label={t("assistant.conversationSetupAriaLabel")}
+          placeholder={t("assistant.conversationSetupPlaceholder")}
           value={setupInstructions}
           rows={2}
           disabled={isStarting}
@@ -101,8 +101,8 @@ export function AssistantView({
         />
         <div className="assistant-composer">
           <textarea
-            aria-label="Seed prompt"
-            placeholder="Ask about the selected language, e.g. How do verb chains work?"
+            aria-label={t("assistant.seedPromptAriaLabel")}
+            placeholder={t("assistant.seedPromptPlaceholder")}
             value={input}
             rows={3}
             disabled={isStarting}
@@ -110,7 +110,7 @@ export function AssistantView({
             onKeyDown={(event) => handleComposerKeyDown(event, handleStart)}
           />
           <button type="button" onClick={handleStart} disabled={isStarting || input.trim().length === 0}>
-            {isStarting ? "Starting..." : "Start conversation"}
+            {isStarting ? t("assistant.starting") : t("assistant.startConversation")}
           </button>
         </div>
       </section>
@@ -118,11 +118,11 @@ export function AssistantView({
   }
 
   return (
-    <section className="panel-card assistant-chat" aria-label="Assistant conversation">
+    <section className="panel-card assistant-chat" aria-label={t("assistant.conversationAriaLabel")}>
       <div className="record-topline">
         <div>
-          <span className="detail-label">Grounded chat</span>
-          <h2>{formatStatus(session.mode)} session</h2>
+          <span className="detail-label">{t("assistant.groundedChat")}</span>
+          <h2>{t("assistant.sessionHeading", { mode: formatStatus(session.mode) })}</h2>
         </div>
         <button
           type="button"
@@ -130,21 +130,21 @@ export function AssistantView({
           onClick={() => resetConversation(selectedLanguageId)}
           disabled={isSending}
         >
-          New conversation
+          {t("assistant.newConversation")}
         </button>
       </div>
-      <div className="assistant-messages" role="log" aria-label="Conversation messages">
+      <div className="assistant-messages" role="log" aria-label={t("assistant.conversationMessagesAriaLabel")}>
         {session.messages
           .filter((message) => message.role === "user" || message.role === "assistant")
           .map((message) => (
             <div key={message.id} className={`assistant-message ${message.role}`}>
               <div className="assistant-message-meta">
-                <span className="assistant-author">{message.role === "user" ? "You" : "Assistant"}</span>
+                <span className="assistant-author">{message.role === "user" ? t("assistant.authorYou") : t("assistant.authorAssistant")}</span>
                 {message.role === "assistant" && (
                   fallbackMessageIds.has(message.id) ? (
-                    <span className="assistant-chip warning">deterministic fallback (no model)</span>
+                    <span className="assistant-chip warning">{t("assistant.deterministicFallbackChip")}</span>
                   ) : (
-                    <span className="assistant-chip">model reply</span>
+                    <span className="assistant-chip">{t("assistant.modelReplyChip")}</span>
                   )
                 )}
               </div>
@@ -153,7 +153,7 @@ export function AssistantView({
           ))}
         {isSending && (
           <p className="assistant-thinking" role="status" aria-live="polite">
-            Thinking...
+            {t("assistant.thinking")}
           </p>
         )}
         <div ref={endRef} />
@@ -165,8 +165,8 @@ export function AssistantView({
       )}
       <div className="assistant-composer">
         <textarea
-          aria-label="Message the assistant"
-          placeholder="Reply (Enter to send, Shift+Enter for a new line)"
+          aria-label={t("assistant.messageAssistantAriaLabel")}
+          placeholder={t("assistant.replyPlaceholder")}
           value={input}
           rows={2}
           disabled={isSending}
@@ -174,12 +174,11 @@ export function AssistantView({
           onKeyDown={(event) => handleComposerKeyDown(event, handleSend)}
         />
         <button type="button" onClick={handleSend} disabled={isSending || input.trim().length === 0}>
-          {isSending ? "Thinking..." : "Send"}
+          {isSending ? t("assistant.thinking") : t("assistant.send")}
         </button>
       </div>
       <p className="privacy-note">
-        Grounded in public workspace context only. Hidden chain-of-thought is never exposed, and fallback replies are
-        flagged so canned offline text is never mistaken for a model answer.
+        {t("assistant.privacyNote")}
       </p>
     </section>
   );

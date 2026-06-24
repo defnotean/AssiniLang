@@ -3,6 +3,7 @@ import type { Note } from "@assini/db";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { DetailBlock } from "../components/DetailBlock";
 import { formatEvidenceLabel } from "../lib/format";
+import { useI18n } from "../i18n";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
 export function ReviewView({
@@ -22,6 +23,7 @@ export function ReviewView({
   onReview: (status: ReviewStatus) => void;
   onSaveExplanation: (explanation: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [filter, setFilter] = useState<ReviewFilter>("all");
   const [noteExplanationDraft, setNoteExplanationDraft] = useState(selectedNote?.explanation ?? "");
   const [noteEditMessage, setNoteEditMessage] = useState<string | null>(null);
@@ -54,13 +56,13 @@ export function ReviewView({
     event.preventDefault();
     if (!canSaveExplanation) return;
     await onSaveExplanation(trimmedDraft);
-    setNoteEditMessage("Note explanation updated.");
+    setNoteEditMessage(t("reviewView.noteExplanationUpdated"));
   }
 
   return (
     <div className="review-workbench">
-      <section className="triage-panel" aria-label="Review queue">
-        <div className="filter-strip" aria-label="Review filters">
+      <section className="triage-panel" aria-label={t("reviewView.reviewQueue")}>
+        <div className="filter-strip" aria-label={t("reviewView.reviewFilters")}>
           {(["all", "pending", "contested", "rejected", "deferred", "escalated", "approved"] as const).map((item) => (
             <button
               type="button"
@@ -68,21 +70,21 @@ export function ReviewView({
               className={filter === item ? "active" : ""}
               onClick={() => setFilter(item)}
             >
-              <span>{item === "all" ? "All" : item[0].toUpperCase() + item.slice(1)}</span>
+              <span>{t(`reviewView.filter.${item}`)}</span>
               <strong aria-hidden="true">{counts[item]}</strong>
             </button>
           ))}
         </div>
 
         <div className="note-table-head" aria-hidden="true">
-          <span>Topic</span>
-          <span>Status</span>
-          <span>Evidence</span>
+          <span>{t("reviewView.topic")}</span>
+          <span>{t("reviewView.status")}</span>
+          <span>{t("reviewView.evidence")}</span>
         </div>
 
         <div className="note-table-body">
           {filteredNotes.length === 0 ? (
-            <p className="empty-state">No notes in this filter.</p>
+            <p className="empty-state">{t("reviewView.noNotesInFilter")}</p>
           ) : (
             filteredNotes.map((note) => (
               <button
@@ -95,7 +97,7 @@ export function ReviewView({
               >
                 <span className="note-topic">
                   <strong>{note.topic}</strong>
-                  <small>{note.confidence} confidence</small>
+                  <small>{t(`confidence.${note.confidence}`)}</small>
                 </span>
                 <StatusBadge status={note.status} />
                 <span className="note-evidence">{formatEvidenceLabel(note.evidenceCount)}</span>
@@ -105,12 +107,12 @@ export function ReviewView({
         </div>
       </section>
 
-      <section className="detail-panel note-detail-panel" aria-label="Note detail panel">
+      <section className="detail-panel note-detail-panel" aria-label={t("reviewView.noteDetailPanel")}>
         {selectedNote ? (
-          <article className="record-card" aria-label="Selected note detail">
+          <article className="record-card" aria-label={t("reviewView.selectedNoteDetail")}>
             <div className="record-topline">
               <div>
-                <span className="detail-label">Selected note</span>
+                <span className="detail-label">{t("reviewView.selectedNote")}</span>
                 <h2>{selectedNote.topic}</h2>
               </div>
               <div className="pill-row">
@@ -122,7 +124,7 @@ export function ReviewView({
             <p className="explanation">{selectedNote.explanation}</p>
             <form className="note-edit-form" onSubmit={handleSaveExplanation}>
               <div className="form-group">
-                <label htmlFor="note-explanation-draft">Revised note explanation</label>
+                <label htmlFor="note-explanation-draft">{t("reviewView.revisedNoteExplanation")}</label>
                 <textarea
                   id="note-explanation-draft"
                   value={noteExplanationDraft}
@@ -133,7 +135,7 @@ export function ReviewView({
                 />
               </div>
               <button type="submit" className="secondary" disabled={!canSaveExplanation}>
-                {reviewingNoteId === selectedNote.id ? "Saving..." : "Save note explanation"}
+                {reviewingNoteId === selectedNote.id ? t("reviewView.saving") : t("reviewView.saveNoteExplanation")}
               </button>
               {noteEditMessage && (
                 <p className="result-notice" role="status" aria-live="polite">
@@ -143,24 +145,24 @@ export function ReviewView({
             </form>
             <dl className="detail-grid">
               <div>
-                <dt>Evidence</dt>
+                <dt>{t("reviewView.evidence")}</dt>
                 <dd>{formatEvidenceLabel(selectedNote.evidenceCount)}</dd>
               </div>
               <div>
-                <dt>Dialect scope</dt>
+                <dt>{t("reviewView.dialectScope")}</dt>
                 <dd>{selectedNote.dialectScope}</dd>
               </div>
               <div>
-                <dt>Last reviewed by</dt>
-                <dd>{selectedNote.reviewer.lastReviewedBy ?? "Unreviewed"}</dd>
+                <dt>{t("reviewView.lastReviewedBy")}</dt>
+                <dd>{selectedNote.reviewer.lastReviewedBy ?? t("reviewView.unreviewed")}</dd>
               </div>
               <div>
-                <dt>Last reviewed at</dt>
-                <dd>{selectedNote.reviewer.lastReviewedAt ?? "Unreviewed"}</dd>
+                <dt>{t("reviewView.lastReviewedAt")}</dt>
+                <dd>{selectedNote.reviewer.lastReviewedAt ?? t("reviewView.unreviewed")}</dd>
               </div>
             </dl>
 
-            <DetailBlock title="Evidence Citations">
+            <DetailBlock title={t("reviewView.evidenceCitations")}>
               <div className="pill-row">
                 {selectedNote.evidencePassageIds.map((passageId) => (
                   <span key={passageId} className="pill">
@@ -170,9 +172,9 @@ export function ReviewView({
               </div>
             </DetailBlock>
 
-            <DetailBlock title="Examples">
+            <DetailBlock title={t("reviewView.examples")}>
               {selectedNote.examples.length === 0 ? (
-                <p className="inline-empty">No examples supplied.</p>
+                <p className="inline-empty">{t("reviewView.noExamplesSupplied")}</p>
               ) : (
                 <div className="detail-list">
                   {selectedNote.examples.map((example) => (
@@ -185,9 +187,9 @@ export function ReviewView({
               )}
             </DetailBlock>
 
-            <DetailBlock title="Reviewer comments">
+            <DetailBlock title={t("reviewView.reviewerComments")}>
               {selectedNote.reviewer.comments.length === 0 ? (
-                <p className="inline-empty">No reviewer comments.</p>
+                <p className="inline-empty">{t("reviewView.noReviewerComments")}</p>
               ) : (
                 <div className="detail-list">
                   {selectedNote.reviewer.comments.map((comment) => (
@@ -199,9 +201,9 @@ export function ReviewView({
               )}
             </DetailBlock>
 
-            <DetailBlock title="Edit history">
+            <DetailBlock title={t("reviewView.editHistory")}>
               {selectedNote.editHistory.length === 0 ? (
-                <p className="inline-empty">No edit history.</p>
+                <p className="inline-empty">{t("reviewView.noEditHistory")}</p>
               ) : (
                 <div className="detail-list">
                   {selectedNote.editHistory.map((entry) => (
@@ -220,52 +222,52 @@ export function ReviewView({
               <button
                 type="button"
                 className="approve"
-                aria-label={`Approve ${selectedNote.topic}`}
+                aria-label={t("reviewView.approveNote", { topic: selectedNote.topic })}
                 disabled={reviewingNoteId !== null}
                 onClick={() => onReview("approved")}
               >
-                Approve
+                {t("reviewView.approve")}
               </button>
               <button
                 type="button"
                 className="contest"
-                aria-label={`Contest ${selectedNote.topic}`}
+                aria-label={t("reviewView.contestNote", { topic: selectedNote.topic })}
                 disabled={reviewingNoteId !== null}
                 onClick={() => onReview("contested")}
               >
-                Contest
+                {t("reviewView.contest")}
               </button>
               <button
                 type="button"
                 className="reject"
-                aria-label={`Reject ${selectedNote.topic}`}
+                aria-label={t("reviewView.rejectNote", { topic: selectedNote.topic })}
                 disabled={reviewingNoteId !== null}
                 onClick={() => onReview("rejected")}
               >
-                Reject
+                {t("reviewView.reject")}
               </button>
               <button
                 type="button"
                 className="defer"
-                aria-label={`Defer ${selectedNote.topic}`}
+                aria-label={t("reviewView.deferNote", { topic: selectedNote.topic })}
                 disabled={reviewingNoteId !== null}
                 onClick={() => onReview("deferred")}
               >
-                Defer
+                {t("reviewView.defer")}
               </button>
               <button
                 type="button"
                 className="escalate"
-                aria-label={`Escalate ${selectedNote.topic}`}
+                aria-label={t("reviewView.escalateNote", { topic: selectedNote.topic })}
                 disabled={reviewingNoteId !== null}
                 onClick={() => onReview("escalated")}
               >
-                Escalate
+                {t("reviewView.escalate")}
               </button>
             </div>
           </article>
         ) : (
-          <p className="empty-state">No notes for this language.</p>
+          <p className="empty-state">{t("reviewView.noNotesForLanguage")}</p>
         )}
       </section>
     </div>

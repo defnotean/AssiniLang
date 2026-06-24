@@ -8,6 +8,7 @@ import {
 } from "../corpusImport";
 import { MorphChips } from "../components/MorphChips";
 import type { CorpusPassage } from "../lib/types";
+import { useI18n } from "../i18n";
 
 export function CorpusView({
   corpus,
@@ -18,6 +19,7 @@ export function CorpusView({
   isWorkflowBusy: boolean;
   onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [displayMode, setDisplayMode] = useState<"cards" | "interlinear">("cards");
   const [morphFilter, setMorphFilter] = useState<string | null>(null);
@@ -85,9 +87,9 @@ export function CorpusView({
     try {
       await onImportCorpusPassage(result.payload);
       setImportDraft({ ...EMPTY_CORPUS_IMPORT_DRAFT });
-      setImportMessage("Corpus passage imported.");
+      setImportMessage(t("corpus.importSuccess"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Corpus import failed";
+      const message = error instanceof Error ? error.message : t("corpus.importFailed");
       setImportError(message);
     } finally {
       setIsImportingCorpus(false);
@@ -96,7 +98,7 @@ export function CorpusView({
 
   return (
     <div className="corpus-view">
-      <form className="record-card form-panel compact corpus-import-form" aria-label="Corpus import" onSubmit={handleImportCorpus}>
+      <form className="record-card form-panel compact corpus-import-form" aria-label={t("corpus.importFormLabel")} onSubmit={handleImportCorpus}>
         <button
           type="button"
           className="secondary corpus-import-toggle"
@@ -105,15 +107,15 @@ export function CorpusView({
           onClick={() => setIsImportOpen((current) => !current)}
         >
           <span>
-            <span className="detail-label">Corpus import</span>
-            <span className="corpus-import-toggle-title">Add source passage</span>
+            <span className="detail-label">{t("corpus.importLabel")}</span>
+            <span className="corpus-import-toggle-title">{t("corpus.addSourcePassage")}</span>
           </span>
-          <span aria-hidden="true">{isImportOpen ? "Hide" : "Open"}</span>
+          <span aria-hidden="true">{isImportOpen ? t("corpus.hide") : t("corpus.open")}</span>
         </button>
         {isImportOpen && (
         <div className="corpus-import-grid" id="corpus-import-fields">
           <div className="form-group wide">
-            <label htmlFor="corpus-import-target">Corpus target text</label>
+            <label htmlFor="corpus-import-target">{t("corpus.targetTextLabel")}</label>
             <input
               id="corpus-import-target"
               value={importDraft.target}
@@ -121,7 +123,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group wide">
-            <label htmlFor="corpus-import-translation">English translation</label>
+            <label htmlFor="corpus-import-translation">{t("corpus.translationLabel")}</label>
             <input
               id="corpus-import-translation"
               value={importDraft.translation}
@@ -129,7 +131,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-source">Source</label>
+            <label htmlFor="corpus-import-source">{t("corpus.sourceLabel")}</label>
             <input
               id="corpus-import-source"
               value={importDraft.source}
@@ -137,7 +139,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-author">Author</label>
+            <label htmlFor="corpus-import-author">{t("corpus.authorLabel")}</label>
             <input
               id="corpus-import-author"
               value={importDraft.author}
@@ -145,7 +147,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-year">Year</label>
+            <label htmlFor="corpus-import-year">{t("corpus.yearLabel")}</label>
             <input
               id="corpus-import-year"
               type="number"
@@ -155,7 +157,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-license">License</label>
+            <label htmlFor="corpus-import-license">{t("corpus.licenseLabel")}</label>
             <input
               id="corpus-import-license"
               value={importDraft.license}
@@ -163,7 +165,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-consent-record">Consent record</label>
+            <label htmlFor="corpus-import-consent-record">{t("corpus.consentRecordLabel")}</label>
             <input
               id="corpus-import-consent-record"
               value={importDraft.consentRecord}
@@ -171,7 +173,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
-            <label htmlFor="corpus-import-tags">Topic tags</label>
+            <label htmlFor="corpus-import-tags">{t("corpus.topicTagsLabel")}</label>
             <input
               id="corpus-import-tags"
               value={importDraft.tags}
@@ -179,7 +181,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group wide">
-            <label htmlFor="corpus-import-morphemes">Morpheme segmentation</label>
+            <label htmlFor="corpus-import-morphemes">{t("corpus.morphemeSegmentationLabel")}</label>
             <textarea
               id="corpus-import-morphemes"
               value={importDraft.morphemes}
@@ -187,7 +189,7 @@ export function CorpusView({
             />
           </div>
           <div className="form-group wide">
-            <label htmlFor="corpus-import-restrictions">Access restrictions</label>
+            <label htmlFor="corpus-import-restrictions">{t("corpus.accessRestrictionsLabel")}</label>
             <input
               id="corpus-import-restrictions"
               value={importDraft.restrictions}
@@ -198,7 +200,7 @@ export function CorpusView({
         )}
         {isImportOpen && (
           <button type="submit" className="secondary" disabled={!canImportPassage}>
-            {isImportingCorpus ? "Importing..." : "Import passage"}
+            {isImportingCorpus ? t("corpus.importing") : t("corpus.importPassage")}
           </button>
         )}
         {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
@@ -207,24 +209,24 @@ export function CorpusView({
 
       <div className="toolbar-row">
         <label className="search-field" htmlFor="corpus-search">
-          <span className="visually-hidden">Search corpus</span>
+          <span className="visually-hidden">{t("corpus.searchLabel")}</span>
           <input
             id="corpus-search"
             type="search"
-            aria-label="Search corpus"
+            aria-label={t("corpus.searchLabel")}
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search passages, translations, tags"
+            placeholder={t("corpus.searchPlaceholder")}
           />
         </label>
-        <div className="display-mode-toggle" role="group" aria-label="Corpus display mode">
+        <div className="display-mode-toggle" role="group" aria-label={t("corpus.displayModeLabel")}>
           <button
             type="button"
             className={displayMode === "cards" ? "active" : ""}
             aria-pressed={displayMode === "cards"}
             onClick={() => setDisplayMode("cards")}
           >
-            Cards
+            {t("corpus.cards")}
           </button>
           <button
             type="button"
@@ -232,34 +234,36 @@ export function CorpusView({
             aria-pressed={displayMode === "interlinear"}
             onClick={() => setDisplayMode("interlinear")}
           >
-            Interlinear
+            {t("corpus.interlinear")}
           </button>
         </div>
-        <span className="record-count">{visible.length} of {corpus.length} passages</span>
+        <span className="record-count">{t("corpus.passageCount", { visible: visible.length, total: corpus.length })}</span>
       </div>
 
       {morphFilter && (
         <div className="active-filter-row">
           <span className="active-filter-pill">
-            <span>Morpheme: {morphFilter}</span>
+            <span>{t("corpus.morphemeFilter", { morpheme: morphFilter })}</span>
             <button
               type="button"
-              aria-label={`Clear morpheme filter ${morphFilter}`}
+              aria-label={t("corpus.clearMorphemeFilter", { morpheme: morphFilter })}
               onClick={() => setMorphFilter(null)}
             >
               ×
             </button>
           </span>
           <span className="record-count" role="status" aria-live="polite">
-            {visible.length} passage{visible.length === 1 ? "" : "s"} containing {morphFilter}
+            {visible.length === 1
+              ? t("corpus.passagesContainingOne", { count: visible.length, morpheme: morphFilter })
+              : t("corpus.passagesContainingOther", { count: visible.length, morpheme: morphFilter })}
           </span>
         </div>
       )}
 
-      <section className="corpus-list" aria-label="Corpus passages">
+      <section className="corpus-list" aria-label={t("corpus.passagesLabel")}>
         {visible.length === 0 ? (
           <p className="empty-state">
-            {morphFilter ? "No passages contain the selected morpheme." : "No passages match your search."}
+            {morphFilter ? t("corpus.emptyMorpheme") : t("corpus.emptySearch")}
           </p>
         ) : displayMode === "interlinear" ? (
           visible.map((passage) => (

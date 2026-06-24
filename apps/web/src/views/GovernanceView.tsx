@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import type { AuditEvent, GovernanceRecord, ReviewDisposition, ReviewPolicy } from "@assini/db";
 import { formatStatus, safeDomId } from "../lib/format";
-import { POLICY_TYPE_LABELS, REVIEW_DISPOSITION_LABELS } from "../lib/viewConfig";
+import { useI18n } from "../i18n";
 import type { AsyncState, SnapshotDownload } from "../lib/types";
 
 export function GovernanceView({
@@ -77,6 +77,7 @@ export function GovernanceView({
   onResolveReviewDisposition: (dispositionId: string) => void;
   onExportSnapshot: () => void;
 }) {
+  const { t } = useI18n();
   const records = governanceState.status === "ready"
     ? governanceState.data.filter((record) => record.languageId === selectedLanguageId)
     : [];
@@ -87,79 +88,77 @@ export function GovernanceView({
     ? auditEventState.data.filter((event) => event.languageId === selectedLanguageId)
     : [];
   const loadedReviewPolicy = reviewPolicyState.status === "ready" ? reviewPolicyState.data : null;
-  const reviewPolicySummary = loadedReviewPolicy ? `${loadedReviewPolicy.approvalThreshold} approvals required` : null;
+  const reviewPolicySummary = loadedReviewPolicy ? t("governance.approvalsRequired", { count: loadedReviewPolicy.approvalThreshold }) : null;
 
   return (
     <div className="governance-view">
       <section className="policy-card">
-        <p className="eyebrow">Deployment policy</p>
-        <h2>Data Stewardship Policy</h2>
+        <p className="eyebrow">{t("governance.deploymentPolicy")}</p>
+        <h2>{t("governance.dataStewardshipPolicy")}</h2>
         <p>
-          This platform operates under a <strong>Local Data Stewardship Policy</strong>. Every source is ingested with
-          provenance and consent records, processing happens on this machine, and all model outputs must remain
-          reviewable by authorized local users before teaching content is promoted.
+          {t("governance.dataStewardshipIntroBefore")} <strong>{t("governance.localDataStewardshipPolicy")}</strong>{t("governance.dataStewardshipIntroAfter")}
         </p>
       </section>
 
       <section className="policy-card">
         <form className="form-panel compact" onSubmit={onSubmit}>
-          <p className="eyebrow">Policy authoring</p>
-          <h2>Create policy record</h2>
+          <p className="eyebrow">{t("governance.policyAuthoring")}</p>
+          <h2>{t("governance.createPolicyRecord")}</h2>
 
           {governanceSuccess && <p className="result-notice">{governanceSuccess}</p>}
           {governanceError && <p className="result-notice error">{governanceError}</p>}
 
           <div className="form-group">
-            <label htmlFor="policy-type">Policy type</label>
+            <label htmlFor="policy-type">{t("governance.policyType")}</label>
             <select
               id="policy-type"
               value={policyType}
               onChange={(event) => onPolicyTypeChange(event.target.value as GovernanceRecord["policyType"])}
             >
-              <option value="generation">Generation</option>
-              <option value="access">Access</option>
-              <option value="consent">Consent</option>
+              <option value="generation">{t("policyType.generation")}</option>
+              <option value="access">{t("policyType.access")}</option>
+              <option value="consent">{t("policyType.consent")}</option>
             </select>
           </div>
 
           <div className="form-group">
-            <label htmlFor="policy-effective-date">Effective date</label>
+            <label htmlFor="policy-effective-date">{t("governance.effectiveDate")}</label>
             <input
               id="policy-effective-date"
               type="text"
               inputMode="numeric"
-              placeholder="YYYY-MM-DD"
+              placeholder={t("governance.effectiveDatePlaceholder")}
               value={policyEffectiveDate}
               onChange={(event) => onEffectiveDateChange(event.target.value)}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="policy-content">Policy content</label>
+            <label htmlFor="policy-content">{t("governance.policyContent")}</label>
             <textarea
               id="policy-content"
               value={policyContent}
               onChange={(event) => onContentChange(event.target.value)}
-              placeholder="Write a consent, access, or generation rule"
+              placeholder={t("governance.policyContentPlaceholder")}
             />
           </div>
 
           <button type="submit" disabled={isSubmittingGovernance}>
-            {isSubmittingGovernance ? "Recording..." : "Create policy record"}
+            {isSubmittingGovernance ? t("governance.recording") : t("governance.createPolicyRecord")}
           </button>
         </form>
       </section>
 
       <section className="policy-card">
         <form className="form-panel compact" onSubmit={onReviewPolicySubmit}>
-          <p className="eyebrow">Review routing</p>
-          <h2>Review policy</h2>
+          <p className="eyebrow">{t("governance.reviewRouting")}</p>
+          <h2>{t("governance.reviewPolicy")}</h2>
 
           {reviewPolicySuccess && <p className="result-notice">{reviewPolicySuccess}</p>}
           {reviewPolicyError && <p className="result-notice error">{reviewPolicyError}</p>}
           {reviewPolicyState.status === "loading" && (
             <p className="inline-empty" role="status" aria-live="polite">
-              Loading review policy.
+              {t("governance.loadingReviewPolicy")}
             </p>
           )}
           {reviewPolicyState.status === "error" && (
@@ -171,24 +170,24 @@ export function GovernanceView({
             <p className="review-policy-summary">
               <strong>{reviewPolicySummary}</strong>
               <span>
-                {loadedReviewPolicy?.requiresAssignedReviewer ? "assigned reviewers only" : "authorized reviewers"}
+                {loadedReviewPolicy?.requiresAssignedReviewer ? t("governance.assignedReviewersOnly") : t("governance.authorizedReviewers")}
               </span>
             </p>
           )}
 
           <div className="form-group">
-            <label htmlFor="review-policy-reviewers">Assigned reviewer IDs</label>
+            <label htmlFor="review-policy-reviewers">{t("governance.assignedReviewerIds")}</label>
             <input
               id="review-policy-reviewers"
               type="text"
               value={reviewPolicyReviewerIds}
               onChange={(event) => onReviewPolicyReviewerIdsChange(event.target.value)}
-              placeholder="reviewer-1, elder-1"
+              placeholder={t("governance.assignedReviewerIdsPlaceholder")}
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="review-policy-threshold">Approval threshold</label>
+            <label htmlFor="review-policy-threshold">{t("governance.approvalThreshold")}</label>
             <input
               id="review-policy-threshold"
               type="number"
@@ -206,25 +205,25 @@ export function GovernanceView({
               checked={reviewPolicyRequiresAssigned}
               onChange={(event) => onReviewPolicyRequiresAssignedChange(event.target.checked)}
             />
-            <span>Require assigned reviewer</span>
+            <span>{t("governance.requireAssignedReviewer")}</span>
           </label>
 
           <button type="submit" disabled={isSubmittingReviewPolicy}>
-            {isSubmittingReviewPolicy ? "Updating..." : "Update review policy"}
+            {isSubmittingReviewPolicy ? t("governance.updating") : t("governance.updateReviewPolicy")}
           </button>
         </form>
       </section>
 
-      <section className="policy-card disposition-ledger" aria-label="Review disposition work">
-        <p className="eyebrow">Resolution workflow</p>
-        <h2>Review disposition work</h2>
+      <section className="policy-card disposition-ledger" aria-label={t("governance.reviewDispositionWork")}>
+        <p className="eyebrow">{t("governance.resolutionWorkflow")}</p>
+        <h2>{t("governance.reviewDispositionWork")}</h2>
 
         {reviewDispositionSuccess && <p className="result-notice" role="status">{reviewDispositionSuccess}</p>}
         {reviewDispositionError && <p className="result-notice error">{reviewDispositionError}</p>}
 
         {reviewDispositionState.status === "loading" && (
           <p className="inline-empty" role="status" aria-live="polite">
-            Loading review disposition work.
+            {t("governance.loadingReviewDispositionWork")}
           </p>
         )}
 
@@ -235,7 +234,7 @@ export function GovernanceView({
         )}
 
         {reviewDispositionState.status === "ready" && reviewDispositions.length === 0 && (
-          <p className="inline-empty">No review disposition work for this language.</p>
+          <p className="inline-empty">{t("governance.noReviewDispositionWork")}</p>
         )}
 
         {reviewDispositions.length > 0 && (
@@ -249,32 +248,32 @@ export function GovernanceView({
                   <div className="record-topline">
                     <div>
                       <span className="detail-label">{disposition.id}</span>
-                      <h3>{REVIEW_DISPOSITION_LABELS[disposition.disposition]}</h3>
+                      <h3>{t(`reviewDisposition.${disposition.disposition}`)}</h3>
                     </div>
                     <span className={`status-badge ${disposition.status}`}>{formatStatus(disposition.status)}</span>
                   </div>
                   <p>{disposition.reason}</p>
                   <div className="pill-row">
-                    <span className="pill">Note: {disposition.noteId}</span>
-                    <span className="pill">Assigned to {disposition.assignedTo}</span>
-                    {disposition.dueAt && <span className="pill">Due {disposition.dueAt}</span>}
-                    <span className="pill">Opened by {disposition.openedBy}</span>
+                    <span className="pill">{t("governance.notePill", { noteId: disposition.noteId })}</span>
+                    <span className="pill">{t("governance.assignedToPill", { assignedTo: disposition.assignedTo })}</span>
+                    {disposition.dueAt && <span className="pill">{t("governance.duePill", { dueAt: disposition.dueAt })}</span>}
+                    <span className="pill">{t("governance.openedByPill", { openedBy: disposition.openedBy })}</span>
                   </div>
 
                   {disposition.status === "resolved" ? (
                     <div className="resolution-summary">
-                      {disposition.resolvedBy && <strong>Resolved by {disposition.resolvedBy}</strong>}
+                      {disposition.resolvedBy && <strong>{t("governance.resolvedBy", { resolvedBy: disposition.resolvedBy })}</strong>}
                       {disposition.resolutionSummary && <p>{disposition.resolutionSummary}</p>}
                     </div>
                   ) : (
                     <div className="resolution-form">
                       <div className="form-group">
-                        <label htmlFor={resolutionInputId}>Resolution summary for {disposition.id}</label>
+                        <label htmlFor={resolutionInputId}>{t("governance.resolutionSummaryFor", { id: disposition.id })}</label>
                         <textarea
                           id={resolutionInputId}
                           value={resolutionDraft}
                           onChange={(event) => onReviewDispositionDraftChange(disposition.id, event.target.value)}
-                          placeholder="Record the review decision, correction, or follow-up evidence."
+                          placeholder={t("governance.resolutionSummaryPlaceholder")}
                         />
                       </div>
                       <button
@@ -283,7 +282,7 @@ export function GovernanceView({
                         disabled={isResolving || resolutionDraft.trim().length === 0}
                         onClick={() => onResolveReviewDisposition(disposition.id)}
                       >
-                        {isResolving ? `Resolving ${disposition.id}...` : `Resolve ${disposition.id}`}
+                        {isResolving ? t("governance.resolvingButton", { id: disposition.id }) : t("governance.resolveButton", { id: disposition.id })}
                       </button>
                     </div>
                   )}
@@ -294,13 +293,13 @@ export function GovernanceView({
         )}
       </section>
 
-      <section className="policy-card audit-ledger" aria-label="Audit event ledger">
-        <p className="eyebrow">Mutation trace</p>
-        <h2>Audit event ledger</h2>
+      <section className="policy-card audit-ledger" aria-label={t("governance.auditEventLedger")}>
+        <p className="eyebrow">{t("governance.mutationTrace")}</p>
+        <h2>{t("governance.auditEventLedger")}</h2>
 
         {auditEventState.status === "loading" && (
           <p className="inline-empty" role="status" aria-live="polite">
-            Loading audit events.
+            {t("governance.loadingAuditEvents")}
           </p>
         )}
 
@@ -311,7 +310,7 @@ export function GovernanceView({
         )}
 
         {auditEventState.status === "ready" && auditEvents.length === 0 && (
-          <p className="inline-empty">No audit events for this language yet.</p>
+          <p className="inline-empty">{t("governance.noAuditEvents")}</p>
         )}
 
         {auditEvents.length > 0 && (
@@ -337,19 +336,18 @@ export function GovernanceView({
       </section>
 
       <section className="policy-card snapshot-card">
-        <p className="eyebrow">Review export</p>
-        <h2>Language snapshot</h2>
+        <p className="eyebrow">{t("governance.reviewExport")}</p>
+        <h2>{t("governance.languageSnapshot")}</h2>
         <p>
-          Build a sanitized JSON packet for this language with corpus, public notes, public exercises, governance records,
-          and evaluation summaries. Answer keys and learner submissions stay out of the export.
+          {t("governance.languageSnapshotDescription")}
         </p>
         <div className="snapshot-actions">
           <button type="button" className="secondary" disabled={isExportingSnapshot} onClick={onExportSnapshot}>
-            {isExportingSnapshot ? "Exporting..." : "Export review snapshot"}
+            {isExportingSnapshot ? t("governance.exporting") : t("governance.exportReviewSnapshot")}
           </button>
           {snapshotDownload && (
             <a className="download-link" href={snapshotDownload.href} download={snapshotDownload.fileName}>
-              Download snapshot JSON
+              {t("governance.downloadSnapshotJson")}
             </a>
           )}
         </div>
@@ -362,11 +360,11 @@ export function GovernanceView({
       </section>
 
       <div className="table-card">
-        <h2>Policy Records</h2>
+        <h2>{t("governance.policyRecords")}</h2>
 
         {governanceState.status === "loading" && (
           <p className="inline-empty" role="status" aria-live="polite">
-            Loading governance records.
+            {t("governance.loadingGovernanceRecords")}
           </p>
         )}
 
@@ -377,23 +375,23 @@ export function GovernanceView({
         )}
 
         {governanceState.status === "ready" && records.length === 0 && (
-          <p className="inline-empty">No governance policy records for this language yet.</p>
+          <p className="inline-empty">{t("governance.noGovernancePolicyRecords")}</p>
         )}
 
         {records.length > 0 && (
           <table className="data-table governance-table">
             <thead>
               <tr>
-                <th>Type</th>
-                <th>Policy</th>
-                <th>Effective</th>
-                <th>Approved By</th>
+                <th>{t("governance.tableType")}</th>
+                <th>{t("governance.tablePolicy")}</th>
+                <th>{t("governance.tableEffective")}</th>
+                <th>{t("governance.tableApprovedBy")}</th>
               </tr>
             </thead>
             <tbody>
               {records.map((record) => (
                 <tr key={record.id}>
-                  <td>{POLICY_TYPE_LABELS[record.policyType]}</td>
+                  <td>{t(`policyType.${record.policyType}`)}</td>
                   <td>{record.content}</td>
                   <td>{record.effectiveDate}</td>
                   <td>{record.approvedBy}</td>

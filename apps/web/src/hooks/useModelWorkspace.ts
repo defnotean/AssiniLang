@@ -3,6 +3,7 @@ import type { DashboardData, LlmReachability, LlmStatus, ObservabilityData } fro
 import { checkLlmReachability, createAiSession, fetchLlmStatus, fetchObservability } from "../api";
 import { isRealModelProvider, latestAssistantMessage, sessionUsedDeterministicFallback } from "../lib/format";
 import type { AsyncState, ViewMode } from "../lib/types";
+import { useI18n } from "../i18n";
 
 export interface ModelWorkspace {
   llmState: AsyncState<LlmStatus>;
@@ -27,6 +28,7 @@ export function useModelWorkspace(
   selectedLanguageId: string | null,
   data: DashboardData | null
 ): ModelWorkspace {
+  const { t } = useI18n();
   const [llmState, setLlmState] = useState<AsyncState<LlmStatus>>({ status: "idle" });
   const [observabilityState, setObservabilityState] = useState<AsyncState<ObservabilityData>>({ status: "idle" });
   const [isTestingModel, setIsTestingModel] = useState(false);
@@ -70,7 +72,7 @@ export function useModelWorkspace(
     try {
       setObservabilityState({ status: "ready", data: await fetchObservability() });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Model observability failed";
+      const message = error instanceof Error ? error.message : t("model.errObservabilityFailed");
       setObservabilityState({ status: "error", message });
     }
   }
@@ -78,7 +80,7 @@ export function useModelWorkspace(
   async function handleModelSmokeTest() {
     if (!data) return;
     if (!selectedLanguageId) {
-      setModelTestResult("Select or create a language first.");
+      setModelTestResult(t("errors.selectOrCreateLanguage"));
       return;
     }
     setIsTestingModel(true);
@@ -101,7 +103,7 @@ export function useModelWorkspace(
       setModelTestIsPlaceholder(!isRealModelProvider(refreshedStatus) || sessionUsedDeterministicFallback(session));
       await refreshModelObservability();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Model smoke test failed";
+      const message = error instanceof Error ? error.message : t("model.errSmokeTestFailed");
       setModelTestResult(message);
       setModelTestIsPlaceholder(false);
       await refreshModelObservability();
@@ -117,7 +119,7 @@ export function useModelWorkspace(
     try {
       setReachabilityResult(await checkLlmReachability());
     } catch (error) {
-      const message = error instanceof Error ? error.message : "LLM reachability check failed";
+      const message = error instanceof Error ? error.message : t("model.errReachabilityFailed");
       setReachabilityError(message);
     } finally {
       setIsCheckingReachability(false);

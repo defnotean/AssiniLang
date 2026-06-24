@@ -1,5 +1,6 @@
 import type { LlmReachability, LlmStatus, ObservabilityData } from "../api";
 import { StatusBadge } from "../components/badges";
+import { useI18n } from "../i18n";
 import { countFailedSessions, formatCount, formatMode, formatReachability, formatStatus } from "../lib/format";
 import type { AsyncState } from "../lib/types";
 
@@ -26,10 +27,11 @@ export function ModelSetupView({
   reachabilityError: string | null;
   onTestConnection: () => void;
 }) {
+  const { t } = useI18n();
   if (llmState.status === "loading" || llmState.status === "idle") {
     return (
       <div className="panel-card" role="status" aria-live="polite">
-        Checking model provider configuration...
+        {t("model.checkingConfiguration")}
       </div>
     );
   }
@@ -47,45 +49,44 @@ export function ModelSetupView({
   const recentSessions = observability?.sessions.slice(0, 5) ?? [];
   return (
     <div className="model-grid">
-      <section className="panel-card model-status" aria-label="LLM provider readiness">
+      <section className="panel-card model-status" aria-label={t("model.providerReadinessAria")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Provider readiness</span>
-            <h2>{status.configured ? "Ready" : "Needs configuration"}</h2>
+            <span className="detail-label">{t("model.providerReadiness")}</span>
+            <h2>{status.configured ? t("model.ready") : t("model.needsConfiguration")}</h2>
           </div>
           <span className={`status-badge ${status.configured ? "approved" : "under_review"}`}>
-            {status.configured ? "Configured" : "Incomplete"}
+            {status.configured ? t("model.configured") : t("model.incomplete")}
           </span>
         </div>
         <dl className="detail-grid">
           <div>
-            <dt>Mode</dt>
+            <dt>{t("model.mode")}</dt>
             <dd>{formatMode(status.mode)}</dd>
           </div>
           <div>
-            <dt>Provider</dt>
+            <dt>{t("model.provider")}</dt>
             <dd>{status.provider}</dd>
           </div>
           <div>
-            <dt>Model</dt>
-            <dd>{status.model ?? "Not set"}</dd>
+            <dt>{t("model.model")}</dt>
+            <dd>{status.model ?? t("model.notSet")}</dd>
           </div>
           <div>
-            <dt>Base URL</dt>
-            <dd>{status.baseUrl ?? "Not set"}</dd>
+            <dt>{t("model.baseUrl")}</dt>
+            <dd>{status.baseUrl ?? t("model.notSet")}</dd>
           </div>
           <div>
-            <dt>API key</dt>
-            <dd>{status.apiKey.configured ? "Configured server-side" : status.apiKey.required ? "Required" : "Optional / not set"}</dd>
+            <dt>{t("model.apiKey")}</dt>
+            <dd>{status.apiKey.configured ? t("model.configuredServerSide") : status.apiKey.required ? t("model.required") : t("model.optionalNotSet")}</dd>
           </div>
           <div>
-            <dt>Timeout</dt>
-            <dd>{status.timeoutMs}ms</dd>
+            <dt>{t("model.timeout")}</dt>
+            <dd>{t("model.timeoutValue", { ms: status.timeoutMs })}</dd>
           </div>
         </dl>
         <p className="privacy-note">
-          API keys are never entered in the browser or returned by the status endpoint. Configure keys only in the API server
-          environment.
+          {t("model.privacyNote")}
         </p>
         {status.warnings.length > 0 && (
           <div className="warning-list">
@@ -96,18 +97,17 @@ export function ModelSetupView({
         )}
         <div className="model-actions">
           <button type="button" onClick={onSmokeTest} disabled={isTestingModel}>
-            {isTestingModel ? "Testing provider..." : "Run provider smoke test"}
+            {isTestingModel ? t("model.testingProvider") : t("model.runSmokeTest")}
           </button>
           <button type="button" className="secondary" onClick={onTestConnection} disabled={isCheckingReachability}>
-            {isCheckingReachability ? "Testing…" : "Test connection"}
+            {isCheckingReachability ? t("model.testing") : t("model.testConnection")}
           </button>
         </div>
         {modelTestResult && (
           <>
             {modelTestIsPlaceholder && (
               <p className="result-notice warning" role="status" aria-live="polite">
-                Offline placeholder — no model is configured, so this is a canned response, not a real model reply.
-                Configure a provider in the variables below and restart the API.
+                {t("model.offlinePlaceholder")}
               </p>
             )}
             <p className="result-notice" role="status" aria-live="polite">
@@ -127,20 +127,20 @@ export function ModelSetupView({
         )}
       </section>
 
-      <section className="panel-card model-observability" aria-label="Model session observability">
+      <section className="panel-card model-observability" aria-label={t("model.observabilityAria")}>
         <div className="record-topline">
           <div>
-            <span className="detail-label">Session observability</span>
-            <h2>{observability ? `${observability.totals.sessions} sessions` : "Loading sessions"}</h2>
+            <span className="detail-label">{t("model.sessionObservability")}</span>
+            <h2>{observability ? t("model.sessionsCount", { count: observability.totals.sessions }) : t("model.loadingSessions")}</h2>
           </div>
           {observability && (
             <span className={`status-badge ${countFailedSessions(observability) > 0 ? "contested" : "approved"}`}>
-              {countFailedSessions(observability)} failed
+              {t("model.failedCount", { count: countFailedSessions(observability) })}
             </span>
           )}
         </div>
         {observabilityState.status === "loading" && (
-          <p className="inline-empty" role="status" aria-live="polite">Loading AI session observability...</p>
+          <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingObservability")}</p>
         )}
         {observabilityState.status === "error" && (
           <p className="inline-error" role="alert">{observabilityState.message}</p>
@@ -149,24 +149,24 @@ export function ModelSetupView({
           <>
             <dl className="detail-grid">
               <div>
-                <dt>Active</dt>
+                <dt>{t("model.active")}</dt>
                 <dd>{observability.totals.activeSessions}</dd>
               </div>
               <div>
-                <dt>Failed</dt>
+                <dt>{t("model.failed")}</dt>
                 <dd>{countFailedSessions(observability)}</dd>
               </div>
               <div>
-                <dt>Messages</dt>
+                <dt>{t("model.messages")}</dt>
                 <dd>{observability.totals.messages}</dd>
               </div>
               <div>
-                <dt>Elder corrections</dt>
+                <dt>{t("model.elderCorrections")}</dt>
                 <dd>{observability.totals.elderCorrections}</dd>
               </div>
             </dl>
             {recentSessions.length === 0 ? (
-              <p className="inline-empty">No AI sessions recorded.</p>
+              <p className="inline-empty">{t("model.noSessions")}</p>
             ) : (
               <div className="detail-list session-list">
                 {recentSessions.map((session) => (
@@ -183,10 +183,10 @@ export function ModelSetupView({
         )}
       </section>
 
-      <section className="panel-card setup-card" aria-label="Local LLM setup instructions">
-        <span className="detail-label">Local OpenAI-compatible endpoints</span>
-        <h2>Ollama, LM Studio, or llama.cpp</h2>
-        <p>Start a local server that exposes <code>/v1/chat/completions</code>, then set the API process environment:</p>
+      <section className="panel-card setup-card" aria-label={t("model.localSetupAria")}>
+        <span className="detail-label">{t("model.localEndpoints")}</span>
+        <h2>{t("model.localProviders")}</h2>
+        <p>{t("model.localSetupIntroBefore")}<code>/v1/chat/completions</code>{t("model.localSetupIntroAfter")}</p>
         <div className="command-list">
           {status.setup.localExamples.map((example) => (
             <code key={example}>{example}</code>
@@ -194,10 +194,10 @@ export function ModelSetupView({
         </div>
       </section>
 
-      <section className="panel-card setup-card" aria-label="Remote API setup instructions">
-        <span className="detail-label">Remote API key integration</span>
-        <h2>Server-side keys only</h2>
-        <p>For hosted OpenAI-compatible APIs, keep the key in the API process and let the backend proxy safe requests.</p>
+      <section className="panel-card setup-card" aria-label={t("model.remoteSetupAria")}>
+        <span className="detail-label">{t("model.remoteIntegration")}</span>
+        <h2>{t("model.serverSideKeysOnly")}</h2>
+        <p>{t("model.remoteSetupIntro")}</p>
         <div className="command-list">
           {status.setup.remoteExamples.map((example) => (
             <code key={example}>{example}</code>

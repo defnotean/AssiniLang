@@ -14,6 +14,7 @@ import {
 } from "../api";
 import { buildEvaluationArtifactDownload, buildSnapshotDownload, parseReviewerIds } from "../lib/format";
 import type { AsyncState, SnapshotDownload, ViewMode } from "../lib/types";
+import { useI18n } from "../i18n";
 
 export interface GovernanceWorkspace {
   governanceState: AsyncState<GovernanceRecord[]>;
@@ -66,6 +67,7 @@ export function useGovernanceWorkspace(
   view: ViewMode,
   refreshDashboard: () => Promise<void>
 ): GovernanceWorkspace {
+  const { t } = useI18n();
   const [governanceState, setGovernanceState] = useState<AsyncState<GovernanceRecord[]>>({ status: "idle" });
   const [policyType, setPolicyType] = useState<GovernanceRecord["policyType"]>("generation");
   const [policyEffectiveDate, setPolicyEffectiveDate] = useState("");
@@ -183,13 +185,13 @@ export function useGovernanceWorkspace(
 
     if (!content || !effectiveDate) {
       setGovernanceSuccess(null);
-      setGovernanceError("Please provide policy content and an effective date.");
+      setGovernanceError(t("governance.errPolicyContentRequired"));
       return;
     }
 
     if (!selectedLanguageId) {
       setGovernanceSuccess(null);
-      setGovernanceError("Select or create a language first.");
+      setGovernanceError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -207,10 +209,10 @@ export function useGovernanceWorkspace(
     try {
       await createGovernanceRecord(payload);
       setPolicyContent("");
-      setGovernanceSuccess("Governance policy recorded.");
+      setGovernanceSuccess(t("governance.msgPolicyRecorded"));
       setGovernanceState({ status: "ready", data: await fetchGovernance() });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Governance policy creation failed";
+      const message = error instanceof Error ? error.message : t("governance.errPolicyCreationFailed");
       setGovernanceError(message);
     } finally {
       setIsSubmittingGovernance(false);
@@ -224,25 +226,25 @@ export function useGovernanceWorkspace(
 
     if (assignedReviewerIds.length === 0) {
       setReviewPolicySuccess(null);
-      setReviewPolicyError("Please provide at least one assigned reviewer ID.");
+      setReviewPolicyError(t("governance.errReviewerIdRequired"));
       return;
     }
 
     if (!Number.isInteger(approvalThreshold) || approvalThreshold < 1) {
       setReviewPolicySuccess(null);
-      setReviewPolicyError("Approval threshold must be a positive whole number.");
+      setReviewPolicyError(t("governance.errApprovalThresholdInvalid"));
       return;
     }
 
     if (reviewPolicyRequiresAssigned && approvalThreshold > assignedReviewerIds.length) {
       setReviewPolicySuccess(null);
-      setReviewPolicyError("Approval threshold cannot exceed assigned reviewers.");
+      setReviewPolicyError(t("governance.errApprovalThresholdExceedsReviewers"));
       return;
     }
 
     if (!selectedLanguageId) {
       setReviewPolicySuccess(null);
-      setReviewPolicyError("Select or create a language first.");
+      setReviewPolicyError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -262,9 +264,9 @@ export function useGovernanceWorkspace(
       setReviewPolicyReviewerIds(policy.assignedReviewerIds.join(", "));
       setReviewPolicyApprovalThreshold(policy.approvalThreshold.toString());
       setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
-      setReviewPolicySuccess("Review policy updated.");
+      setReviewPolicySuccess(t("governance.msgReviewPolicyUpdated"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Review policy update failed";
+      const message = error instanceof Error ? error.message : t("governance.errReviewPolicyUpdateFailed");
       setReviewPolicyError(message);
     } finally {
       setIsSubmittingReviewPolicy(false);
@@ -275,13 +277,13 @@ export function useGovernanceWorkspace(
     const resolutionSummary = (reviewDispositionDrafts[dispositionId] ?? "").trim();
     if (resolutionSummary.length === 0) {
       setReviewDispositionSuccess(null);
-      setReviewDispositionError("Resolution summary is required.");
+      setReviewDispositionError(t("governance.errResolutionSummaryRequired"));
       return;
     }
 
     if (!selectedLanguageId) {
       setReviewDispositionSuccess(null);
-      setReviewDispositionError("Select or create a language first.");
+      setReviewDispositionError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -296,9 +298,9 @@ export function useGovernanceWorkspace(
       ]);
       setReviewDispositionState({ status: "ready", data: dispositions });
       setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: "" }));
-      setReviewDispositionSuccess("Review disposition resolved.");
+      setReviewDispositionSuccess(t("governance.msgReviewDispositionResolved"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Review disposition resolution failed";
+      const message = error instanceof Error ? error.message : t("governance.errReviewDispositionResolutionFailed");
       setReviewDispositionError(message);
     } finally {
       setResolvingReviewDispositionId(null);
@@ -308,7 +310,7 @@ export function useGovernanceWorkspace(
   async function handleExportSnapshot() {
     if (!selectedLanguageId) {
       setSnapshotDownload(null);
-      setSnapshotError("Select or create a language first.");
+      setSnapshotError(t("errors.selectOrCreateLanguage"));
       return;
     }
 
@@ -320,7 +322,7 @@ export function useGovernanceWorkspace(
       const snapshot = await fetchLanguageSnapshot(selectedLanguageId);
       setSnapshotDownload(buildSnapshotDownload(snapshot));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Snapshot export failed";
+      const message = error instanceof Error ? error.message : t("governance.errSnapshotExportFailed");
       setSnapshotError(message);
     } finally {
       setIsExportingSnapshot(false);
@@ -336,7 +338,7 @@ export function useGovernanceWorkspace(
       const artifact = await fetchEvaluationArtifact();
       setEvaluationArtifactDownload(buildEvaluationArtifactDownload(artifact));
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Evaluation artifact export failed";
+      const message = error instanceof Error ? error.message : t("governance.errEvaluationArtifactExportFailed");
       setEvaluationArtifactError(message);
     } finally {
       setIsExportingEvaluationArtifact(false);

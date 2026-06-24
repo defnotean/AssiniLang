@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { LanguageCreatePayload } from "../api";
 import { LANGUAGE_TYPOLOGY_OPTIONS } from "../lib/viewConfig";
+import { useI18n } from "../i18n";
 import type { Language } from "../lib/types";
 
 export function CreateLanguageForm({
@@ -10,6 +11,7 @@ export function CreateLanguageForm({
   isWorkflowBusy: boolean;
   onCreate: (payload: LanguageCreatePayload) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -21,7 +23,7 @@ export function CreateLanguageForm({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!name.trim() || !description.trim() || !orthography.trim()) {
-      setCreateError("Name, description, and orthography are required.");
+      setCreateError(t("createLang.requiredFields"));
       return;
     }
 
@@ -40,7 +42,7 @@ export function CreateLanguageForm({
       setTypology("unknown");
       setIsOpen(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Language creation failed";
+      const message = error instanceof Error ? error.message : t("createLang.creationFailed");
       setCreateError(message);
     } finally {
       setIsCreating(false);
@@ -50,24 +52,24 @@ export function CreateLanguageForm({
   if (!isOpen) {
     return (
       <button type="button" className="secondary new-language-toggle" disabled={isWorkflowBusy} onClick={() => setIsOpen(true)}>
-        New language
+        {t("createLang.newLanguage")}
       </button>
     );
   }
 
   return (
-    <form className="form-panel compact new-language-form" aria-label="Create language" onSubmit={handleSubmit}>
+    <form className="form-panel compact new-language-form" aria-label={t("createLang.createLanguage")} onSubmit={handleSubmit}>
       <div>
-        <span className="detail-label">Workspace setup</span>
-        <h3>New language</h3>
+        <span className="detail-label">{t("createLang.workspaceSetup")}</span>
+        <h3>{t("createLang.newLanguage")}</h3>
       </div>
       {createError && <p className="result-notice error" role="alert">{createError}</p>}
       <div className="form-group">
-        <label htmlFor="new-language-name">Language name</label>
+        <label htmlFor="new-language-name">{t("createLang.nameLabel")}</label>
         <input id="new-language-name" value={name} onChange={(event) => setName(event.target.value)} />
       </div>
       <div className="form-group">
-        <label htmlFor="new-language-description">Description</label>
+        <label htmlFor="new-language-description">{t("createLang.descriptionLabel")}</label>
         <textarea
           id="new-language-description"
           value={description}
@@ -75,11 +77,11 @@ export function CreateLanguageForm({
         />
       </div>
       <div className="form-group">
-        <label htmlFor="new-language-orthography">Orthography</label>
+        <label htmlFor="new-language-orthography">{t("createLang.orthographyLabel")}</label>
         <input id="new-language-orthography" value={orthography} onChange={(event) => setOrthography(event.target.value)} />
       </div>
       <div className="form-group">
-        <label htmlFor="new-language-typology">Typology</label>
+        <label htmlFor="new-language-typology">{t("createLang.typologyLabel")}</label>
         <select
           id="new-language-typology"
           value={typology}
@@ -91,10 +93,10 @@ export function CreateLanguageForm({
         </select>
       </div>
       <button type="submit" disabled={isWorkflowBusy || isCreating}>
-        {isCreating ? "Creating..." : "Create language"}
+        {isCreating ? t("createLang.creating") : t("createLang.createLanguage")}
       </button>
       <button type="button" className="secondary" disabled={isCreating} onClick={() => setIsOpen(false)}>
-        Cancel
+        {t("common.cancel")}
       </button>
     </form>
   );
