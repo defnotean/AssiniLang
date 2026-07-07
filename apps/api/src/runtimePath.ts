@@ -6,6 +6,11 @@ type RuntimeDbPathOptions = {
   moduleUrl?: string;
 };
 
+export function resolveRepoRoot(options: Pick<RuntimeDbPathOptions, "moduleUrl"> = {}) {
+  const moduleDir = dirname(fileURLToPath(options.moduleUrl ?? import.meta.url));
+  return resolve(moduleDir, "..", "..", "..");
+}
+
 export function resolveRuntimeDbPath(options: RuntimeDbPathOptions = {}) {
   const env = options.env ?? process.env;
   const override = env.ASSINI_DB_PATH?.trim();
@@ -13,8 +18,11 @@ export function resolveRuntimeDbPath(options: RuntimeDbPathOptions = {}) {
     return resolve(override);
   }
 
-  const moduleDir = dirname(fileURLToPath(options.moduleUrl ?? import.meta.url));
-  return resolve(moduleDir, "..", "..", "..", "data", "local-db.json");
+  return resolve(resolveRepoRoot({ moduleUrl: options.moduleUrl }), "data", "local-db.json");
+}
+
+export function resolveRuntimeSettingsPath(options: Pick<RuntimeDbPathOptions, "moduleUrl"> = {}) {
+  return resolve(resolveRepoRoot({ moduleUrl: options.moduleUrl }), ".env");
 }
 
 /**

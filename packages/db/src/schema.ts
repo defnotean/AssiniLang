@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { auditMetadataPrivacyIssue } from "./auditMetadataPrivacy.js";
-import { sourceAssetFilePathIssue } from "./sourceAssetPaths.js";
+import { sourceAssetFilePathIssue } from "./sourceAssetPathValidation.js";
 
 export const languageTypologySchema = z.enum([
   "agglutinative",

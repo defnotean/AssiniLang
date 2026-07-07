@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { copyFile, mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
-import Database from "better-sqlite3";
+import type Database from "better-sqlite3";
 import { eq, getTableColumns } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { appStateSchema, parseAppState, type AppState, type Note } from "./schema.js";
 import * as schema from "./dbSchema.js";
@@ -94,6 +94,19 @@ function nullToUndefined(val: any, key?: string): any {
 }
 
 type SnapshotKey = { mtimeMs: number; size: number };
+type SqliteRuntime = {
+  Database: typeof Database;
+  drizzle: typeof drizzleSqlite;
+};
+type DrizzleDatabase = ReturnType<typeof drizzleSqlite>;
+
+async function loadSqliteRuntime(): Promise<SqliteRuntime> {
+  const [{ default: Database }, { drizzle }] = await Promise.all([
+    import("better-sqlite3"),
+    import("drizzle-orm/better-sqlite3")
+  ]);
+  return { Database, drizzle };
+}
 
 export class JsonStore {
   private updateQueue: Promise<void> = Promise.resolve();
@@ -396,6 +409,7 @@ export class JsonStore {
 
     let db: Database.Database | undefined;
     try {
+      const { Database, drizzle } = await loadSqliteRuntime();
       db = new Database(this.dbPath);
       this.ensureTablesOnce(db, key);
       const drizzleDb = drizzle(db, { schema });
@@ -468,7 +482,7 @@ export class JsonStore {
    * unchanged collection produces zero row changes.
    */
   private syncTable(
-    drizzleDb: ReturnType<typeof drizzle>,
+    drizzleDb: DrizzleDatabase,
     table: SQLiteTable,
     records: readonly Record<string, unknown>[]
   ): void {
@@ -543,6 +557,7 @@ export class JsonStore {
     await mkdir(dbDir, { recursive: true });
     const preWriteKey = await this.snapshotKey();
 
+    const { Database, drizzle } = await loadSqliteRuntime();
     const db = new Database(this.dbPath);
     this.ensureTablesOnce(db, preWriteKey);
     const drizzleDb = drizzle(db, { schema });
@@ -593,6 +608,7 @@ export class JsonStore {
         return destination;
       }
 
+      const { Database } = await loadSqliteRuntime();
       const db = new Database(this.dbPath);
       try {
         this.ensureTables(db);

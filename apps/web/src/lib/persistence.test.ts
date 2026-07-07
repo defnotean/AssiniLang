@@ -13,14 +13,16 @@ function makeStorage(initial: Record<string, string> = {}) {
 }
 
 describe("workspace persistence", () => {
-  it("defaults to the corpus view when nothing is stored", () => {
-    expect(getInitialView(makeStorage())).toBe("corpus");
-    expect(getInitialView(undefined)).toBe("corpus");
+  it("defaults to the start view when nothing is stored", () => {
+    expect(getInitialView(makeStorage())).toBe("profile");
+    expect(getInitialView(undefined)).toBe("profile");
   });
 
-  it("restores a stored view only when it is a known view mode", () => {
-    expect(getInitialView(makeStorage({ "workspace.view": "governance" }))).toBe("governance");
-    expect(getInitialView(makeStorage({ "workspace.view": "not-a-view" }))).toBe("corpus");
+  it("restores a stored top-level view and maps old detailed views into the four-tab shell", () => {
+    expect(getInitialView(makeStorage({ "workspace.view": "learner" }))).toBe("learner");
+    expect(getInitialView(makeStorage({ "workspace.view": "governance" }))).toBe("model");
+    expect(getInitialView(makeStorage({ "workspace.view": "review" }))).toBe("ingest");
+    expect(getInitialView(makeStorage({ "workspace.view": "not-a-view" }))).toBe("profile");
   });
 
   it("ignores storage failures when reading the view", () => {
@@ -29,7 +31,7 @@ describe("workspace persistence", () => {
         throw new Error("denied");
       }
     };
-    expect(getInitialView(storage)).toBe("corpus");
+    expect(getInitialView(storage)).toBe("profile");
   });
 
   it("returns null for missing or blank stored language ids", () => {

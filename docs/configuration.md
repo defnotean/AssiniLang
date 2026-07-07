@@ -19,7 +19,9 @@ bash (macOS/Linux):
 ASSINI_LLM_PROVIDER=ollama ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1 npm run dev
 ```
 
-Variables apply to the process you start. You can also keep `ASSINI_*` settings in a repo-root `.env` file instead of re-exporting them every shell: the API calls Node's `process.loadEnvFile()` at startup (no dependency), so a `.env` at the repo root is loaded automatically when the API boots. Start from `.env.example` for safe local defaults, then keep real secrets in `.env` only. The repo-root `.env` is git-ignored locally so secrets are never committed. The provider is resolved once at boot, so restart the API after editing `.env` (or any `ASSINI_*` variable) for the change to take effect.
+Variables apply to the process you start. You can also keep `ASSINI_*` settings in a repo-root `.env` file instead of re-exporting them every shell: the API loads env files at startup with documented precedence (shell env wins, then repo-root `.env`, then cwd `.env`). Start from `.env.example` for safe local defaults, then keep real secrets in `.env` only. The repo-root `.env` is git-ignored locally so secrets are never committed.
+
+The web app's Model Setup screen can edit the common runtime settings through `GET /llm/settings` and `PUT /llm/settings`. It also calls `GET /llm/models` to populate the model dropdown from the configured endpoint, common local providers, and optional discovery URLs. If no model is configured and exactly one no-key local model is discovered, the app saves and activates it automatically. Choosing a discovered model also saves and switches the active provider immediately; manually typed settings still use Save settings. Saving writes the repo-root `.env`, updates the running API process environment, and refreshes the active model provider for future ingestion, model-draft generation, and AI sessions. API keys are write-only: the browser can submit replacements or clear them, but settings/status responses only report whether a key is configured. Dev launcher settings such as ports, host, allowed origins, body limit, logger, database path, and prototype auth still require restarting `npm.cmd run dev`.
 
 ## LLM provider
 
@@ -27,13 +29,15 @@ Read by `apps/api/src/llmProvider.ts`. The same provider drives ingestion extrac
 
 | Variable | Default | Accepted values | Effect |
 | --- | --- | --- | --- |
-| `ASSINI_LLM_PROVIDER` | unset (auto-detect) | `deterministic`, `off`, `mock`, `openai-compatible`, `local`, `ollama`, `lm-studio`, `openai`, `remote` | Selects the provider mode. `deterministic`/`off`/`mock` disable model calls. `openai-compatible`/`local`/`ollama`/`lm-studio` all mean "OpenAI-compatible endpoint at `ASSINI_LLM_BASE_URL`". `openai`/`remote` mean a remote API that requires a key. Any other value is unknown: model calls throw, and `GET /llm/status` reports mode `invalid` with a warning rather than HTTP-erroring itself. |
+| `ASSINI_LLM_PROVIDER` | unset (auto-detect) | `deterministic`, `off`, `mock`, `openai-compatible`, `local`, `ollama`, `lm-studio`, `openai`, `remote` | Selects the provider mode. `deterministic`/`off`/`mock` disable model calls. `openai-compatible`/`local`/`ollama`/`lm-studio` all mean "OpenAI-compatible endpoint at `ASSINI_LLM_BASE_URL`". `openai`/`remote` mean a remote API that requires a key. Any other value is unknown: the server degrades to deterministic mode (no external calls), and `GET /llm/status` reports mode `invalid` with a warning rather than HTTP-erroring itself. |
 | `ASSINI_LLM_BASE_URL` | `https://api.openai.com/v1` in remote mode; required in local mode | http(s) URL | Base URL of the OpenAI-compatible `/chat/completions` endpoint. |
 | `ASSINI_LLM_MODEL` | `gpt-4o-mini` in remote mode; required in local mode | model name string | Model sent in completion requests. Falls back to `OPENAI_MODEL` when unset. |
 | `ASSINI_LLM_API_KEY` | unset | secret string | Bearer token for the LLM endpoint. Required in remote mode. `OPENAI_API_KEY` is accepted as an alias. |
-| `ASSINI_LLM_TIMEOUT_MS` | `30000` | positive integer | Per-request completion timeout in milliseconds. Invalid values fall back to the default with a warning. |
+| `ASSINI_LLM_TIMEOUT_MS` | `180000` | positive integer | Per-request completion timeout in milliseconds. Invalid values fall back to the default with a warning. |
 | `ASSINI_LLM_MAX_TOKENS` | `4096` | positive integer | Caps `max_tokens` on each model request. Unset or invalid values fall back to the default. Raise it if extractions are getting truncated. |
 | `ASSINI_LLM_JSON_MODE` | unset (off) | `1` or `true` | When enabled, sends `response_format: { type: "json_object" }` on extraction (`completeChat`) requests only - never on AI chat sessions. Off by default because some local servers reject the field; turn it on with capable servers (recent llama.cpp or OpenAI) to make extraction JSON more reliable. |
+| `ASSINI_LLM_DISCOVERY_BASE_URLS` | unset | comma- or whitespace-separated http(s) URLs | Extra model endpoints for `GET /llm/models` to probe. Use this for model servers on another machine instead of relying on broad LAN scans. URLs may be roots (`http://box:11434`) or OpenAI-compatible bases (`http://box:8080/v1`). |
+| `ASSINI_MODEL_DISCOVERY_URLS` | unset | comma- or whitespace-separated http(s) URLs | Alias for `ASSINI_LLM_DISCOVERY_BASE_URLS`. |
 
 Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local OpenAI-compatible mode; an API key alone means remote OpenAI mode; nothing configured means the deterministic fallback (no model calls, offline heuristics for ingestion).
 
@@ -41,6 +45,24 @@ Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local
 | --- | --- | --- | --- |
 | `OPENAI_API_KEY` | unset | secret string | Alias for `ASSINI_LLM_API_KEY`. |
 | `OPENAI_MODEL` | unset | model name string | Alias for `ASSINI_LLM_MODEL`. |
+
+## Verification scripts
+
+Read by the local driver scripts under `scripts/`. These are optional test harness controls and do not affect the running browser app unless the script explicitly saves runtime settings through the API.
+
+| Variable | Default | Accepted values | Effect |
+| --- | --- | --- | --- |
+| `ASSINI_TEST_USER` | `reviewer-1` | user id string | Actor id used by `scripts/verifyDgxLanguage.mjs` when sending API requests. |
+| `ASSINI_VERIFY_LANGUAGE` | `Veridspark` | language name string | Language name used by `npm run model:verify` when creating or expanding the local model verification workspace. |
+| `ASSINI_VERIFY_MODEL` | `Irene` | model name string | Preferred model name for `npm run model:verify`; the script probes discovered models and falls back to another reachable model if this one is listed but cannot generate. |
+| `ASSINI_VERIFY_MODEL_BASE_URL` | unset | http(s) URL | Optional preferred base URL for `ASSINI_VERIFY_MODEL`, useful when several exposed endpoints list similarly named models. |
+| `ASSINI_VERIFY_AUTO_SWITCH_MODEL` | unset (enabled) | `false` to disable | Allows `npm run model:verify` to save the selected reachable model into runtime settings before running model-backed checks. |
+| `ASSINI_VERIFY_MAX_TOKENS` | `8192` | positive integer | Max token cap saved by `npm run model:verify` when it auto-switches the model. Raise this for reasoning-heavy local models that need more room to emit final JSON. |
+| `ASSINI_VERIFY_JSON_MODE` | unset (enabled) | `false` to disable | Controls whether `npm run model:verify` saves runtime JSON mode while configuring the selected model. |
+| `ASSINI_DESKTOP_FORCE_BUILD` | unset | `1` | Forces `npm.cmd run desktop` to rebuild before opening the Electron desktop shell, even when existing build outputs look current. |
+| `ASSINI_DESKTOP_SMOKE` | unset | `1` | Internal flag used by `npm.cmd run desktop:smoke` to make the packaged Electron app run its rendered UI smoke check and exit automatically. |
+| `ASSINI_DESKTOP_SMOKE_REPORT` | `dist-desktop/desktop-smoke-report.json` from the launcher | file path | Internal report path used by the packaged desktop smoke check. |
+| `ASSINI_DESKTOP_SMOKE_SCREENSHOT` | `dist-desktop/desktop-smoke.png` from the launcher | file path | Internal screenshot path used by the packaged desktop smoke check to prove the window is not blank. |
 
 ## Transcription (audio sources)
 
@@ -94,7 +116,7 @@ For image sources, pick a vision-capable model such as `llava`.
 Two practical notes from real-model testing:
 
 - On AMD GPUs that ROCm does not cover (verified on an RX 9070 XT), Ollama silently falls back to CPU at roughly a tenth of the speed. Start the Ollama server with `OLLAMA_VULKAN=1` to use the Vulkan backend and check placement with `ollama ps` (it should report `100% GPU`).
-- Extraction prompts generate long structured output; for 7B-14B models, raise the request timeout (for example `ASSINI_LLM_TIMEOUT_MS=180000`) so long sources do not abort at the 30-second default.
+- Extraction prompts generate long structured output; for very large local models, raise the request timeout beyond the 180-second default if long sources still abort.
 
 ### LM Studio
 

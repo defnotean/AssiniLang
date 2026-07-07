@@ -4,7 +4,14 @@ import { createBootstrapState } from "./bootstrap.js";
 import { JsonStore } from "./store.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
-export const seedDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");
+export const defaultSeedDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");
+
+export function resolveSeedDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  const override = env.ASSINI_DB_PATH?.trim();
+  return override ? resolve(override) : defaultSeedDbPath;
+}
+
+export const seedDbPath = resolveSeedDbPath();
 
 const invokedFilePath = process.argv[1] ? resolve(process.argv[1]) : undefined;
 

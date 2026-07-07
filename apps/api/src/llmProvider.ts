@@ -1,6 +1,17 @@
 import type { AiMessage, AiSessionMode, AppState, CorpusPassage, Language, Note } from "@assini/db";
+import type { LlmProviderReadiness, LlmReachability } from "@assini/api-contract";
+import {
+  DEFAULT_LLM_MAX_TOKENS,
+  DEFAULT_LLM_TIMEOUT_MS,
+  ensureV1BaseUrl,
+  normalizeBaseUrl,
+  parseBooleanFlag,
+  resolveLlmTimeoutMs,
+  trimValue
+} from "./llmEnvShared.js";
 
-type Env = Record<string, string | undefined>;
+export type { LlmProviderReadiness, LlmReachability } from "@assini/api-contract";
+
 type FetchFn = typeof fetch;
 
 type ChatRole = "system" | "user" | "assistant";
@@ -81,6 +92,11 @@ export type LlmProvider = {
   completeChat?(messages: LlmChatMessage[]): Promise<string>;
 };
 
+export type MutableLlmProvider = LlmProvider & {
+  updateFromEnv(env?: Env): void;
+  current(): LlmProvider;
+};
+
 export type OpenAiCompatibleConfig = {
   baseUrl: string;
   model: string;
@@ -90,75 +106,56 @@ export type OpenAiCompatibleConfig = {
   jsonMode?: boolean;
 };
 
-export type LlmReachability = {
-  reachable: boolean;
-  checked: boolean;
-  mode: string;
-  status?: number;
-  detail?: string;
-  latencyMs?: number;
-};
 
-export type LlmProviderReadiness = {
-  provider: string;
-  mode: "deterministic" | "local-openai-compatible" | "remote-api" | "invalid";
-  configured: boolean;
-  activeProviderName: string;
-  baseUrl?: string;
-  model?: string;
-  timeoutMs: number;
-  apiKey: {
-    required: boolean;
-    configured: boolean;
-    acceptedVariables: string[];
-  };
-  environment: {
-    providerVariable: "ASSINI_LLM_PROVIDER";
-    baseUrlVariable: "ASSINI_LLM_BASE_URL";
-    modelVariable: "ASSINI_LLM_MODEL";
-    apiKeyVariables: ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"];
-    timeoutVariable: "ASSINI_LLM_TIMEOUT_MS";
-  };
-  transcription: {
-    configured: boolean;
-    baseUrl?: string;
-    model?: string;
-    baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL";
-    modelVariable: "ASSINI_TRANSCRIBE_MODEL";
-  };
-  setup: {
-    localExamples: string[];
-    remoteExamples: string[];
-  };
-  warnings: string[];
-};
+type Env = Record<string, string | undefined>;
 
 type OpenAiChatCompletionResponse = {
   choices?: Array<{
     message?: {
       content?: unknown;
+      reasoning_content?: unknown;
     };
   }>;
 };
+type OpenAiChatCompletionMessage = NonNullable<NonNullable<OpenAiChatCompletionResponse["choices"]>[number]["message"]>;
 
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_REMOTE_OPENAI_MODEL = "gpt-4o-mini";
-const DEFAULT_LLM_TIMEOUT_MS = 30_000;
-const DEFAULT_LLM_MAX_TOKENS = 4096;
-const DEFAULT_REACHABILITY_TIMEOUT_MS = 8_000;
 const MAX_CONTEXT_ITEMS = 8;
 const MAX_TEXT_CHARS = 1_200;
 const MAX_PREVIOUS_MESSAGES = 8;
+const HEALTH_CHECK_MAX_TOKENS = 256;
+const THINKING_ONLY_PATTERN = /^\[(?:think|THINK)\]$/i;
+const REASONING_ONLY_MESSAGE = "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content.";
 
-function trimValue(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+function parseAssistantMessageContent(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    const trimmed = content.trim();
+    if (trimmed.length === 0 || THINKING_ONLY_PATTERN.test(trimmed)) return undefined;
+    return trimmed;
+  }
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((part) => {
+        if (!part || typeof part !== "object") return "";
+        const record = part as { type?: unknown; text?: unknown };
+        return record.type === "text" && typeof record.text === "string" ? record.text : "";
+      })
+      .join("")
+      .trim();
+    if (text.length === 0 || THINKING_ONLY_PATTERN.test(text)) return undefined;
+    return text;
+  }
+
+  return undefined;
 }
 
-function redactText(text: string, maxChars = MAX_TEXT_CHARS): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (normalized.length <= maxChars) return normalized;
-  return `${normalized.slice(0, maxChars - 1)}…`;
+function hasReasoningOnlyContent(message: OpenAiChatCompletionMessage | undefined): boolean {
+  if (!message) return false;
+  return parseAssistantMessageContent(message.content) === undefined
+    && typeof message.reasoning_content === "string"
+    && message.reasoning_content.trim().length > 0;
 }
 
 function parsePositiveInteger(value: string | undefined, fallback: number): { value: number; warnings: string[] } {
@@ -184,18 +181,10 @@ function parseOptionalPositiveInteger(value: string | undefined): number | undef
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function parseBooleanFlag(value: string | undefined): boolean {
-  const trimmed = trimValue(value)?.toLowerCase();
-  return trimmed === "1" || trimmed === "true";
-}
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
-}
-
-function ensureV1BaseUrl(baseUrl: string): string {
-  const normalized = normalizeBaseUrl(baseUrl);
-  return /\/v1$/.test(normalized) ? normalized : `${normalized}/v1`;
+function redactText(text: string, maxChars = MAX_TEXT_CHARS): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
 function parseHttpBaseUrl(baseUrl: string | undefined): URL | undefined {
@@ -231,10 +220,6 @@ function baseUrlWarnings(baseUrl: string | undefined, missingMessage: string): s
 
 function completionUrl(baseUrl: string): string {
   return `${normalizeBaseUrl(baseUrl)}/chat/completions`;
-}
-
-function modelsUrl(baseUrl: string): string {
-  return `${normalizeBaseUrl(baseUrl)}/models`;
 }
 
 function safeNote(note: Note): LlmContextNote {
@@ -661,12 +646,16 @@ export function createOpenAiCompatibleLlmProvider(
       }
 
       const payload = await response.json() as OpenAiChatCompletionResponse;
-      const content = payload.choices?.[0]?.message?.content;
-      if (typeof content !== "string" || content.trim().length === 0) {
+      const message = payload.choices?.[0]?.message;
+      const content = parseAssistantMessageContent(message?.content);
+      if (!content) {
+        if (hasReasoningOnlyContent(message)) {
+          throw new Error(REASONING_ONLY_MESSAGE);
+        }
         throw new Error("LLM provider returned an empty assistant message");
       }
 
-      return content.trim();
+      return content;
     } catch (error) {
       if (timedOut || isAbortError(error)) {
         throw new Error(`LLM provider request timed out after ${timeoutMs}ms`, { cause: error });
@@ -766,6 +755,32 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
   return createDeterministicLlmProvider();
 }
 
+export function createMutableLlmProvider(
+  env: Env = process.env,
+  fetchFn: FetchFn = globalThis.fetch
+): MutableLlmProvider {
+  let current = createLlmProviderFromEnv(env, fetchFn);
+
+  return {
+    get name() {
+      return current.name;
+    },
+    async generateAssistantMessage(input) {
+      return current.generateAssistantMessage(input);
+    },
+    get completeChat() {
+      if (!current.completeChat) return undefined;
+      return (messages: LlmChatMessage[]) => current.completeChat?.(messages) ?? Promise.reject(new Error("LLM provider does not support structured chat completion"));
+    },
+    updateFromEnv(nextEnv = process.env) {
+      current = createLlmProviderFromEnv(nextEnv, fetchFn);
+    },
+    current() {
+      return current;
+    }
+  };
+}
+
 type ResolvedProbeTarget = { baseUrl: string; apiKey?: string };
 
 /**
@@ -809,15 +824,12 @@ function sanitizeReachabilityError(error: unknown, apiKey?: string): string {
   return sanitizeProviderErrorDetail(message, apiKey);
 }
 
-function looksLikeUnsupportedEndpoint(status: number): boolean {
-  return status === 404 || status === 405;
-}
-
 /**
- * Issue a single minimal request to confirm the configured provider is
- * reachable. Never throws: network/timeout failures resolve to
- * { reachable: false }. Deterministic/unconfigured/invalid configurations
- * skip the network entirely. Secrets are redacted from any returned detail.
+ * Issue one tiny chat completion to confirm the configured provider can
+ * actually generate, not just list models. Never throws: network/timeout
+ * failures resolve to { reachable: false }. Deterministic/unconfigured/invalid
+ * configurations skip the network entirely. Secrets are redacted from any
+ * returned detail.
  */
 export async function probeLlmProviderReachability(
   options: { env?: Env; fetchFn?: FetchFn; timeoutMs?: number } = {}
@@ -840,9 +852,7 @@ export async function probeLlmProviderReachability(
     };
   }
 
-  const timeoutMs = Number.isInteger(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
-    ? options.timeoutMs as number
-    : DEFAULT_REACHABILITY_TIMEOUT_MS;
+  const timeoutMs = resolveLlmTimeoutMs(env, options.timeoutMs);
   const { baseUrl, apiKey } = target;
   const headers: Record<string, string> = {};
   if (apiKey) {
@@ -858,43 +868,54 @@ export async function probeLlmProviderReachability(
   const startedAt = Date.now();
 
   try {
-    let response = await fetchFn(modelsUrl(baseUrl), {
-      method: "GET",
-      headers,
-      signal: controller.signal
+    const response = await fetchFn(completionUrl(baseUrl), {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: readiness.model ?? DEFAULT_REMOTE_OPENAI_MODEL,
+        messages: [{ role: "user", content: "Reply with exactly: ok" }],
+        max_tokens: HEALTH_CHECK_MAX_TOKENS,
+        stream: false
+      })
     });
-
-    if (!response.ok && looksLikeUnsupportedEndpoint(response.status)) {
-      response = await fetchFn(completionUrl(baseUrl), {
-        method: "POST",
-        headers: { ...headers, "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          model: readiness.model ?? DEFAULT_REMOTE_OPENAI_MODEL,
-          messages: [{ role: "user", content: "ping" }],
-          max_tokens: 1,
-          stream: false
-        })
-      });
-    }
 
     const latencyMs = Date.now() - startedAt;
     const result: LlmReachability = {
       checked: true,
-      reachable: response.ok,
+      reachable: false,
       mode,
       status: response.status,
       latencyMs
     };
-    if (!response.ok) {
+    if (response.ok) {
+      let payload: OpenAiChatCompletionResponse;
+      try {
+        payload = await response.json() as OpenAiChatCompletionResponse;
+      } catch {
+        result.detail = "Chat completions returned invalid JSON.";
+        return result;
+      }
+      const message = payload.choices?.[0]?.message;
+      const content = parseAssistantMessageContent(message?.content);
+      if (!content) {
+        result.detail = hasReasoningOnlyContent(message)
+          ? REASONING_ONLY_MESSAGE
+          : "Chat completions returned an empty assistant message.";
+        return result;
+      }
+      result.reachable = true;
+    } else {
       const detail = await readProviderErrorDetail(response, apiKey);
-      if (detail) result.detail = detail;
+      result.detail = detail
+        ? `Chat completions failed with status ${response.status}: ${detail}`
+        : `Chat completions failed with status ${response.status}.`;
     }
     return result;
   } catch (error) {
     const detail = timedOut || isAbortError(error)
       ? `Reachability probe timed out after ${timeoutMs}ms.`
-      : sanitizeReachabilityError(error, apiKey);
+      : `Chat completions failed: ${sanitizeReachabilityError(error, apiKey)}`;
     return { checked: true, reachable: false, mode, detail };
   } finally {
     clearTimeout(timeout);

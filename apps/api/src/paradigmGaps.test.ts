@@ -105,6 +105,21 @@ describe("paradigm gap detection", () => {
     expect(detectParadigmGaps(state, TEST_LANGUAGE_ID)).toEqual([]);
   });
 
+  it("normalizes common tense and person gloss aliases before comparing cells", () => {
+    const state = stateWithCorpus([
+      makePassage(base, "p1", TEST_LANGUAGE_ID, [free("talo", "walk"), suffix("-mi", "present", ["tense"])]),
+      makePassage(base, "p2", TEST_LANGUAGE_ID, [free("talo", "walk"), suffix("-lo", "past tense", ["tense"])]),
+      makePassage(base, "p3", TEST_LANGUAGE_ID, [free("nemi", "teach"), suffix("-mi", "present tense", ["tense"])]),
+      makePassage(base, "p4", TEST_LANGUAGE_ID, [free("nemi", "teach"), suffix("-lo", "past", ["tense"])]),
+      makePassage(base, "p5", TEST_LANGUAGE_ID, [free("kora", "speak"), suffix("-na", "first person singular", ["person"])]),
+      makePassage(base, "p6", TEST_LANGUAGE_ID, [free("kora", "speak"), suffix("-ki", "3sg", ["person"])]),
+      makePassage(base, "p7", TEST_LANGUAGE_ID, [free("sora", "see"), suffix("-na", "1sg", ["person"])]),
+      makePassage(base, "p8", TEST_LANGUAGE_ID, [free("sora", "see"), suffix("-ki", "third person singular", ["person"])])
+    ]);
+
+    expect(detectParadigmGaps(state, TEST_LANGUAGE_ID)).toEqual([]);
+  });
+
   it("isolates evidence and gaps per language", () => {
     const sharedCorpus = [
       makePassage(base, "p1", TEST_LANGUAGE_ID, [free("talo", "walk"), suffix("-na", "1sg", ["person"])]),

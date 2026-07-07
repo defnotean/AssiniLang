@@ -75,16 +75,17 @@ const EXERCISE_TYPES = [
 
 const DEFAULT_EXERCISE_TYPE: Exercise["type"] = "translate_to_english";
 
-const MAX_CONTEXT_CHARS = 12_000;
-const MAX_CONTEXT_PASSAGES = 30;
-const MAX_CONTEXT_LEXEMES = 200;
-const MAX_CONTEXT_NOTES = 40;
-const MAX_GENERATED_NOTES = 20;
+const MAX_CONTEXT_CHARS = 4_000;
+const MAX_CONTEXT_PASSAGES = 6;
+const MAX_CONTEXT_LEXEMES = 50;
+const MAX_CONTEXT_NOTES = 12;
+const MAX_GENERATED_NOTES = 3;
 const MIN_EXPLANATION_CHARS = 24;
 const MIN_GRADING_EXPLANATION_CHARS = 24;
 const MIN_ADVERSARIAL_ANSWERS = 2;
 const MAX_GENERATED_EXPECTED_ANSWERS = 12;
 const MAX_GENERATED_ADVERSARIAL_ANSWERS = 12;
+const REASONING_ONLY_PATTERN = /reasoning_content/i;
 
 const confidenceSchema = z.enum(["low", "medium", "high"]).catch("medium");
 
@@ -259,6 +260,7 @@ export function buildNoteGenerationMessages(language: Language, context: Generat
     "- Use ONLY forms that appear in the supplied corpus or lexicon. Never invent words, affixes, or translations.",
     "- Every note MUST cite one or more evidencePassageIds drawn from the supplied passage ids. A note with no real evidence is useless and will be discarded.",
     "- Do not restate an existing note topic.",
+    "- Generate exactly 1 concise note when you see a non-duplicate grounded pattern. If nothing is safely new, return {\"notes\":[]}.",
     ...describeLanguage(language),
     "Respond with a single JSON object and nothing else, using exactly this shape:",
     JSON.stringify({
@@ -270,12 +272,45 @@ export function buildNoteGenerationMessages(language: Language, context: Generat
           confidence: "low|medium|high"
         }
       ]
-    })
+    }),
+    "Important for reasoning-capable local servers: put the JSON in the visible assistant content field, not only in reasoning_content.",
+    "Keep the visible final JSON compact; do not include analysis, prose, markdown, or chain-of-thought outside the JSON."
   ].join("\n\n");
 
   return [
     { role: "system", content: system },
     { role: "user", content: `Approved data to draw on:\n\n${serializeContext(context)}` }
+  ];
+}
+
+function buildCompactNoteGenerationMessages(language: Language, context: GenerationContext): LlmChatMessage[] {
+  const compactContext: GenerationContext = {
+    corpus: context.corpus.slice(0, 2),
+    lexemes: context.lexemes.slice(0, 24),
+    notes: context.notes.slice(0, 8)
+  };
+  return [
+    {
+      role: "system",
+      content: [
+        "Return visible JSON only. Do not include analysis, markdown, or hidden-only reasoning.",
+        "If you cannot safely create one new grounded note, return exactly {\"notes\":[]}.",
+        "Use only the supplied passage ids as evidencePassageIds.",
+        ...describeLanguage(language),
+        "Required JSON shape:",
+        JSON.stringify({
+          notes: [
+            {
+              topic: "short/topic/path",
+              explanation: "one concise grounded sentence",
+              evidencePassageIds: ["<supplied passage id>"],
+              confidence: "low|medium|high"
+            }
+          ]
+        })
+      ].join("\n\n")
+    },
+    { role: "user", content: `Small approved data sample:\n\n${serializeContext(compactContext)}` }
   ];
 }
 
@@ -293,6 +328,7 @@ export function buildExerciseGenerationMessages(
     "- expectedAnswers must be answerable from the supplied data; provide at least one.",
     `- Provide at least ${MIN_ADVERSARIAL_ANSWERS} adversarialAnswers, each a plausible wrong answer with a short reason it is wrong.`,
     "- gradingExplanation must explain, in at least a sentence, why the expected answer is correct.",
+    "- Produce exactly one compact exercise. Prefer a simple passage already present in the supplied corpus.",
     requestedType
       ? `Produce an exercise of type "${requestedType}".`
       : `Choose a suitable type from: ${EXERCISE_TYPES.join(", ")}.`,
@@ -308,12 +344,56 @@ export function buildExerciseGenerationMessages(
         adversarialAnswers: [{ answer: "<plausible wrong answer>", reason: "<why it is wrong>" }],
         gradingExplanation: "why the expected answer is correct"
       }
-    })
+    }),
+    "Important for reasoning-capable local servers: put the JSON in the visible assistant content field, not only in reasoning_content.",
+    "Keep the visible final JSON compact; do not include analysis, prose, markdown, or chain-of-thought outside the JSON."
   ].join("\n\n");
 
   return [
     { role: "system", content: system },
     { role: "user", content: `Approved data to draw on:\n\n${serializeContext(context)}` }
+  ];
+}
+
+function buildCompactExerciseGenerationMessages(
+  language: Language,
+  context: GenerationContext,
+  options: { type?: Exercise["type"] } = {}
+): LlmChatMessage[] {
+  const requestedType = options.type && EXERCISE_TYPES.includes(options.type) ? options.type : DEFAULT_EXERCISE_TYPE;
+  const compactContext: GenerationContext = {
+    corpus: context.corpus.slice(0, 2),
+    lexemes: context.lexemes.slice(0, 24),
+    notes: context.notes.slice(0, 6)
+  };
+
+  return [
+    {
+      role: "system",
+      content: [
+        "Return visible JSON only. Do not include analysis, markdown, or hidden-only reasoning.",
+        "Create exactly one compact grounded language-learning exercise.",
+        `The exercise type must be "${requestedType}".`,
+        "Use only supplied vocabulary forms and supplied note ids.",
+        ...describeLanguage(language),
+        "Required JSON shape:",
+        JSON.stringify({
+          exercise: {
+            type: requestedType,
+            prompt: "short learner-facing task",
+            allowedVocabulary: ["<form from supplied lexicon>"],
+            allowedRuleIds: ["<id from supplied notes>"],
+            expectedAnswers: ["<correct answer>"],
+            adversarialAnswers: [
+              { answer: "<plausible wrong answer>", reason: "<why it is wrong>" },
+              { answer: "<another plausible wrong answer>", reason: "<why it is wrong>" }
+            ],
+            gradingExplanation: "one concise grounded sentence"
+          }
+        })
+      ].join("\n\n")
+    },
+    { role: "user", content: `Small approved data sample:\n\n${serializeContext(compactContext)}` }
   ];
 }
 
@@ -506,6 +586,10 @@ function buildExerciseGrounding(lexemes: Lexeme[], notes: Note[]): ExerciseGroun
   };
 }
 
+function isReasoningOnlyGenerationError(error: unknown): boolean {
+  return error instanceof Error && REASONING_ONLY_PATTERN.test(error.message);
+}
+
 // --- orchestrators ---------------------------------------------------------
 
 export async function generateModelDraftNotes(params: {
@@ -529,15 +613,46 @@ export async function generateModelDraftNotes(params: {
   };
 
   const query = `${params.language.name} ${params.language.description} ${params.language.orthography}`;
-  const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 15, llmConfig);
+  const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 4, llmConfig);
 
   const messages = buildNoteGenerationMessages(params.language, {
     corpus: retrievedCorpus,
     lexemes: params.lexemes,
     notes: params.existingNotes
   });
-  const content = await params.provider.completeChat(messages);
-  return parseGeneratedNotes(content, buildNoteGrounding(retrievedCorpus, params.existingNotes));
+  const grounding = buildNoteGrounding(retrievedCorpus, params.existingNotes);
+  try {
+    const content = await params.provider.completeChat(messages);
+    return parseGeneratedNotes(content, grounding);
+  } catch (error) {
+    if (!isReasoningOnlyGenerationError(error)) {
+      throw error;
+    }
+  }
+
+  const retryWarnings = [
+    "Model returned only reasoning_content for draft-note generation; retried with a smaller JSON-only prompt."
+  ];
+  try {
+    const retryContent = await params.provider.completeChat(buildCompactNoteGenerationMessages(params.language, {
+      corpus: retrievedCorpus,
+      lexemes: params.lexemes,
+      notes: params.existingNotes
+    }));
+    const retryResult = parseGeneratedNotes(retryContent, grounding);
+    return { notes: retryResult.notes, warnings: [...retryWarnings, ...retryResult.warnings] };
+  } catch (retryError) {
+    if (!isReasoningOnlyGenerationError(retryError)) {
+      throw retryError;
+    }
+    return {
+      notes: [],
+      warnings: [
+        ...retryWarnings,
+        "Model again returned only reasoning_content for draft-note generation; no draft notes were created."
+      ]
+    };
+  }
 }
 
 export async function generateModelExercise(params: {
@@ -558,6 +673,27 @@ export async function generateModelExercise(params: {
     { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
     { type: params.type }
   );
-  const content = await params.provider.completeChat(messages);
-  return parseGeneratedExercise(content, buildExerciseGrounding(params.lexemes, params.notes));
+  const grounding = buildExerciseGrounding(params.lexemes, params.notes);
+  try {
+    const content = await params.provider.completeChat(messages);
+    return parseGeneratedExercise(content, grounding);
+  } catch (error) {
+    if (!isReasoningOnlyGenerationError(error)) {
+      throw error;
+    }
+  }
+
+  const retryContent = await params.provider.completeChat(buildCompactExerciseGenerationMessages(
+    params.language,
+    { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
+    { type: params.type }
+  ));
+  const retryResult = parseGeneratedExercise(retryContent, grounding);
+  return {
+    exercise: retryResult.exercise,
+    warnings: [
+      "Model returned only reasoning_content for exercise generation; retried with a smaller JSON-only prompt.",
+      ...retryResult.warnings
+    ]
+  };
 }

@@ -6,7 +6,9 @@ import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { JobQueue } from "./jobQueue.js";
 import { recoverInterruptedSources } from "./jobRecovery.js";
 import { JsonStore, type AppState, type User } from "@assini/db";
-import { createLlmProviderFromEnv, type LlmProvider } from "./llmProvider.js";
+import { createMutableLlmProvider, type LlmProvider } from "./llmProvider.js";
+import { resolveRuntimeSettingsPath } from "./runtimePath.js";
+import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
 import {
   readPrototypeSessionTtlMs,
   type PrototypeSessionMap,
@@ -54,6 +56,8 @@ type ServerOptions = {
   dataDir?: string;
   /** Fetch implementation used for URL sources and transcription; overridable in tests. */
   ingestionFetch?: typeof fetch;
+  /** Local settings file path. Defaults to the repo-root .env in normal dev runs. */
+  settingsPath?: string;
   logger?: any;
   concurrency?: number;
 };
@@ -101,13 +105,7 @@ export function createServer(options: ServerOptions = {}) {
       ? {
           level: "info",
           redact: {
-            paths: [
-              "req.headers.authorization",
-              "req.headers.cookie",
-              "res.headers['set-cookie']",
-              "body.apiKey",
-              "body.password"
-            ],
+            paths: [...FASTIFY_LOGGER_REDACT_PATHS],
             censor: "[REDACTED]"
           }
         }
@@ -123,9 +121,11 @@ export function createServer(options: ServerOptions = {}) {
   const prototypeSessionTtlMs = options.prototypeSessionTtlMs ?? readPrototypeSessionTtlMs(process.env);
   const now = options.now ?? Date.now;
   prototypeSessions.now = now;
-  const llmProvider = options.llmProvider ?? createLlmProviderFromEnv();
   const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
   const ingestionFetch = options.ingestionFetch ?? globalThis.fetch;
+  const mutableLlmProvider = options.llmProvider ? undefined : createMutableLlmProvider(process.env, ingestionFetch);
+  const llmProvider = options.llmProvider ?? mutableLlmProvider as LlmProvider;
+  const settingsPath = options.settingsPath ?? resolveRuntimeSettingsPath({ moduleUrl: import.meta.url });
   const rateLimitBuckets = new Map<string, number[]>();
   const requestMetrics: RouteContext["requestMetrics"] = {
     startedAtMs: now(),
@@ -220,6 +220,7 @@ export function createServer(options: ServerOptions = {}) {
 
   const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
   app.register(cors, {
+    credentials: true,
     origin: (origin, callback) => {
       callback(null, isCorsOriginAllowed(origin, allowedOrigins));
     }
@@ -243,6 +244,10 @@ export function createServer(options: ServerOptions = {}) {
     llmProvider,
     dataDir,
     ingestionFetch,
+    settingsPath,
+    reloadLlmProvider: mutableLlmProvider
+      ? () => mutableLlmProvider.updateFromEnv(process.env)
+      : undefined,
     jobQueue,
     requestMetrics
   };

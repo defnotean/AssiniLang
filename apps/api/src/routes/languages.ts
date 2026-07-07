@@ -3,6 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { languageCreatePayloadSchema, languagePatchPayloadSchema } from "@assini/api-contract";
 import { isReviewPolicyAssignableRole, type Language, type ReviewPolicy } from "@assini/db";
 import { buildLanguageProfile } from "../publicLanguageViews.js";
+import { deleteLanguageAssetDirectory, purgeLanguageFromState } from "../languageDeletion.js";
 import { appendAuditEvent, parseStringArray, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
@@ -56,7 +57,7 @@ function parseLanguagePatchBody(input: unknown): LanguagePatchBody | undefined {
 }
 
 export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, updateState, checkRateLimit, authToken, prototypeSessions } = ctx;
+  const { readState, updateState, checkRateLimit, authToken, prototypeSessions, dataDir } = ctx;
 
   app.get("/languages", async () => {
     const state = await readState();
@@ -199,6 +200,46 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     }
 
     return updated;
+  });
+
+  app.delete("/languages/:languageId", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const existing = current.languages.find((language) => language.id === languageId);
+    if (!existing) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    const deletedAt = new Date().toISOString();
+    await updateState((state) => {
+      const purged = purgeLanguageFromState(state, languageId);
+      return appendAuditEvent(purged, {
+        actor,
+        at: deletedAt,
+        action: "language.deleted",
+        entityType: "language",
+        entityId: languageId,
+        languageId: null,
+        summary: `Deleted language ${existing.name}.`,
+        metadata: {
+          languageName: existing.name,
+          typology: existing.typology
+        }
+      });
+    });
+
+    await deleteLanguageAssetDirectory(dataDir, languageId).catch(() => undefined);
+
+    return {
+      id: languageId,
+      name: existing.name,
+      deleted: true
+    };
   });
 
   app.get("/languages/:languageId/lexicon", async (request, reply) => {

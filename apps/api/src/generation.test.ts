@@ -53,6 +53,24 @@ function providerWithChat(response: string): { provider: LlmProvider; calls: Llm
   return { provider, calls };
 }
 
+function providerWithChatQueue(responses: Array<string | Error>): { provider: LlmProvider; calls: LlmChatMessage[][] } {
+  const calls: LlmChatMessage[][] = [];
+  const queue = [...responses];
+  const provider: LlmProvider = {
+    name: "stub",
+    async generateAssistantMessage() {
+      return { content: "unused", warnings: [] };
+    },
+    async completeChat(messages) {
+      calls.push(messages);
+      const next = queue.shift();
+      if (next instanceof Error) throw next;
+      return next ?? "{\"notes\":[]}";
+    }
+  };
+  return { provider, calls };
+}
+
 const providerWithoutChat: LlmProvider = {
   name: "deterministic",
   async generateAssistantMessage() {
@@ -323,6 +341,53 @@ describe("generateModelDraftNotes", () => {
       provider
     })).rejects.toThrow(/valid JSON/);
   });
+
+  it("retries draft notes with compact context after reasoning-only provider output", async () => {
+    const { provider, calls } = providerWithChatQueue([
+      new Error("LLM provider returned only reasoning_content without visible assistant content."),
+      JSON.stringify({
+        notes: [
+          {
+            topic: "morphology/person/first-singular",
+            explanation: "The suffix -na marks a first-person singular subject on the verb.",
+            evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
+            confidence: "high"
+          }
+        ]
+      })
+    ]);
+
+    const result = await generateModelDraftNotes({
+      language,
+      corpus,
+      lexemes,
+      existingNotes: notes,
+      provider
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(result.notes).toHaveLength(1);
+    expect(result.warnings.some((warning) => warning.includes("retried with a smaller JSON-only prompt"))).toBe(true);
+  });
+
+  it("returns an empty draft result when the compact retry is also reasoning-only", async () => {
+    const { provider, calls } = providerWithChatQueue([
+      new Error("LLM provider returned only reasoning_content without visible assistant content."),
+      new Error("LLM provider returned only reasoning_content without visible assistant content.")
+    ]);
+
+    const result = await generateModelDraftNotes({
+      language,
+      corpus,
+      lexemes,
+      existingNotes: notes,
+      provider
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(result.notes).toEqual([]);
+    expect(result.warnings.some((warning) => warning.includes("no draft notes were created"))).toBe(true);
+  });
 });
 
 describe("generateModelExercise", () => {
@@ -365,6 +430,39 @@ describe("generateModelExercise", () => {
     expect(result.exercise.type).toBe("translate_to_target");
     expect(result.exercise.allowedVocabulary).toEqual(["saku", "talo", "-ki"]);
     expect(result.warnings.some((warning) => warning.includes("ghost-form"))).toBe(true);
+  });
+
+  it("retries exercise generation with compact context after reasoning-only provider output", async () => {
+    const { provider, calls } = providerWithChatQueue([
+      new Error("LLM provider returned only reasoning_content without visible assistant content."),
+      JSON.stringify({
+        exercise: {
+          type: "translate_to_english",
+          prompt: "Translate to English: saku talo-ki.",
+          allowedVocabulary: ["saku", "talo", "-ki"],
+          allowedRuleIds: [`${TEST_LANGUAGE_ID}-note-basic-order`],
+          expectedAnswers: ["The child walks."],
+          adversarialAnswers: [
+            { answer: "I walk.", reason: "-ki is third person, not first person." },
+            { answer: "The child walked.", reason: "The prompt does not mark past tense." }
+          ],
+          gradingExplanation: "The prompt uses known lexemes saku and talo with the third-person suffix -ki."
+        }
+      })
+    ]);
+
+    const result = await generateModelExercise({
+      language,
+      lexemes,
+      notes,
+      corpus,
+      type: "translate_to_english",
+      provider
+    });
+
+    expect(calls).toHaveLength(2);
+    expect(result.exercise.type).toBe("translate_to_english");
+    expect(result.warnings.some((warning) => warning.includes("retried with a smaller JSON-only prompt"))).toBe(true);
   });
 
   it("throws when the grounded exercise is unusable", async () => {

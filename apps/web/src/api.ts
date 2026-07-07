@@ -23,13 +23,25 @@ import type {
   LanguageCreatePayload,
   LanguagePatchPayload,
   SourceRegistrationPayload,
-  ElderCorrectionPayload
+  ElderCorrectionPayload,
+  DiscoveredLlmModel,
+  LlmModelDiscoveryResponse,
+  LlmReachability,
+  LlmStatus,
+  RuntimeSettings,
+  RuntimeSettingsResponse
 } from "@assini/api-contract";
 export type {
   LanguageCreatePayload,
   LanguagePatchPayload,
   SourceRegistrationPayload,
-  ElderCorrectionPayload
+  ElderCorrectionPayload,
+  DiscoveredLlmModel,
+  LlmModelDiscoveryResponse,
+  LlmReachability,
+  LlmStatus,
+  RuntimeSettings,
+  RuntimeSettingsResponse
 };
 
 export type { ExtractionDraft, Language, LanguagePhonology, Lexeme, SourceAsset };
@@ -192,47 +204,23 @@ export type NeuralMapResponse = NeuralMap & {
   languageId: string;
 };
 
-export type LlmStatus = {
-  provider: string;
-  mode: "deterministic" | "local-openai-compatible" | "remote-api" | "invalid";
-  configured: boolean;
-  activeProviderName: string;
-  baseUrl?: string;
-  model?: string;
-  timeoutMs: number;
-  apiKey: {
-    required: boolean;
-    configured: boolean;
-    acceptedVariables: string[];
-  };
-  environment: {
-    providerVariable: string;
-    baseUrlVariable: string;
-    modelVariable: string;
-    apiKeyVariables: string[];
-    timeoutVariable: string;
-  };
-  transcription: {
-    configured: boolean;
-    baseUrl?: string;
-    model?: string;
-    baseUrlVariable: string;
-    modelVariable: string;
-  };
-  setup: {
-    localExamples: string[];
-    remoteExamples: string[];
-  };
-  warnings: string[];
-};
-
-export type LlmReachability = {
-  reachable: boolean;
-  checked: boolean;
-  mode: string;
-  status?: number;
-  detail?: string;
-  latencyMs?: number;
+export type RuntimeSettingsUpdate = Partial<Pick<
+  RuntimeSettings,
+  | "provider"
+  | "baseUrl"
+  | "model"
+  | "timeoutMs"
+  | "maxTokens"
+  | "jsonMode"
+  | "transcriptionBaseUrl"
+  | "transcriptionModel"
+  | "ocrLang"
+  | "allowPrivateUrls"
+>> & {
+  apiKey?: string;
+  clearApiKey?: boolean;
+  transcriptionApiKey?: string;
+  clearTranscriptionApiKey?: boolean;
 };
 
 export type ElderCorrectionReviewStatus = Extract<ElderCorrection["status"], "accepted" | "rejected">;
@@ -326,10 +314,87 @@ export type CreateAiSessionPayload = {
 
 type LocalActor = "learner" | "elder" | "programmer" | "reviewer";
 
+export type DesktopPreferences = {
+  hideToTray: boolean;
+  hideToTraySupported?: boolean;
+  launchAtLogin: boolean;
+  launchAtLoginSupported?: boolean;
+};
+
+export type DesktopBackupSummary = {
+  backupsDir?: string;
+  count: number;
+  latestCreatedAt?: string;
+  latestName?: string;
+  latestPath?: string;
+};
+
+export type DesktopShortcutSummary = {
+  desktopExists: boolean;
+  desktopPath?: string;
+  startMenuExists: boolean;
+  startMenuPath?: string;
+};
+
+type DesktopActionBridgeResult = Promise<{
+  ok: boolean;
+  message?: string;
+  backupSummary?: DesktopBackupSummary;
+  diagnosticsDir?: string;
+  diagnosticsPath?: string;
+  shortcutSummary?: DesktopShortcutSummary;
+}>;
+
+type AssiniDesktopBridge = {
+  apiBaseUrl: string;
+  appFolder?: string;
+  appPath?: string;
+  appVersion?: string;
+  authToken: string;
+  backupSummary?: DesktopBackupSummary;
+  backupsDir?: string;
+  createAppShortcuts?: () => DesktopActionBridgeResult;
+  createDataBackup?: () => DesktopActionBridgeResult;
+  createDesktopShortcut?: () => DesktopActionBridgeResult;
+  createStartMenuShortcut?: () => DesktopActionBridgeResult;
+  dataDir?: string;
+  diagnosticsDir?: string;
+  desktopPreferences?: DesktopPreferences;
+  isPackaged?: boolean;
+  openBackupsFolder?: () => DesktopActionBridgeResult;
+  openAppFolder?: () => DesktopActionBridgeResult;
+  openDataFolder?: () => DesktopActionBridgeResult;
+  openDiagnosticsFolder?: () => DesktopActionBridgeResult;
+  openLatestBackupFolder?: () => DesktopActionBridgeResult;
+  openSettingsFolder?: () => DesktopActionBridgeResult;
+  pruneOldDataBackups?: () => DesktopActionBridgeResult;
+  prototypeAuth: true;
+  refreshBackupSummary?: () => DesktopActionBridgeResult;
+  refreshShortcutSummary?: () => DesktopActionBridgeResult;
+  restoreLatestDataBackup?: () => DesktopActionBridgeResult;
+  resetWindowLayout?: () => DesktopActionBridgeResult;
+  saveDiagnosticsReport?: (text: string) => DesktopActionBridgeResult;
+  setDesktopPreferences?: (patch: Partial<Pick<DesktopPreferences, "hideToTray" | "launchAtLogin">>) => Promise<{
+    ok: boolean;
+    message?: string;
+    preferences?: DesktopPreferences;
+  }>;
+  shortcutSummary?: DesktopShortcutSummary;
+  settingsPath?: string;
+};
+
+declare global {
+  interface Window {
+    assiniDesktop?: AssiniDesktopBridge;
+  }
+}
+
 type ErrorDetails = {
   detail?: string;
   requestId?: string;
 };
+
+let actorFetchQueue: Promise<void> = Promise.resolve();
 
 export class ApiError extends Error {
   readonly status?: number;
@@ -348,7 +413,25 @@ function jsonHeaders(json = false): HeadersInit {
 }
 
 function prototypeAuthUnavailable(): Error {
-  return new Error("Prototype session auth is available only in the local Vite dev server.");
+  return new Error("Prototype session auth is available only in the local Vite dev server or AssiniLang Desktop.");
+}
+
+function desktopBridge(): AssiniDesktopBridge | undefined {
+  return typeof window === "undefined" ? undefined : window.assiniDesktop;
+}
+
+function desktopActorHeaders(actor: LocalActor, json = false): HeadersInit | undefined {
+  const bridge = desktopBridge();
+  if (!bridge?.prototypeAuth || !bridge.authToken) return undefined;
+  return {
+    ...jsonHeaders(json),
+    "x-assini-user-id": prototypeActorId(actor),
+    "x-assini-dev-token": bridge.authToken
+  };
+}
+
+function canUsePrototypeAuth(): boolean {
+  return import.meta.env.DEV || Boolean(desktopBridge()?.prototypeAuth && desktopBridge()?.authToken);
 }
 
 function requestIdFromValue(value: unknown): string | undefined {
@@ -419,7 +502,7 @@ async function assertOk(response: Response, fallback: string): Promise<void> {
 }
 
 function prototypeActorId(actor: LocalActor): string {
-  if (!import.meta.env.DEV) {
+  if (!canUsePrototypeAuth()) {
     throw prototypeAuthUnavailable();
   }
 
@@ -436,6 +519,11 @@ function prototypeActorId(actor: LocalActor): string {
 }
 
 async function openPrototypeSession(actor: LocalActor): Promise<void> {
+  if (desktopBridge()?.prototypeAuth) {
+    prototypeActorId(actor);
+    return;
+  }
+
   if (!import.meta.env.DEV) {
     throw prototypeAuthUnavailable();
   }
@@ -452,6 +540,10 @@ async function openPrototypeSession(actor: LocalActor): Promise<void> {
 
 /** Logs out of the local prototype session: clears the server record and expires the HttpOnly cookie. */
 export async function closePrototypeSession(): Promise<void> {
+  if (desktopBridge()?.prototypeAuth) {
+    return;
+  }
+
   if (!import.meta.env.DEV) {
     throw prototypeAuthUnavailable();
   }
@@ -465,6 +557,11 @@ export async function closePrototypeSession(): Promise<void> {
 }
 
 async function actorRequest(actor: LocalActor, json = false): Promise<RequestInit> {
+  const desktopHeaders = desktopActorHeaders(actor, json);
+  if (desktopHeaders) {
+    return { headers: desktopHeaders };
+  }
+
   await openPrototypeSession(actor);
   return {
     credentials: "include",
@@ -472,8 +569,45 @@ async function actorRequest(actor: LocalActor, json = false): Promise<RequestIni
   };
 }
 
-async function getJson<T>(path: string, actor?: LocalActor): Promise<T> {
-  const response = await fetch(`/api${path}`, actor ? await actorRequest(actor) : undefined);
+async function fetchAsActor(
+  actor: LocalActor,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  json = false
+): Promise<Response> {
+  const desktopHeaders = desktopActorHeaders(actor, json);
+  if (desktopHeaders) {
+    return fetch(input, {
+      ...init,
+      headers: {
+        ...desktopHeaders,
+        ...((init.headers ?? {}) as Record<string, string>)
+      }
+    });
+  }
+
+  const operation = actorFetchQueue.then(async () => {
+    await openPrototypeSession(actor);
+    return fetch(input, {
+      ...init,
+      credentials: "include",
+      headers: {
+        ...jsonHeaders(json),
+        ...((init.headers ?? {}) as Record<string, string>)
+      }
+    });
+  });
+  actorFetchQueue = operation.then(
+    () => undefined,
+    () => undefined
+  );
+  return operation;
+}
+
+async function getJson<T>(path: string, actor?: LocalActor, init?: RequestInit): Promise<T> {
+  const response = await (actor
+    ? fetchAsActor(actor, `/api${path}`, init)
+    : fetch(`/api${path}`, init));
 
   await assertOk(response, `Request failed: ${path}`);
 
@@ -533,10 +667,10 @@ export async function resolveReviewDisposition(
   dispositionId: string,
   resolutionSummary: string
 ): Promise<ReviewDisposition> {
-  const response = await fetch(`/api/review-dispositions/${encodeURIComponent(dispositionId)}/resolve`, {
+  const response = await fetch("/api/review-dispositions/resolve", {
     method: "PATCH",
     ...(await actorRequest("reviewer", true)),
-    body: JSON.stringify({ resolutionSummary })
+    body: JSON.stringify({ dispositionId, resolutionSummary })
   });
 
   await assertOk(response, "Review disposition resolution failed");
@@ -591,11 +725,39 @@ export async function fetchLlmStatus(): Promise<LlmStatus> {
   return getJson<LlmStatus>("/llm/status");
 }
 
-export async function checkLlmReachability(): Promise<LlmReachability> {
-  const response = await fetch("/api/llm/health-check", {
-    method: "POST",
-    ...(await actorRequest("programmer"))
+export async function fetchRuntimeSettings(): Promise<RuntimeSettingsResponse> {
+  return getJson<RuntimeSettingsResponse>("/llm/settings", "programmer");
+}
+
+export async function fetchDiscoveredModels(
+  baseUrl?: string,
+  options: { includeCommonTargets?: boolean } = {}
+): Promise<LlmModelDiscoveryResponse> {
+  const query = new URLSearchParams();
+  const trimmedBaseUrl = baseUrl?.trim();
+  if (trimmedBaseUrl) query.set("baseUrl", trimmedBaseUrl);
+  if (options.includeCommonTargets === false) {
+    query.set("includeCommonTargets", "false");
+  }
+  query.set("refresh", Date.now().toString());
+  return getJson<LlmModelDiscoveryResponse>(`/llm/models?${query.toString()}`, "programmer", {
+    cache: "no-store"
   });
+}
+
+export async function updateRuntimeSettings(payload: RuntimeSettingsUpdate): Promise<RuntimeSettingsResponse> {
+  const response = await fetchAsActor("programmer", "/api/llm/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  }, true);
+
+  await assertOk(response, "Runtime settings update failed");
+
+  return response.json() as Promise<RuntimeSettingsResponse>;
+}
+
+export async function checkLlmReachability(): Promise<LlmReachability> {
+  const response = await fetchAsActor("programmer", "/api/llm/health-check", { method: "POST" });
 
   await assertOk(response, "LLM reachability check failed");
 
@@ -646,6 +808,23 @@ export async function createLanguage(payload: LanguageCreatePayload): Promise<La
   await assertOk(response, "Language creation failed");
 
   return response.json() as Promise<Language>;
+}
+
+export type LanguageDeleteResult = {
+  id: string;
+  name: string;
+  deleted: true;
+};
+
+export async function deleteLanguage(languageId: string): Promise<LanguageDeleteResult> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}`, {
+    method: "DELETE",
+    ...(await actorRequest("reviewer"))
+  });
+
+  await assertOk(response, "Language deletion failed");
+
+  return response.json() as Promise<LanguageDeleteResult>;
 }
 
 export async function updateLanguage(languageId: string, patch: LanguagePatchPayload): Promise<Language> {

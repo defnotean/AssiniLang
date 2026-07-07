@@ -8,7 +8,9 @@ import {
   fetchEvaluationArtifact,
   fetchLanguageProfile,
   fetchLanguageSnapshot,
+  fetchDiscoveredModels,
   fetchLlmStatus,
+  fetchRuntimeSettings,
   fetchReviewPolicy,
   fetchReviewDispositions,
   generateDraftNotes,
@@ -23,7 +25,8 @@ import {
   submitExerciseAnswer,
   fetchRecommendedExercises,
   createAiSession,
-  bulkReviewExtractionDrafts
+  bulkReviewExtractionDrafts,
+  updateRuntimeSettings
 } from "./api";
 
 describe("fetchDashboardData", () => {
@@ -242,6 +245,66 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/llm/status", undefined);
   });
 
+  it("fetches runtime settings through a programmer prototype session", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ settings: { provider: "deterministic" }, status: { configured: true } })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchRuntimeSettings();
+
+    expectPrototypeSession(fetchMock, "programmer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/llm/settings", actorRequest);
+  });
+
+  it("fetches discovered models through a programmer prototype session", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ models: [{ model: "irene-fusion" }], errors: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchDiscoveredModels("http://irene-box:8080/v1");
+
+    expectPrototypeSession(fetchMock, "programmer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      expect.stringMatching(/^\/api\/llm\/models\?baseUrl=http%3A%2F%2Firene-box%3A8080%2Fv1&refresh=\d+$/),
+      {
+        ...actorRequest,
+        cache: "no-store"
+      }
+    );
+  });
+
+  it("updates runtime settings through a programmer prototype session", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ settings: { provider: "openai-compatible" }, status: { configured: true } })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      provider: "openai-compatible",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "irene-fusion",
+      apiKey: "local-secret"
+    };
+    await updateRuntimeSettings(payload);
+
+    expectPrototypeSession(fetchMock, "programmer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/llm/settings", {
+      method: "PUT",
+      ...jsonRequest,
+      body: JSON.stringify(payload)
+    });
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("x-assini-dev-token");
+  });
+
   it("fetches encoded language profiles", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -420,7 +483,7 @@ describe("fetchDashboardData", () => {
     );
   });
 
-  it("fetches and resolves encoded review dispositions through role-aware prototype auth", async () => {
+  it("fetches and resolves review dispositions through role-aware prototype auth", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ id: "review-disposition-1" })
@@ -438,10 +501,13 @@ describe("fetchDashboardData", () => {
 
     await resolveReviewDisposition("review/disposition 1", "Resolved after Elder review.");
     expectPrototypeSession(fetchMock, "reviewer-1", 2);
-    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/review-dispositions/review%2Fdisposition%201/resolve", {
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/review-dispositions/resolve", {
       method: "PATCH",
       ...jsonRequest,
-      body: JSON.stringify({ resolutionSummary: "Resolved after Elder review." })
+      body: JSON.stringify({
+        dispositionId: "review/disposition 1",
+        resolutionSummary: "Resolved after Elder review."
+      })
     });
   });
 

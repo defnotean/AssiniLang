@@ -3,19 +3,19 @@ import type { DraftGroundingFlag, ExtractionDraft, ExtractionDraftDuplicate } fr
 import type { Language, PublicExercise, ReviewStatus, ViewMode } from "./types";
 
 export const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebrow: string }> = {
-  profile: { label: "Language Profile", title: "Language Profile", eyebrow: "Linguistic profile" },
-  ingest: { label: "Sources & intake", title: "Sources & Intake", eyebrow: "Source ingestion" },
-  corpus: { label: "Corpus Browser", title: "Corpus Browser", eyebrow: "Source library" },
-  review: { label: "Note Review Queue", title: "Note Review Queue", eyebrow: "Human review" },
-  learner: { label: "Learning Lab", title: "Learner Exercise Preview", eyebrow: "Practice" },
-  eval: { label: "Evaluation Dashboard", title: "Evaluation Dashboard", eyebrow: "Quality gates" },
-  governance: { label: "Governance", title: "Governance & Policy", eyebrow: "Policy" },
-  elder: { label: "Elder corrections", title: "Help us fix the words", eyebrow: "Community elders" },
-  assistant: { label: "AI Assistant", title: "AI Assistant", eyebrow: "Grounded chat" },
-  model: { label: "Model Setup", title: "Model Setup", eyebrow: "Local LLM readiness" }
+  profile: { label: "Start", title: "Start", eyebrow: "Overview" },
+  ingest: { label: "Build", title: "Build", eyebrow: "Add and review" },
+  corpus: { label: "Examples", title: "Examples", eyebrow: "Saved material" },
+  review: { label: "Review", title: "Review", eyebrow: "Check work" },
+  learner: { label: "Practice", title: "Practice", eyebrow: "Exercises and chat" },
+  eval: { label: "Checks", title: "Checks", eyebrow: "Quality" },
+  governance: { label: "Rules", title: "Rules", eyebrow: "Safety and exports" },
+  elder: { label: "Corrections", title: "Corrections", eyebrow: "Community fixes" },
+  assistant: { label: "Chat", title: "Chat", eyebrow: "Ask the model" },
+  model: { label: "Settings", title: "Settings", eyebrow: "Model and app setup" }
 };
 
-export const VIEW_ORDER: ViewMode[] = ["profile", "ingest", "corpus", "review", "learner", "eval", "governance", "elder", "assistant", "model"];
+export const VIEW_ORDER: ViewMode[] = ["profile", "ingest", "learner", "model"];
 
 export const LANGUAGE_TYPOLOGY_OPTIONS: Language["typology"][] = [
   "unknown",

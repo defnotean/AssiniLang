@@ -1,4 +1,4 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -240,7 +240,7 @@ describe("api server", () => {
       let fetchCalls = 0;
       const fetchStub: typeof fetch = async () => {
         fetchCalls += 1;
-        return new Response(JSON.stringify({ data: [] }), {
+        return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -282,6 +282,174 @@ describe("api server", () => {
 
       const unauthorized = await app.inject({ method: "POST", url: "/llm/health-check" });
       expect(unauthorized.statusCode).toBe(401);
+    });
+  });
+
+  describe("GET/PUT /llm/settings", () => {
+    it("discovers exposed model endpoints for programmer actors", async () => {
+      const fetchStub: typeof fetch = async (input) => {
+        if (input.toString() === "http://irene-box:8080/v1/models") {
+          return new Response(JSON.stringify({
+            data: [{ id: "irene-fusion" }]
+          }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response("not found", { status: 404 });
+      };
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        ingestionFetch: fetchStub
+      });
+
+      const response = await app.inject({
+        method: "GET",
+        url: "/llm/models?baseUrl=http%3A%2F%2Firene-box%3A8080",
+        headers: authHeaders("programmer-1")
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.headers["cache-control"]).toBe("no-store, max-age=0");
+      expect(response.json().models).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          provider: "openai-compatible",
+          baseUrl: "http://irene-box:8080/v1",
+          model: "irene-fusion"
+        })
+      ]));
+    });
+
+    it("persists sanitized model settings and hot-swaps the active provider", async () => {
+      const previous = {
+        provider: process.env.ASSINI_LLM_PROVIDER,
+        baseUrl: process.env.ASSINI_LLM_BASE_URL,
+        model: process.env.ASSINI_LLM_MODEL,
+        apiKey: process.env.ASSINI_LLM_API_KEY,
+        timeout: process.env.ASSINI_LLM_TIMEOUT_MS,
+        maxTokens: process.env.ASSINI_LLM_MAX_TOKENS,
+        jsonMode: process.env.ASSINI_LLM_JSON_MODE
+      };
+      delete process.env.ASSINI_LLM_PROVIDER;
+      delete process.env.ASSINI_LLM_BASE_URL;
+      delete process.env.ASSINI_LLM_MODEL;
+      delete process.env.ASSINI_LLM_API_KEY;
+      delete process.env.ASSINI_LLM_TIMEOUT_MS;
+      delete process.env.ASSINI_LLM_MAX_TOKENS;
+      delete process.env.ASSINI_LLM_JSON_MODE;
+
+      const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+      const settingsPath = join(dir, ".env");
+      const completionBodies: Array<Record<string, unknown>> = [];
+      const fetchStub: typeof fetch = async (_input, init) => {
+        const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : {};
+        completionBodies.push(body);
+        return new Response(JSON.stringify({
+          choices: [{ message: { content: "Irene is connected." } }]
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      };
+
+      try {
+        const app = createServer({
+          initialState: buildTestWorkspaceState(),
+          ingestionFetch: fetchStub,
+          settingsPath
+        });
+
+        const save = await app.inject({
+          method: "PUT",
+          url: "/llm/settings",
+          headers: authHeaders("programmer-1"),
+          payload: {
+            provider: "openai-compatible",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            model: "irene-fusion",
+            apiKey: "plain-provider-secret",
+            timeoutMs: 180000,
+            maxTokens: 8192,
+            jsonMode: true
+          }
+        });
+
+        expect(save.statusCode).toBe(200);
+        expect(save.json()).toMatchObject({
+          settings: {
+            provider: "openai-compatible",
+            baseUrl: "http://127.0.0.1:11434/v1",
+            model: "irene-fusion",
+            apiKeyConfigured: true,
+            timeoutMs: 180000,
+            maxTokens: 8192,
+            jsonMode: true
+          },
+          status: {
+            configured: true,
+            mode: "local-openai-compatible",
+            model: "irene-fusion"
+          },
+          persisted: true
+        });
+        expect(JSON.stringify(save.json())).not.toContain("plain-provider-secret");
+        expect(await readFile(settingsPath, "utf8")).toContain("ASSINI_LLM_API_KEY=plain-provider-secret");
+
+        const settings = await app.inject({
+          method: "GET",
+          url: "/llm/settings",
+          headers: authHeaders("programmer-1")
+        });
+        expect(settings.statusCode).toBe(200);
+        expect(settings.json().settings.apiKeyConfigured).toBe(true);
+        expect(JSON.stringify(settings.json())).not.toContain("plain-provider-secret");
+
+        const session = await app.inject({
+          method: "POST",
+          url: "/ai/sessions",
+          headers: authHeaders("learner-1"),
+          payload: {
+            languageId: TEST_LANGUAGE_ID,
+            mode: "learner_practice",
+            seedPrompt: "Give me one prompt.",
+            contextNoteIds: [],
+            contextPassageIds: []
+          }
+        });
+
+        expect(session.statusCode).toBe(201);
+        expect(session.json().messages.at(-1).content).toBe("Irene is connected.");
+        expect(completionBodies[0]).toMatchObject({
+          model: "irene-fusion",
+          max_tokens: 8192
+        });
+      } finally {
+        restoreEnv("ASSINI_LLM_PROVIDER", previous.provider);
+        restoreEnv("ASSINI_LLM_BASE_URL", previous.baseUrl);
+        restoreEnv("ASSINI_LLM_MODEL", previous.model);
+        restoreEnv("ASSINI_LLM_API_KEY", previous.apiKey);
+        restoreEnv("ASSINI_LLM_TIMEOUT_MS", previous.timeout);
+        restoreEnv("ASSINI_LLM_MAX_TOKENS", previous.maxTokens);
+        restoreEnv("ASSINI_LLM_JSON_MODE", previous.jsonMode);
+      }
+    });
+
+    it("restricts settings updates to programmer, admin, and lead actors", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        settingsPath: join(dir, ".env")
+      });
+
+      const forbidden = await app.inject({
+        method: "PUT",
+        url: "/llm/settings",
+        headers: authHeaders("reviewer-1"),
+        payload: { provider: "deterministic" }
+      });
+
+      expect(forbidden.statusCode).toBe(403);
+      expect(forbidden.json()).toEqual({ error: "Forbidden" });
     });
   });
 
@@ -339,6 +507,51 @@ describe("api server", () => {
     const missing = await app.inject({ method: "GET", url: "/languages/not-a-language/profile" });
     expect(missing.statusCode).toBe(404);
     expect(missing.json()).toEqual({ error: "Language not found: not-a-language" });
+  });
+
+  it("deletes a language and purges scoped workspace records", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const deleted = await app.inject({
+      method: "DELETE",
+      url: `/languages/${TEST_LANGUAGE_ID}`,
+      headers: authHeaders("reviewer-1")
+    });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({
+      id: TEST_LANGUAGE_ID,
+      name: "Testlang",
+      deleted: true
+    });
+
+    const languages = await app.inject({ method: "GET", url: "/languages" });
+    expect(languages.statusCode).toBe(200);
+    expect(languages.json()).toEqual([]);
+
+    const corpus = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
+    expect(corpus.statusCode).toBe(404);
+
+    const audit = await app.inject({
+      method: "GET",
+      url: "/audit/events",
+      headers: authHeaders("programmer-1")
+    });
+    expect(audit.statusCode).toBe(200);
+    expect(audit.json().some((event: { action: string }) => event.action === "language.deleted")).toBe(true);
+    expect(audit.json().every((event: { languageId: string | null }) => event.languageId !== TEST_LANGUAGE_ID)).toBe(true);
+  });
+
+  it("returns 404 when deleting a missing language", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/languages/not-a-language",
+      headers: authHeaders("reviewer-1")
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
   });
 
   it("restricts browser CORS to configured local development origins", async () => {
@@ -2413,18 +2626,24 @@ describe("api server", () => {
     const dispositionId = dispositions.json()[0].id as string;
     const unauthorizedResolve = await app.inject({
       method: "PATCH",
-      url: `/review-dispositions/${dispositionId}/resolve`,
+      url: "/review-dispositions/resolve",
       headers: authHeaders("reviewer-1"),
-      payload: { resolutionSummary: "Reviewer should not resolve assigned Elder work." }
+      payload: {
+        dispositionId,
+        resolutionSummary: "Reviewer should not resolve assigned Elder work."
+      }
     });
     expect(unauthorizedResolve.statusCode).toBe(403);
     expect(unauthorizedResolve.json()).toEqual({ error: "Forbidden" });
 
     const resolved = await app.inject({
       method: "PATCH",
-      url: `/review-dispositions/${dispositionId}/resolve`,
+      url: "/review-dispositions/resolve",
       headers: authHeaders("elder-1"),
-      payload: { resolutionSummary: "Elder confirmed the note can return to reviewer quorum." }
+      payload: {
+        dispositionId,
+        resolutionSummary: "Elder confirmed the note can return to reviewer quorum."
+      }
     });
     expect(resolved.statusCode).toBe(200);
     expect(resolved.json()).toMatchObject({

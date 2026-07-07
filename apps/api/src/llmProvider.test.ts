@@ -224,8 +224,8 @@ describe("llm provider", () => {
       ASSINI_LLM_TIMEOUT_MS: "-10"
     });
 
-    expect(status.timeoutMs).toBe(30_000);
-    expect(status.warnings).toContain("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 30000.");
+    expect(status.timeoutMs).toBe(180_000);
+    expect(status.warnings).toContain("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000.");
   });
 
   it("turns provider request timeouts into actionable errors", async () => {
@@ -478,12 +478,16 @@ describe("llm provider", () => {
     });
   });
 
-  it("reports a configured provider as reachable when the models endpoint returns 200", async () => {
-    const calls: string[] = [];
-    const fetchFn: typeof fetch = async (input) => {
+  it("reports a configured provider as reachable when a tiny chat completion returns 200", async () => {
+    const calls: Array<{ url: string; method?: string; body?: Record<string, unknown> }> = [];
+    const fetchFn: typeof fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      calls.push(url);
-      return new Response(JSON.stringify({ data: [] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined;
+      calls.push({ url, method: init?.method, body });
+      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
     };
 
     const result = await probeLlmProviderReachability({
@@ -495,7 +499,17 @@ describe("llm provider", () => {
       fetchFn
     });
 
-    expect(calls).toEqual(["http://127.0.0.1:11434/v1/models"]);
+    expect(calls).toEqual([
+      {
+        url: "http://127.0.0.1:11434/v1/chat/completions",
+        method: "POST",
+        body: expect.objectContaining({
+          model: "llama3.1",
+          max_tokens: 256,
+          stream: false
+        })
+      }
+    ]);
     expect(result).toMatchObject({
       checked: true,
       reachable: true,
@@ -505,18 +519,12 @@ describe("llm provider", () => {
     expect(typeof result.latencyMs).toBe("number");
   });
 
-  it("falls back to a tiny chat completion when the models endpoint is unsupported", async () => {
+  it("reports a provider as unreachable when chat completions fails even if the model server is up", async () => {
     const calls: Array<{ url: string; method?: string }> = [];
     const fetchFn: typeof fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       calls.push({ url, method: init?.method });
-      if (url.endsWith("/models")) {
-        return new Response("not found", { status: 404 });
-      }
-      return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response("<urlopen error [Errno 111] Connection refused>", { status: 503 });
     };
 
     const result = await probeLlmProviderReachability({
@@ -529,9 +537,136 @@ describe("llm provider", () => {
     });
 
     expect(calls).toEqual([
-      { url: "http://127.0.0.1:1234/v1/models", method: "GET" },
       { url: "http://127.0.0.1:1234/v1/chat/completions", method: "POST" }
     ]);
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: false,
+      status: 503,
+      detail: "Chat completions failed with status 503: <urlopen error [Errno 111] Connection refused>"
+    });
+  });
+
+  it("uses ASSINI_LLM_TIMEOUT_MS for reachability probes instead of a short fixed default", async () => {
+    const scheduledTimeouts: number[] = [];
+    const originalSetTimeout = globalThis.setTimeout;
+    vi.spyOn(globalThis, "setTimeout").mockImplementation((handler, timeout, ...args) => {
+      if (typeof timeout === "number") scheduledTimeouts.push(timeout);
+      return originalSetTimeout(handler, timeout, ...args);
+    });
+
+    const fetchFn: typeof fetch = (_input, init) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => {
+        reject(new DOMException("Aborted", "AbortError"));
+      });
+    });
+
+    await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ASSINI_LLM_TIMEOUT_MS: "120"
+      },
+      fetchFn
+    });
+
+    expect(scheduledTimeouts).toContain(120);
+  });
+
+  it("reports a provider as unreachable when chat completions returns no assistant text", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
+        ASSINI_LLM_MODEL: "local-model"
+      },
+      fetchFn
+    });
+
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: false,
+      status: 200,
+      detail: "Chat completions returned an empty assistant message."
+    });
+  });
+
+  it("reports reasoning-only local model responses without exposing reasoning content", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({
+        choices: [{ message: { content: "", reasoning_content: "private internal reasoning" } }]
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
+        ASSINI_LLM_MODEL: "local-model"
+      },
+      fetchFn
+    });
+
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: false,
+      status: 200,
+      detail: "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content."
+    });
+    expect(JSON.stringify(result)).not.toContain("private internal reasoning");
+  });
+
+  it("reports a provider as unreachable when chat completions returns thinking-only placeholder text", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "[THINK]" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
+        ASSINI_LLM_MODEL: "local-model"
+      },
+      fetchFn
+    });
+
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: false,
+      status: 200,
+      detail: "Chat completions returned an empty assistant message."
+    });
+  });
+
+  it("accepts array-shaped assistant content from OpenAI-compatible providers", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({
+        choices: [{ message: { content: [{ type: "text", text: "ok from parts" }] } }]
+      }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
+        ASSINI_LLM_MODEL: "local-model"
+      },
+      fetchFn
+    });
+
     expect(result).toMatchObject({ checked: true, reachable: true, status: 200 });
   });
 

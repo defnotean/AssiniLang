@@ -1,9 +1,9 @@
-import { lookup as dnsLookup } from "node:dns/promises";
 import { mkdir, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDraftPayload, type Language, type SourceAsset } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 type Env = Record<string, string | undefined>;
 type FetchFn = typeof fetch;
@@ -28,6 +28,7 @@ const MAX_CHUNKS_PER_SOURCE = 8;
 const MAX_CANDIDATES_PER_KIND = 100;
 const MAX_URL_CONTENT_BYTES = 2_000_000;
 const MAX_MERGED_SUMMARY_CHARS = 300;
+const SECRET_PATTERN = /\bsk-[A-Za-z0-9._-]+/g;
 
 const TEXT_DOCUMENT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "text"]);
 
@@ -129,101 +130,17 @@ export function htmlToText(html: string): string {
     .join("\n");
 }
 
-function privateUrlsAllowed(env: Env): boolean {
-  const value = env.ASSINI_ALLOW_PRIVATE_URLS?.trim().toLowerCase();
-  return value === "1" || value === "true";
-}
-
-function isIpv4Literal(host: string): boolean {
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-}
-
-function isPrivateIpv4(address: string): boolean {
-  const octets = address.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) {
-    return false;
-  }
-  const [first, second] = [octets[0] ?? -1, octets[1] ?? -1];
-  return first === 0
-    || first === 10
-    || first === 127
-    || (first === 169 && second === 254)
-    || (first === 172 && second >= 16 && second <= 31)
-    || (first === 192 && second === 168);
-}
-
-function isPrivateIpv6(address: string): boolean {
-  const normalized = (address.toLowerCase().replace(/^\[|\]$/g, "").split("%")[0] ?? "");
-  if (normalized === "::1" || normalized === "0:0:0:0:0:0:0:1") return true;
-  if (/^f[cd]/.test(normalized)) return true; // fc00::/7 unique-local
-  if (/^fe[89ab]/.test(normalized)) return true; // fe80::/10 link-local
-  const mapped = normalized.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped?.[1]) return isPrivateIpv4(mapped[1]);
-  return false;
-}
-
-function isPrivateAddress(address: string): boolean {
-  return isIpv4Literal(address) ? isPrivateIpv4(address) : isPrivateIpv6(address);
-}
-
-function isPrivateHostname(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/\.$/, "");
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return true;
-  if (isIpv4Literal(host)) return isPrivateIpv4(host);
-  if (host.includes(":") || host.startsWith("[")) return isPrivateIpv6(host);
-  return false;
-}
-
-/**
- * Fetches a source URL and converts it to plain text. To keep the server
- * from being used as a proxy into the local network, URLs that point at
- * private/reserved addresses (localhost, 10/8, 172.16/12, 192.168/16,
- * 127/8, 169.254/16, 0/8, ::1, fe80::/10, fc00::/7) are rejected, and
- * public-looking hostnames are DNS-resolved and checked against the same
- * ranges. Set ASSINI_ALLOW_PRIVATE_URLS=1 to skip these checks in trusted
- * local setups.
- */
 export async function fetchUrlText(
   url: string,
   fetchFn: FetchFn = globalThis.fetch,
   options: { env?: Env; lookupFn?: LookupFn } = {}
 ): Promise<string> {
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    throw new Error(`Source URL is not a valid URL: ${url}`);
-  }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("Source URLs must use http or https.");
-  }
-
   const env = options.env ?? process.env;
-  if (!privateUrlsAllowed(env)) {
-    if (isPrivateHostname(parsed.hostname)) {
-      throw new Error(
-        `Source URL points at a private or local network (${parsed.hostname}) and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
-      );
-    }
-    const isIpLiteral = isIpv4Literal(parsed.hostname) || parsed.hostname.includes(":") || parsed.hostname.startsWith("[");
-    if (!isIpLiteral) {
-      const lookupFn = options.lookupFn ?? ((hostname: string) => dnsLookup(hostname));
-      let resolvedAddress: string | undefined;
-      try {
-        resolvedAddress = (await lookupFn(parsed.hostname)).address;
-      } catch {
-        // Unresolvable hostnames fall through so fetch reports its own error.
-      }
-      if (resolvedAddress !== undefined && isPrivateAddress(resolvedAddress)) {
-        throw new Error(
-          `Source URL hostname ${parsed.hostname} resolves to a private or local network address and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
-        );
-      }
-    }
-  }
+  const parsed = await assertOutboundHttpUrlAllowed(url, { env, lookupFn: options.lookupFn });
 
   const response = await fetchFn(parsed.toString(), {
-    headers: { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" }
+    headers: { Accept: "text/html, text/plain;q=0.9, */*;q=0.1" },
+    redirect: "manual"
   });
   if (!response.ok) {
     throw new Error(`Fetching source URL failed with status ${response.status}.`);
@@ -347,6 +264,7 @@ function extractionInstructions(language: Language, sourceKind: SourceAsset["kin
       passages: [{ textTarget: "sentence or phrase in the target language", textTranslation: "translation", topicTags: ["topic"], morphemes: [{ surface: "piece", lemma: "base form", gloss: "meaning", features: ["optional"] }], confidence: "low|medium|high", rationale: "why" }],
       grammarNotes: [{ topic: "short/topic/path", explanation: "observed grammar pattern", confidence: "low|medium|high", rationale: "evidence" }]
     }),
+    "Important for reasoning-capable local servers: put the JSON in the visible assistant content field, not only in reasoning_content.",
     "Omit morphemes when you are not confident about segmentation. Use empty arrays when a category has no items."
   ].join("\n\n");
 }
@@ -494,15 +412,34 @@ export function parseExtractionResponse(content: string): { candidates: Extracti
   };
 }
 
+function extractionErrorWarning(error: unknown, partLabel: string): string {
+  const message = error instanceof Error && error.message.trim().length > 0
+    ? error.message
+    : "model extraction failed";
+  const sanitized = message
+    .replace(SECRET_PATTERN, "[redacted-secret]")
+    .replace(/\s+/g, " ")
+    .trim();
+  return `Model extraction failed for ${partLabel}: ${sanitized.slice(0, 300)}; fell back to offline heuristics when no usable model output remained.`;
+}
+
+function canFallbackFromModelExtractionError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return message.includes("reasoning_content")
+    || message.includes("timed out")
+    || message.includes("timeout")
+    || message.includes("aborterror");
+}
+
 function candidateDedupeKey(candidate: ExtractionCandidate): string {
   const payload = candidate.payload;
   if (candidate.kind === "lexeme") {
-    return `lexeme:${(payload.form ?? "").toLowerCase()} ${(payload.gloss ?? "").toLowerCase()}`;
+    return `lexeme:${(payload.form ?? "").toLowerCase()}\u0000${(payload.gloss ?? "").toLowerCase()}`;
   }
   if (candidate.kind === "corpus_passage") {
     return `corpus_passage:${payload.textTarget ?? ""}`;
   }
-  return `grammar_note:${payload.topic ?? ""} ${payload.explanation ?? ""}`;
+  return `grammar_note:${payload.topic ?? ""}\u0000${payload.explanation ?? ""}`;
 }
 
 function mergeChunkExtractions(
@@ -754,7 +691,16 @@ export async function extractCandidatesForAsset(
         index: index + 1,
         total: processable.length
       });
-      const content = await provider.completeChat(messages);
+      let content: string;
+      try {
+        content = await provider.completeChat(messages);
+      } catch (error) {
+        if (!canFallbackFromModelExtractionError(error)) {
+          throw error;
+        }
+        warnings.push(extractionErrorWarning(error, `part ${index + 1} of ${processable.length}`));
+        continue;
+      }
       const parsed = parseExtractionResponse(content);
       if (parsed) {
         parsedParts.push(parsed);

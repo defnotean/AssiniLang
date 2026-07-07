@@ -458,7 +458,7 @@ export function IngestView({ languageId }: { languageId: string }) {
         ) : (
           <>
             <div className="pill-row bulk-review-bar" aria-label={t("ingest.bulkDraftReviewAria")}>
-              <label>
+              <label className="checkbox-row">
                 <input
                   type="checkbox"
                   aria-label={t("ingest.selectAllProposedAria")}
@@ -466,7 +466,7 @@ export function IngestView({ languageId }: { languageId: string }) {
                   disabled={isBulkReviewing}
                   onChange={toggleSelectAllProposed}
                 />
-                {" "}{t("ingest.selectAllProposed")}
+                <span>{t("ingest.selectAllProposed")}</span>
               </label>
               <span className="muted">{t("ingest.selectedCount", { count: selectedDraftIds.length })}</span>
               <button

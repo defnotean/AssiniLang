@@ -97,7 +97,7 @@ export function useGovernanceWorkspace(
 
   useEffect(() => {
     let isCurrent = true;
-    if (view !== "governance" || !selectedLanguageId) {
+    if ((view !== "governance" && view !== "model") || !selectedLanguageId) {
       return () => {
         isCurrent = false;
       };

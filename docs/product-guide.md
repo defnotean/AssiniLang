@@ -132,6 +132,8 @@ The model setup view reports server-side LLM provider readiness, transcription r
 
 Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics. See the [Configuration Reference](configuration.md) for setup recipes.
 
+The discovered-model dropdown scans configured and common local endpoints. If no model is configured and exactly one no-key local model is found, the app saves and activates it automatically. Selecting any discovered model also writes the provider/base URL/model settings immediately, so operators can switch between loaded local models without restarting the app. When a saved model is unloaded, Settings warns that the active saved model is stale and offers to apply the loaded replacement or switch back to offline deterministic mode. Long file-path model names are shortened in status messages and the dropdown, while the editable Model field keeps the exact provider value. Manually typed provider settings still use Save settings.
+
 The provider smoke test shows an "offline placeholder" notice when no real model is configured, so a canned deterministic reply is never mistaken for a model response. A Test connection button actively probes the configured provider endpoint (`POST /llm/health-check`) and reports whether it is reachable, unreachable, or not configured - distinct from the static readiness report, which only checks configuration shape.
 
 ## Local user roles

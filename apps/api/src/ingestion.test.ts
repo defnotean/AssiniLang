@@ -98,6 +98,18 @@ function providerWithChat(response: string): LlmProvider {
   };
 }
 
+function providerWithChatError(error: Error): LlmProvider {
+  return {
+    name: "stub",
+    async generateAssistantMessage() {
+      return { content: "unused", warnings: [] };
+    },
+    async completeChat() {
+      throw error;
+    }
+  };
+}
+
 const providerWithoutChat: LlmProvider = {
   name: "deterministic",
   async generateAssistantMessage() {
@@ -359,6 +371,21 @@ describe("extractCandidatesForAsset", () => {
 
     expect(result.candidates).toHaveLength(1);
     expect(result.warnings.some((warning) => warning.includes("fell back to offline heuristics"))).toBe(true);
+  });
+
+  it("falls back to heuristics with a warning when model extraction throws", async () => {
+    const result = await extractCandidatesForAsset({
+      asset: makeAsset({ rawText: "mira = river" }),
+      language,
+      provider: providerWithChatError(new Error("LLM provider returned only reasoning_content using sk-test-secret")),
+      dataDir: tmpdir()
+    });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.payload.form).toBe("mira");
+    expect(result.warnings.some((warning) => warning.includes("Model extraction failed for part 1 of 1"))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("fell back to offline heuristics"))).toBe(true);
+    expect(JSON.stringify(result.warnings)).not.toContain("sk-test-secret");
   });
 
   it("uses heuristics with a warning when no model is configured", async () => {

@@ -5,6 +5,7 @@ packages/*/node_modules/
 
 # Build output and TypeScript incremental state
 dist/
+dist-desktop/
 apps/*/dist/
 packages/*/dist/
 *.tsbuildinfo

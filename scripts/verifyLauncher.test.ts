@@ -23,6 +23,9 @@ describe("repository verification launcher", () => {
     expect(steps.every((step) => step.command === "C:\\Windows\\System32\\cmd.exe")).toBe(true);
     expect(steps.every((step) => step.options.stdio === "inherit")).toBe(true);
     expect(steps.every((step) => step.options.windowsHide === true)).toBe(true);
+    expect(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH).toMatch(/local-db\.json$/);
+    expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_DB_PATH)
+      .toBe(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH);
   });
 
   it("uses plain npm on non-Windows platforms", () => {

@@ -49,14 +49,20 @@ apps/
     src/ingestion.ts     Raw-source extraction pipeline (chunking, OCR, transcription, fallbacks).
     src/publicLanguageViews.ts  Public projection and redaction.
     src/llmProvider.ts   LLM/transcription provider wiring.
+    src/llmDiscovery.ts  Model endpoint discovery for Model Setup.
+    src/appSettings.ts   Runtime settings read/write (.env persistence).
+    src/runtimeEnvLoader.ts  Documented env-file bootstrap precedence.
+    src/llmEnvShared.ts  Shared env parsing and URL normalization helpers.
+    src/urlSafety.ts     SSRF guard shared by ingestion and model discovery.
   web/                 React research console.
     src/App.tsx          App shell: layout, sidebar, theme, top-level state and data fetching.
     src/views/           One module per workspace (CorpusView, ReviewView, GovernanceView, ...).
+    src/hooks/           Workspace state hooks (useModelWorkspace, useGovernanceWorkspace, ...).
     src/components/      Shared presentational pieces (badges, marks, ScoreRing, StatusScreen, ...).
     src/lib/             Pure helpers: formatting, view config, theme + workspace persistence, types.
 
 packages/
-  api-contract/        Shared API payload/response contracts.
+  api-contract/        Shared API payload/response contracts (including LLM settings schemas).
   db/                  Zod schemas, TypeScript types, JSON/SQLite persistence, migrations, seed CLI.
   eval/                Deterministic study-loop generation, answer grading, and evaluation scoring.
 

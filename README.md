@@ -38,6 +38,32 @@ npm.cmd run dev
 
 Web console: `http://localhost:5173` - API: `http://localhost:4321`.
 
+For a desktop window instead of opening a browser tab:
+
+```powershell
+npm.cmd run desktop
+```
+
+You can also double-click `AssiniLang Desktop.cmd` from this folder on Windows. The desktop launcher starts the API on a private local port and opens the built UI in an AssiniLang window. It builds automatically when the desktop outputs are missing or stale, and skips the build on repeat opens when the current build is still valid. Set `ASSINI_DESKTOP_FORCE_BUILD=1` before launching if you want to force a rebuild.
+
+The desktop app behaves like a single normal app instance: opening it again focuses the existing window, and it remembers the last window size and position. In Settings, Desktop app tools can launch the packaged app at Windows sign-in, hide the window to the tray on close, reset the remembered window layout, show the app version and install folder, show and open the app, local data, settings, backups, diagnostics, and latest-backup paths, show the latest backup and shortcut install status, copy or save redacted diagnostics for troubleshooting, set up both Desktop and Start Menu shortcuts in one click or create them individually, create a timestamped backup before experiments, restore the latest backup after confirming, and prune older backups while keeping the newest 5.
+
+To build a standalone Windows app folder and portable zip:
+
+```powershell
+npm.cmd run desktop:package
+```
+
+Then open `dist-desktop\Open AssiniLang.cmd`, run `dist-desktop\Install AssiniLang.cmd` once to copy it into your user Programs folder and add Start Menu/Desktop shortcuts, or share `dist-desktop\AssiniLang-win32-x64.zip`. After extracting the zip, users can double-click `Open AssiniLang.cmd` inside the extracted folder; `AssiniLang.exe` still works directly. Packaged desktop data and model settings are stored in the app's user-data folder, so the install folder can stay read-only.
+
+To verify that the packaged app really renders instead of opening to a white screen:
+
+```powershell
+npm.cmd run desktop:smoke
+```
+
+That command launches the packaged `.exe` with a temporary profile, creates a disposable Bisaya smoke workspace, clicks through Start, Build, Practice, and Settings, verifies the model/provider controls, and writes `dist-desktop\desktop-smoke-report.json` plus `dist-desktop\desktop-smoke.png`. Use `npm.cmd run desktop:package:smoke` when you want to rebuild the package and immediately run the visual smoke check.
+
 To use a real local model, point the API at an OpenAI-compatible endpoint before `npm.cmd run dev`:
 
 ```powershell
@@ -66,6 +92,11 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | Command | Purpose |
 | --- | --- |
 | `npm.cmd run dev` | Start the API and web console together. |
+| `npm.cmd run desktop` | Build and open the Electron desktop shell with the API started in the background. |
+| `npm.cmd run desktop:package` | Build `dist-desktop\AssiniLang-win32-x64\AssiniLang.exe` plus `dist-desktop\AssiniLang-win32-x64.zip` for a click-to-run Windows desktop release. |
+| `npm.cmd run desktop:smoke` | Launch the packaged `.exe` with a temporary profile and verify the rendered desktop UI plus screenshot. |
+| `npm.cmd run desktop:package:smoke` | Rebuild the Windows package and immediately run the packaged desktop visual smoke check. |
+| `AssiniLang Desktop.cmd` | Windows double-click launcher for the desktop shell. |
 | `npm.cmd run verify` | Full quality gate: tests, type checks, seed, eval, builds. |
 | `npm.cmd test` | All Vitest tests. |
 | `npm.cmd run check` | TypeScript project checks. |
@@ -94,6 +125,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 
 ```text
 apps/api/        Fastify API: domain route modules (src/routes/), ingestion pipeline, LLM/transcription providers, public projection.
+apps/desktop/    Electron desktop shell: starts the API and opens the built web UI in a normal app window.
 apps/web/        React 19 + Vite research console: App shell, per-workspace views (src/views/), shared components and lib helpers.
 packages/db/     Zod schemas, integrity validation, migrations, JSON/SQLite store, bootstrap/seed CLI.
 packages/eval/   Deterministic study-loop and scoring logic.

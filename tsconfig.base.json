@@ -17,8 +17,10 @@
     "baseUrl": ".",
     "paths": {
       "@assini/db": ["packages/db/src/index.ts"],
+      "@assini/db/schema": ["packages/db/src/schema.ts"],
       "@assini/eval": ["packages/eval/src/index.ts"],
-      "@assini/api-contract": ["packages/api-contract/src/index.ts"]
+      "@assini/api-contract": ["packages/api-contract/src/index.ts"],
+      "@assini/api-contract/llm": ["packages/api-contract/src/llmContract.ts"]
     }
   }
 }

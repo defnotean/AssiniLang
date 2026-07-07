@@ -8,7 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@assini/api-contract": resolve(rootDir, "packages/api-contract/src/index.ts"),
+      "@assini/api-contract/llm": resolve(rootDir, "packages/api-contract/src/llmContract.ts"),
       "@assini/db": resolve(rootDir, "packages/db/src/index.ts"),
+      "@assini/db/schema": resolve(rootDir, "packages/db/src/schema.ts"),
       "@assini/eval": resolve(rootDir, "packages/eval/src/index.ts")
     }
   },
@@ -32,6 +34,12 @@ export default defineConfig({
       },
       {
         extends: true,
+        resolve: {
+          alias: {
+            "@assini/api-contract/llm": resolve(rootDir, "packages/api-contract/src/llmContract.ts"),
+            "@assini/db/schema": resolve(rootDir, "packages/db/src/schema.ts")
+          }
+        },
         test: {
           name: "web",
           environment: "jsdom",

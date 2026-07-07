@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   GOVERNANCE_APPROVER_ROLES,
   isReviewPolicyAssignableRole,
@@ -19,6 +19,10 @@ type ReviewPolicyBody = Pick<ReviewPolicy, "assignedReviewerIds" | "approvalThre
 
 type ReviewDispositionResolveBody = {
   resolutionSummary: string;
+};
+
+type ReviewDispositionResolveByIdBody = ReviewDispositionResolveBody & {
+  dispositionId: string;
 };
 
 function parseGovernanceBody(input: unknown): GovernanceBody | undefined {
@@ -114,8 +118,122 @@ function parseReviewDispositionResolveBody(input: unknown): ReviewDispositionRes
   return resolutionSummary.length > 0 ? { resolutionSummary } : undefined;
 }
 
+function parseReviewDispositionResolveByIdBody(input: unknown): ReviewDispositionResolveByIdBody | undefined {
+  const body = parseReviewDispositionResolveBody(input);
+  if (!body || !input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const rawDispositionId = (input as Record<string, unknown>).dispositionId;
+  const dispositionId = typeof rawDispositionId === "string" ? rawDispositionId.trim() : "";
+  return dispositionId.length > 0 ? { ...body, dispositionId } : undefined;
+}
+
 export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, updateState, checkRateLimit, authToken, prototypeSessions } = ctx;
+
+  async function resolveReviewDisposition(
+    request: FastifyRequest,
+    reply: FastifyReply,
+    dispositionId: string,
+    body: ReviewDispositionResolveBody
+  ): Promise<ReviewDisposition | { error: string }> {
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    let dispositionMissing = false;
+    let dispositionAlreadyResolved = false;
+    let dispositionForbidden = false;
+    let nextDisposition: ReviewDisposition | undefined;
+
+    await updateState((state) => {
+      const existingDisposition = state.reviewDispositions.find((disposition) => disposition.id === dispositionId);
+      if (!existingDisposition) {
+        dispositionMissing = true;
+        return state;
+      }
+
+      if (existingDisposition.status === "resolved") {
+        dispositionAlreadyResolved = true;
+        return state;
+      }
+
+      const canResolve = actor.role === "lead" || actor.role === "admin" || actor.id === existingDisposition.assignedTo;
+      if (!canResolve) {
+        dispositionForbidden = true;
+        return state;
+      }
+
+      const resolvedAt = new Date().toISOString();
+      nextDisposition = {
+        ...existingDisposition,
+        status: "resolved",
+        resolvedAt,
+        resolvedBy: actor.id,
+        resolutionSummary: body.resolutionSummary
+      };
+
+      const linkedNote = state.notes.find((note) => note.id === existingDisposition.noteId);
+      const nextNote = linkedNote
+        ? {
+            ...linkedNote,
+            status: "under_review" as const,
+            editHistory: [
+              ...linkedNote.editHistory,
+              {
+                at: resolvedAt,
+                by: actor.id,
+                action: "disposition_resolved",
+                summary: body.resolutionSummary
+              }
+            ]
+          }
+        : undefined;
+
+      return appendAuditEvent({
+        ...state,
+        reviewDispositions: state.reviewDispositions.map((disposition) => (
+          disposition.id === dispositionId ? nextDisposition as ReviewDisposition : disposition
+        )),
+        notes: nextNote
+          ? state.notes.map((note) => (note.id === nextNote.id ? nextNote : note))
+          : state.notes
+      }, {
+        actor,
+        at: resolvedAt,
+        action: "review_disposition.resolved",
+        entityType: "review_disposition",
+        entityId: dispositionId,
+        languageId: existingDisposition.languageId,
+        summary: `Resolved ${existingDisposition.disposition} review disposition for ${existingDisposition.noteId}.`,
+        metadata: {
+          noteId: existingDisposition.noteId,
+          disposition: existingDisposition.disposition,
+          noteStatus: nextNote?.status ?? null,
+          resolvedBy: actor.id
+        }
+      });
+    });
+
+    if (dispositionMissing) {
+      reply.code(404);
+      return { error: `Review disposition not found: ${dispositionId}` };
+    }
+
+    if (dispositionAlreadyResolved) {
+      reply.code(400);
+      return { error: "Review disposition is already resolved" };
+    }
+
+    if (dispositionForbidden) {
+      reply.code(403);
+      return { error: "Forbidden" };
+    }
+
+    return nextDisposition as ReviewDisposition;
+  }
 
   app.get("/governance", async () => {
     const state = await readState();
@@ -299,100 +417,16 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
       return { error: "Invalid review disposition resolution body" };
     }
 
-    const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
-    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    return resolveReviewDisposition(request, reply, dispositionId, body);
+  });
 
-    let dispositionMissing = false;
-    let dispositionAlreadyResolved = false;
-    let dispositionForbidden = false;
-    let nextDisposition: ReviewDisposition | undefined;
-
-    await updateState((state) => {
-      const existingDisposition = state.reviewDispositions.find((disposition) => disposition.id === dispositionId);
-      if (!existingDisposition) {
-        dispositionMissing = true;
-        return state;
-      }
-
-      if (existingDisposition.status === "resolved") {
-        dispositionAlreadyResolved = true;
-        return state;
-      }
-
-      const canResolve = actor.role === "lead" || actor.role === "admin" || actor.id === existingDisposition.assignedTo;
-      if (!canResolve) {
-        dispositionForbidden = true;
-        return state;
-      }
-
-      const resolvedAt = new Date().toISOString();
-      nextDisposition = {
-        ...existingDisposition,
-        status: "resolved",
-        resolvedAt,
-        resolvedBy: actor.id,
-        resolutionSummary: body.resolutionSummary
-      };
-
-      const linkedNote = state.notes.find((note) => note.id === existingDisposition.noteId);
-      const nextNote = linkedNote
-        ? {
-            ...linkedNote,
-            status: "under_review" as const,
-            editHistory: [
-              ...linkedNote.editHistory,
-              {
-                at: resolvedAt,
-                by: actor.id,
-                action: "disposition_resolved",
-                summary: body.resolutionSummary
-              }
-            ]
-          }
-        : undefined;
-
-      return appendAuditEvent({
-        ...state,
-        reviewDispositions: state.reviewDispositions.map((disposition) => (
-          disposition.id === dispositionId ? nextDisposition as ReviewDisposition : disposition
-        )),
-        notes: nextNote
-          ? state.notes.map((note) => (note.id === nextNote.id ? nextNote : note))
-          : state.notes
-      }, {
-        actor,
-        at: resolvedAt,
-        action: "review_disposition.resolved",
-        entityType: "review_disposition",
-        entityId: dispositionId,
-        languageId: existingDisposition.languageId,
-        summary: `Resolved ${existingDisposition.disposition} review disposition for ${existingDisposition.noteId}.`,
-        metadata: {
-          noteId: existingDisposition.noteId,
-          disposition: existingDisposition.disposition,
-          noteStatus: nextNote?.status ?? null,
-          resolvedBy: actor.id
-        }
-      });
-    });
-
-    if (dispositionMissing) {
-      reply.code(404);
-      return { error: `Review disposition not found: ${dispositionId}` };
-    }
-
-    if (dispositionAlreadyResolved) {
+  app.patch("/review-dispositions/resolve", async (request, reply) => {
+    const body = parseReviewDispositionResolveByIdBody(request.body ?? {});
+    if (!body) {
       reply.code(400);
-      return { error: "Review disposition is already resolved" };
+      return { error: "Invalid review disposition resolution body" };
     }
 
-    if (dispositionForbidden) {
-      reply.code(403);
-      return { error: "Forbidden" };
-    }
-
-    return nextDisposition;
+    return resolveReviewDisposition(request, reply, body.dispositionId, body);
   });
 }

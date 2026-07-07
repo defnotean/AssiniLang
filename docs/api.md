@@ -13,6 +13,9 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use; creating a session also sweeps expired session records. |
 | DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. |
 | GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
+| GET | `/llm/settings` | programmer, lead, admin | Sanitized editable runtime settings for model, transcription, OCR, and URL-fetch behavior. |
+| GET | `/llm/models` | programmer, lead, admin | Discover model IDs exposed by configured, explicit, and common local OpenAI-compatible endpoints. Optional `?baseUrl=` adds one endpoint to the scan. |
+| PUT | `/llm/settings` | programmer, lead, admin | Save local runtime settings to `.env` and apply the active LLM provider without returning secret values. |
 | POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
 | GET | `/users/me` | Any actor | Current prototype user. |
 | GET | `/languages` | Public | List languages. |
@@ -49,7 +52,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/languages/:languageId/review-policy` | reviewer, elder, lead, admin | Review policy for one language. |
 | PUT | `/languages/:languageId/review-policy` | lead, admin (prototype-session reviewer exception) | Update assigned reviewers and threshold. |
 | GET | `/languages/:languageId/review-dispositions` | reviewer, elder, lead, admin | Review-disposition work records. |
-| PATCH | `/review-dispositions/:dispositionId/resolve` | reviewer, elder, lead, admin | Resolve a disposition work record. |
+| PATCH | `/review-dispositions/resolve` | reviewer, elder, lead, admin | Resolve a disposition work record by request-body id. |
+| PATCH | `/review-dispositions/:dispositionId/resolve` | reviewer, elder, lead, admin | Legacy path-id resolver for disposition ids that are safe in URL paths. |
 | GET | `/audit/events` | lead, admin, programmer | Role-gated audit events; `?languageId=` filters. |
 | GET | `/languages/:languageId/elder-context` | elder, reviewer, lead, admin | Public context and correction ledger for elder review. |
 | GET | `/elder/corrections` | elder, reviewer, lead, admin | Correction records; `?languageId=` filters. |
@@ -104,6 +108,10 @@ Do not treat prototype auth as production security.
 `POST /languages` and `PATCH /languages/:languageId`
 
 Creation requires nonblank name, description, and orthography; typology defaults to `unknown` when omitted. The phonology object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) is optional but unlocks orthography validation for corpus text once declared. New languages get `status: "active"`, creator attribution, and a default review policy assigned to available reviewers. IDs are slugs derived from the name.
+
+`DELETE /languages/:languageId` (roles: reviewer, lead, admin)
+
+Permanently removes the language and all workspace records scoped to it (corpus, lexicon, notes, exercises, sources, extraction drafts, governance, AI sessions, review records, and related audit history). Uploaded assets under `data/assets/<languageId>/` are removed best-effort. Returns `{ id, name, deleted: true }` on success; `404` when the language does not exist. Appends a `language.deleted` audit event after purge.
 
 ## Source ingestion
 
@@ -281,6 +289,10 @@ The persisted app-state schema enforces the same ledger invariants during local 
 ## LLM status and sessions
 
 `GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. It is a static, no-network read of the environment: it checks configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
+
+`GET /llm/settings` and `PUT /llm/settings` are programmer/lead/admin routes for the local settings screen. They expose non-secret runtime values such as provider, base URL, model, timeout, max tokens, JSON mode, transcription endpoint, OCR language, and the private-URL fetch toggle. API keys are write-only: clients can submit replacements or clear them, but responses only report whether a key is configured. `PUT /llm/settings` writes the repo-root `.env`, updates the running API process environment, and refreshes the active provider for future ingestion, generation, and AI-session calls. Port, host, CORS, and body-limit changes still require restarting the dev launcher.
+
+`GET /llm/models` is the Model Setup discovery route. It asks the configured endpoint, any `ASSINI_LLM_DISCOVERY_BASE_URLS` / `ASSINI_MODEL_DISCOVERY_URLS` entries, and common local model servers for OpenAI-compatible `/v1/models`; Ollama endpoints are also checked through native `/api/tags`. It returns sanitized `{ models, errors, scannedAt }` data where each model candidate carries the provider, base URL, and model ID needed by `PUT /llm/settings`. The route does not sweep the whole LAN by default; pass `?baseUrl=http://host:port/v1` or configure discovery URLs for network-hosted model machines.
 
 `POST /llm/health-check` (roles: programmer, lead, admin) actively probes the configured provider endpoint with a real network request and returns `{ reachable, checked, mode, status?, detail?, latencyMs? }`. In deterministic or unconfigured mode it makes no network call and returns `checked: false`. Use it to confirm reachability when `/llm/status` reports a configured provider but ingestion or chat still fails - `/llm/status` only checks config shape, while this route verifies the endpoint answers.
 

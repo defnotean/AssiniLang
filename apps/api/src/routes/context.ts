@@ -33,6 +33,8 @@ export type RouteContext = {
   llmProvider: LlmProvider;
   dataDir: string;
   ingestionFetch: typeof fetch;
+  settingsPath: string;
+  reloadLlmProvider?: () => void;
   jobQueue: JobQueue;
   requestMetrics: RequestMetrics;
 };

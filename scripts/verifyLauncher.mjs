@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const VERIFY_SCRIPT_NAMES = ["test", "check", "seed", "eval", "build"];
 
@@ -24,16 +27,26 @@ function createNpmSpawnSpec(platform, env, args) {
 }
 
 export function createVerificationSteps({ platform = process.platform, env = process.env } = {}) {
+  const verificationDbPath = join(mkdtempSync(join(tmpdir(), "assini-verify-")), "local-db.json");
+
   return VERIFY_SCRIPT_NAMES.map((scriptName) => {
     const npmSpec = createNpmSpawnSpec(platform, env, ["run", scriptName]);
+    const options = {
+      stdio: "inherit",
+      windowsHide: platform === "win32"
+    };
+    if (scriptName === "seed" || scriptName === "eval") {
+      options.env = {
+        ...env,
+        ASSINI_DB_PATH: verificationDbPath
+      };
+    }
+
     return {
       name: scriptName,
       command: npmSpec.command,
       args: npmSpec.args,
-      options: {
-        stdio: "inherit",
-        windowsHide: platform === "win32"
-      }
+      options
     };
   });
 }

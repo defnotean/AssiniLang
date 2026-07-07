@@ -1,5 +1,8 @@
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+
+const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
 function readString(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim() ?? "";
@@ -15,7 +18,17 @@ export function resolveApiProxyTarget(env: ApiProxyEnv = process.env): string {
 }
 
 export default defineConfig({
+  base: "./",
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@assini/api-contract/llm": `${repoRoot}/packages/api-contract/src/llmContract.ts`,
+      "@assini/db/schema": `${repoRoot}/packages/db/src/schema.ts`
+    }
+  },
+  optimizeDeps: {
+    exclude: ["better-sqlite3"]
+  },
   server: {
     proxy: {
       "/api": {
