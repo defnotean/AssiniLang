@@ -12,6 +12,7 @@ These are no longer active roadmap gaps:
 - **Review/governance prototype:** local governance records, per-language review policies, assigned reviewers, approval thresholds, review dispositions, elder corrections, and audit events are implemented for prototype workflows.
 - **Model-assisted authoring:** grounded model draft routes exist for grammar notes (`POST /languages/:languageId/study-loop/model-draft`) and exercises (`POST /languages/:languageId/exercises/generate`). Generated content is constrained to approved lexicon/corpus data and still goes through human review or author save paths; answer keys remain server-side and human-controlled.
 - **Model-draft scoring:** model-generated note drafts receive deterministic grounding scores and failure details, and evaluation runs use persisted model-draft notes when present instead of only answer-key-derived baseline drafts.
+- **Model setup and corpus visualization:** Settings can discover local/OpenAI-compatible model endpoints, save named model profiles, hot-swap the active provider without restarting, test reachability separately from static readiness, and surface stale/unloaded saved models. The examples browser now includes a role-gated corpus graph over passages, morphemes, topics, sources, notes, exercises, AI sessions, and elder corrections.
 - **Learning/evaluation basics:** server-graded exercises with private answer keys, adversarial probe checks, practice recommendations, deterministic evaluation categories, evaluation trends, and paradigm-gap detection are implemented for the local harness.
 - **Local persistence:** JSON and SQLite-backed local stores exist. SQLite now has a `schema_meta` version stamp and a transactional migration runner for future schema bumps.
 - **Backup/restore:** `backupTo` / `restoreFrom` exist for both JSON and SQLite stores, restore validates before replacing live data, and `npm run db:backup` writes validated local backups.
@@ -32,6 +33,16 @@ These features are useful locally but are not production-ready:
 - **Authoring UX:** compact corpus import, exercise authoring, model exercise drafts, and note explanation edits exist. Rich structured note/example editing, N-probe exercise authoring, dry-run TSV/CSV imports, and pre-save validation previews remain incomplete.
 - **Operations:** SQLite migrations and backup/restore are implemented for the local store, but there is no production database target, retention policy, disaster-recovery drill, or operational runbook for real data.
 - **Observability/security:** AI-session observability, audit events, request-id correlation, and a green dependency-audit gate exist, but production metrics, secrets management, rate-limit policy, security review, and incident response are not complete.
+
+## Next milestone: reviewer-ready local beta
+
+Before treating AssiniLang as a stable local beta for non-sensitive synthetic or user-created data, ship these checkable artifacts:
+
+1. **Workflow acceptance pack:** desktop smoke screenshots for Start, Build, Practice, and Settings at desktop/tablet/mobile widths, including empty states, long model names, and graph mode.
+2. **Model operations pack:** `npm.cmd run model:verify` report for at least one local model, one saved-profile switch test, one unloaded-model stale-state test, and documented timeout/max-token recommendations for slow local models.
+3. **Corpus intake pack:** Obsidian vault import fixture, bulk source processing fixture, graph rendering fixture, and failure examples for bad vault paths, unreadable notes, and oversized imports.
+4. **Review accountability pack:** audit/export sample, review-policy quorum test, elder-correction apply/reject test, and a redaction check showing no answer keys, prompts, or API keys in public/exported shapes.
+5. **Operator recovery pack:** backup/restore drill, interrupted-processing recovery drill, corrupted-database loud-failure example, and a short runbook for local data location, logs, diagnostics, and reset steps.
 
 ## Remaining blockers before real community data
 

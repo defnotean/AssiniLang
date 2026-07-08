@@ -26,6 +26,8 @@ describe("repository verification launcher", () => {
     expect(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH).toMatch(/local-db\.json$/);
     expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_DB_PATH)
       .toBe(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH);
+    expect(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_SEED_FIXTURE).toBe("1");
+    expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_EVAL_REQUIRE_LANGUAGES).toBe("1");
   });
 
   it("uses plain npm on non-Windows platforms", () => {

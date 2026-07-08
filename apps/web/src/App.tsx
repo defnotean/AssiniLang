@@ -9,11 +9,7 @@ import {
   deleteLanguage,
   fetchCurrentUser,
   fetchDashboardData,
-  generateDraftNotes,
-  generateModelDraftNotes,
-  importCorpusPassage,
-  reviewNote,
-  runEvaluation
+  importCorpusPassage
 } from "./api";
 import { CommandPalette } from "./components/CommandPalette";
 import { SignOutButton } from "./components/SignOutButton";
@@ -25,11 +21,9 @@ import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
   DashboardLoadState,
-  ReviewStatus,
   Theme,
   ViewMode
 } from "./lib/types";
-import { REVIEWER_COMMENTS } from "./lib/viewConfig";
 import { useI18n } from "./i18n";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
@@ -37,6 +31,7 @@ import { useElderWorkspace } from "./hooks/useElderWorkspace";
 import { useGovernanceWorkspace } from "./hooks/useGovernanceWorkspace";
 import { useLearnerWorkspace } from "./hooks/useLearnerWorkspace";
 import { useModelWorkspace } from "./hooks/useModelWorkspace";
+import { useReviewWorkspace } from "./hooks/useReviewWorkspace";
 import { useWorkspacePaletteCommands } from "./hooks/useWorkspacePaletteCommands";
 import { TOUR_STEPS, useWorkspaceTour } from "./hooks/useWorkspaceTour";
 import { AssistantView } from "./views/AssistantView";
@@ -66,13 +61,7 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const { showTour, setShowTour, dismissTour } = useWorkspaceTour();
-  const [isEvaluating, setIsEvaluating] = useState(false);
-  const [isDrafting, setIsDrafting] = useState(false);
-  const [isModelDrafting, setIsModelDrafting] = useState(false);
-  const [modelDraftMessage, setModelDraftMessage] = useState<string | null>(null);
-  const [modelDraftError, setModelDraftError] = useState<string | null>(null);
-  const [reviewingNoteId, setReviewingNoteId] = useState<string | null>(null);
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [dashboardReloadKey, setDashboardReloadKey] = useState(0);
 
   const data = loadState.status === "ready" ? loadState.data : null;
 
@@ -81,6 +70,7 @@ export function App() {
   const learner = useLearnerWorkspace(view, selectedLanguageId, data, refreshDashboard);
   const governance = useGovernanceWorkspace(selectedLanguageId, view, refreshDashboard);
   const assistant = useAssistantWorkspace();
+  const review = useReviewWorkspace(view, selectedLanguageId, data, refreshDashboard);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -146,7 +136,9 @@ export function App() {
     learner.setExerciseResult(null);
     learner.setExerciseAnswer("");
     learner.setSelectedExerciseId(null);
-    setSelectedNoteId(null);
+    review.setSelectedNoteId(null);
+    review.setReviewActionError(null);
+    review.setWorkspaceActionError(null);
     learner.setSubmissionHistory([]);
 
     fetchDashboardData(selectedLanguageId ?? undefined)
@@ -161,15 +153,13 @@ export function App() {
       isCurrent = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLanguageId]);
+  }, [selectedLanguageId, dashboardReloadKey]);
 
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId) ?? null;
-  const selectedNote = data?.notes.find((note) => note.id === selectedNoteId) ?? data?.notes[0] ?? null;
-  const selectedExercise = learner.selectedExercise;
-  const isWorkflowBusy = isEvaluating
-    || isDrafting
-    || isModelDrafting
-    || reviewingNoteId !== null
+  const isWorkflowBusy = review.isEvaluating
+    || review.isDrafting
+    || review.isModelDrafting
+    || review.reviewingNoteId !== null
     || learner.isGrading
     || elder.isSubmittingCorrection
     || elder.reviewingCorrectionId !== null
@@ -230,97 +220,8 @@ export function App() {
   }
 
   function handleViewSelect(mode: ViewMode) {
+    review.setWorkspaceActionError(null);
     setView(mode);
-  }
-
-  async function handleRunEval() {
-    setIsEvaluating(true);
-    try {
-      await runEvaluation();
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.evaluationRunFailed");
-      setLoadState({ status: "error", message });
-    } finally {
-      setIsEvaluating(false);
-    }
-  }
-
-  async function handleGenerateDrafts() {
-    if (!selectedLanguageId) return;
-    setIsDrafting(true);
-    try {
-      await generateDraftNotes(selectedLanguageId);
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.draftGenerationFailed");
-      setLoadState({ status: "error", message });
-    } finally {
-      setIsDrafting(false);
-    }
-  }
-
-  async function handleGenerateModelDrafts() {
-    if (!selectedLanguageId) return;
-    setIsModelDrafting(true);
-    setModelDraftMessage(null);
-    setModelDraftError(null);
-    try {
-      const { generated, warnings, notes } = await generateModelDraftNotes(selectedLanguageId);
-      await refreshDashboard();
-      const summary = t(generated === 1 ? "review.modelDraftSummaryOne" : "review.modelDraftSummaryOther", {
-        count: generated
-      });
-      const scored = notes?.filter((note) => note.grounding) ?? [];
-      const groundingSummary = scored.length > 0
-        ? ` ${t("review.groundingLabel")} ${scored
-            .map((note) => `${Math.round((note.grounding?.score ?? 0) * 100)}%`)
-            .join(", ")}.${scored.some((note) => (note.grounding?.failures.length ?? 0) > 0) ? ` ${t("review.reviewFlagged")}` : ""}`
-        : "";
-      setModelDraftMessage(
-        warnings.length > 0 ? `${summary}${groundingSummary} ${warnings.join(" ")}` : `${summary}${groundingSummary}`
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.modelDraftGenerationFailed");
-      setModelDraftError(message);
-    } finally {
-      setIsModelDrafting(false);
-    }
-  }
-
-  async function handleReview(status: ReviewStatus) {
-    if (!selectedNote) return;
-    setReviewingNoteId(selectedNote.id);
-    try {
-      await reviewNote(selectedNote.id, {
-        status,
-        reviewerComment: REVIEWER_COMMENTS[status]
-      });
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.noteReviewFailed");
-      setLoadState({ status: "error", message });
-    } finally {
-      setReviewingNoteId(null);
-    }
-  }
-
-  async function handleSaveNoteExplanation(explanation: string) {
-    if (!selectedNote) return;
-    setReviewingNoteId(selectedNote.id);
-    try {
-      await reviewNote(selectedNote.id, {
-        explanation,
-        reviewerComment: "Edited note explanation in local prototype."
-      });
-      await refreshDashboard();
-    } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.noteExplanationUpdateFailed");
-      setLoadState({ status: "error", message });
-      throw error;
-    } finally {
-      setReviewingNoteId(null);
-    }
   }
 
   async function handleImportCorpusPassage(payload: CorpusImportPayload) {
@@ -336,11 +237,25 @@ export function App() {
   }
 
   if (loadState.status === "error") {
-    return <StatusScreen kind="error" message={loadState.message} />;
+    return (
+      <StatusScreen
+        kind="error"
+        message={loadState.message}
+        onRetry={() => setDashboardReloadKey((key) => key + 1)}
+        retryLabel={t("app.retryLoad")}
+      />
+    );
   }
 
   if (!data) {
-    return <StatusScreen kind="error" message={t("app.workspaceUnavailable")} />;
+    return (
+      <StatusScreen
+        kind="error"
+        message={t("app.workspaceUnavailable")}
+        onRetry={() => setDashboardReloadKey((key) => key + 1)}
+        retryLabel={t("app.retryLoad")}
+      />
+    );
   }
 
   const currentTitle = t(`viewConfig.${view}.title`);
@@ -431,14 +346,15 @@ export function App() {
           currentBreadcrumb={currentBreadcrumb}
           selectedLanguage={selectedLanguage}
           isWorkflowBusy={isWorkflowBusy}
-          isDrafting={isDrafting}
-          isModelDrafting={isModelDrafting}
-          isEvaluating={isEvaluating}
-          modelDraftMessage={modelDraftMessage}
-          modelDraftError={modelDraftError}
-          onGenerateDrafts={handleGenerateDrafts}
-          onGenerateModelDrafts={handleGenerateModelDrafts}
-          onRunEval={handleRunEval}
+          isDrafting={review.isDrafting}
+          isModelDrafting={review.isModelDrafting}
+          isEvaluating={review.isEvaluating}
+          modelDraftMessage={review.modelDraftMessage}
+          modelDraftError={review.modelDraftError}
+          actionError={review.workspaceActionError}
+          onGenerateDrafts={review.handleGenerateDrafts}
+          onGenerateModelDrafts={review.handleGenerateModelDrafts}
+          onRunEval={review.handleRunEval}
         />
 
         <DiamondBand compact />
@@ -493,6 +409,7 @@ export function App() {
                         <p>{t("simple.savedExamplesBody")}</p>
                       </div>
                       <CorpusView
+                        languageId={selectedLanguageId}
                         corpus={data.corpus}
                         isWorkflowBusy={isWorkflowBusy}
                         onImportCorpusPassage={handleImportCorpusPassage}
@@ -510,7 +427,7 @@ export function App() {
                         <h2>{t("simple.addMaterialTitle")}</h2>
                         <p>{t("simple.addMaterialBody")}</p>
                       </div>
-                      <IngestView languageId={selectedLanguageId} />
+                      <IngestView languageId={selectedLanguageId} onIntakeCommitted={refreshDashboard} />
                     </section>
                     <section className="simple-section surface-section" aria-label={t("simple.reviewSuggestionsAria")}>
                       <div className="simple-section-heading">
@@ -520,12 +437,16 @@ export function App() {
                       </div>
                       <ReviewView
                         notes={data.notes}
-                        selectedNote={selectedNote}
+                        selectedNote={review.selectedNote}
                         isWorkflowBusy={isWorkflowBusy}
-                        reviewingNoteId={reviewingNoteId}
-                        onSelectNote={setSelectedNoteId}
-                        onReview={handleReview}
-                        onSaveExplanation={handleSaveNoteExplanation}
+                        reviewingNoteId={review.reviewingNoteId}
+                        actionError={review.reviewActionError}
+                        onSelectNote={(noteId) => {
+                          review.setReviewActionError(null);
+                          review.setSelectedNoteId(noteId);
+                        }}
+                        onReview={review.handleReview}
+                        onSaveExplanation={review.handleSaveNoteExplanation}
                       />
                     </section>
                     <section className="simple-section surface-section" aria-label={t("simple.communityCorrectionsAria")}>
@@ -540,45 +461,36 @@ export function App() {
                 ) : <NoLanguageNotice />
               )}
               {view === "learner" && (
-                <div className="simple-workspace-stack">
-                  <section className="simple-section surface-section" aria-label={t("simple.practiceExercisesAria")}>
-                    <div className="simple-section-heading">
-                      <span className="detail-label">{t("simple.practice")}</span>
-                      <h2>{t("simple.practiceTitle")}</h2>
-                      <p>{t("simple.practiceBody")}</p>
-                    </div>
-                    <LearnerView
-                      languageId={selectedLanguageId}
-                      exercises={data.exercises}
-                      selectedExercise={selectedExercise}
-                      selectedExerciseId={learner.selectedExerciseId}
-                      isWorkflowBusy={isWorkflowBusy}
-                      exerciseAnswer={learner.exerciseAnswer}
-                      isGrading={learner.isGrading}
-                      exerciseResult={learner.exerciseResult}
-                      isLoadingSubmissions={learner.isLoadingSubmissions}
-                      submissionHistory={learner.submissionHistory}
-                      onSelectExercise={learner.setSelectedExerciseId}
-                      onAnswerChange={learner.setExerciseAnswer}
-                      onGrade={learner.handleGrade}
-                      onCreateExercise={learner.handleCreateExercise}
-                      onGenerateExercise={learner.handleGenerateExercise}
-                    />
-                  </section>
-                  <section className="simple-section" aria-label={t("simple.askModelAria")}>
-                    <div className="simple-section-heading">
-                      <span className="detail-label">{t("simple.ask")}</span>
-                      <h2>{t("simple.askTitle")}</h2>
-                      <p>{t("simple.askBody")}</p>
-                    </div>
-                    <AssistantView
-                      selectedLanguageId={selectedLanguageId}
-                      contextNoteIds={data.notes.slice(0, 4).map((note) => note.id)}
-                      contextPassageIds={data.corpus.slice(0, 4).map((passage) => passage.id)}
-                      assistant={assistant}
-                    />
-                  </section>
-                </div>
+                selectedLanguageId ? (
+                  <div className="simple-workspace-stack">
+                    <section className="simple-section surface-section" aria-label={t("simple.practiceExercisesAria")}>
+                      <div className="simple-section-heading">
+                        <span className="detail-label">{t("simple.practice")}</span>
+                        <h2>{t("simple.practiceTitle")}</h2>
+                        <p>{t("simple.practiceBody")}</p>
+                      </div>
+                      <LearnerView
+                        languageId={selectedLanguageId}
+                        exercises={data.exercises}
+                        learner={learner}
+                        isWorkflowBusy={isWorkflowBusy}
+                      />
+                    </section>
+                    <section className="simple-section" aria-label={t("simple.askModelAria")}>
+                      <div className="simple-section-heading">
+                        <span className="detail-label">{t("simple.ask")}</span>
+                        <h2>{t("simple.askTitle")}</h2>
+                        <p>{t("simple.askBody")}</p>
+                      </div>
+                      <AssistantView
+                        selectedLanguageId={selectedLanguageId}
+                        contextNoteIds={data.notes.slice(0, 4).map((note) => note.id)}
+                        contextPassageIds={data.corpus.slice(0, 4).map((passage) => passage.id)}
+                        assistant={assistant}
+                      />
+                    </section>
+                  </div>
+                ) : <NoLanguageNotice />
               )}
               {view === "model" && (
                 <div className="simple-workspace-stack">
@@ -588,27 +500,7 @@ export function App() {
                       <h2>{t("simple.modelTitle")}</h2>
                       <p>{t("simple.modelBody")}</p>
                     </div>
-                    <ModelSetupView
-                      llmState={model.llmState}
-                      settingsState={model.settingsState}
-                      modelDiscoveryState={model.modelDiscoveryState}
-                      observabilityState={model.observabilityState}
-                      isTestingModel={model.isTestingModel}
-                      modelTestResult={model.modelTestResult}
-                      modelTestIsPlaceholder={model.modelTestIsPlaceholder}
-                      onSmokeTest={model.handleModelSmokeTest}
-                      isCheckingReachability={model.isCheckingReachability}
-                      reachabilityResult={model.reachabilityResult}
-                      reachabilityError={model.reachabilityError}
-                      onTestConnection={model.handleTestConnection}
-                      isSavingSettings={model.isSavingSettings}
-                      settingsSaveResult={model.settingsSaveResult}
-                      settingsSaveError={model.settingsSaveError}
-                      isRefreshingModels={model.isRefreshingModels}
-                      isAutoRefreshingModels={model.isAutoRefreshingModels}
-                      onRefreshModelDiscovery={model.refreshModelDiscovery}
-                      onSaveSettings={model.handleSaveSettings}
-                    />
+                    <ModelSetupView model={model} />
                   </section>
                   <section className="simple-section surface-section" aria-label={t("simple.qualityChecksAria")}>
                     <div className="simple-section-heading">
@@ -636,42 +528,7 @@ export function App() {
                       </div>
                       <GovernanceView
                         selectedLanguageId={selectedLanguageId}
-                        governanceState={governance.governanceState}
-                        auditEventState={governance.auditEventState}
-                        policyType={governance.policyType}
-                        policyEffectiveDate={governance.policyEffectiveDate}
-                        policyContent={governance.policyContent}
-                        governanceSuccess={governance.governanceSuccess}
-                        governanceError={governance.governanceError}
-                        isSubmittingGovernance={governance.isSubmittingGovernance}
-                        reviewPolicyState={governance.reviewPolicyState}
-                        reviewPolicyReviewerIds={governance.reviewPolicyReviewerIds}
-                        reviewPolicyApprovalThreshold={governance.reviewPolicyApprovalThreshold}
-                        reviewPolicyRequiresAssigned={governance.reviewPolicyRequiresAssigned}
-                        reviewPolicySuccess={governance.reviewPolicySuccess}
-                        reviewPolicyError={governance.reviewPolicyError}
-                        isSubmittingReviewPolicy={governance.isSubmittingReviewPolicy}
-                        reviewDispositionState={governance.reviewDispositionState}
-                        reviewDispositionDrafts={governance.reviewDispositionDrafts}
-                        reviewDispositionSuccess={governance.reviewDispositionSuccess}
-                        reviewDispositionError={governance.reviewDispositionError}
-                        resolvingReviewDispositionId={governance.resolvingReviewDispositionId}
-                        snapshotDownload={governance.snapshotDownload}
-                        snapshotError={governance.snapshotError}
-                        isExportingSnapshot={governance.isExportingSnapshot}
-                        onPolicyTypeChange={governance.setPolicyType}
-                        onEffectiveDateChange={governance.setPolicyEffectiveDate}
-                        onContentChange={governance.setPolicyContent}
-                        onSubmit={governance.handleSubmitGovernance}
-                        onReviewPolicyReviewerIdsChange={governance.setReviewPolicyReviewerIds}
-                        onReviewPolicyApprovalThresholdChange={governance.setReviewPolicyApprovalThreshold}
-                        onReviewPolicyRequiresAssignedChange={governance.setReviewPolicyRequiresAssigned}
-                        onReviewPolicySubmit={governance.handleSubmitReviewPolicy}
-                        onReviewDispositionDraftChange={(dispositionId, summary) => {
-                          governance.setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: summary }));
-                        }}
-                        onResolveReviewDisposition={governance.handleResolveReviewDisposition}
-                        onExportSnapshot={governance.handleExportSnapshot}
+                        governance={governance}
                       />
                     </section>
                   ) : <NoLanguageNotice />}

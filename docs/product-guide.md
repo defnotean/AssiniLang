@@ -7,16 +7,23 @@ The workspace starts empty. Users create their own languages, ingest their own r
 ## Core workflow
 
 1. Create a language. The web console's New language form (at the bottom of the language sidebar) collects name, typology, description, and orthography. A phonology inventory can currently be supplied only through the `POST /languages` API, not the web form.
-2. Add raw sources to that language: pasted text, word lists, URLs, or uploaded files including images, audio, and PDF/DOCX documents.
+2. Add raw sources to that language: pasted text, word lists, URLs, local Obsidian Markdown vaults, or uploaded files including images, audio, and PDF/DOCX documents.
 3. Process a source. A local LLM extracts candidate lexemes, corpus passages, and grammar notes; without a configured model, an offline heuristic parses delimited word-list lines and local OCR reads images instead.
 4. Review the resulting extraction drafts. Each extraction draft shows its payload, confidence, rationale, and any duplicate badge; accepting commits it, rejecting discards it.
-5. Build on the committed data with corpus import, note review, exercise authoring, evaluation, governance, and elder corrections.
+5. Build on the committed data with corpus import and graph browsing, note review, exercise authoring, evaluation, governance, model profiles, and elder corrections.
 
 ## Web console
 
-The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console: the sidebar selects a language, and section navigation switches between that language's workspaces - Language Profile, Sources & intake, Corpus Browser, Note Review Queue, Learning Lab, Evaluation Dashboard, Governance, and Model Setup.
+The Vite React app runs at `http://localhost:5173` during local development. It is organized as a language-focused console: the sidebar selects a language, and section navigation switches between four top-level tabs:
 
-### Language profile
+- **Start:** language overview, profile-derived counts, saved examples, corpus search, interlinear display, concordance, and corpus graph.
+- **Build:** source intake, Obsidian vault import, extraction draft review, note review, and elder/community corrections.
+- **Practice:** learner exercises, exercise authoring, model-generated exercise previews, and grounded chat.
+- **Settings:** model discovery, saved model profiles, provider tests, evaluation checks, governance records, audit, and exports.
+
+The feature sections below use their domain names so API, code, and documentation stay easy to cross-reference.
+
+### Start and language profile
 
 The profile view presents public linguistic metadata derived from workspace state:
 
@@ -30,11 +37,12 @@ The profile also reports paradigm gaps - a fieldwork to-do derived entirely from
 
 Use this view to understand what forms and rules the selected language currently supports. A new language starts with an empty profile and fills in as sources are processed and drafts are accepted.
 
-### Sources & intake
+### Build and sources & intake
 
 The intake workspace captures raw materials and turns them into reviewable drafts:
 
-- Register a pasted text, word list, or URL source, or upload a file (PDF, DOCX, plain-text documents, images, or audio; 25 MB cap).
+- Register a pasted text, word list, or URL source; import local Obsidian Markdown notes as pending text sources; or upload a file (PDF, DOCX, plain-text documents, images, or audio; 25 MB cap).
+- Obsidian import accepts a vault folder path, optional subfolder traversal, and a maximum Markdown-file count. The server skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, then stores each readable note as an ordinary pending text source for the same processing and review flow.
 - Process a source to generate extraction drafts. The console processes in the background and polls until the source leaves `processing`, so long sources through a slow local model do not block the page. URL sources are fetched and converted to text server-side; images use a vision-capable model or fall back to local OCR; audio is transcribed through a configured transcription endpoint first.
 - Review proposed drafts one by one, or select several with the per-draft checkboxes (or "Select all proposed") and accept/reject them in bulk - up to 50 at a time, with a confirm step and a per-draft failure report when some items cannot be reviewed. Duplicate badges warn when a draft repeats an existing entry ("Duplicate of existing entry"), reuses a form with a different gloss ("Same form, different gloss"), repeats a note topic ("Duplicate topic"), or duplicates another pending draft. Badges are advisory and never block a decision. Grounding badges additionally warn when a draft contradicts already-accepted data: a form whose gloss conflicts with an accepted lexeme, a form that decomposes into accepted morphemes (so its gloss probably belongs to a different word), or a corpus segmentation that contradicts an accepted gloss - hover a badge for the full explanation.
 - Accepting a lexeme draft adds it to the lexicon; accepting a corpus draft stores the passage with a private answer key and `pending-review` consent status; accepting a grammar-note draft creates a draft note in the normal review queue.
@@ -43,9 +51,9 @@ The intake workspace captures raw materials and turns them into reviewable draft
 
 Nothing extracted by a model enters the workspace without an explicit human accept.
 
-### Corpus browser
+### Start examples and corpus browser
 
-The corpus browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels. Two display modes are available: cards, and an interlinear glossed text mode that aligns each surface form over its gloss with the free translation beneath. Clicking any morpheme (in either mode) filters the list to passages containing that surface form - a lightweight concordance - with an active-filter pill showing the match count.
+The examples browser shows target-language passages, English translations, morphological segmentation, topic tags, source labels, and consent-use labels. Three display modes are available: cards, an interlinear glossed text mode that aligns each surface form over its gloss with the free translation beneath, and a corpus graph that visualizes passages, morphemes, topics, source assets, notes, exercises, AI sessions, and elder corrections as a role-gated context network. Clicking any morpheme in the text modes filters the list to passages containing that surface form - a lightweight concordance - with an active-filter pill showing the match count.
 
 A command palette (Ctrl+K or Cmd+K) is available everywhere in the console for jumping to a language, opening a workspace view, or toggling the theme.
 
@@ -69,9 +77,9 @@ If assignments change mid-review, earlier approvals stay in the audit trail but 
 
 Repeated contested, rejected, deferred, or escalated decisions for the same note and disposition update the existing open work item instead of creating duplicate open ledger entries.
 
-### Learning lab
+### Practice and learning lab
 
-The Learning Lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.
+The Practice lab previews public learner exercises and submits answers to the API for server-side grading. Public exercise responses omit private answer keys, adversarial probes, and grading explanations.
 
 A "Practice next" panel recommends what to work on using spaced repetition derived from your own submission history: unattempted exercises come first, a correct answer doubles the review interval (1, 2, 4 ... up to 30 days), and a wrong answer resets it, so overdue material resurfaces ahead of comfortable material.
 
@@ -126,13 +134,13 @@ The conversation is fully interactive in natural language: the complete message 
 
 The assistant is a conversation partner, not an authority: its claims carry no special status, and nothing it says changes workspace data - the lexicon, corpus, and notes only change through the reviewed workflows.
 
-### Model setup
+### Settings and model setup
 
-The model setup view reports server-side LLM provider readiness, transcription readiness, and AI session observability. Browser code never receives provider API keys.
+The Settings tab reports server-side LLM provider readiness, transcription readiness, saved model profiles, evaluation checks, governance records, exports, and AI session observability. Browser code never receives provider API keys.
 
 Supported provider modes include deterministic fallback, OpenAI-compatible local servers, LM Studio, Ollama, and OpenAI-compatible remote APIs. Audio transcription uses a separate OpenAI-compatible endpoint. Timed-out or failed provider calls are recorded as failed AI sessions with sanitized diagnostics. See the [Configuration Reference](configuration.md) for setup recipes.
 
-The discovered-model dropdown scans configured and common local endpoints. If no model is configured and exactly one no-key local model is found, the app saves and activates it automatically. Selecting any discovered model also writes the provider/base URL/model settings immediately, so operators can switch between loaded local models without restarting the app. When a saved model is unloaded, Settings warns that the active saved model is stale and offers to apply the loaded replacement or switch back to offline deterministic mode. Long file-path model names are shortened in status messages and the dropdown, while the editable Model field keeps the exact provider value. Manually typed provider settings still use Save settings.
+The discovered-model dropdown scans configured and common local endpoints. Saved model profiles store named provider/base URL/model combinations, can be activated without restarting, and keep API keys write-only in responses. If no model is configured and exactly one no-key local model is found, the app saves and activates it automatically. Selecting any discovered model also writes the provider/base URL/model settings immediately, so operators can switch between loaded local models without restarting the app. When a saved model is unloaded, Settings warns that the active saved model is stale and offers to apply the loaded replacement or switch back to offline deterministic mode. Long file-path model names are shortened in status messages and the dropdown, while the editable Model field keeps the exact provider value. Manually typed provider settings still use Save settings.
 
 The provider smoke test shows an "offline placeholder" notice when no real model is configured, so a canned deterministic reply is never mistaken for a model response. A Test connection button actively probes the configured provider endpoint (`POST /llm/health-check`) and reports whether it is reachable, unreachable, or not configured - distinct from the static readiness report, which only checks configuration shape.
 
@@ -154,7 +162,7 @@ The browser actor mapping is:
 - Learner: learner exercise submissions and learner-practice AI sessions.
 - Elder: governance records and elder-correction review/apply flows.
 - Reviewer: language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
-- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, and AI observability. The `GET /observability/neural-map` context graph is reachable with a programmer token through the API but is not surfaced in the browser console.
+- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, AI observability, and the corpus graph in the Start examples browser.
 
 Lead and admin identities still exist in the local state for backend authorization, persisted review-policy authority, audit integrity, and future production-account design. Review-policy edits from the browser are audited as reviewer activity, while the stored policy updater remains the canonical lead/admin authority required by local database validation.
 

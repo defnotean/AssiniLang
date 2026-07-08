@@ -31,17 +31,30 @@ export function readPrototypeSessionTtlMs(env: Record<string, string | undefined
   return value;
 }
 
+export function prototypeSessionCookieSecure(
+  env: Record<string, string | undefined> = process.env
+): boolean {
+  const flag = env.ASSINI_COOKIE_SECURE?.trim().toLowerCase();
+  if (flag === "1" || flag === "true") return true;
+  if (flag === "0" || flag === "false") return false;
+  return env.NODE_ENV === "production";
+}
+
 export function serializePrototypeSessionCookie(
   sessionId: string,
-  maxAgeSeconds: number = PROTOTYPE_SESSION_MAX_AGE_SECONDS
+  maxAgeSeconds: number = PROTOTYPE_SESSION_MAX_AGE_SECONDS,
+  options: { secure?: boolean; env?: Record<string, string | undefined> } = {}
 ): string {
-  return [
+  const secure = options.secure ?? prototypeSessionCookieSecure(options.env ?? process.env);
+  const parts = [
     `${PROTOTYPE_SESSION_COOKIE}=${encodeURIComponent(sessionId)}`,
     "HttpOnly",
     "SameSite=Strict",
     "Path=/",
     `Max-Age=${maxAgeSeconds}`
-  ].join("; ");
+  ];
+  if (secure) parts.push("Secure");
+  return parts.join("; ");
 }
 
 /** Same attributes as the create path, but Max-Age=0 so the browser drops the cookie immediately. */

@@ -141,7 +141,7 @@ export async function fetchDashboardData(languageId?: string): Promise<Dashboard
   if (!languageId) {
     const [languages, evaluations] = await Promise.all([
       getJson<Language[]>("/languages"),
-      getJson<EvaluationRun[]>("/evaluations")
+      getJson<EvaluationRun[]>("/evaluations", "reviewer")
     ]);
 
     const firstLanguageId = languages[0]?.id;
@@ -165,7 +165,7 @@ export async function fetchDashboardData(languageId?: string): Promise<Dashboard
     getJson<CorpusPassage[]>(`/languages/${encodedLanguageId}/corpus`),
     getJson<Note[]>(`/languages/${encodedLanguageId}/notes`),
     getJson<PublicExercise[]>(`/languages/${encodedLanguageId}/exercises`),
-    getJson<EvaluationRun[]>("/evaluations")
+    getJson<EvaluationRun[]>("/evaluations", "reviewer")
   ]);
 
   return { languages, corpus, notes, exercises, evaluations };

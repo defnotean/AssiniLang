@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDraftPayload, type Language, type SourceAsset } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { normalizeHttpBaseUrl } from "./llmEnvShared.js";
 import { parseModelJson } from "./modelJson.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
@@ -184,6 +185,9 @@ export async function transcribeAudioFile(
   const model = env.ASSINI_TRANSCRIBE_MODEL?.trim() || "whisper-1";
   const apiKey = env.ASSINI_TRANSCRIBE_API_KEY?.trim();
 
+  const parsedBase = await assertOutboundHttpUrlAllowed(baseUrl, { env });
+  const transcriptionUrl = `${parsedBase.toString().replace(/\/+$/, "")}/audio/transcriptions`;
+
   const data = await readFile(params.filePath);
   const form = new FormData();
   form.append(
@@ -197,10 +201,11 @@ export async function transcribeAudioFile(
   const headers: Record<string, string> = {};
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const response = await fetchFn(`${baseUrl.replace(/\/+$/, "")}/audio/transcriptions`, {
+  const response = await fetchFn(transcriptionUrl, {
     method: "POST",
     headers,
-    body: form
+    body: form,
+    redirect: "manual"
   });
   if (!response.ok) {
     throw new Error(`Transcription request failed with status ${response.status}.`);
@@ -211,6 +216,106 @@ export async function transcribeAudioFile(
     throw new Error("Transcription endpoint returned no text.");
   }
   return payload.text.trim();
+}
+
+export function ocrModelConfigured(env: Env = process.env): boolean {
+  return Boolean(normalizeHttpBaseUrl(env.ASSINI_OCR_BASE_URL));
+}
+
+function parseOcrModelContent(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return undefined;
+  }
+  const parts = content
+    .filter((part): part is { type: string; text: string } =>
+      typeof part === "object"
+      && part !== null
+      && "type" in part
+      && part.type === "text"
+      && typeof (part as { text?: unknown }).text === "string"
+    )
+    .map((part) => part.text);
+  return parts.length > 0 ? parts.join("") : undefined;
+}
+
+export async function ocrImageWithModel(
+  params: {
+    filePath: string;
+    mimeType?: string;
+    env?: Env;
+    fetchFn?: FetchFn;
+  }
+): Promise<string> {
+  const env = params.env ?? process.env;
+  const fetchFn = params.fetchFn ?? globalThis.fetch;
+  const baseUrl = env.ASSINI_OCR_BASE_URL?.trim();
+  if (!baseUrl) {
+    throw new Error(
+      "OCR model endpoint is not configured. Set ASSINI_OCR_BASE_URL to an OpenAI-compatible /chat/completions server (for example a local llava server)."
+    );
+  }
+
+  const model = env.ASSINI_OCR_MODEL?.trim() || "llava";
+  const apiKey = env.ASSINI_OCR_API_KEY?.trim();
+
+  const parsedBase = await assertOutboundHttpUrlAllowed(baseUrl, { env });
+  const completionsUrl = `${parsedBase.toString().replace(/\/+$/, "")}/chat/completions`;
+
+  const data = await readFile(params.filePath);
+  const mimeType = params.mimeType ?? "application/octet-stream";
+  const base64Data = data.toString("base64");
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
+
+  const response = await fetchFn(completionsUrl, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Extract all readable text from this image. Return plain text only — no commentary, explanation, or JSON."
+            },
+            {
+              type: "image_url",
+              image_url: { url: `data:${mimeType};base64,${base64Data}` }
+            }
+          ]
+        }
+      ]
+    }),
+    redirect: "manual"
+  });
+  if (!response.ok) {
+    throw new Error(`OCR model request failed with status ${response.status}.`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("OCR model endpoint returned invalid JSON.");
+  }
+
+  const choices = (payload as { choices?: unknown }).choices;
+  if (!Array.isArray(choices) || choices.length === 0) {
+    throw new Error("OCR model endpoint returned no choices.");
+  }
+
+  const content = (choices[0] as { message?: { content?: unknown } }).message?.content;
+  const text = parseOcrModelContent(content);
+  if (!text || text.trim().length === 0) {
+    throw new Error("OCR model endpoint returned no text.");
+  }
+  return text.trim();
 }
 
 /**
@@ -592,7 +697,22 @@ export async function extractCandidatesForAsset(
     if (!asset.filePath) throw new Error("Image source asset has no stored file.");
     const absolutePath = resolveSourceAssetFilePath(params.dataDir, asset.filePath, asset.languageId);
 
-    if (provider.completeChat) {
+    if (ocrModelConfigured(env)) {
+      let ocrText: string;
+      try {
+        ocrText = await ocrImageWithModel({
+          filePath: absolutePath,
+          mimeType: asset.mimeType,
+          env,
+          fetchFn
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`Configured OCR model could not read the image: ${reason}`);
+      }
+      warnings.push("Used configured OCR model to read the image.");
+      resolved = { text: ocrText, warnings: [] };
+    } else if (provider.completeChat) {
       const imageData = await readFile(absolutePath);
       const messages = buildImageExtractionMessages(language, asset.mimeType ?? "image/png", imageData.toString("base64"));
       const content = await provider.completeChat(messages);
@@ -603,23 +723,23 @@ export async function extractCandidatesForAsset(
         );
       }
       return { ...parsed, warnings };
+    } else {
+      let ocrText: string;
+      try {
+        ocrText = await ocrImageFile({
+          filePath: absolutePath,
+          env,
+          cachePath: resolve(params.dataDir, "ocr-cache")
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Local OCR could not read the image: ${reason} Configure a vision-capable model via ASSINI_LLM_PROVIDER (for example llava via Ollama), or provide a clearer image.`
+        );
+      }
+      warnings.push("No vision model configured; used local OCR (tesseract.js) to read the image.");
+      resolved = { text: ocrText, warnings: [] };
     }
-
-    let ocrText: string;
-    try {
-      ocrText = await ocrImageFile({
-        filePath: absolutePath,
-        env,
-        cachePath: resolve(params.dataDir, "ocr-cache")
-      });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      throw new Error(
-        `Local OCR could not read the image: ${reason} Configure a vision-capable model via ASSINI_LLM_PROVIDER (for example llava via Ollama), or provide a clearer image.`
-      );
-    }
-    warnings.push("No vision model configured; used local OCR (tesseract.js) to read the image.");
-    resolved = { text: ocrText, warnings: [] };
   } else {
     resolved = await resolveAssetText(asset, params.dataDir, env, fetchFn, params.lookupFn);
   }

@@ -218,8 +218,10 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     return nextDisposition as ReviewDisposition;
   }
 
-  app.get("/governance", async () => {
+  app.get("/governance", async (request, reply) => {
     const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     return state.governance;
   });
 

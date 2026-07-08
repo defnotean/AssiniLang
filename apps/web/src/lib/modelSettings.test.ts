@@ -53,6 +53,9 @@ function runtimeSettings(
     transcriptionBaseUrl: "",
     transcriptionModel: "whisper-1",
     transcriptionApiKeyConfigured: false,
+    ocrBaseUrl: "",
+    ocrModel: "llava",
+    ocrApiKeyConfigured: false,
     ocrLang: "eng",
     allowPrivateUrls: false,
     ...overrides
@@ -73,6 +76,9 @@ describe("model settings helpers", () => {
         transcriptionBaseUrl: "http://127.0.0.1:9000/v1",
         transcriptionModel: "whisper-large",
         transcriptionApiKeyConfigured: true,
+        ocrBaseUrl: "http://127.0.0.1:11434/v1",
+        ocrModel: "llava",
+        ocrApiKeyConfigured: true,
         ocrLang: "ceb",
         allowPrivateUrls: true
       }
@@ -85,6 +91,10 @@ describe("model settings helpers", () => {
       maxTokens: "8192",
       transcriptionApiKey: "",
       clearTranscriptionApiKey: false,
+      ocrBaseUrl: "http://127.0.0.1:11434/v1",
+      ocrModel: "llava",
+      ocrApiKey: "",
+      clearOcrApiKey: false,
       ocrLang: "ceb"
     });
   });
@@ -176,6 +186,9 @@ describe("model settings helpers", () => {
         transcriptionBaseUrl: "",
         transcriptionModel: "whisper-1",
         transcriptionApiKeyConfigured: false,
+        ocrBaseUrl: "",
+        ocrModel: "llava",
+        ocrApiKeyConfigured: false,
         ocrLang: "eng",
         allowPrivateUrls: false
       },

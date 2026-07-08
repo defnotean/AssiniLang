@@ -28,7 +28,8 @@ function isPrivateIpv4(address: string): boolean {
     || first === 127
     || (first === 169 && second === 254)
     || (first === 172 && second >= 16 && second <= 31)
-    || (first === 192 && second === 168);
+    || (first === 192 && second === 168)
+    || (first === 100 && second >= 64 && second <= 127);
 }
 
 function isPrivateIpv6(address: string): boolean {
@@ -77,14 +78,16 @@ async function assertResolvedAddressAllowed(hostname: string, env: Env, lookupFn
   const isIpLiteral = isIpv4Literal(hostname) || hostname.includes(":") || hostname.startsWith("[");
   if (isIpLiteral) return;
 
-  let resolvedAddress: string | undefined;
+  let resolvedAddress: string;
   try {
     resolvedAddress = (await lookupFn(hostname)).address;
   } catch {
-    return;
+    throw new Error(
+      `URL hostname ${hostname} could not be resolved and was blocked. Only resolvable public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
+    );
   }
 
-  if (resolvedAddress !== undefined && isPrivateAddress(resolvedAddress)) {
+  if (isPrivateAddress(resolvedAddress)) {
     throw new Error(
       `URL hostname ${hostname} resolves to a private or local network address and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
     );

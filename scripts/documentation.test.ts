@@ -32,6 +32,15 @@ async function readAllDocs(): Promise<Map<string, string>> {
   return docs;
 }
 
+function markdownSection(content: string, startHeading: string, endHeading: string): string {
+  const start = content.indexOf(startHeading);
+  const end = content.indexOf(endHeading, start + startHeading.length);
+  if (start < 0 || end < 0) {
+    throw new Error(`Could not find markdown section ${startHeading} before ${endHeading}`);
+  }
+  return content.slice(start, end);
+}
+
 // Route paths registered in the Fastify server, derived from source so the
 // guard cannot go stale when routes are added or renamed.
 async function readRegisteredRoutePaths(): Promise<string[]> {
@@ -78,11 +87,29 @@ async function readAppStateShape(): Promise<{ collections: string[]; schemaVersi
   for (const match of body.matchAll(/^\s*([A-Za-z0-9_]+):\s*z\.array\(/gm)) {
     if (match[1]) collections.push(match[1]);
   }
-  const versionMatch = body.match(/schemaVersion:\s*z\.literal\((\d+)\)/);
+
+  const versionMatch = body.match(/schemaVersion:\s*z\.literal\(([^)]+)\)/);
   if (!versionMatch || versionMatch[1] === undefined) {
     throw new Error("Could not find schemaVersion z.literal(...) in appStateSchema");
   }
-  return { collections, schemaVersion: Number(versionMatch[1]) };
+
+  const versionExpression = versionMatch[1].trim();
+  let schemaVersion: number;
+  if (/^\d+$/.test(versionExpression)) {
+    schemaVersion = Number(versionExpression);
+  } else {
+    const constantMatch = schema.match(
+      new RegExp(`export const ${versionExpression} = (\\d+) as const`)
+    );
+    if (!constantMatch || constantMatch[1] === undefined) {
+      throw new Error(
+        `Could not resolve schemaVersion literal ${versionExpression} from schema.ts`
+      );
+    }
+    schemaVersion = Number(constantMatch[1]);
+  }
+
+  return { collections, schemaVersion };
 }
 
 describe("project documentation", () => {
@@ -112,7 +139,7 @@ describe("project documentation", () => {
       "docs/development.md": ["npm.cmd run verify", "Building a language from raw sources"],
       "docs/ingestion.md": ["## Source kinds", "## SSRF guard", "## Error catalogue", "## Duplicate flags on drafts", "```mermaid"],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
-      "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Sources & intake"],
+      "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
       "docs/roadmap.md": ["Non-negotiable gate", "First Nations"],
       "docs/troubleshooting.md": ["## Startup and ports", "ASSINI_TRANSCRIBE_BASE_URL", "ASSINI_ALLOW_PRIVATE_URLS", "data/local-db.json"],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
@@ -211,10 +238,11 @@ describe("project documentation", () => {
 
   it("indexes every server route path in docs/api.md", async () => {
     const apiDoc = await readProjectFile("docs/api.md");
+    const routeIndex = markdownSection(apiDoc, "## Route index", "## Auth model");
     const routePaths = await readRegisteredRoutePaths();
 
     expect(routePaths.length).toBeGreaterThanOrEqual(10);
-    const undocumented = routePaths.filter((path) => !apiDoc.includes(`\`${path}\``)).sort();
+    const undocumented = routePaths.filter((path) => !routeIndex.includes(`\`${path}\``)).sort();
     expect(undocumented, `Add these routes to the docs/api.md route index: ${undocumented.join(", ")}`).toEqual([]);
   });
 

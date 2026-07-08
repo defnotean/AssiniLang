@@ -1,12 +1,14 @@
 import type { CorpusPassage, ExtractionDraft, Lexeme, Note, SourceAsset } from "@assini/db";
-import type { SourceRegistrationPayload } from "@assini/api-contract";
+import type {
+  ObsidianVaultImportPayload,
+  ObsidianVaultImportResponse,
+  ProcessSourceResponse,
+  SourceRegistrationPayload
+} from "@assini/api-contract";
 import { actorRequest, assertOk, getJson } from "../lib/apiClient";
 
-export type ProcessSourceResult = {
-  asset: SourceAsset;
-  drafts: ExtractionDraft[];
-  warnings: string[];
-};
+/** Alias kept for existing call sites; matches the shared API contract. */
+export type ProcessSourceResult = ProcessSourceResponse;
 
 /**
  * Read-time duplicate flag computed by the API when listing extraction
@@ -55,7 +57,7 @@ export type BulkReviewExtractionDraftsResult = {
 };
 
 export async function fetchSources(languageId: string): Promise<SourceAsset[]> {
-  return getJson<SourceAsset[]>(`/languages/${encodeURIComponent(languageId)}/sources`);
+  return getJson<SourceAsset[]>(`/languages/${encodeURIComponent(languageId)}/sources`, "reviewer");
 }
 
 export async function registerSource(languageId: string, payload: SourceRegistrationPayload): Promise<SourceAsset> {
@@ -90,6 +92,21 @@ export async function uploadSourceFile(languageId: string, file: File, title?: s
   return response.json() as Promise<SourceAsset>;
 }
 
+export async function importObsidianVault(
+  languageId: string,
+  payload: ObsidianVaultImportPayload
+): Promise<ObsidianVaultImportResponse> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/sources/obsidian-vault`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Obsidian vault import failed");
+
+  return response.json() as Promise<ObsidianVaultImportResponse>;
+}
+
 export async function processSource(
   sourceId: string,
   options?: { async?: boolean }
@@ -111,7 +128,10 @@ export async function fetchExtractionDrafts(
   status?: ExtractionDraft["status"]
 ): Promise<ExtractionDraftView[]> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
-  return getJson<ExtractionDraftView[]>(`/languages/${encodeURIComponent(languageId)}/extraction-drafts${query}`);
+  return getJson<ExtractionDraftView[]>(
+    `/languages/${encodeURIComponent(languageId)}/extraction-drafts${query}`,
+    "reviewer"
+  );
 }
 
 export async function acceptExtractionDraft(draftId: string): Promise<AcceptExtractionDraftResult> {

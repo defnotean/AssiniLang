@@ -22,10 +22,13 @@ import {
   type EvaluationRun,
   type Exercise,
   type ExerciseSubmission,
+  type ExtractionDraft,
   type GovernanceRecord,
   type Language,
+  type Lexeme,
   type Note,
   type ReviewDisposition,
+  type SourceAsset,
   userRoleSchema
 } from "./schema";
 
@@ -2753,6 +2756,212 @@ describe("JsonStore", () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it.each([
+    [
+      "missing language",
+      {
+        id: "source-1",
+        languageId: "missing-language",
+        kind: "text" as const,
+        title: "Notes",
+        rawText: "mira",
+        status: "pending" as const,
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      },
+      "Source asset references missing language: missing-language"
+    ],
+    [
+      "failed without error",
+      {
+        id: "source-1",
+        languageId: "avenik",
+        kind: "text" as const,
+        title: "Notes",
+        rawText: "mira",
+        status: "failed" as const,
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      },
+      "Failed source asset requires an error: source-1"
+    ],
+    [
+      "non-failed with error",
+      {
+        id: "source-1",
+        languageId: "avenik",
+        kind: "text" as const,
+        title: "Notes",
+        rawText: "mira",
+        status: "pending" as const,
+        error: "stale failure",
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      },
+      "Non-failed source asset must not carry an error: source-1"
+    ]
+  ])("rejects persisted source assets with %s", (_caseName, asset, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.sourceAssets = [asset];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it.each([
+    [
+      "missing source asset",
+      {
+        id: "draft-1",
+        languageId: "avenik",
+        sourceAssetId: "missing-source",
+        kind: "lexeme" as const,
+        payload: { form: "mira", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] },
+        confidence: "medium" as const,
+        status: "proposed" as const,
+        createdAt: "2026-06-06T00:00:00.000Z"
+      },
+      "Extraction draft references missing source asset: missing-source"
+    ],
+    [
+      "accepted without committed entity",
+      {
+        id: "draft-1",
+        languageId: "avenik",
+        sourceAssetId: "source-1",
+        kind: "lexeme" as const,
+        payload: { form: "mira", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] },
+        confidence: "medium" as const,
+        status: "accepted" as const,
+        createdAt: "2026-06-06T00:00:00.000Z",
+        reviewedBy: "reviewer-1",
+        reviewedAt: "2026-06-06T00:01:00.000Z"
+      },
+      "Accepted extraction draft requires committedEntityId: draft-1"
+    ],
+    [
+      "rejected with committed entity",
+      {
+        id: "draft-1",
+        languageId: "avenik",
+        sourceAssetId: "source-1",
+        kind: "lexeme" as const,
+        payload: { form: "mira", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] },
+        confidence: "medium" as const,
+        status: "rejected" as const,
+        createdAt: "2026-06-06T00:00:00.000Z",
+        reviewedBy: "reviewer-1",
+        reviewedAt: "2026-06-06T00:01:00.000Z",
+        committedEntityId: "lex-1"
+      },
+      "Non-accepted extraction draft must not carry committedEntityId: draft-1"
+    ]
+  ])("rejects persisted extraction drafts with %s", (_caseName, draft, errorMessage) => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.sourceAssets = [{
+      id: "source-1",
+      languageId: "avenik",
+      kind: "text",
+      title: "Notes",
+      rawText: "mira = river",
+      status: "processed",
+      createdBy: "programmer-1",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      processedAt: "2026-06-06T00:01:00.000Z"
+    }];
+    state.extractionDrafts = [draft as ExtractionDraft];
+
+    expect(() => parseAppState(state)).toThrow(errorMessage);
+  });
+
+  it("rejects accepted extraction drafts whose committed entity belongs to another language", () => {
+    const state = createEmptyState();
+    state.languages = [
+      createTestLanguage(),
+      createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })
+    ];
+    state.sourceAssets = [{
+      id: "source-1",
+      languageId: "avenik",
+      kind: "text",
+      title: "Notes",
+      rawText: "mira = river",
+      status: "processed",
+      createdBy: "programmer-1",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      processedAt: "2026-06-06T00:01:00.000Z"
+    }];
+    state.lexemes = [{
+      id: "lex-solari",
+      languageId: "solari",
+      form: "xara",
+      gloss: "stone",
+      partOfSpeech: "noun",
+      tags: [],
+      sourceAssetIds: []
+    } satisfies Lexeme];
+    state.extractionDrafts = [{
+      id: "draft-1",
+      languageId: "avenik",
+      sourceAssetId: "source-1",
+      kind: "lexeme",
+      payload: { form: "mira", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] },
+      confidence: "medium",
+      status: "accepted",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      reviewedBy: "reviewer-1",
+      reviewedAt: "2026-06-06T00:01:00.000Z",
+      committedEntityId: "lex-solari"
+    } satisfies ExtractionDraft];
+
+    expect(() => parseAppState(state)).toThrow(
+      "Extraction draft committedEntityId lex-solari belongs to language solari, not avenik"
+    );
+  });
+
+  it("rejects lexemes that reference missing or cross-language source assets", () => {
+    const state = createEmptyState();
+    state.languages = [
+      createTestLanguage(),
+      createTestLanguage({ id: "solari", name: "Solari", typology: "isolating" })
+    ];
+    state.sourceAssets = [{
+      id: "source-solari",
+      languageId: "solari",
+      kind: "text",
+      title: "Other language notes",
+      rawText: "x",
+      status: "processed",
+      createdBy: "programmer-1",
+      createdAt: "2026-06-06T00:00:00.000Z",
+      processedAt: "2026-06-06T00:01:00.000Z"
+    } satisfies SourceAsset];
+    state.lexemes = [{
+      id: "lex-1",
+      languageId: "avenik",
+      form: "mira",
+      gloss: "river",
+      partOfSpeech: "noun",
+      tags: [],
+      sourceAssetIds: ["source-solari"]
+    } satisfies Lexeme];
+
+    expect(() => parseAppState(state)).toThrow(
+      "Lexeme source asset source-solari belongs to language solari, not avenik"
+    );
+  });
+
+  it("rejects corpus passages that reference missing source assets", () => {
+    const state = createEmptyState();
+    state.languages = [createTestLanguage()];
+    state.corpus = [createTestCorpusPassage({ sourceAssetId: "missing-source" })];
+
+    expect(() => parseAppState(state)).toThrow(
+      "Corpus passage references missing source asset: missing-source"
+    );
   });
 
   it("round-trips a source asset with extraction warnings through the store", async () => {

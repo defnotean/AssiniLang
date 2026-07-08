@@ -141,6 +141,14 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
   app.get("/exercises/:exerciseId/submissions", async (request, reply) => {
     const { exerciseId } = request.params as { exerciseId: string };
     const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "learner",
+      "reviewer",
+      "lead",
+      "admin"
+    ]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+
     const exercise = state.exercises.find((item) => item.id === exerciseId);
 
     if (!exercise) {

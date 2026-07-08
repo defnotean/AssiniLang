@@ -11,12 +11,19 @@ export function resolveEvalDbPath(env: NodeJS.ProcessEnv = process.env): string 
   return override ? resolve(override) : defaultEvalDbPath;
 }
 
+function requireLanguages(env: NodeJS.ProcessEnv = process.env): boolean {
+  const value = env.ASSINI_EVAL_REQUIRE_LANGUAGES?.trim().toLowerCase();
+  return value === "1" || value === "true";
+}
+
 export async function runEvaluationCli({
   dbPath = resolveEvalDbPath(),
+  env = process.env,
   stderr = console.error,
   stdout = console.log
 }: {
   dbPath?: string;
+  env?: NodeJS.ProcessEnv;
   stderr?: (message?: unknown, ...optionalParams: unknown[]) => void;
   stdout?: (message?: unknown, ...optionalParams: unknown[]) => void;
 } = {}) {
@@ -24,6 +31,11 @@ export async function runEvaluationCli({
   const state = await store.read();
 
   if (state.languages.length === 0) {
+    if (requireLanguages(env)) {
+      stderr("Evaluation gate failed: workspace has no languages (ASSINI_EVAL_REQUIRE_LANGUAGES is set).");
+      stderr("Seed a fixture language before running verify, or unset ASSINI_EVAL_REQUIRE_LANGUAGES for an empty local workspace.");
+      return 1;
+    }
     stdout("No languages in the workspace yet; nothing to evaluate.");
     stdout("Create a language and ingest sources through the web console or API, then re-run the evaluation.");
     return 0;

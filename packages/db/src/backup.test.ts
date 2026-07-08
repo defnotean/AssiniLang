@@ -1,7 +1,7 @@
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JsonStore } from "./store.js";
 import { buildTestWorkspaceState } from "./testing.js";
 
@@ -89,4 +89,30 @@ it("json backup is a byte-for-byte copy of the live file", async () => {
   const backupPath = join(dir, "copy.json");
   await store.backupTo(backupPath);
   expect(await readFile(backupPath, "utf8")).toBe(await readFile(dbPath, "utf8"));
+});
+
+it("keeps the live json database readable when restore write fails after backup validation", async () => {
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+  const beforeBytes = await readFile(dbPath, "utf8");
+
+  const backupPath = join(dir, "backup.json");
+  await store.backupTo(backupPath);
+
+  // Backup is already validated inside restoreFrom before any write; fail the
+  // temp write so the live file must remain untouched.
+  const writeSpy = vi.spyOn(JsonStore.prototype, "write").mockRejectedValueOnce(
+    new Error("simulated restore write failure")
+  );
+  try {
+    await expect(store.restoreFrom(backupPath)).rejects.toThrow(dbPath);
+    expect(await store.read()).toEqual(before);
+    expect(await readFile(dbPath, "utf8")).toBe(beforeBytes);
+    const leftovers = (await readdir(dir)).filter((name) => name.includes("restore-tmp"));
+    expect(leftovers).toEqual([]);
+  } finally {
+    writeSpy.mockRestore();
+  }
 });

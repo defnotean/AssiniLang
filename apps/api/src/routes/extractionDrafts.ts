@@ -326,6 +326,8 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
     const { languageId } = request.params as { languageId: string };
     const { status } = request.query as { status?: string };
     const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
       return { error: `Language not found: ${languageId}` };

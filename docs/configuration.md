@@ -36,6 +36,8 @@ Read by `apps/api/src/llmProvider.ts`. The same provider drives ingestion extrac
 | `ASSINI_LLM_TIMEOUT_MS` | `180000` | positive integer | Per-request completion timeout in milliseconds. Invalid values fall back to the default with a warning. |
 | `ASSINI_LLM_MAX_TOKENS` | `4096` | positive integer | Caps `max_tokens` on each model request. Unset or invalid values fall back to the default. Raise it if extractions are getting truncated. |
 | `ASSINI_LLM_JSON_MODE` | unset (off) | `1` or `true` | When enabled, sends `response_format: { type: "json_object" }` on extraction (`completeChat`) requests only - never on AI chat sessions. Off by default because some local servers reject the field; turn it on with capable servers (recent llama.cpp or OpenAI) to make extraction JSON more reliable. |
+| `ASSINI_LLM_ACTIVE_PROFILE_ID` | unset | profile id string | Runtime settings screen bookkeeping for the active saved model profile. Usually written by the app, not by hand. |
+| `ASSINI_LLM_MODEL_PROFILES` | unset | JSON array | Runtime settings screen storage for saved model profiles. May contain server-side API keys; keep it in local `.env` only and edit through the app when possible. |
 | `ASSINI_LLM_DISCOVERY_BASE_URLS` | unset | comma- or whitespace-separated http(s) URLs | Extra model endpoints for `GET /llm/models` to probe. Use this for model servers on another machine instead of relying on broad LAN scans. URLs may be roots (`http://box:11434`) or OpenAI-compatible bases (`http://box:8080/v1`). |
 | `ASSINI_MODEL_DISCOVERY_URLS` | unset | comma- or whitespace-separated http(s) URLs | Alias for `ASSINI_LLM_DISCOVERY_BASE_URLS`. |
 
@@ -72,12 +74,21 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `ASSINI_TRANSCRIBE_MODEL` | `whisper-1` | model name string | Model sent with the transcription request. |
 | `ASSINI_TRANSCRIBE_API_KEY` | unset | secret string | Optional bearer token for the transcription server. |
 
+## OCR model (image sources)
+
+| Variable | Default | Accepted values | Effect |
+| --- | --- | --- | --- |
+| `ASSINI_OCR_BASE_URL` | unset | http(s) URL | OpenAI-compatible server whose `/chat/completions` endpoint reads image sources. When set, image processing tries this dedicated OCR model before the main LLM or local tesseract fallback. |
+| `ASSINI_OCR_MODEL` | `llava` | model name string | Model sent with the OCR request. Can differ from `ASSINI_LLM_MODEL` so you can keep a small text model for extraction and a vision model only for images. |
+| `ASSINI_OCR_API_KEY` | unset | secret string | Optional bearer token for the OCR server. |
+
 ## Ingestion safety and OCR
 
 | Variable | Default | Accepted values | Effect |
 | --- | --- | --- | --- |
 | `ASSINI_ALLOW_PRIVATE_URLS` | unset (guard active) | `1` or `true` | Disables the SSRF guard so URL sources may point at localhost and private networks. Only enable in a trusted local setup; see [ingestion](ingestion.md#ssrf-guard). |
-| `ASSINI_OCR_LANG` | `eng` | tesseract.js language code (`eng`, `spa`, `fra`, ...) | Language for the local OCR fallback on image sources. The first run per language downloads trained data (a few MB, internet required once) and caches it under `data/ocr-cache/`. |
+| `ASSINI_OBSIDIAN_VAULT_ROOTS` | unset (vault import disabled) | semicolon-separated absolute directory paths | Allowlist of roots for `POST /languages/:languageId/sources/obsidian-vault`. The resolved vault path must equal a root or sit under `root` + path separator. Fail-closed: when unset or empty, vault imports return `400`. Prefer `realpath` so symlink escapes cannot leave an allowlisted root. Example: `C:\Users\you\Documents\Obsidian;D:\LanguageVaults`. |
+| `ASSINI_OCR_LANG` | `eng` | tesseract.js language code (`eng`, `spa`, `fra`, ...) | Language for the local tesseract.js fallback on image sources when neither the OCR model nor a vision-capable main LLM is configured. The first run per language downloads trained data (a few MB, internet required once) and caches it under `data/ocr-cache/`. |
 
 ## Ports, paths, and auth
 
@@ -89,13 +100,16 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `HOST` | `127.0.0.1` | hostname/IP | API listen host; also the host the dev launcher binds both processes to. |
 | `ASSINI_API_HOST` | `127.0.0.1` | hostname/IP | Where the Vite `/api` proxy forwards requests (set automatically by the dev launcher). |
 | `ASSINI_API_PORT` | `4321` | port number | Port for the Vite `/api` proxy target (set automatically by the dev launcher). |
-| `ASSINI_DB_PATH` | `data/local-db.json` in the repo | absolute or relative file path | Overrides where the JSON local database lives. Uploaded assets and the OCR cache live next to it. |
+| `ASSINI_DB_PATH` | `data/local-db.json` in the repo | absolute or relative file path | Overrides where the local database lives. Paths ending in `.json` use the JSON store; any other extension uses SQLite. Uploaded assets and the OCR cache live next to it. Honored by seed, eval, and `db:backup`. |
+| `ASSINI_SEED_FIXTURE` | unset | `1` / `true` | When set, `npm run seed` writes the built-in Testlang fixture instead of an empty workspace. Verify sets this automatically. |
+| `ASSINI_EVAL_REQUIRE_LANGUAGES` | unset | `1` / `true` | When set, `npm run eval` exits non-zero if the workspace has no languages. Verify sets this automatically so an empty seed cannot green-pass. |
 | `ASSINI_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | comma-separated origins | CORS allow-list for the API. Set this explicitly when serving the web app from a deployed origin. |
 | `ASSINI_BODY_LIMIT_BYTES` | `65536` | positive integer | Maximum JSON request body size for Fastify routes. Multipart file uploads keep their separate 25 MB cap. |
 | `ASSINI_API_LOGGER` | unset (off) | `1` or `true` | Enables Fastify's built-in request/error logger for deployed or diagnostic runs. |
 | `ASSINI_DEV_AUTH_TOKEN` | unset (`test` under `NODE_ENV=test`) | secret string | Server token accepted in the `x-assini-dev-token` header for lead/admin server-token calls. |
 | `ASSINI_ENABLE_PROTOTYPE_AUTH` | unset (disabled) | `true` | Enables `POST /auth/prototype-session` for browser prototype sessions. The dev launcher sets this automatically. |
 | `ASSINI_PROTOTYPE_SESSION_TTL_MS` | `28800000` (8 hours) | positive integer (milliseconds) | Prototype session lifetime. Each successful use within the TTL slides the expiry forward; expired sessions return 401 and are evicted lazily and during session creation. Invalid values fail server startup. |
+| `ASSINI_COOKIE_SECURE` | unset (`Secure` when `NODE_ENV=production`) | `1`/`true` or `0`/`false` | When true (or when unset in production), prototype session `Set-Cookie` includes the `Secure` attribute so the session id is not sent over cleartext HTTP. Set `0` only for local HTTP development. |
 | `ASSINI_API_URL` | `http://127.0.0.1:4321` | URL | Base API URL used by driver scripts such as `scripts/setupKelevi.mjs` (the synthetic demo-language builder). |
 
 ## Setup recipes
@@ -111,7 +125,7 @@ npm.cmd run dev
 
 The explicit `/v1` base URL above is still correct. With the `ollama` alias a bare host (for example `http://127.0.0.1:11434`) now also works: the base URL is auto-normalized to end in `/v1`.
 
-For image sources, pick a vision-capable model such as `llava`.
+For image sources, pick a vision-capable model such as `llava`, or configure a separate OCR endpoint (see [Ollama OCR model](#ollama-ocr-model-image-sources) below).
 
 Two practical notes from real-model testing:
 
@@ -163,6 +177,21 @@ npm.cmd run dev
 
 Any server exposing an OpenAI-compatible `POST /audio/transcriptions` works (for example faster-whisper-server or whisper.cpp's server).
 
+### Ollama OCR model (image sources)
+
+Use a dedicated vision endpoint for images while keeping a smaller text model for extraction:
+
+```powershell
+$env:ASSINI_LLM_PROVIDER="ollama"
+$env:ASSINI_LLM_BASE_URL="http://127.0.0.1:11434/v1"
+$env:ASSINI_LLM_MODEL="llama3.1"
+$env:ASSINI_OCR_BASE_URL="http://127.0.0.1:11434/v1"
+$env:ASSINI_OCR_MODEL="llava"
+npm.cmd run dev
+```
+
+Pull the vision model first (`ollama pull llava`). Image sources call the OCR endpoint; text extraction still uses the main LLM. If `ASSINI_OCR_BASE_URL` is unset, images fall back to the main LLM when it is vision-capable, otherwise to local tesseract (`ASSINI_OCR_LANG`).
+
 ### Deterministic / no-model mode
 
 ```powershell
@@ -170,7 +199,7 @@ $env:ASSINI_LLM_PROVIDER="deterministic"
 npm.cmd run dev
 ```
 
-This is also the default with nothing configured. No external calls are made: text and word-list sources are parsed by the offline heuristic (delimited lines), images fall back to local OCR, and audio sources fail until a transcription endpoint is configured. Extraction results carry an explicit warning so you know no model ran.
+This is also the default with nothing configured. No external calls are made: text and word-list sources are parsed by the offline heuristic (delimited lines), images fall back to local tesseract OCR, and audio sources fail until a transcription endpoint is configured. Extraction results carry an explicit warning so you know no model ran.
 
 ## Checking the active configuration
 
@@ -178,4 +207,4 @@ This is also the default with nothing configured. No external calls are made: te
 curl.exe http://localhost:4321/llm/status
 ```
 
-The response reports provider mode, sanitized base URL, model, timeout, transcription readiness, and configuration warnings - never key values.
+The response reports provider mode, sanitized base URL, model, timeout, transcription readiness, OCR readiness, and configuration warnings - never key values.

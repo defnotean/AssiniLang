@@ -107,8 +107,10 @@ describe("bulk extraction draft review", () => {
 
     const drafts = await app.inject({
       method: "GET",
-      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=accepted`
+      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=accepted`,
+      headers: authHeaders("reviewer-1")
     });
+    expect(drafts.statusCode).toBe(200);
     const acceptedIds = drafts.json().map((draft: { id: string }) => draft.id);
     expect(acceptedIds).toContain("bulk-draft-lexeme");
     expect(acceptedIds).toContain("bulk-draft-note");

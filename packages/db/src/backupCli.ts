@@ -1,10 +1,14 @@
 import { basename, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveSeedDbPath } from "./seedCli.js";
 import { JsonStore } from "./store.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(currentFilePath), "..", "..", "..");
-const dbPath = resolve(repoRoot, "data", "local-db.json");
+
+export function resolveBackupDbPath(env: NodeJS.ProcessEnv = process.env): string {
+  return resolveSeedDbPath(env);
+}
 
 export function defaultBackupPath(sourcePath: string, now = new Date()): string {
   const timestamp = now.toISOString().replace(/[:.]/g, "-");
@@ -16,6 +20,7 @@ export function defaultBackupPath(sourcePath: string, now = new Date()): string 
 const invokedFilePath = process.argv[1] ? resolve(process.argv[1]) : undefined;
 
 if (invokedFilePath === currentFilePath) {
+  const dbPath = resolveBackupDbPath();
   const destinationArg = process.argv[2];
   const destination = destinationArg ? resolve(destinationArg) : defaultBackupPath(dbPath);
 

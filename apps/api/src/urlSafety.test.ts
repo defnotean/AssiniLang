@@ -13,4 +13,29 @@ describe("outbound URL safety", () => {
     });
     expect(parsed.hostname).toBe("127.0.0.1");
   });
+
+  it("fails closed when DNS lookup fails", async () => {
+    await expect(
+      assertOutboundHttpUrlAllowed("http://unresolvable.example/v1", {
+        env: {},
+        lookupFn: async () => {
+          throw new Error("ENOTFOUND");
+        }
+      })
+    ).rejects.toThrow(/could not be resolved/);
+  });
+
+  it("blocks hostnames that resolve to private addresses", async () => {
+    await expect(
+      assertOutboundHttpUrlAllowed("http://metadata.example/v1", {
+        env: {},
+        lookupFn: async () => ({ address: "169.254.169.254", family: 4 })
+      })
+    ).rejects.toThrow(/resolves to a private/);
+  });
+
+  it("blocks CGNAT addresses", async () => {
+    await expect(assertOutboundHttpUrlAllowed("http://100.64.0.1/v1", { env: {} }))
+      .rejects.toThrow(/private or local network/);
+  });
 });

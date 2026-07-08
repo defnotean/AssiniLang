@@ -75,8 +75,10 @@ export function useElderWorkspace(
       .then((context) => {
         if (isCurrent) setElderContext(context);
       })
-      .catch(() => {
-        if (isCurrent) setElderContext(null);
+      .catch((error: Error) => {
+        if (!isCurrent) return;
+        setElderContext(null);
+        setCorrectionError(error.message || t("elderWs.errContextLoadFailed"));
       })
       .finally(() => {
         if (isCurrent) setIsLoadingElder(false);

@@ -1,11 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   fetchRecommendedExercises,
-  type ExerciseAuthoringPayload,
-  type GeneratedExerciseDraft,
-  type PublicExerciseSubmission,
   type RecommendedExercises
 } from "../api";
+import type { LearnerWorkspace } from "../hooks/useLearnerWorkspace";
 import { formatSubmissionStatus, parseAuthoringList } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { AsyncState, PublicExercise } from "../lib/types";
@@ -16,38 +14,28 @@ const EXERCISE_TYPES = ["translate_to_target", "translate_to_english", "segment"
 export function LearnerView({
   languageId,
   exercises,
-  selectedExercise,
-  selectedExerciseId,
-  isWorkflowBusy,
-  exerciseAnswer,
-  isGrading,
-  exerciseResult,
-  isLoadingSubmissions,
-  submissionHistory,
-  onSelectExercise,
-  onAnswerChange,
-  onGrade,
-  onCreateExercise,
-  onGenerateExercise
+  learner,
+  isWorkflowBusy
 }: {
   languageId: string | null;
   exercises: PublicExercise[];
-  selectedExercise: PublicExercise | null;
-  selectedExerciseId: string | null;
+  learner: LearnerWorkspace;
   isWorkflowBusy: boolean;
-  exerciseAnswer: string;
-  isGrading: boolean;
-  exerciseResult: string | null;
-  isLoadingSubmissions: boolean;
-  submissionHistory: PublicExerciseSubmission[];
-  onSelectExercise: (exerciseId: string) => void;
-  onAnswerChange: (answer: string) => void;
-  onGrade: () => void;
-  onCreateExercise: (payload: ExerciseAuthoringPayload) => Promise<void>;
-  onGenerateExercise: (
-    options?: { type?: string }
-  ) => Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
 }) {
+  const {
+    selectedExercise,
+    selectedExerciseId,
+    exerciseAnswer,
+    isGrading,
+    exerciseResult,
+    isLoadingSubmissions,
+    submissionHistory,
+    setSelectedExerciseId: onSelectExercise,
+    setExerciseAnswer: onAnswerChange,
+    handleGrade: onGrade,
+    handleCreateExercise: onCreateExercise,
+    handleGenerateExercise: onGenerateExercise
+  } = learner;
   const { t } = useI18n();
   const [authoringType, setAuthoringType] = useState<PublicExercise["type"]>("translate_to_target");
   const [authoringPrompt, setAuthoringPrompt] = useState("");

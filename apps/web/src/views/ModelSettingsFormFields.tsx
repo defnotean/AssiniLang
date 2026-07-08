@@ -165,6 +165,56 @@ export function ModelSettingsFormFields({
       </div>
 
       <div className="settings-subsection">
+        <span className="detail-label">{t("model.ocrSettings")}</span>
+        <div className="settings-grid">
+          <div className="form-group">
+            <label htmlFor="ocr-base-url">{t("model.ocrBaseUrl")}</label>
+            <input
+              id="ocr-base-url"
+              value={form.ocrBaseUrl}
+              placeholder="http://127.0.0.1:11434/v1"
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({ ...current, ocrBaseUrl: event.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="ocr-model">{t("model.ocrModel")}</label>
+            <input
+              id="ocr-model"
+              value={form.ocrModel}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({ ...current, ocrModel: event.target.value }))}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="ocr-api-key">{t("model.replaceOcrApiKey")}</label>
+            <input
+              id="ocr-api-key"
+              type="password"
+              value={form.ocrApiKey}
+              autoComplete="off"
+              disabled={isSavingSettings || form.clearOcrApiKey}
+              onChange={(event) => setForm((current) => ({ ...current, ocrApiKey: event.target.value }))}
+            />
+          </div>
+          <label className="checkbox-row settings-checkbox" htmlFor="clear-ocr-key">
+            <input
+              id="clear-ocr-key"
+              type="checkbox"
+              checked={form.clearOcrApiKey}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                clearOcrApiKey: event.target.checked,
+                ocrApiKey: event.target.checked ? "" : current.ocrApiKey
+              }))}
+            />
+            {t("model.clearOcrApiKey")}
+          </label>
+        </div>
+      </div>
+
+      <div className="settings-subsection">
         <span className="detail-label">{t("model.ingestionSettings")}</span>
         <div className="settings-grid">
           <div className="form-group">

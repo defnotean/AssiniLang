@@ -3,12 +3,16 @@ import { redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.j
 
 const ORIGINAL_ENV = {
   ASSINI_LLM_API_KEY: process.env.ASSINI_LLM_API_KEY,
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+  ASSINI_TRANSCRIBE_API_KEY: process.env.ASSINI_TRANSCRIBE_API_KEY,
+  ASSINI_OCR_API_KEY: process.env.ASSINI_OCR_API_KEY
 };
 
 afterEach(() => {
   process.env.ASSINI_LLM_API_KEY = ORIGINAL_ENV.ASSINI_LLM_API_KEY;
   process.env.OPENAI_API_KEY = ORIGINAL_ENV.OPENAI_API_KEY;
+  process.env.ASSINI_TRANSCRIBE_API_KEY = ORIGINAL_ENV.ASSINI_TRANSCRIBE_API_KEY;
+  process.env.ASSINI_OCR_API_KEY = ORIGINAL_ENV.ASSINI_OCR_API_KEY;
 });
 
 describe("secret redaction", () => {
@@ -25,11 +29,25 @@ describe("secret redaction", () => {
     expect(redactConfiguredSecrets("failed with short")).toBe("failed with short");
   });
 
+  it("redacts transcription API keys from configured env", () => {
+    process.env.ASSINI_TRANSCRIBE_API_KEY = "transcribe-secret-value";
+
+    expect(redactConfiguredSecrets("failed with transcribe-secret-value"))
+      .toBe("failed with [redacted-secret]");
+  });
+
+  it("redacts OCR API keys from configured env", () => {
+    process.env.ASSINI_OCR_API_KEY = "ocr-secret-value";
+
+    expect(redactConfiguredSecrets("failed with ocr-secret-value"))
+      .toBe("failed with [redacted-secret]");
+  });
+
   it("redacts common API key and bearer token shapes", () => {
     const redacted = redactErrorSecrets(
-      "sk-live-value ASSINI_LLM_API_KEY=abc123 Bearer clear-token"
+      "sk-live-value ASSINI_LLM_API_KEY=abc123 ASSINI_TRANSCRIBE_API_KEY=xyz ASSINI_OCR_API_KEY=ocr Bearer clear-token"
     );
 
-    expect(redacted).toBe("[redacted-secret] [redacted-secret] [redacted-secret]");
+    expect(redacted).toBe("[redacted-secret] [redacted-secret] [redacted-secret] [redacted-secret] [redacted-secret]");
   });
 });

@@ -1,10 +1,11 @@
 import type Database from "better-sqlite3";
+import { CURRENT_SCHEMA_VERSION } from "./schema.js";
 
 /**
- * The schema version the current code writes. Mirrors `schemaVersion` in the
- * Zod app-state schema (packages/db/src/schema.ts).
+ * The schema version the current code writes. Mirrors `CURRENT_SCHEMA_VERSION`
+ * in the Zod app-state schema (packages/db/src/schema.ts).
  */
-export const SQLITE_SCHEMA_VERSION = 8;
+export const SQLITE_SCHEMA_VERSION = CURRENT_SCHEMA_VERSION;
 
 export interface SqliteMigration {
   /** Version the database must be at for this migration to apply. */

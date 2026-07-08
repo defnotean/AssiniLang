@@ -5,7 +5,7 @@ export type GovernancePayload = Pick<GovernanceRecord, "languageId" | "policyTyp
 export type ReviewPolicyPayload = Pick<ReviewPolicy, "assignedReviewerIds" | "approvalThreshold" | "requiresAssignedReviewer">;
 
 export async function fetchGovernance(): Promise<GovernanceRecord[]> {
-  return getJson<GovernanceRecord[]>("/governance");
+  return getJson<GovernanceRecord[]>("/governance", "reviewer");
 }
 
 export async function createGovernanceRecord(payload: GovernancePayload): Promise<GovernanceRecord> {

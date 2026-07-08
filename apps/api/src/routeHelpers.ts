@@ -14,9 +14,10 @@ import {
   type User,
   type UserRole
 } from "@assini/db";
+import { redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.js";
 
 export const MODEL_REQUIRED_MESSAGE =
-  "A configured model is required to generate draft notes. Set ASSINI_LLM_* (see the configuration reference) and retry.";
+  "A configured model is required to generate drafts. Set ASSINI_LLM_* (see the configuration reference) and retry.";
 
 export { parseStringArray } from "./parseArrays.js";
 export {
@@ -25,19 +26,31 @@ export {
   PROTOTYPE_SESSION_MAX_AGE_SECONDS,
   PROTOTYPE_SESSION_TTL_ENV_NAME,
   isPrototypeSessionActive,
+  prototypeSessionCookieSecure,
   pruneExpiredPrototypeSessions,
   readPrototypeSessionTtlMs,
   serializeExpiredPrototypeSessionCookie,
   serializePrototypeSessionCookie
 } from "./prototypeSessions.js";
 export type { PrototypeSessionMap, PrototypeSessionRecord } from "./prototypeSessions.js";
-export { redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.js";
+export { redactConfiguredSecrets, redactErrorSecrets };
 export {
   corpusPhonologyValidationError,
   corpusTargetContainsSurface,
   firstDuplicateNormalizedValue,
   normalizeAuthoredAnswer
 } from "./corpusValidation.js";
+
+function redactAuditValue(value: unknown): unknown {
+  if (typeof value === "string") return redactErrorSecrets(value);
+  if (Array.isArray(value)) return value.map(redactAuditValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => [key, redactAuditValue(nested)])
+    );
+  }
+  return value;
+}
 
 export type ResolvedActor = {
   actor: User;
@@ -69,8 +82,8 @@ export function buildAuditEvent(state: AppState, draft: AuditEventDraft, offset:
     entityType: draft.entityType,
     entityId: draft.entityId,
     languageId: draft.languageId ?? null,
-    summary: draft.summary,
-    metadata: draft.metadata ?? {}
+    summary: redactErrorSecrets(draft.summary),
+    metadata: redactAuditValue(draft.metadata ?? {}) as Record<string, unknown>
   };
 }
 
@@ -225,6 +238,7 @@ export function requireActor(
 
 export function buildNeuralMap(state: AppState, languageId: string): NeuralMapResponse {
   const language = state.languages.find((item) => item.id === languageId);
+  const sourceAssets = state.sourceAssets.filter((asset) => asset.languageId === languageId);
   const corpus = state.corpus.filter((passage) => passage.languageId === languageId);
   const notes = state.notes.filter((note) => note.languageId === languageId);
   const exercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
@@ -238,9 +252,72 @@ export function buildNeuralMap(state: AppState, languageId: string): NeuralMapRe
     nodes.push({ id: `language:${language.id}`, type: "language", label: language.name, metadata: { typology: language.typology } });
   }
 
+  for (const asset of sourceAssets) {
+    nodes.push({
+      id: `source_asset:${asset.id}`,
+      type: "source_asset",
+      label: asset.title,
+      metadata: { kind: asset.kind, status: asset.status }
+    });
+  }
+
+  const sourceAssetsById = new Map(sourceAssets.map((asset) => [asset.id, asset]));
+  const sourceAssetsByTitle = new Map(sourceAssets.map((asset) => [asset.title, asset]));
+  const seenMorphemes = new Set<string>();
+  const seenTopicTags = new Set<string>();
+  const seenCoOccurrenceEdges = new Set<string>();
+
   for (const passage of corpus) {
     nodes.push({ id: `corpus:${passage.id}`, type: "corpus", label: passage.textTarget, metadata: { source: passage.source } });
     edges.push({ source: `language:${languageId}`, target: `corpus:${passage.id}`, relation: "has_corpus", weight: 1 });
+
+    const sourceTitle = passage.source.startsWith("source-asset:") ? passage.source.slice("source-asset:".length) : "";
+    const sourceAsset = (passage.sourceAssetId ? sourceAssetsById.get(passage.sourceAssetId) : undefined)
+      ?? sourceAssetsByTitle.get(sourceTitle);
+    if (sourceAsset) {
+      edges.push({
+        source: `source_asset:${sourceAsset.id}`,
+        target: `corpus:${passage.id}`,
+        relation: "from_source",
+        weight: 0.95
+      });
+    }
+
+    for (const tag of passage.topicTags) {
+      const tagNodeId = `topic_tag:${languageId}:${tag}`;
+      if (!seenTopicTags.has(tagNodeId)) {
+        seenTopicTags.add(tagNodeId);
+        nodes.push({ id: tagNodeId, type: "topic_tag", label: tag, metadata: {} });
+      }
+      edges.push({ source: `corpus:${passage.id}`, target: tagNodeId, relation: "tagged", weight: 0.65 });
+    }
+
+    const morphemeSurfaces = [...new Set(
+      passage.morphologicalSegmentation.map((morpheme) => morpheme.surface).filter(Boolean)
+    )].slice(0, 12);
+    for (const surface of morphemeSurfaces) {
+      const morphemeNodeId = `morpheme:${languageId}:${surface}`;
+      if (!seenMorphemes.has(morphemeNodeId)) {
+        seenMorphemes.add(morphemeNodeId);
+        nodes.push({ id: morphemeNodeId, type: "morpheme", label: surface, metadata: {} });
+      }
+      edges.push({ source: `corpus:${passage.id}`, target: morphemeNodeId, relation: "contains_morpheme", weight: 0.72 });
+    }
+
+    for (let index = 0; index < morphemeSurfaces.length; index += 1) {
+      for (let nextIndex = index + 1; nextIndex < morphemeSurfaces.length; nextIndex += 1) {
+        const [left, right] = [morphemeSurfaces[index], morphemeSurfaces[nextIndex]].sort();
+        const edgeId = `${left}\u0000${right}`;
+        if (seenCoOccurrenceEdges.has(edgeId)) continue;
+        seenCoOccurrenceEdges.add(edgeId);
+        edges.push({
+          source: `morpheme:${languageId}:${left}`,
+          target: `morpheme:${languageId}:${right}`,
+          relation: "co_occurs",
+          weight: 0.35
+        });
+      }
+    }
   }
 
   for (const note of notes) {

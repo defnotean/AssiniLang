@@ -81,7 +81,7 @@ Extraction quality depends on the configured local model. All provider configura
 The workspace has no hardcoded language data. To populate a language locally:
 
 1. Create the language with a name, typology, description, and orthography. The web console's New language form in the sidebar collects those four fields; a phonology inventory can be supplied only through `POST /languages`. Declaring the inventory enables orthography validation for later corpus text.
-2. Register or upload raw sources for it in the Sources & intake view: pasted text, word lists, URLs, or files including images, audio, and PDF/DOCX documents.
+2. Register or upload raw sources for it in the Build tab: pasted text, word lists, URLs, Obsidian Markdown vault imports, or files including images, audio, and PDF/DOCX documents.
 3. Process each source (`POST /sources/:sourceId/process`; the console uses async mode and polls) and review the proposed extraction drafts. Duplicate badges flag drafts that repeat existing entries or other pending drafts.
 4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.
 5. Author exercises against the accepted notes and lexicon, then run evaluation.
@@ -100,12 +100,11 @@ Useful smoke checks:
 - A new language can be created and appears in the sidebar.
 - A pasted word-list source can be registered, processed, and its extraction drafts reviewed.
 - Accepting a lexeme draft updates the language's lexicon and profile counts.
-- Corpus Browser shows target text, translations, segmentation, and import controls.
+- Start examples show target text, translations, segmentation, import controls, interlinear display, concordance filtering, and graph mode.
 - Corpus import can create a validated passage and refresh the visible passage count.
-- Note Review Queue shows statuses and evidence counts.
-- Learning Lab grades a correct answer.
-- Evaluation Dashboard can run a system eval.
-- Governance view can load policy, audit, disposition, and export controls.
+- Build review shows note statuses and evidence counts.
+- Practice grades a correct answer.
+- Settings can discover/test models, switch saved profiles, run a system eval, and load policy, audit, disposition, and export controls.
 
 ## Generated files
 

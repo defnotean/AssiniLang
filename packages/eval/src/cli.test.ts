@@ -25,6 +25,7 @@ describe("evaluation CLI", () => {
 
     const exitCode = await runEvaluationCli({
       dbPath,
+      env: {},
       stderr: (message) => stderr.push(String(message)),
       stdout: (message) => stdout.push(String(message))
     });
@@ -32,5 +33,22 @@ describe("evaluation CLI", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toEqual([]);
     expect(stdout.join("\n")).toContain("No languages in the workspace yet");
+  });
+
+  it("fails when ASSINI_EVAL_REQUIRE_LANGUAGES is set and the workspace is empty", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-eval-cli-require-"));
+    const dbPath = join(dir, "local-db.json");
+    await new JsonStore(dbPath).write(createBootstrapState());
+    const stderr: string[] = [];
+
+    const exitCode = await runEvaluationCli({
+      dbPath,
+      env: { ASSINI_EVAL_REQUIRE_LANGUAGES: "1" },
+      stderr: (message) => stderr.push(String(message)),
+      stdout: () => undefined
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.join("\n")).toContain("ASSINI_EVAL_REQUIRE_LANGUAGES");
   });
 });

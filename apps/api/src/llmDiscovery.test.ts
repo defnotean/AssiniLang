@@ -81,7 +81,8 @@ describe("LLM model discovery", () => {
       },
       fetchFn: fetchStub,
       includeCommonTargets: false,
-      timeoutMs: 500
+      timeoutMs: 500,
+      lookupFn: async () => ({ address: "93.184.216.34", family: 4 })
     });
 
     expect(result.models[0]).toMatchObject({
@@ -190,6 +191,71 @@ describe("LLM model discovery", () => {
     expect(allowed.errors).toEqual([]);
   });
 
+  it("blocks configured and common local discovery targets when private URLs are disallowed", async () => {
+    const seenUrls: string[] = [];
+    const fetchStub: typeof fetch = async (input) => {
+      seenUrls.push(input.toString());
+      return new Response(JSON.stringify({ data: [] }), { status: 200 });
+    };
+
+    const result = await discoverLlmModels({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_LLM_DISCOVERY_BASE_URLS: "http://10.0.0.8:8080/v1"
+      },
+      fetchFn: fetchStub,
+      includeCommonTargets: true,
+      timeoutMs: 500
+    });
+
+    expect(seenUrls).toEqual([]);
+    expect(result.models).toEqual([]);
+    expect(result.endpoints).toEqual([]);
+    expect(result.errors).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: "Configured endpoint",
+        baseUrl: "http://127.0.0.1:9000/v1",
+        detail: expect.stringMatching(/private or local network/)
+      }),
+      expect.objectContaining({
+        source: "Discovery endpoint",
+        baseUrl: "http://10.0.0.8:8080/v1",
+        detail: expect.stringMatching(/private or local network/)
+      })
+    ]));
+    // Common localhost targets are skipped silently (reportErrors: false).
+    expect(result.errors.every((error) => !/Ollama local|LM Studio local|llama\.cpp local|Local model server/.test(error.source))).toBe(true);
+  });
+
+  it("scans common localhost targets only when ASSINI_ALLOW_PRIVATE_URLS is on", async () => {
+    const seenUrls: string[] = [];
+    const fetchStub: typeof fetch = async (input) => {
+      seenUrls.push(input.toString());
+      return new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+    };
+
+    await discoverLlmModels({
+      env: {},
+      fetchFn: fetchStub,
+      includeCommonTargets: true,
+      timeoutMs: 500
+    });
+    expect(seenUrls.some((url) => url.includes("127.0.0.1") || url.includes("localhost"))).toBe(false);
+
+    seenUrls.length = 0;
+    await discoverLlmModels({
+      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+      fetchFn: fetchStub,
+      includeCommonTargets: true,
+      timeoutMs: 500
+    });
+    expect(seenUrls.some((url) => url.includes("127.0.0.1") || url.includes("localhost"))).toBe(true);
+  });
+
   it("reports unreachable requested endpoints without leaking raw fetch errors", async () => {
     const result = await discoverLlmModels({
       env: {},
@@ -198,7 +264,8 @@ describe("LLM model discovery", () => {
       },
       extraBaseUrls: ["http://offline-box:8080/v1"],
       includeCommonTargets: false,
-      timeoutMs: 500
+      timeoutMs: 500,
+      lookupFn: async () => ({ address: "93.184.216.34", family: 4 })
     });
 
     expect(result.models).toEqual([]);

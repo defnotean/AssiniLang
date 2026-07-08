@@ -74,7 +74,7 @@ docs/                  The handbook, plus dated history under docs/specs and doc
 
 1. `npm.cmd run seed` writes an empty workspace to `data/local-db.json`: the local prototype users and no languages.
 2. Users create languages through `POST /languages` with name, typology, description, orthography, and an optional phonology inventory.
-3. Raw materials are registered or uploaded as source assets: pasted text, word lists, URLs, images, audio, and documents (plain-text formats, PDF, DOCX).
+3. Raw materials are registered or uploaded as source assets: pasted text, word lists, URLs, Obsidian Markdown vault imports, images, audio, and documents (plain-text formats, PDF, DOCX).
 4. `POST /sources/:sourceId/process` runs the ingestion pipeline (synchronously, or in the background with `{ "async": true }`), turning a source asset into proposed extraction drafts.
 5. Reviewers accept or reject each draft. Accepted drafts commit lexemes, corpus passages with private answer keys, or grammar notes.
 6. The Fastify API reads and mutates the JSON-backed state through `JsonStore`; public projection helpers strip private fields before data reaches the web app.

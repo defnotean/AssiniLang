@@ -12,22 +12,27 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/ready` | Public | Readiness check for schema-valid persistence. |
 | POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use; creating a session also sweeps expired session records. |
 | DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. |
-| GET | `/llm/status` | Public | Sanitized LLM provider and transcription readiness. |
+| GET | `/llm/status` | programmer, lead, admin | Sanitized LLM provider, transcription, and OCR readiness. |
 | GET | `/llm/settings` | programmer, lead, admin | Sanitized editable runtime settings for model, transcription, OCR, and URL-fetch behavior. |
 | GET | `/llm/models` | programmer, lead, admin | Discover model IDs exposed by configured, explicit, and common local OpenAI-compatible endpoints. Optional `?baseUrl=` adds one endpoint to the scan. |
 | PUT | `/llm/settings` | programmer, lead, admin | Save local runtime settings to `.env` and apply the active LLM provider without returning secret values. |
+| POST | `/llm/model-profiles` | programmer, lead, admin | Save or update a named model profile; optionally activate it immediately. |
+| PUT | `/llm/model-profiles/:profileId/activate` | programmer, lead, admin | Activate a saved model profile and hot-swap the active provider. |
+| DELETE | `/llm/model-profiles/:profileId` | programmer, lead, admin | Delete a saved model profile. |
 | POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
 | GET | `/users/me` | Any actor | Current prototype user. |
 | GET | `/languages` | Public | List languages. |
 | POST | `/languages` | reviewer, lead, admin | Create a language. |
 | PATCH | `/languages/:languageId` | reviewer, lead, admin | Update language metadata or phonology. |
+| DELETE | `/languages/:languageId` | reviewer, lead, admin | Permanently delete one language and its scoped workspace records. |
 | GET | `/languages/:languageId/profile` | Public | State-derived public profile. |
 | GET | `/languages/:languageId/lexicon` | Public | The language's lexemes. |
-| GET | `/languages/:languageId/sources` | Public | List source assets (the async-processing polling target). |
+| GET | `/languages/:languageId/sources` | reviewer, lead, admin, programmer | List source assets (the async-processing polling target). |
 | POST | `/languages/:languageId/sources` | reviewer, lead, admin | Register a `text`, `wordlist`, or `url` source. |
+| POST | `/languages/:languageId/sources/obsidian-vault` | reviewer, lead, admin | Import Markdown files from a local Obsidian vault path as pending text sources. |
 | POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). |
 | POST | `/sources/:sourceId/process` | reviewer, lead, admin | Run extraction; `{ "async": true }` for background mode. |
-| GET | `/languages/:languageId/extraction-drafts` | Public | List drafts with read-time duplicate flags; `?status=` filters. |
+| GET | `/languages/:languageId/extraction-drafts` | reviewer, lead, admin | List drafts with read-time duplicate flags; `?status=` filters. |
 | POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
 | POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
 | POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. |
@@ -41,13 +46,13 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). |
 | POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. |
 | POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
-| GET | `/exercises/:exerciseId/submissions` | Public | Sanitized submission history. |
+| GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. |
 | POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
-| GET | `/evaluations` | Public | Previous evaluation runs. |
+| GET | `/evaluations` | lead, admin, programmer, reviewer | Previous evaluation runs. |
 | POST | `/evaluations/run` | lead, admin, programmer, reviewer | Run evaluation for all languages. |
 | GET | `/exports/languages/:languageId/snapshot` | reviewer, elder, lead, admin | Sanitized language snapshot with integrity metadata. |
 | GET | `/exports/evaluations/artifact` | reviewer, lead, admin, programmer | Sanitized evaluation artifact. |
-| GET | `/governance` | Public | List governance records. |
+| GET | `/governance` | lead, admin, programmer, reviewer | List governance records. |
 | POST | `/governance` | elder, lead, admin | Create a consent, access, or generation policy record. |
 | GET | `/languages/:languageId/review-policy` | reviewer, elder, lead, admin | Review policy for one language. |
 | PUT | `/languages/:languageId/review-policy` | lead, admin (prototype-session reviewer exception) | Update assigned reviewers and threshold. |
@@ -82,7 +87,7 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 - Learner practice and learner-mode AI sessions use the learner actor.
 - Language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review-policy editing, and review-disposition workflows use the reviewer actor.
 - Governance writes and elder-correction review/apply flows use the Elder actor.
-- Audit reads, evaluation artifact reads, programmer AI sessions, operational metrics, and AI observability use the programmer actor. The `GET /observability/neural-map` graph is programmer-token reachable but is not wired into the browser console.
+- Audit reads, evaluation artifact reads, programmer AI sessions, operational metrics, AI observability, and the corpus graph in the Examples view use the programmer actor.
 
 Do not treat prototype auth as production security.
 
@@ -117,13 +122,15 @@ Permanently removes the language and all workspace records scoped to it (corpus,
 
 `POST /languages/:languageId/sources` registers a pasted `text`, `wordlist`, or `url` source with a title.
 
+`POST /languages/:languageId/sources/obsidian-vault` imports Markdown files from a local Obsidian vault folder path. The body is `{ "vaultPath": "...", "includeSubfolders": true, "maxFiles": 100 }`. The vault path must resolve under `ASSINI_OBSIDIAN_VAULT_ROOTS` (semicolon-separated absolute roots); when that env is unset/empty, or the path is outside the allowlist (including `..` / symlink escapes), the route returns `400`. The server reads `.md` files, skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, and stores each non-empty note as a pending `text` source. The response reports imported assets, skipped files with reasons, warnings, and counts. Process the imported sources normally to produce extraction drafts.
+
 `POST /languages/:languageId/sources/upload` accepts one multipart file up to 25 MB. The source kind is detected from MIME type and extension: images become `image`, audio files become `audio`, everything else becomes `document`. Document extraction supports plain-text formats (txt, md, csv, tsv, json), PDF, and DOCX.
 
 `POST /sources/:sourceId/process` runs the extraction pipeline. Processing per kind, chunking and merge rules, fallback behavior, and the full error catalogue are documented in the [Ingestion Deep Dive](ingestion.md). In short:
 
 - `text`/`wordlist`: LLM extraction; without a configured model, offline heuristic parsing of delimited lines.
 - `url`: SSRF-guarded server-side fetch and HTML-to-text conversion, then extraction.
-- `image`: vision-capable model when configured, otherwise local OCR (tesseract.js).
+- `image`: dedicated OCR model when `ASSINI_OCR_BASE_URL` is configured; otherwise vision-capable main LLM; otherwise local tesseract (`ASSINI_OCR_LANG`).
 - `audio`: transcription through `ASSINI_TRANSCRIBE_BASE_URL`, then text extraction.
 - `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing, then extraction.
 
@@ -133,7 +140,7 @@ The route also supports background processing for long sources: send a JSON body
 
 ## Extraction drafts
 
-`GET /languages/:languageId/extraction-drafts` lists drafts; `?status=proposed|accepted|rejected` filters.
+`GET /languages/:languageId/extraction-drafts` (roles: reviewer, lead, admin) lists drafts; `?status=proposed|accepted|rejected` filters.
 
 Listed proposed drafts may carry a read-time `duplicate` flag, computed per request and never persisted. Existing-workspace matches produce `{ kind, entityId }`: `exact` for a case-insensitive lexeme form+gloss match or a case/whitespace-insensitive corpus target-text match, `form` for a lexeme form that already exists with a different gloss (a possible homonym or gloss refinement), and `topic` for a grammar note repeating an existing note topic. The lexeme `exact` flag requires the draft to carry both a form and a gloss; a form match on a glossless draft yields the `form` flag instead. Topic matching is case- and whitespace-insensitive, like the lexeme and corpus comparisons. When two pending drafts propose the same thing, the later draft gets `{ kind: "pending", draftId }` pointing at the earlier one. Each draft gets at most one flag (existing-entity matches win over pending matches); the flag is advisory and does not block accept or reject.
 
@@ -288,9 +295,11 @@ The persisted app-state schema enforces the same ledger invariants during local 
 
 ## LLM status and sessions
 
-`GET /llm/status` returns provider readiness and transcription readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. It is a static, no-network read of the environment: it checks configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
+`GET /llm/status` returns provider readiness, transcription readiness, and OCR readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. OCR readiness reports whether `ASSINI_OCR_BASE_URL` is configured for image-source processing. These are static, no-network reads of the environment: they check configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
 
-`GET /llm/settings` and `PUT /llm/settings` are programmer/lead/admin routes for the local settings screen. They expose non-secret runtime values such as provider, base URL, model, timeout, max tokens, JSON mode, transcription endpoint, OCR language, and the private-URL fetch toggle. API keys are write-only: clients can submit replacements or clear them, but responses only report whether a key is configured. `PUT /llm/settings` writes the repo-root `.env`, updates the running API process environment, and refreshes the active provider for future ingestion, generation, and AI-session calls. Port, host, CORS, and body-limit changes still require restarting the dev launcher.
+`GET /llm/settings` and `PUT /llm/settings` are programmer/lead/admin routes for the local settings screen. They expose non-secret runtime values such as provider, base URL, model, timeout, max tokens, JSON mode, transcription endpoint, OCR model endpoint, OCR language (tesseract fallback), and the private-URL fetch toggle. API keys are write-only: clients can submit replacements or clear them, but responses only report whether a key is configured. `PUT /llm/settings` writes the repo-root `.env`, updates the running API process environment, and refreshes the active provider for future ingestion, generation, and AI-session calls. Port, host, CORS, and body-limit changes still require restarting the dev launcher.
+
+`POST /llm/model-profiles`, `PUT /llm/model-profiles/:profileId/activate`, and `DELETE /llm/model-profiles/:profileId` manage named runtime model profiles. Profiles store provider/base URL/model and related runtime knobs; API keys are still write-only in responses. Activating a profile materializes its settings into the active runtime env and reloads the provider, so users can switch between loaded local or remote models without restarting the app.
 
 `GET /llm/models` is the Model Setup discovery route. It asks the configured endpoint, any `ASSINI_LLM_DISCOVERY_BASE_URLS` / `ASSINI_MODEL_DISCOVERY_URLS` entries, and common local model servers for OpenAI-compatible `/v1/models`; Ollama endpoints are also checked through native `/api/tags`. It returns sanitized `{ models, errors, scannedAt }` data where each model candidate carries the provider, base URL, and model ID needed by `PUT /llm/settings`. The route does not sweep the whole LAN by default; pass `?baseUrl=http://host:port/v1` or configure discovery URLs for network-hosted model machines.
 

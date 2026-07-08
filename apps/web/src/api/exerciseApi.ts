@@ -53,7 +53,7 @@ export async function fetchRecommendedExercises(languageId: string): Promise<Rec
 }
 
 export async function fetchExerciseSubmissions(exerciseId: string): Promise<PublicExerciseSubmission[]> {
-  return getJson<PublicExerciseSubmission[]>(`/exercises/${encodeURIComponent(exerciseId)}/submissions`);
+  return getJson<PublicExerciseSubmission[]>(`/exercises/${encodeURIComponent(exerciseId)}/submissions`, "learner");
 }
 
 export async function createExercise(

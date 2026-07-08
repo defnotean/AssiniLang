@@ -35,6 +35,13 @@ const status: LlmStatus = {
     model: "",
     modelVariable: "ASSINI_TRANSCRIBE_MODEL"
   },
+  ocr: {
+    baseUrl: "",
+    baseUrlVariable: "ASSINI_OCR_BASE_URL",
+    configured: false,
+    model: "",
+    modelVariable: "ASSINI_OCR_MODEL"
+  },
   warnings: ["one", "two"]
 };
 
@@ -178,6 +185,9 @@ function baseInput(): DesktopDiagnosticsInput {
       maxTokens: 4096,
       model: "llama3.1",
       ocrLang: "eng",
+      ocrBaseUrl: "http://127.0.0.1:11434/v1",
+      ocrModel: "llava",
+      ocrApiKeyConfigured: false,
       provider: "openai-compatible",
       timeoutMs: 45000,
       transcriptionApiKeyConfigured: true,
@@ -239,6 +249,9 @@ describe("desktopDiagnostics", () => {
       "- Transcription base URL: not set",
       "- Transcription model: whisper-large",
       "- Transcription key: configured server-side",
+      "- OCR base URL: http://127.0.0.1:11434/v1",
+      "- OCR model: llava",
+      "- OCR key: not configured",
       "- OCR language: eng",
       "",
       "Model discovery",

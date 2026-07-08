@@ -59,6 +59,7 @@ export {
   bulkReviewExtractionDrafts,
   fetchExtractionDrafts,
   fetchSources,
+  importObsidianVault,
   processSource,
   registerSource,
   rejectExtractionDraft,
@@ -101,13 +102,17 @@ export type {
 } from "./api/languageApi";
 
 export {
+  activateModelProfile,
   checkLlmReachability,
+  deleteModelProfile,
   fetchDiscoveredModels,
   fetchLlmStatus,
   fetchRuntimeSettings,
+  saveModelProfile,
   updateRuntimeSettings
 } from "./api/llmApi";
 export type { RuntimeSettingsUpdate } from "./api/llmApi";
+export type { ProcessSourceResponse, RuntimeSettingsPatch } from "@assini/api-contract";
 
 export {
   generateDraftNotes,
@@ -133,6 +138,10 @@ export type {
   LlmModelDiscoveryResponse,
   LlmReachability,
   LlmStatus,
+  LlmModelProfile,
+  ModelProfileSavePayload,
+  ObsidianVaultImportPayload,
+  ObsidianVaultImportResponse,
   RuntimeSettings,
   RuntimeSettingsResponse,
   SourceRegistrationPayload

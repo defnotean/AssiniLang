@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { copyFile, mkdir, readFile, rename, rm, stat, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import type Database from "better-sqlite3";
 import { eq, getTableColumns } from "drizzle-orm";
 import type { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import type { SQLiteTable } from "drizzle-orm/sqlite-core";
-import { appStateSchema, parseAppState, type AppState, type Note } from "./schema.js";
+import { appStateSchema, CURRENT_SCHEMA_VERSION, parseAppState, type AppState, type Note } from "./schema.js";
 import * as schema from "./dbSchema.js";
 import { runSqliteMigrations } from "./sqliteMigrations.js";
 
@@ -37,9 +37,36 @@ function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBacken
   return backend;
 }
 
+/**
+ * Replaces `destPath` with `tempPath`. Prefers a single rename; on platforms
+ * that cannot rename over an existing file (Windows), moves the live file
+ * aside first and restores it if the final rename fails.
+ */
+async function replaceFileAtomically(tempPath: string, destPath: string): Promise<void> {
+  try {
+    await rename(tempPath, destPath);
+    return;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") {
+      throw error;
+    }
+  }
+
+  const previousPath = join(dirname(destPath), `.${basename(destPath)}.${randomUUID()}.prev`);
+  await rename(destPath, previousPath);
+  try {
+    await rename(tempPath, destPath);
+  } catch (error) {
+    await rename(previousPath, destPath).catch(() => undefined);
+    throw error;
+  }
+  await unlink(previousPath).catch(() => undefined);
+}
+
 export function createEmptyState(): AppState {
   return {
-    schemaVersion: 8,
+    schemaVersion: CURRENT_SCHEMA_VERSION,
     languages: [],
     corpus: [],
     noteAnswerKeys: [],
@@ -437,7 +464,7 @@ export class JsonStore {
       db.close();
 
       const state: AppState = {
-        schemaVersion: 8,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
         languages: nullToUndefined(languagesList) as any,
         corpus: nullToUndefined(corpusList) as any,
         corpusAnswerKeys: nullToUndefined(corpusAnswerKeysList) as any,
@@ -628,8 +655,10 @@ export class JsonStore {
   /**
    * Replaces the live database with the state stored in `sourcePath`. The
    * backup is fully parsed (Zod) before the live database is touched; on any
-   * validation failure the live database is left untouched. The snapshot
-   * cache is invalidated so the next read reflects the restored data.
+   * validation failure the live database is left untouched. Restored bytes are
+   * written to a temp path and then atomically renamed into place so a failed
+   * write cannot delete the live database. Caches are cleared only after the
+   * replace succeeds.
    */
   async restoreFrom(sourcePath: string): Promise<AppState> {
     const source = resolve(sourcePath);
@@ -653,12 +682,28 @@ export class JsonStore {
       );
     }
 
-    // The live file may be corrupt (that is the usual reason to restore), so
-    // remove it before writing through the normal path. write() re-validates
-    // the state and clears the snapshot cache.
-    await rm(this.dbPath, { force: true });
+    const dbDir = dirname(this.dbPath);
+    await mkdir(dbDir, { recursive: true });
+    // Keep the live basename suffix so backend inference stays correct if the
+    // explicit backend option is ever omitted; still pass backend explicitly.
+    const tempPath = join(dbDir, `.${basename(this.dbPath)}.${randomUUID()}.restore-tmp`);
+
+    try {
+      const tempStore = new JsonStore(tempPath, { backend: this.backend });
+      await tempStore.write(restored);
+      // Confirm the temp file is readable before touching the live database.
+      await tempStore.read();
+      await replaceFileAtomically(tempPath, this.dbPath);
+    } catch (error) {
+      await unlink(tempPath).catch(() => undefined);
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to restore local database at ${this.dbPath}: ${message}`, {
+        cause: error
+      });
+    }
+
     this.snapshot = null;
-    await this.write(restored);
+    this.schemaVerifiedKey = null;
     return restored;
   }
 

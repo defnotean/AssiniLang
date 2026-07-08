@@ -6,11 +6,20 @@ import { formatEvidenceLabel } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
+const REVIEW_FILTERS: ReviewFilter[] = ["all", "pending", "contested", "rejected", "deferred", "escalated", "approved"];
+
+function matchesReviewFilter(note: Note, filter: ReviewFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "pending") return note.status === "draft" || note.status === "under_review";
+  return note.status === filter;
+}
+
 export function ReviewView({
   notes,
   selectedNote,
   isWorkflowBusy,
   reviewingNoteId,
+  actionError = null,
   onSelectNote,
   onReview,
   onSaveExplanation
@@ -19,6 +28,7 @@ export function ReviewView({
   selectedNote: Note | null;
   isWorkflowBusy: boolean;
   reviewingNoteId: string | null;
+  actionError?: string | null;
   onSelectNote: (noteId: string) => void;
   onReview: (status: ReviewStatus) => void;
   onSaveExplanation: (explanation: string) => Promise<void>;
@@ -27,23 +37,26 @@ export function ReviewView({
   const [filter, setFilter] = useState<ReviewFilter>("all");
   const [noteExplanationDraft, setNoteExplanationDraft] = useState(selectedNote?.explanation ?? "");
   const [noteEditMessage, setNoteEditMessage] = useState<string | null>(null);
-  const counts = useMemo(() => ({
-    all: notes.length,
-    pending: notes.filter((note) => note.status === "draft" || note.status === "under_review").length,
-    contested: notes.filter((note) => note.status === "contested").length,
-    rejected: notes.filter((note) => note.status === "rejected").length,
-    deferred: notes.filter((note) => note.status === "deferred").length,
-    escalated: notes.filter((note) => note.status === "escalated").length,
-    approved: notes.filter((note) => note.status === "approved").length
-  }), [notes]);
+  const [noteEditError, setNoteEditError] = useState<string | null>(null);
+  const counts = useMemo(() => (
+    notes.reduce<Record<ReviewFilter, number>>((nextCounts, note) => {
+      nextCounts.all += 1;
+      if (note.status === "draft" || note.status === "under_review") {
+        nextCounts.pending += 1;
+      } else if (note.status in nextCounts) {
+        nextCounts[note.status as ReviewFilter] += 1;
+      }
+      return nextCounts;
+    }, { all: 0, pending: 0, contested: 0, rejected: 0, deferred: 0, escalated: 0, approved: 0 })
+  ), [notes]);
   const filteredNotes = useMemo(() => {
     if (filter === "all") return notes;
-    if (filter === "pending") return notes.filter((note) => note.status === "draft" || note.status === "under_review");
-    return notes.filter((note) => note.status === filter);
+    return notes.filter((note) => matchesReviewFilter(note, filter));
   }, [filter, notes]);
   useEffect(() => {
     setNoteExplanationDraft(selectedNote?.explanation ?? "");
     setNoteEditMessage(null);
+    setNoteEditError(null);
   }, [selectedNote?.id, selectedNote?.explanation]);
   const trimmedDraft = noteExplanationDraft.trim();
   const canSaveExplanation = selectedNote !== null
@@ -55,15 +68,22 @@ export function ReviewView({
   async function handleSaveExplanation(event: FormEvent) {
     event.preventDefault();
     if (!canSaveExplanation) return;
-    await onSaveExplanation(trimmedDraft);
-    setNoteEditMessage(t("reviewView.noteExplanationUpdated"));
+    setNoteEditError(null);
+    try {
+      await onSaveExplanation(trimmedDraft);
+      setNoteEditMessage(t("reviewView.noteExplanationUpdated"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("errors.noteExplanationUpdateFailed");
+      setNoteEditMessage(null);
+      setNoteEditError(message);
+    }
   }
 
   return (
     <div className="review-workbench">
       <section className="triage-panel" aria-label={t("reviewView.reviewQueue")}>
         <div className="filter-strip" aria-label={t("reviewView.reviewFilters")}>
-          {(["all", "pending", "contested", "rejected", "deferred", "escalated", "approved"] as const).map((item) => (
+          {REVIEW_FILTERS.map((item) => (
             <button
               type="button"
               key={item}
@@ -131,6 +151,7 @@ export function ReviewView({
                   onChange={(event) => {
                     setNoteExplanationDraft(event.target.value);
                     setNoteEditMessage(null);
+                    setNoteEditError(null);
                   }}
                 />
               </div>
@@ -142,7 +163,17 @@ export function ReviewView({
                   {noteEditMessage}
                 </p>
               )}
+              {noteEditError && (
+                <p className="result-notice error" role="alert">
+                  {noteEditError}
+                </p>
+              )}
             </form>
+            {actionError && (
+              <p className="result-notice error" role="alert">
+                {actionError}
+              </p>
+            )}
             <dl className="detail-grid">
               <div>
                 <dt>{t("reviewView.evidence")}</dt>

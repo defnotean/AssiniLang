@@ -14,6 +14,10 @@ export type SettingsFormState = {
   transcriptionModel: string;
   transcriptionApiKey: string;
   clearTranscriptionApiKey: boolean;
+  ocrBaseUrl: string;
+  ocrModel: string;
+  ocrApiKey: string;
+  clearOcrApiKey: boolean;
   ocrLang: string;
   allowPrivateUrls: boolean;
 };
@@ -38,6 +42,10 @@ export const DEFAULT_FORM: SettingsFormState = {
   transcriptionModel: "whisper-1",
   transcriptionApiKey: "",
   clearTranscriptionApiKey: false,
+  ocrBaseUrl: "",
+  ocrModel: "llava",
+  ocrApiKey: "",
+  clearOcrApiKey: false,
   ocrLang: "eng",
   allowPrivateUrls: false
 };
@@ -57,6 +65,10 @@ export function formFromSettings(response: RuntimeSettingsResponse): SettingsFor
     transcriptionModel: settings.transcriptionModel,
     transcriptionApiKey: "",
     clearTranscriptionApiKey: false,
+    ocrBaseUrl: settings.ocrBaseUrl,
+    ocrModel: settings.ocrModel,
+    ocrApiKey: "",
+    clearOcrApiKey: false,
     ocrLang: settings.ocrLang,
     allowPrivateUrls: settings.allowPrivateUrls
   };
@@ -98,6 +110,10 @@ export function formStateFromControls(
       "clear-transcribe-key",
       fallback.clearTranscriptionApiKey
     ),
+    ocrBaseUrl: inputValue(formElement, "ocr-base-url", fallback.ocrBaseUrl),
+    ocrModel: inputValue(formElement, "ocr-model", fallback.ocrModel),
+    ocrApiKey: inputValue(formElement, "ocr-api-key", fallback.ocrApiKey),
+    clearOcrApiKey: checkboxValue(formElement, "clear-ocr-key", fallback.clearOcrApiKey),
     ocrLang: inputValue(formElement, "ocr-lang", fallback.ocrLang),
     allowPrivateUrls: checkboxValue(formElement, "allow-private-urls", fallback.allowPrivateUrls)
   };

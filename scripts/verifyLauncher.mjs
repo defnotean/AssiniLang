@@ -27,7 +27,10 @@ export function createVerificationSteps({ platform = process.platform, env = pro
     if (scriptName === "seed" || scriptName === "eval") {
       options.env = {
         ...env,
-        ASSINI_DB_PATH: verificationDbPath
+        ASSINI_DB_PATH: verificationDbPath,
+        // Verify must exercise a real language fixture, not an empty workspace no-op.
+        ...(scriptName === "seed" ? { ASSINI_SEED_FIXTURE: "1" } : {}),
+        ...(scriptName === "eval" ? { ASSINI_EVAL_REQUIRE_LANGUAGES: "1" } : {})
       };
     }
 

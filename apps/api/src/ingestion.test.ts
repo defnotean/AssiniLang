@@ -9,6 +9,8 @@ import {
   heuristicExtractFromText,
   htmlToText,
   ocrImageFile,
+  ocrImageWithModel,
+  ocrModelConfigured,
   parseExtractionResponse,
   splitTextIntoChunks,
   transcribeAudioFile
@@ -285,14 +287,11 @@ describe("fetchUrlText", () => {
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
-  it("lets fetch handle unresolvable hostnames instead of blocking them", async () => {
-    const fetchStub = (async () => new Response("plain words", {
-      status: 200,
-      headers: { "content-type": "text/plain" }
-    })) as typeof fetch;
-
-    const text = await fetchUrlText("https://nowhere.example.com/words", fetchStub, { env: {}, lookupFn: failingLookup });
-    expect(text).toContain("plain words");
+  it("rejects unresolvable hostnames before fetching", async () => {
+    const fetchStub = vi.fn() as unknown as typeof fetch;
+    await expect(fetchUrlText("https://nowhere.example.com/words", fetchStub, { env: {}, lookupFn: failingLookup }))
+      .rejects.toThrow(/could not be resolved and was blocked/);
+    expect(fetchStub).not.toHaveBeenCalled();
   });
 
   it("allows private URLs when ASSINI_ALLOW_PRIVATE_URLS is set", async () => {
@@ -316,14 +315,26 @@ describe("transcribeAudioFile", () => {
     })).rejects.toThrow(/ASSINI_TRANSCRIBE_BASE_URL/);
   });
 
+  it("blocks private metadata transcription URLs when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
+    const fetchStub = vi.fn() as unknown as typeof fetch;
+    await expect(transcribeAudioFile({
+      filePath: "irrelevant.wav",
+      env: { ASSINI_TRANSCRIBE_BASE_URL: "http://169.254.169.254/latest" },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/private or local network/);
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
   it("posts the audio file to an OpenAI-compatible transcription endpoint", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-ingest-test-"));
     const filePath = join(dir, "clip.wav");
     await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
 
     let requestedUrl = "";
-    const fetchStub = (async (url: RequestInfo | URL) => {
+    let requestedInit: RequestInit | undefined;
+    const fetchStub = (async (url: RequestInfo | URL, init?: RequestInit) => {
       requestedUrl = String(url);
+      requestedInit = init;
       return new Response(JSON.stringify({ text: "mira talo-na" }), {
         status: 200,
         headers: { "content-type": "application/json" }
@@ -333,12 +344,93 @@ describe("transcribeAudioFile", () => {
     const transcript = await transcribeAudioFile({
       filePath,
       mimeType: "audio/wav",
-      env: { ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1" },
+      env: {
+        ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
       fetchFn: fetchStub
     });
 
     expect(transcript).toBe("mira talo-na");
     expect(requestedUrl).toBe("http://127.0.0.1:9000/v1/audio/transcriptions");
+    expect(requestedInit?.redirect).toBe("manual");
+  });
+});
+
+describe("ocrModelConfigured", () => {
+  it("is false when ASSINI_OCR_BASE_URL is unset", () => {
+    expect(ocrModelConfigured({})).toBe(false);
+  });
+
+  it("is true for a normalized http base URL", () => {
+    expect(ocrModelConfigured({ ASSINI_OCR_BASE_URL: "http://127.0.0.1:11434/v1/" })).toBe(true);
+  });
+});
+
+describe("ocrImageWithModel", () => {
+  it("fails with setup guidance when no OCR endpoint is configured", async () => {
+    await expect(ocrImageWithModel({
+      filePath: "irrelevant.png",
+      env: {}
+    })).rejects.toThrow(/ASSINI_OCR_BASE_URL/);
+  });
+
+  it("blocks private OCR base URLs when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
+    const fetchStub = vi.fn() as unknown as typeof fetch;
+    await expect(ocrImageWithModel({
+      filePath: "irrelevant.png",
+      env: { ASSINI_OCR_BASE_URL: "http://169.254.169.254/latest" },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/private or local network/);
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("posts the image to an OpenAI-compatible chat completions endpoint", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ingest-ocr-test-"));
+    const filePath = join(dir, "photo.png");
+    const imageBytes = Buffer.from([1, 2, 3, 4]);
+    await writeFile(filePath, imageBytes);
+
+    let requestedUrl = "";
+    let requestedInit: RequestInit | undefined;
+    let requestedBody: Record<string, unknown> | undefined;
+    const fetchStub = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      requestedUrl = String(url);
+      requestedInit = init;
+      requestedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "mira = river" } }]
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const text = await ocrImageWithModel({
+      filePath,
+      mimeType: "image/png",
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_OCR_MODEL: "llava:13b",
+        ASSINI_OCR_API_KEY: "ocr-secret",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(text).toBe("mira = river");
+    expect(requestedUrl).toBe("http://127.0.0.1:9000/v1/chat/completions");
+    expect(requestedInit?.redirect).toBe("manual");
+    expect(requestedInit?.headers).toMatchObject({
+      Authorization: "Bearer ocr-secret",
+      "Content-Type": "application/json"
+    });
+    expect(requestedBody?.model).toBe("llava:13b");
+
+    const messages = requestedBody?.messages as Array<{ role: string; content: unknown }>;
+    const userContent = messages?.[0]?.content as Array<{ type: string; image_url?: { url: string } }>;
+    const imagePart = userContent?.find((part) => part.type === "image_url");
+    expect(imagePart?.image_url?.url).toBe(`data:image/png;base64,${imageBytes.toString("base64")}`);
   });
 });
 
@@ -700,6 +792,49 @@ describe("ocrImageFile", () => {
 });
 
 describe("extractCandidatesForAsset image OCR fallback", () => {
+  it("uses the configured OCR model and then text extraction when ASSINI_OCR_BASE_URL is set", async () => {
+    ocrStub.reset("should not be used");
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-ocr-"));
+    await mkdir(join(dataDir, "assets", language.id), { recursive: true });
+    const imageBytes = Buffer.from([1, 2, 3, 4]);
+    await writeFile(join(dataDir, "assets", language.id, "photo.png"), imageBytes);
+
+    const { provider, calls } = providerWithChatQueue([
+      JSON.stringify({
+        summary: "Text extraction after OCR.",
+        lexemes: [{ form: "mira", gloss: "river" }]
+      })
+    ]);
+
+    const fetchStub = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "mira = river" } }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    const result = await extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
+      language,
+      provider,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.summary).toBe("Text extraction after OCR.");
+    expect(result.candidates[0]?.payload.form).toBe("mira");
+    expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read the image."))).toBe(true);
+    expect(ocrStub.createWorkerCalls).toBe(0);
+    expect(calls).toHaveLength(1);
+    const userMessage = calls[0]?.find((message) => message.role === "user");
+    expect(userMessage?.content).toContain("mira = river");
+    expect(JSON.stringify(calls[0])).not.toContain("image_url");
+  });
+
   it("prefers the vision model and never invokes OCR when completeChat exists", async () => {
     ocrStub.reset("should not be used");
     const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-"));

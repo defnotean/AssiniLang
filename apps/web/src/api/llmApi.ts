@@ -2,32 +2,17 @@ import type {
   LlmModelDiscoveryResponse,
   LlmReachability,
   LlmStatus,
-  RuntimeSettings,
+  ModelProfileSavePayload,
+  RuntimeSettingsPatch,
   RuntimeSettingsResponse
 } from "@assini/api-contract";
 import { assertOk, fetchAsActor, getJson } from "../lib/apiClient";
 
-export type RuntimeSettingsUpdate = Partial<Pick<
-  RuntimeSettings,
-  | "provider"
-  | "baseUrl"
-  | "model"
-  | "timeoutMs"
-  | "maxTokens"
-  | "jsonMode"
-  | "transcriptionBaseUrl"
-  | "transcriptionModel"
-  | "ocrLang"
-  | "allowPrivateUrls"
->> & {
-  apiKey?: string;
-  clearApiKey?: boolean;
-  transcriptionApiKey?: string;
-  clearTranscriptionApiKey?: boolean;
-};
+/** Alias kept for existing call sites; matches the shared API contract. */
+export type RuntimeSettingsUpdate = RuntimeSettingsPatch;
 
 export async function fetchLlmStatus(): Promise<LlmStatus> {
-  return getJson<LlmStatus>("/llm/status");
+  return getJson<LlmStatus>("/llm/status", "programmer");
 }
 
 export async function fetchRuntimeSettings(): Promise<RuntimeSettingsResponse> {
@@ -57,6 +42,41 @@ export async function updateRuntimeSettings(payload: RuntimeSettingsUpdate): Pro
   }, true);
 
   await assertOk(response, "Runtime settings update failed");
+
+  return response.json() as Promise<RuntimeSettingsResponse>;
+}
+
+export async function saveModelProfile(payload: ModelProfileSavePayload): Promise<RuntimeSettingsResponse> {
+  const response = await fetchAsActor("programmer", "/api/llm/model-profiles", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  }, true);
+
+  await assertOk(response, "Model profile save failed");
+
+  return response.json() as Promise<RuntimeSettingsResponse>;
+}
+
+export async function activateModelProfile(profileId: string): Promise<RuntimeSettingsResponse> {
+  const response = await fetchAsActor(
+    "programmer",
+    `/api/llm/model-profiles/${encodeURIComponent(profileId)}/activate`,
+    { method: "PUT" }
+  );
+
+  await assertOk(response, "Model profile switch failed");
+
+  return response.json() as Promise<RuntimeSettingsResponse>;
+}
+
+export async function deleteModelProfile(profileId: string): Promise<RuntimeSettingsResponse> {
+  const response = await fetchAsActor(
+    "programmer",
+    `/api/llm/model-profiles/${encodeURIComponent(profileId)}`,
+    { method: "DELETE" }
+  );
+
+  await assertOk(response, "Model profile delete failed");
 
   return response.json() as Promise<RuntimeSettingsResponse>;
 }

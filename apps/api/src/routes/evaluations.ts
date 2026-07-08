@@ -13,8 +13,10 @@ function averageEvaluationScore(run: AppState["evaluationRuns"][number]): number
 export function registerEvaluationRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, updateState, checkRateLimit, authToken, prototypeSessions } = ctx;
 
-  app.get("/evaluations", async () => {
+  app.get("/evaluations", async (request, reply) => {
     const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["lead", "admin", "programmer", "reviewer"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     return state.evaluationRuns;
   });
 

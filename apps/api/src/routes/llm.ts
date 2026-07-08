@@ -1,8 +1,14 @@
 import type { FastifyInstance } from "fastify";
 import {
+  activateRuntimeModelProfile,
   applyRuntimeSettingsPatch,
+  deleteRuntimeModelProfile,
+  modelProfileSavePayloadSchema,
   runtimeSettingsPatchSchema,
-  runtimeSettingsResponse
+  RuntimeModelProfileNotFoundError,
+  RuntimeModelProfilesCorruptError,
+  runtimeSettingsResponse,
+  saveRuntimeModelProfile
 } from "../appSettings.js";
 import { discoverLlmModels } from "../llmDiscovery.js";
 import { describeLlmProviderFromEnv, probeLlmProviderReachability } from "../llmProvider.js";
@@ -26,6 +32,28 @@ function queryIncludeCommonTargets(query: unknown): boolean | undefined {
   return undefined;
 }
 
+function profileIdFromParams(params: unknown): string {
+  const raw = (params as { profileId?: unknown } | undefined)?.profileId;
+  if (typeof raw !== "string") return "";
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
+function mapModelProfileMutationError(error: unknown, reply: { code: (statusCode: number) => unknown }): { error: string } | undefined {
+  if (error instanceof RuntimeModelProfileNotFoundError) {
+    reply.code(404);
+    return { error: error.message };
+  }
+  if (error instanceof RuntimeModelProfilesCorruptError) {
+    reply.code(409);
+    return { error: error.message };
+  }
+  return undefined;
+}
+
 export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const {
     readState,
@@ -37,7 +65,12 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     reloadLlmProvider
   } = ctx;
 
-  app.get("/llm/status", async () => describeLlmProviderFromEnv());
+  app.get("/llm/status", async (request, reply) => {
+    const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    return describeLlmProviderFromEnv();
+  });
 
   app.get("/llm/settings", async (request, reply) => {
     const state = await readState();
@@ -79,6 +112,71 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
       patch,
       reloadLlmProvider
     });
+  });
+
+  app.post("/llm/model-profiles", async (request, reply) => {
+    const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const payload = parseSchemaBody(modelProfileSavePayloadSchema, request.body ?? {});
+    if (!payload) {
+      reply.code(400);
+      return { error: "Invalid model profile body" };
+    }
+
+    try {
+      return await saveRuntimeModelProfile({
+        settingsPath,
+        payload,
+        reloadLlmProvider
+      });
+    } catch (error) {
+      const mapped = mapModelProfileMutationError(error, reply);
+      if (mapped) return mapped;
+      throw error;
+    }
+  });
+
+  app.put("/llm/model-profiles/:profileId/activate", async (request, reply) => {
+    const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const profileId = profileIdFromParams(request.params);
+    try {
+      return await activateRuntimeModelProfile({
+        settingsPath,
+        profileId,
+        reloadLlmProvider
+      });
+    } catch (error) {
+      const mapped = mapModelProfileMutationError(error, reply);
+      if (mapped) return mapped;
+      throw error;
+    }
+  });
+
+  app.delete("/llm/model-profiles/:profileId", async (request, reply) => {
+    const state = await readState();
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    const profileId = profileIdFromParams(request.params);
+    try {
+      return await deleteRuntimeModelProfile({
+        settingsPath,
+        profileId,
+        reloadLlmProvider
+      });
+    } catch (error) {
+      const mapped = mapModelProfileMutationError(error, reply);
+      if (mapped) return mapped;
+      throw error;
+    }
   });
 
   app.post("/llm/health-check", async (request, reply) => {

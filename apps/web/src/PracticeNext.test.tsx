@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Dispatch, SetStateAction } from "react";
 import { LearnerView } from "./views/LearnerView";
 import type { PublicExercise } from "./lib/types";
 
@@ -29,23 +30,32 @@ const fixtureExercises = [
 ];
 
 function renderLearnerView(overrides: { onSelectExercise?: (exerciseId: string) => void; languageId?: string | null } = {}) {
+  const setSelectedExerciseId: Dispatch<SetStateAction<string | null>> = (value) => {
+    const next = typeof value === "function" ? value(fixtureExercises[0].id) : value;
+    overrides.onSelectExercise?.(next ?? "");
+  };
+
   return render(
     <LearnerView
       languageId={overrides.languageId === undefined ? "avenik" : overrides.languageId}
       exercises={fixtureExercises}
-      selectedExercise={fixtureExercises[0]}
-      selectedExerciseId={fixtureExercises[0].id}
       isWorkflowBusy={false}
-      exerciseAnswer=""
-      isGrading={false}
-      exerciseResult={null}
-      isLoadingSubmissions={false}
-      submissionHistory={[]}
-      onSelectExercise={overrides.onSelectExercise ?? vi.fn()}
-      onAnswerChange={vi.fn()}
-      onGrade={vi.fn()}
-      onCreateExercise={vi.fn()}
-      onGenerateExercise={vi.fn()}
+      learner={{
+        selectedExercise: fixtureExercises[0],
+        selectedExerciseId: fixtureExercises[0].id,
+        setSelectedExerciseId: overrides.onSelectExercise ? setSelectedExerciseId : vi.fn(),
+        exerciseAnswer: "",
+        setExerciseAnswer: vi.fn(),
+        isGrading: false,
+        isLoadingSubmissions: false,
+        exerciseResult: null,
+        setExerciseResult: vi.fn(),
+        submissionHistory: [],
+        setSubmissionHistory: vi.fn(),
+        handleGrade: vi.fn(),
+        handleCreateExercise: vi.fn(),
+        handleGenerateExercise: vi.fn()
+      }}
     />
   );
 }

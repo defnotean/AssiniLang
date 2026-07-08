@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useI18n } from "../i18n";
 
 export type PaletteCommand = {
@@ -30,15 +31,13 @@ export function CommandPalette({
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const previousFocusRef = useRef<HTMLElement | null>(null);
+
+  useFocusTrap(dialogRef);
 
   useEffect(() => {
-    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     inputRef.current?.focus();
-    return () => {
-      previousFocusRef.current?.focus();
-    };
   }, []);
 
   const filtered = useMemo(() => {
@@ -82,6 +81,7 @@ export function CommandPalette({
   return (
     <div className="palette-overlay" onClick={onClose}>
       <div
+        ref={dialogRef}
         className="command-palette"
         role="dialog"
         aria-modal="true"

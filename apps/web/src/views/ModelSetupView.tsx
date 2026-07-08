@@ -1,13 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import type {
   DiscoveredLlmModel,
-  LlmModelDiscoveryResponse,
-  LlmReachability,
-  LlmStatus,
-  ObservabilityData,
-  RuntimeSettingsResponse,
+  ModelProfileSavePayload,
   RuntimeSettingsUpdate
 } from "../api";
+import type { ModelWorkspace } from "../hooks/useModelWorkspace";
 import { useI18n } from "../i18n";
 import {
   applyDiscoveredModelToForm,
@@ -21,61 +18,47 @@ import {
   syncFormWithDiscoveredModels,
   type SettingsFormState
 } from "../lib/modelSettings";
-import type { AsyncState } from "../lib/types";
 import { DesktopToolsPanel } from "./DesktopToolsPanel";
 import { ModelDiscoveryPanel } from "./ModelDiscoveryPanel";
 import { ModelObservabilityPanel } from "./ModelObservabilityPanel";
 import { ModelSettingsFormFields } from "./ModelSettingsFormFields";
 import { ProviderReadinessPanel } from "./ProviderReadinessPanel";
 
-export function ModelSetupView({
-  llmState,
-  settingsState,
-  modelDiscoveryState,
-  observabilityState,
-  isTestingModel,
-  modelTestResult,
-  modelTestIsPlaceholder,
-  onSmokeTest,
-  isCheckingReachability,
-  reachabilityResult,
-  reachabilityError,
-  onTestConnection,
-  isSavingSettings,
-  settingsSaveResult,
-  settingsSaveError,
-  isRefreshingModels,
-  isAutoRefreshingModels,
-  onRefreshModelDiscovery,
-  onSaveSettings
-}: {
-  llmState: AsyncState<LlmStatus>;
-  settingsState: AsyncState<RuntimeSettingsResponse>;
-  modelDiscoveryState: AsyncState<LlmModelDiscoveryResponse>;
-  observabilityState: AsyncState<ObservabilityData>;
-  isTestingModel: boolean;
-  modelTestResult: string | null;
-  modelTestIsPlaceholder: boolean;
-  onSmokeTest: () => void;
-  isCheckingReachability: boolean;
-  reachabilityResult: LlmReachability | null;
-  reachabilityError: string | null;
-  onTestConnection: () => void;
-  isSavingSettings: boolean;
-  settingsSaveResult: string | null;
-  settingsSaveError: string | null;
-  isRefreshingModels: boolean;
-  isAutoRefreshingModels: boolean;
-  onRefreshModelDiscovery: (baseUrl?: string) => Promise<void>;
-  onSaveSettings: (payload: RuntimeSettingsUpdate) => Promise<void>;
-}) {
+export function ModelSetupView({ model }: { model: ModelWorkspace }) {
+  const {
+    llmState,
+    settingsState,
+    modelDiscoveryState,
+    observabilityState,
+    isTestingModel,
+    modelTestResult,
+    modelTestIsPlaceholder,
+    isCheckingReachability,
+    reachabilityResult,
+    reachabilityError,
+    isSavingSettings,
+    settingsSaveResult,
+    settingsSaveError,
+    isRefreshingModels,
+    isAutoRefreshingModels,
+    handleModelSmokeTest: onSmokeTest,
+    handleTestConnection: onTestConnection,
+    refreshModelDiscovery: onRefreshModelDiscovery,
+    handleSaveSettings: onSaveSettings,
+    handleSaveModelProfile: onSaveModelProfile,
+    handleActivateModelProfile: onActivateModelProfile,
+    handleDeleteModelProfile: onDeleteModelProfile
+  } = model;
   const { t } = useI18n();
   const [form, setForm] = useState<SettingsFormState>(DEFAULT_FORM);
+  const [profileName, setProfileName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (settingsState.status === "ready") {
       setForm(formFromSettings(settingsState.data));
+      const activeProfile = settingsState.data.profiles?.find((profile) => profile.id === settingsState.data.activeProfileId);
+      setProfileName(activeProfile?.name ?? settingsState.data.settings.model ?? "");
       setFormError(null);
     }
   }, [settingsState]);
@@ -107,8 +90,18 @@ export function ModelSetupView({
     );
   }
 
+  if (settingsState.status === "error") {
+    return (
+      <div className="panel-card error" role="alert">
+        {settingsState.message}
+      </div>
+    );
+  }
+
   const status = llmState.data;
   const settings = settingsState.status === "ready" ? settingsState.data.settings : null;
+  const modelProfiles = settingsState.status === "ready" ? settingsState.data.profiles ?? [] : [];
+  const activeProfileId = settingsState.status === "ready" ? settingsState.data.activeProfileId ?? "" : "";
   const discoveryEndpoints = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.endpoints ?? [] : [];
   const discoveryErrors = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.errors : [];
   const connectedEndpoints = discoveryEndpoints.filter((endpoint) => endpoint.connected);
@@ -132,20 +125,46 @@ export function ModelSetupView({
 
     setFormError(null);
     return {
-      provider: nextForm.provider,
+      provider: nextForm.provider as RuntimeSettingsUpdate["provider"],
       baseUrl: nextForm.baseUrl.trim(),
       model: nextForm.model.trim(),
-      apiKey: nextForm.apiKey,
-      clearApiKey: nextForm.clearApiKey,
+      apiKey: nextForm.apiKey || undefined,
+      clearApiKey: nextForm.clearApiKey || undefined,
       timeoutMs,
       maxTokens,
       jsonMode: nextForm.jsonMode,
       transcriptionBaseUrl: nextForm.transcriptionBaseUrl.trim(),
       transcriptionModel: nextForm.transcriptionModel.trim(),
-      transcriptionApiKey: nextForm.transcriptionApiKey,
-      clearTranscriptionApiKey: nextForm.clearTranscriptionApiKey,
+      transcriptionApiKey: nextForm.transcriptionApiKey || undefined,
+      clearTranscriptionApiKey: nextForm.clearTranscriptionApiKey || undefined,
+      ocrBaseUrl: nextForm.ocrBaseUrl.trim(),
+      ocrModel: nextForm.ocrModel.trim(),
+      ocrApiKey: nextForm.ocrApiKey || undefined,
+      clearOcrApiKey: nextForm.clearOcrApiKey || undefined,
       ocrLang: nextForm.ocrLang.trim(),
       allowPrivateUrls: nextForm.allowPrivateUrls
+    };
+  }
+
+  function buildProfilePayload(nextForm: SettingsFormState, activate: boolean): ModelProfileSavePayload | null {
+    const runtimePayload = buildSettingsPayload(nextForm);
+    const name = profileName.trim();
+    if (!runtimePayload) return null;
+    if (!name) {
+      setFormError(t("model.profileNameRequired"));
+      return null;
+    }
+    const activeProfile = modelProfiles.find((profile) => profile.id === activeProfileId);
+    const saveProfileId = activeProfile?.name.trim().toLowerCase() === name.toLowerCase()
+      ? activeProfileId
+      : undefined;
+
+    return {
+      ...runtimePayload,
+      provider: nextForm.provider as ModelProfileSavePayload["provider"],
+      id: saveProfileId || undefined,
+      name,
+      activate
     };
   }
 
@@ -155,7 +174,9 @@ export function ModelSetupView({
       apiKey: "",
       clearApiKey: false,
       transcriptionApiKey: "",
-      clearTranscriptionApiKey: false
+      clearTranscriptionApiKey: false,
+      ocrApiKey: "",
+      clearOcrApiKey: false
     }));
   }
 
@@ -213,6 +234,36 @@ export function ModelSetupView({
     clearSecretFields();
   }
 
+  async function handleSaveProfile(activate: boolean) {
+    const payload = buildProfilePayload(form, activate);
+    if (!payload) return;
+
+    try {
+      await onSaveModelProfile(payload);
+      clearSecretFields();
+    } catch {
+      return;
+    }
+  }
+
+  async function handleActivateProfile(profileId: string) {
+    if (!profileId) return;
+    try {
+      await onActivateModelProfile(profileId);
+    } catch {
+      return;
+    }
+  }
+
+  async function handleDeleteProfile() {
+    if (!activeProfileId) return;
+    try {
+      await onDeleteModelProfile(activeProfileId);
+    } catch {
+      return;
+    }
+  }
+
   return (
     <div className="model-grid">
       <ProviderReadinessPanel
@@ -243,9 +294,6 @@ export function ModelSetupView({
         {settingsState.status === "loading" && (
           <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingSettings")}</p>
         )}
-        {settingsState.status === "error" && (
-          <p className="inline-error" role="alert">{settingsState.message}</p>
-        )}
         <DesktopToolsPanel
           connectedEndpointCount={connectedEndpoints.length}
           discoveryEndpoints={discoveryEndpoints}
@@ -260,6 +308,63 @@ export function ModelSetupView({
         />
         {settingsState.status === "ready" && (
           <form className="settings-form" onSubmit={handleSubmit}>
+            <div className="settings-subsection model-profile-manager" aria-label={t("model.profileManagerAria")}>
+              <span className="detail-label">{t("model.modelProfiles")}</span>
+              <div className="settings-grid">
+                <div className="form-group">
+                  <label htmlFor="model-profile-select">{t("model.savedProfiles")}</label>
+                  <select
+                    id="model-profile-select"
+                    value={activeProfileId}
+                    disabled={isSavingSettings || modelProfiles.length === 0}
+                    onChange={(event) => void handleActivateProfile(event.target.value)}
+                  >
+                    <option value="">{modelProfiles.length > 0 ? t("model.chooseProfile") : t("model.noProfiles")}</option>
+                    {modelProfiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name} ({profile.model || profile.provider})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="model-profile-name">{t("model.profileName")}</label>
+                  <input
+                    id="model-profile-name"
+                    value={profileName}
+                    disabled={isSavingSettings}
+                    onChange={(event) => setProfileName(event.target.value)}
+                    placeholder={t("model.profileNamePlaceholder")}
+                  />
+                </div>
+              </div>
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={isSavingSettings}
+                  onClick={() => void handleSaveProfile(false)}
+                >
+                  {t("model.saveProfile")}
+                </button>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={isSavingSettings}
+                  onClick={() => void handleSaveProfile(true)}
+                >
+                  {t("model.saveAndUseProfile")}
+                </button>
+                <button
+                  type="button"
+                  className="contest"
+                  disabled={isSavingSettings || !activeProfileId}
+                  onClick={() => void handleDeleteProfile()}
+                >
+                  {t("model.deleteProfile")}
+                </button>
+              </div>
+            </div>
             <ModelSettingsFormFields
               form={form}
               isSavingSettings={isSavingSettings}

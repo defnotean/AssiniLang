@@ -4,17 +4,21 @@ import type {
   LlmModelDiscoveryResponse,
   LlmReachability,
   LlmStatus,
+  ModelProfileSavePayload,
   ObservabilityData,
   RuntimeSettingsResponse,
   RuntimeSettingsUpdate
 } from "../api";
 import {
+  activateModelProfile,
   checkLlmReachability,
   createAiSession,
+  deleteModelProfile,
   fetchDiscoveredModels,
   fetchLlmStatus,
   fetchObservability,
   fetchRuntimeSettings,
+  saveModelProfile,
   updateRuntimeSettings
 } from "../api";
 import { isRealModelProvider, latestAssistantMessage, sessionUsedDeterministicFallback } from "../lib/format";
@@ -42,6 +46,8 @@ function payloadForDiscoveredModel(
     jsonMode: settings.jsonMode,
     transcriptionBaseUrl: settings.transcriptionBaseUrl,
     transcriptionModel: settings.transcriptionModel,
+    ocrBaseUrl: settings.ocrBaseUrl,
+    ocrModel: settings.ocrModel,
     ocrLang: settings.ocrLang,
     allowPrivateUrls: settings.allowPrivateUrls
   };
@@ -66,6 +72,9 @@ export interface ModelWorkspace {
   refreshModelObservability: () => Promise<void>;
   refreshModelDiscovery: (baseUrl?: string) => Promise<void>;
   handleSaveSettings: (payload: RuntimeSettingsUpdate) => Promise<void>;
+  handleSaveModelProfile: (payload: ModelProfileSavePayload) => Promise<void>;
+  handleActivateModelProfile: (profileId: string) => Promise<void>;
+  handleDeleteModelProfile: (profileId: string) => Promise<void>;
   handleModelSmokeTest: () => Promise<void>;
   handleTestConnection: () => Promise<void>;
 }
@@ -176,7 +185,13 @@ export function useModelWorkspace(
         }
       })
       .catch((error: Error) => {
-        if (isCurrent) setSettingsState({ status: "error", message: error.message });
+        if (isCurrent) {
+          const message = error.message || t("model.errSettingsLoadFailed");
+          setSettingsState({ status: "error", message });
+          // Keep llmState in sync: ModelSetupView gates on llmState, so a settings
+          // failure must not leave the view stuck on the loading screen forever.
+          setLlmState({ status: "error", message });
+        }
       });
     void startModelDiscovery(undefined, { showLoading: true, includeCommonTargets: true });
     fetchObservability()
@@ -270,6 +285,81 @@ export function useModelWorkspace(
     }
   }
 
+  function applyRuntimeSettingsResponse(nextSettings: RuntimeSettingsResponse) {
+    configuredDiscoveryBaseUrlRef.current = nextSettings.settings.baseUrl.trim() || undefined;
+    setSettingsState({ status: "ready", data: nextSettings });
+    setLlmState({ status: "ready", data: nextSettings.status });
+  }
+
+  function refreshDiscoveryForSettings(nextSettings: RuntimeSettingsResponse) {
+    void startModelDiscovery(nextSettings.settings.baseUrl.trim() || undefined, {
+      automatic: true,
+      includeCommonTargets: true,
+      force: true
+    });
+  }
+
+  async function handleSaveModelProfile(payload: ModelProfileSavePayload) {
+    setIsSavingSettings(true);
+    setSettingsSaveResult(null);
+    setSettingsSaveError(null);
+    setReachabilityError(null);
+    setReachabilityResult(null);
+    setModelTestResult(null);
+    setModelTestIsPlaceholder(false);
+    try {
+      const nextSettings = await saveModelProfile(payload);
+      applyRuntimeSettingsResponse(nextSettings);
+      setSettingsSaveResult(t(payload.activate ? "model.profileSavedAndApplied" : "model.profileSaved"));
+      refreshDiscoveryForSettings(nextSettings);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("model.errProfileSaveFailed");
+      setSettingsSaveError(message);
+      throw error;
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  async function handleActivateModelProfile(profileId: string) {
+    setIsSavingSettings(true);
+    setSettingsSaveResult(null);
+    setSettingsSaveError(null);
+    setReachabilityError(null);
+    setReachabilityResult(null);
+    setModelTestResult(null);
+    setModelTestIsPlaceholder(false);
+    try {
+      const nextSettings = await activateModelProfile(profileId);
+      applyRuntimeSettingsResponse(nextSettings);
+      setSettingsSaveResult(t("model.profileApplied"));
+      refreshDiscoveryForSettings(nextSettings);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("model.errProfileApplyFailed");
+      setSettingsSaveError(message);
+      throw error;
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
+  async function handleDeleteModelProfile(profileId: string) {
+    setIsSavingSettings(true);
+    setSettingsSaveResult(null);
+    setSettingsSaveError(null);
+    try {
+      const nextSettings = await deleteModelProfile(profileId);
+      applyRuntimeSettingsResponse(nextSettings);
+      setSettingsSaveResult(t("model.profileDeleted"));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("model.errProfileDeleteFailed");
+      setSettingsSaveError(message);
+      throw error;
+    } finally {
+      setIsSavingSettings(false);
+    }
+  }
+
   useEffect(() => {
     if (view !== "model") return;
     if (settingsState.status !== "ready" || modelDiscoveryState.status !== "ready") return;
@@ -287,7 +377,10 @@ export function useModelWorkspace(
     if (autoAppliedDiscoveryModelIdRef.current === candidate.id) return;
 
     autoAppliedDiscoveryModelIdRef.current = candidate.id;
-    void handleSaveSettings(payloadForDiscoveredModel(settingsState.data.settings, candidate)).catch(() => undefined);
+    void handleSaveSettings(payloadForDiscoveredModel(settingsState.data.settings, candidate)).catch((error) => {
+      const message = error instanceof Error ? error.message : t("model.errSettingsSaveFailed");
+      setSettingsSaveError(message);
+    });
   }, [modelDiscoveryState, settingsState, view]);
 
   async function handleModelSmokeTest() {
@@ -355,6 +448,9 @@ export function useModelWorkspace(
     refreshModelObservability,
     refreshModelDiscovery,
     handleSaveSettings,
+    handleSaveModelProfile,
+    handleActivateModelProfile,
+    handleDeleteModelProfile,
     handleModelSmokeTest,
     handleTestConnection
   };

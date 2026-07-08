@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildTestCorpus,
   buildTestLanguage,
@@ -331,6 +331,50 @@ describe("generateModelDraftNotes", () => {
     expect(result.warnings.some((warning) => warning.includes("ungrounded"))).toBe(true);
   });
 
+  it("does not forward OPENAI_API_KEY to local embedding retrieval", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [0, ...corpus.map((_, index) => index + 1)].map((index) => ({
+          index,
+          embedding: index === 0 ? [1, 0, 0] : [0.9, 0.1, 0]
+        }))
+      })
+    });
+    vi.stubGlobal("fetch", mockFetch);
+    const { provider } = providerWithChat(JSON.stringify({
+      notes: [
+        {
+          topic: "morphology/person/first-singular",
+          explanation: "The suffix -na marks a first-person singular subject on the verb.",
+          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
+          confidence: "high"
+        }
+      ]
+    }));
+
+    await generateModelDraftNotes({
+      language,
+      corpus,
+      lexemes,
+      existingNotes: notes,
+      provider,
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "local-model",
+        OPENAI_API_KEY: "sk-remote-secret"
+      }
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({
+      headers: { "Content-Type": "application/json" }
+    });
+    expect(JSON.stringify(mockFetch.mock.calls[0]?.[1])).not.toContain("sk-remote-secret");
+    vi.unstubAllGlobals();
+  });
+
   it("throws when the model returns unparseable output", async () => {
     const { provider } = providerWithChat("I cannot do that.");
     await expect(generateModelDraftNotes({
@@ -463,6 +507,22 @@ describe("generateModelExercise", () => {
     expect(calls).toHaveLength(2);
     expect(result.exercise.type).toBe("translate_to_english");
     expect(result.warnings.some((warning) => warning.includes("retried with a smaller JSON-only prompt"))).toBe(true);
+  });
+
+  it("throws when the compact exercise retry is also reasoning-only", async () => {
+    const { provider, calls } = providerWithChatQueue([
+      new Error("LLM provider returned only reasoning_content without visible assistant content."),
+      new Error("LLM provider returned only reasoning_content without visible assistant content.")
+    ]);
+
+    await expect(generateModelExercise({
+      language,
+      lexemes,
+      notes,
+      corpus,
+      provider
+    })).rejects.toThrow(/only reasoning_content for exercise generation twice/);
+    expect(calls).toHaveLength(2);
   });
 
   it("throws when the grounded exercise is unusable", async () => {

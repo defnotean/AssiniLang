@@ -9,7 +9,7 @@ The implemented direction is the final `AssiniLang.html` handoff from the design
 The chosen design is the `Atlas layout`:
 
 - A language-first left sidebar.
-- Per-language section navigation for profile, intake, corpus, notes, learner practice, evaluation, governance, AI assistant chat, and model setup.
+- Per-language section navigation for Start, Build, Practice, and Settings, with the older domain workspaces nested into those daily-use tabs.
 - Dense but readable work surfaces for repeated research and review tasks.
 - A dark night-sky visual system with warm gold accents.
 - Subtle geometric dividers and glyphs used as interface texture, not decoration-heavy branding.
@@ -36,7 +36,7 @@ Use cultural visual cues cautiously. The current motifs are broad placeholder cu
 The main shell should preserve the Atlas structure:
 
 - Sidebar first: the language is the primary context, with the New language creation form at the bottom of the sidebar so a workspace can be started without leaving the console.
-- Section nav second: each workspace belongs to the selected language. The order is profile, Sources & intake, corpus, review, learner, evaluation, governance, model setup.
+- Section nav second: each top-level tab belongs to the selected language. The order is Start, Build, Practice, Settings. Start contains profile and examples, Build contains intake/review/corrections, Practice contains exercises/chat, and Settings contains model setup/checks/rules.
 - Local-prototype notice always visible near the top.
 - Header shows the selected language, current workspace, metadata chips, and primary actions.
 - Stat strip summarizes corpus, notes, exercises, and latest score for the active language.
@@ -45,7 +45,7 @@ Avoid landing-page patterns inside the app. The first screen should stay the usa
 
 ## Workspaces
 
-### Language profile
+### Start and language profile
 
 The profile view should make each documented language inspectable:
 
@@ -60,6 +60,7 @@ The profile view should make each documented language inspectable:
 The intake workspace is the front door for raw materials:
 
 - Registration and upload controls stay compact; the source list with status chips (`pending`, `processing`, `processed`, `failed`) is the main surface.
+- Obsidian vault import belongs beside the other intake controls, but it should read as a bulk helper that creates pending text sources, not as a separate source kind.
 - Background processing keeps the view responsive: a processing source shows its in-flight state and the list polls until it settles.
 - Failed sources surface their sanitized error inline so the fix is obvious before retrying.
 - Processed sources surface their persisted processing warnings under the source (for example "used offline heuristic parsing" or "fell back to offline heuristics"), so a reviewer can see when processing fell back to a heuristic or OCR.
@@ -74,6 +75,7 @@ The corpus view should make source material scannable:
 - English translation in serif italic styling.
 - Morpheme chips with surface and gloss stacked together.
 - Tags, source, and consent labels visible but secondary.
+- Graph mode should explain itself with counts and a legend before the SVG: passages, morphemes, topics, sources, notes, exercises, sessions, corrections, and whether the view is capped for readability.
 - Import controls compact enough that the passage list remains the main surface.
 
 ### Note review queue
@@ -112,9 +114,10 @@ Governance and model setup are operational surfaces:
 - Keep policy records, dispositions, audit events, and exports data-forward.
 - Do not over-style these views; reliability and scanability matter most.
 - Snapshot export summaries should surface the profile-derived counts (vocabulary, morphemes, grammar rules, corpus, source assets, pending drafts) so reviewers can identify gaps before opening JSON artifacts.
-- Model setup reports provider readiness, transcription readiness, and observability without exposing secrets.
+- Model setup reports provider readiness, transcription readiness, saved model profiles, model discovery, reachability tests, and observability without exposing secrets.
 - The provider smoke test flags its result as an "offline placeholder" when no real model is configured, so a deterministic canned reply is never read as a model response.
 - A Test connection button actively probes the configured provider endpoint and reports reachable, unreachable, or not-configured, distinct from the static config-shape readiness report.
+- Saved model profiles should make the active model name obvious. The connected state should identify the model, not only an IP/base URL.
 - Never expose provider keys, answer keys, learner answers, hidden model traces, or local user internals.
 
 ## Responsiveness

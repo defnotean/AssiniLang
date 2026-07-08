@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildTestWorkspaceState } from "@assini/db";
 import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation.js";
 
@@ -30,6 +30,21 @@ describe("evaluation run gate", () => {
 
     expect(runs).toHaveLength(0);
     expect(gate.passed).toBe(true);
+  });
+
+  it("keeps run ids unique when evaluations happen in the same millisecond", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-08T00:00:00.000Z"));
+    try {
+      const [first] = runEvaluationForState(buildTestWorkspaceState());
+      const [second] = runEvaluationForState(buildTestWorkspaceState());
+
+      expect(first?.id).toMatch(/^eval-testlang-/);
+      expect(second?.id).toMatch(/^eval-testlang-/);
+      expect(first?.id).not.toBe(second?.id);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("fails loudly with traceable lines when any evaluation run has failures", () => {
@@ -74,10 +89,70 @@ describe("evaluation run gate", () => {
     );
   });
 
-  it("evaluates model drafts and sets systemVersion to model-study-loop-v1 when model drafts exist", () => {
+  it("fails the gate for a language with no answer keys or exercises", () => {
+    const state = buildTestWorkspaceState();
+    state.noteAnswerKeys = [];
+    state.corpusAnswerKeys = [];
+    state.corpus = [];
+    state.exercises = [];
+    state.notes = [];
+
+    const runs = runEvaluationForState(state);
+    const gate = summarizeEvaluationGate(runs);
+
+    expect(gate.passed).toBe(false);
+    expect(gate.exitCode).toBe(1);
+    expect(gate.failureLines).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("noteCoverage:empty"),
+        expect.stringContaining("exerciseGrading:empty"),
+        "Testlang evaluation gate: no scored evaluation items; language cannot pass without answer keys or exercises."
+      ])
+    );
+  });
+
+  it("evaluates model drafts and sets systemVersion to model-study-loop-v1 when model drafts cover all answer-key topics", () => {
+    const state = buildTestWorkspaceState();
+    const sharedFields = {
+      languageId: "testlang",
+      examples: [] as [],
+      evidencePassageIds: ["testlang-c001"],
+      evidenceCount: 1,
+      confidence: "medium" as const,
+      status: "draft" as const,
+      reviewer: {
+        lastReviewedBy: null,
+        lastReviewedAt: null,
+        comments: [] as string[]
+      },
+      dialectScope: "general",
+      editHistory: [] as []
+    };
+    state.notes.push(
+      {
+        ...sharedFields,
+        id: "model-draft-testlang-1-xyz",
+        topic: "syntax/basic-order",
+        explanation: "Subjects come before verbs."
+      },
+      {
+        ...sharedFields,
+        id: "model-draft-testlang-2-xyz",
+        topic: "morphology/verb/past-suffix",
+        explanation: "Past tense uses -lo before the person suffix."
+      }
+    );
+
+    const runs = runEvaluationForState(state);
+    const run = runs.find((item: any) => item.languageId === "testlang");
+    expect(run).toBeDefined();
+    expect(run?.systemVersion).toBe("model-study-loop-v1");
+  });
+
+  it("does not switch to model-study-loop-v1 for a single stray model-draft note", () => {
     const state = buildTestWorkspaceState();
     state.notes.push({
-      id: "model-draft-testlang-1-xyz",
+      id: "model-draft-testlang-stray-xyz",
       languageId: "testlang",
       topic: "syntax/basic-order",
       explanation: "Subjects come before verbs.",
@@ -98,6 +173,6 @@ describe("evaluation run gate", () => {
     const runs = runEvaluationForState(state);
     const run = runs.find((item: any) => item.languageId === "testlang");
     expect(run).toBeDefined();
-    expect(run?.systemVersion).toBe("model-study-loop-v1");
+    expect(run?.systemVersion).toBe("deterministic-study-loop-v1");
   });
 });

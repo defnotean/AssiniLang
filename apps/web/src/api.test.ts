@@ -31,6 +31,7 @@ import {
   bulkReviewExtractionDrafts,
   acceptExtractionDraft,
   fetchExtractionDrafts,
+  fetchGovernance,
   fetchSources,
   processSource,
   registerSource,
@@ -96,6 +97,13 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/corpus", undefined);
     expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/notes", undefined);
     expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/exercises", undefined);
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/prototype-session", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "reviewer-1" })
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/evaluations", actorRequest);
   });
 
   it("opens an httpOnly prototype session before patching encoded note reviews", async () => {
@@ -140,7 +148,7 @@ describe("fetchDashboardData", () => {
     });
   });
 
-  it("fetches encoded exercise submission history without reviewer auth", async () => {
+  it("opens a learner prototype session before fetching encoded exercise submission history", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => []
@@ -150,7 +158,8 @@ describe("fetchDashboardData", () => {
 
     await fetchExerciseSubmissions("exercise/1");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/exercises/exercise%2F1/submissions", undefined);
+    expectPrototypeSession(fetchMock, "learner-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/exercises/exercise%2F1/submissions", actorRequest);
   });
 
   it("opens a reviewer prototype session before creating encoded exercises", async () => {
@@ -291,7 +300,7 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/users/me", actorRequest);
   });
 
-  it("fetches redacted LLM provider readiness without browser auth secrets", async () => {
+  it("fetches redacted LLM provider readiness through a programmer prototype session", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => ({ configured: true, apiKey: { configured: false } })
@@ -301,7 +310,8 @@ describe("fetchDashboardData", () => {
 
     await fetchLlmStatus();
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/llm/status", undefined);
+    expectPrototypeSession(fetchMock, "programmer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/llm/status", actorRequest);
   });
 
   it("fetches runtime settings through a programmer prototype session", async () => {
@@ -348,7 +358,7 @@ describe("fetchDashboardData", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const payload = {
-      provider: "openai-compatible",
+      provider: "openai-compatible" as const,
       baseUrl: "http://127.0.0.1:11434/v1",
       model: "irene-fusion",
       apiKey: "local-secret"
@@ -411,11 +421,16 @@ describe("fetchDashboardData", () => {
   });
 
   it("includes server error bodies and status codes in query failures without request ids", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: false,
-      status: 503,
-      json: async () => ({ error: "LLM provider is offline" })
-    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return {
+        ok: false,
+        status: 503,
+        json: async () => ({ error: "LLM provider is offline" })
+      };
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -427,12 +442,17 @@ describe("fetchDashboardData", () => {
   });
 
   it("includes x-request-id response headers in API error messages and properties", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: false,
-      status: 503,
-      headers: new Headers({ "x-request-id": "req-header-123" }),
-      json: async () => ({ error: "LLM provider is offline" })
-    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return {
+        ok: false,
+        status: 503,
+        headers: new Headers({ "x-request-id": "req-header-123" }),
+        json: async () => ({ error: "LLM provider is offline" })
+      };
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -444,11 +464,16 @@ describe("fetchDashboardData", () => {
   });
 
   it("uses JSON requestId fields when API error headers are absent", async () => {
-    const fetchMock = vi.fn(async () => ({
-      ok: false,
-      status: 413,
-      json: async () => ({ error: "Payload is too large", requestId: "req-body-413" })
-    }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return {
+        ok: false,
+        status: 413,
+        json: async () => ({ error: "Payload is too large", requestId: "req-body-413" })
+      };
+    });
 
     vi.stubGlobal("fetch", fetchMock);
 
@@ -688,7 +713,7 @@ describe("fetchDashboardData", () => {
     );
   });
 
-  it("fetches encoded source lists without reviewer auth", async () => {
+  it("fetches encoded source lists through a reviewer prototype session", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => []
@@ -698,7 +723,22 @@ describe("fetchDashboardData", () => {
 
     await fetchSources("avenik/test language");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/sources", undefined);
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/sources", actorRequest);
+  });
+
+  it("fetches governance records through a reviewer prototype session", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => []
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchGovernance();
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/governance", actorRequest);
   });
 
   it("opens a reviewer prototype session before registering encoded sources", async () => {
@@ -784,7 +824,7 @@ describe("fetchDashboardData", () => {
     });
   });
 
-  it("fetches encoded proposed extraction drafts", async () => {
+  it("opens a reviewer prototype session before fetching encoded proposed extraction drafts", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => []
@@ -794,9 +834,11 @@ describe("fetchDashboardData", () => {
 
     await fetchExtractionDrafts("avenik/test language", "proposed");
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
       "/api/languages/avenik%2Ftest%20language/extraction-drafts?status=proposed",
-      undefined
+      actorRequest
     );
   });
 

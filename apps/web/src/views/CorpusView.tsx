@@ -1,8 +1,9 @@
-import { useMemo, useState, type FormEvent } from "react";
-import type { CorpusImportPayload } from "../api";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { fetchNeuralMap, type CorpusImportPayload, type NeuralMapResponse } from "../api";
 import {
   buildCorpusImportPayload,
   canSubmitCorpusImportDraft,
+  CORPUS_CONSENT_USE_VALUES,
   EMPTY_CORPUS_IMPORT_DRAFT,
   type CorpusImportDraft
 } from "../corpusImport";
@@ -11,18 +12,24 @@ import type { CorpusPassage } from "../lib/types";
 import { useI18n } from "../i18n";
 
 export function CorpusView({
+  languageId,
   corpus,
   isWorkflowBusy,
   onImportCorpusPassage
 }: {
+  languageId?: string;
   corpus: CorpusPassage[];
   isWorkflowBusy: boolean;
   onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
 }) {
   const { t } = useI18n();
+  const graphLanguageId = languageId ?? corpus[0]?.languageId ?? "";
   const [search, setSearch] = useState("");
-  const [displayMode, setDisplayMode] = useState<"cards" | "interlinear">("cards");
+  const [displayMode, setDisplayMode] = useState<"cards" | "interlinear" | "network">("cards");
   const [morphFilter, setMorphFilter] = useState<string | null>(null);
+  const [graphState, setGraphState] = useState<
+    { status: "idle" | "loading" } | { status: "ready"; data: NeuralMapResponse } | { status: "error"; message: string }
+  >({ status: "idle" });
   const [importDraft, setImportDraft] = useState<CorpusImportDraft>(() => ({ ...EMPTY_CORPUS_IMPORT_DRAFT }));
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -57,6 +64,24 @@ export function CorpusView({
       passage.morphologicalSegmentation.some((morpheme) => morpheme.surface === morphFilter)
     );
   }, [filtered, morphFilter]);
+
+  useEffect(() => {
+    if (displayMode !== "network" || !graphLanguageId) return;
+
+    let isCurrent = true;
+    setGraphState({ status: "loading" });
+    fetchNeuralMap(graphLanguageId)
+      .then((data) => {
+        if (isCurrent) setGraphState({ status: "ready", data });
+      })
+      .catch((error: Error) => {
+        if (isCurrent) setGraphState({ status: "error", message: error.message });
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [displayMode, graphLanguageId]);
 
   function toggleMorphFilter(surface: string) {
     setMorphFilter((current) => (current === surface ? null : surface));
@@ -173,6 +198,20 @@ export function CorpusView({
             />
           </div>
           <div className="form-group">
+            <label htmlFor="corpus-import-consent-use">{t("corpus.consentUseLabel")}</label>
+            <select
+              id="corpus-import-consent-use"
+              value={importDraft.consentUse}
+              onChange={(event) => updateImportDraft("consentUse", event.target.value)}
+            >
+              {CORPUS_CONSENT_USE_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {t(`corpus.consentUse.${value}`)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group">
             <label htmlFor="corpus-import-tags">{t("corpus.topicTagsLabel")}</label>
             <input
               id="corpus-import-tags"
@@ -236,6 +275,14 @@ export function CorpusView({
           >
             {t("corpus.interlinear")}
           </button>
+          <button
+            type="button"
+            className={displayMode === "network" ? "active" : ""}
+            aria-pressed={displayMode === "network"}
+            onClick={() => setDisplayMode("network")}
+          >
+            {t("corpus.network")}
+          </button>
         </div>
         <span className="record-count">{t("corpus.passageCount", { visible: visible.length, total: corpus.length })}</span>
       </div>
@@ -260,8 +307,23 @@ export function CorpusView({
         </div>
       )}
 
-      <section className="corpus-list" aria-label={t("corpus.passagesLabel")}>
-        {visible.length === 0 ? (
+      <section className="corpus-list" aria-label={displayMode === "network" ? t("corpus.networkLabel") : t("corpus.passagesLabel")}>
+        {displayMode === "network" ? (
+          <CorpusGraph
+            graphLanguageId={graphLanguageId}
+            graphState={graphState}
+            onRetry={() => {
+              if (!graphLanguageId) return;
+              setGraphState({ status: "loading" });
+              fetchNeuralMap(graphLanguageId)
+                .then((data) => setGraphState({ status: "ready", data }))
+                .catch((error: unknown) => {
+                  const message = error instanceof Error ? error.message : t("corpus.retryNetwork");
+                  setGraphState({ status: "error", message });
+                });
+            }}
+          />
+        ) : visible.length === 0 ? (
           <p className="empty-state">
             {morphFilter ? t("corpus.emptyMorpheme") : t("corpus.emptySearch")}
           </p>
@@ -319,6 +381,202 @@ export function CorpusView({
           ))
         )}
       </section>
+    </div>
+  );
+}
+
+type GraphPoint = {
+  id: string;
+  x: number;
+  y: number;
+};
+
+const GRAPH_NODE_LIMIT = 96;
+const GRAPH_EDGE_LIMIT = 180;
+const GRAPH_WIDTH = 920;
+const GRAPH_HEIGHT = 540;
+
+function graphNodeClass(type: string): string {
+  if (type === "language") return "language";
+  if (type === "corpus") return "corpus";
+  if (type === "morpheme") return "morpheme";
+  if (type === "topic_tag") return "topic";
+  if (type === "source_asset") return "source";
+  return "record";
+}
+
+function truncateGraphLabel(value: string): string {
+  return value.length > 28 ? `${value.slice(0, 25)}...` : value;
+}
+
+function buildGraphLayout(nodes: NeuralMapResponse["nodes"]): Map<string, GraphPoint> {
+  const grouped = new Map<string, NeuralMapResponse["nodes"]>();
+  for (const node of nodes) {
+    grouped.set(node.type, [...(grouped.get(node.type) ?? []), node]);
+  }
+
+  const ringByType: Record<string, { radius: number; offset: number }> = {
+    language: { radius: 0, offset: 0 },
+    corpus: { radius: 120, offset: -Math.PI / 2 },
+    morpheme: { radius: 205, offset: -Math.PI / 3 },
+    topic_tag: { radius: 278, offset: Math.PI / 7 },
+    source_asset: { radius: 278, offset: Math.PI },
+    note: { radius: 232, offset: Math.PI / 2 },
+    exercise: { radius: 320, offset: Math.PI / 5 },
+    ai_session: { radius: 340, offset: Math.PI / 1.5 },
+    elder_correction: { radius: 340, offset: Math.PI / 1.15 },
+    output: { radius: 340, offset: 0 }
+  };
+  const centerX = GRAPH_WIDTH / 2;
+  const centerY = GRAPH_HEIGHT / 2;
+  const points = new Map<string, GraphPoint>();
+
+  for (const [type, group] of grouped) {
+    const ring = ringByType[type] ?? { radius: 330, offset: 0 };
+    const count = group.length;
+    group.forEach((node, index) => {
+      const angle = ring.offset + (count === 1 ? 0 : (index / count) * Math.PI * 2);
+      points.set(node.id, {
+        id: node.id,
+        x: centerX + Math.cos(angle) * ring.radius,
+        y: centerY + Math.sin(angle) * ring.radius
+      });
+    });
+  }
+
+  return points;
+}
+
+function CorpusGraph({
+  graphLanguageId,
+  graphState,
+  onRetry
+}: {
+  graphLanguageId: string;
+  graphState: { status: "idle" | "loading" } | { status: "ready"; data: NeuralMapResponse } | { status: "error"; message: string };
+  onRetry: () => void;
+}) {
+  const { t } = useI18n();
+  const visibleGraph = useMemo(() => {
+    if (graphState.status !== "ready") return null;
+    const nodes = graphState.data.nodes.slice(0, GRAPH_NODE_LIMIT);
+    const nodeIds = new Set(nodes.map((node) => node.id));
+    const edges = graphState.data.edges
+      .filter((edge) => nodeIds.has(edge.source) && nodeIds.has(edge.target))
+      .slice(0, GRAPH_EDGE_LIMIT);
+    return { nodes, edges, points: buildGraphLayout(nodes) };
+  }, [graphState]);
+  const graphData = graphState.status === "ready" ? graphState.data : null;
+
+  if (graphState.status === "idle" || graphState.status === "loading") {
+    return <p className="empty-state" role="status" aria-live="polite">{t("corpus.loadingNetwork")}</p>;
+  }
+
+  if (graphState.status === "error") {
+    return (
+      <div className="result-notice error" role="alert">
+        <p>{graphState.message}</p>
+        {graphLanguageId ? (
+          <button type="button" className="secondary" onClick={onRetry}>
+            {t("corpus.retryNetwork")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!visibleGraph || !graphData || visibleGraph.nodes.length === 0) {
+    return <p className="empty-state">{t("corpus.emptyNetwork")}</p>;
+  }
+
+  const nodeCounts = visibleGraph.nodes.reduce<Record<string, number>>((counts, node) => {
+    counts[node.type] = (counts[node.type] ?? 0) + 1;
+    return counts;
+  }, {});
+  const insightItems = [
+    { type: "corpus", label: t("corpus.networkInsight.passages") },
+    { type: "morpheme", label: t("corpus.networkInsight.morphemes") },
+    { type: "topic_tag", label: t("corpus.networkInsight.topics") },
+    { type: "source_asset", label: t("corpus.networkInsight.sources") },
+    { type: "note", label: t("corpus.networkInsight.notes") },
+    { type: "exercise", label: t("corpus.networkInsight.exercises") },
+    { type: "ai_session", label: t("corpus.networkInsight.sessions") },
+    { type: "elder_correction", label: t("corpus.networkInsight.corrections") }
+  ].map((item) => ({ ...item, count: nodeCounts[item.type] ?? 0 }))
+    .filter((item) => item.count > 0);
+  const isLimited = graphData.nodes.length > visibleGraph.nodes.length
+    || graphData.edges.length > visibleGraph.edges.length;
+
+  const legendItems = [
+    { kind: "language", label: t("corpus.networkKind.language") },
+    { kind: "corpus", label: t("corpus.networkKind.corpus") },
+    { kind: "source", label: t("corpus.networkKind.source") },
+    { kind: "morpheme", label: t("corpus.networkKind.morpheme") },
+    { kind: "topic", label: t("corpus.networkKind.topic") },
+    { kind: "record", label: t("corpus.networkKind.record") }
+  ];
+
+  return (
+    <div className="corpus-network-panel">
+      <div className="corpus-network-summary">
+        <span>{t("corpus.networkNodes", { count: visibleGraph.nodes.length })}</span>
+        <span>{t("corpus.networkEdges", { count: visibleGraph.edges.length })}</span>
+      </div>
+      <div className="corpus-network-insights" aria-label={t("corpus.networkInsights")}>
+        {insightItems.map((item) => (
+          <span className="corpus-network-insight" key={item.type}>
+            <strong>{item.count}</strong>
+            <span>{item.label}</span>
+          </span>
+        ))}
+        {isLimited && (
+          <span className="corpus-network-limit">
+            {t("corpus.networkLimited", {
+              nodes: visibleGraph.nodes.length,
+              totalNodes: graphData.nodes.length,
+              edges: visibleGraph.edges.length,
+              totalEdges: graphData.edges.length
+            })}
+          </span>
+        )}
+      </div>
+      <svg className="corpus-network-svg" viewBox={`0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}`} role="img" aria-label={t("corpus.networkLabel")}>
+        <g className="network-edges">
+          {visibleGraph.edges.map((edge, index) => {
+            const source = visibleGraph.points.get(edge.source);
+            const target = visibleGraph.points.get(edge.target);
+            if (!source || !target) return null;
+            return (
+              <line
+                key={`${edge.source}:${edge.target}:${edge.relation}:${index}`}
+                x1={source.x}
+                y1={source.y}
+                x2={target.x}
+                y2={target.y}
+                data-relation={edge.relation}
+              />
+            );
+          })}
+        </g>
+        <g className="network-nodes">
+          {visibleGraph.nodes.map((node) => {
+            const point = visibleGraph.points.get(node.id);
+            if (!point) return null;
+            return (
+              <g key={node.id} className={`network-node ${graphNodeClass(node.type)}`} transform={`translate(${point.x} ${point.y})`}>
+                <circle r={node.type === "language" ? 18 : node.type === "corpus" ? 12 : 9} />
+                <text y={node.type === "language" ? -24 : -15}>{truncateGraphLabel(node.label)}</text>
+                <title>{`${node.type}: ${node.label}`}</title>
+              </g>
+            );
+          })}
+        </g>
+      </svg>
+      <div className="corpus-network-legend" aria-label={t("corpus.networkLegend")}>
+        {legendItems.map((item) => (
+          <span key={item.kind}><i className={`network-dot ${item.kind}`} />{item.label}</span>
+        ))}
+      </div>
     </div>
   );
 }

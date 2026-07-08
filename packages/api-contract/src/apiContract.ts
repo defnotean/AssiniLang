@@ -42,9 +42,13 @@ export const languagePatchPayloadSchema = z.object({
   phonology: optionalNullableLanguagePhonologyPayloadSchema
 }).partial();
 
+// Text/wordlist/URL registration (JSON body). Uploads use a separate kind set.
+export const sourceTextRegistrationKindSchema = z.enum(["text", "wordlist", "url"]);
+export const sourceUploadKindSchema = z.enum(["image", "audio", "document"]);
+
 // Source registration schema
 export const sourceRegistrationPayloadSchema = z.object({
-  kind: z.enum(["text", "wordlist", "url"]),
+  kind: sourceTextRegistrationKindSchema,
   title: nonEmptyTrimmedStringSchema,
   rawText: z.string().optional(),
   url: z.string().trim().optional()
@@ -63,10 +67,30 @@ export const sourceRegistrationPayloadSchema = z.object({
   message: "Invalid rawText or URL for the specified source asset kind."
 });
 
+export const obsidianVaultImportPayloadSchema = z.object({
+  vaultPath: nonEmptyTrimmedStringSchema,
+  includeSubfolders: z.boolean().default(true),
+  maxFiles: z.number().int().positive().max(500).default(100)
+}).strict();
+
+export const obsidianVaultImportResponseSchema = z.object({
+  imported: z.array(sourceAssetSchema),
+  skipped: z.array(z.object({
+    path: z.string(),
+    reason: z.string()
+  })),
+  warnings: z.array(z.string()),
+  summary: z.object({
+    scanned: z.number(),
+    imported: z.number(),
+    skipped: z.number()
+  })
+});
+
 // Source processing schemas
 export const processSourceOptionsSchema = z.object({
   async: z.boolean().optional()
-});
+}).strict();
 
 export const processSourceResponseSchema = z.object({
   asset: sourceAssetSchema,
@@ -77,33 +101,37 @@ export const processSourceResponseSchema = z.object({
 // Exercise submission schema
 export const exerciseSubmissionPayloadSchema = z.object({
   answer: z.string().trim().min(1)
-});
+}).strict();
 
 // AI session creation schema
 export const createAiSessionPayloadSchema = z.object({
-  languageId: z.string().min(1),
+  languageId: nonEmptyTrimmedStringSchema,
   mode: aiSessionModeSchema,
   seedPrompt: z.string().default(""),
-  contextNoteIds: z.array(z.string()).default([]),
-  contextPassageIds: z.array(z.string()).default([])
-});
+  contextNoteIds: z.array(nonEmptyTrimmedStringSchema).default([]),
+  contextPassageIds: z.array(nonEmptyTrimmedStringSchema).default([])
+}).strict();
 
 // Elder correction schema
 export const elderCorrectionPayloadSchema = z.object({
-  languageId: z.string().min(1),
-  noteId: z.string().optional(),
-  passageId: z.string().optional(),
-  correction: z.string().min(1),
-  rationale: z.string().min(1),
+  languageId: nonEmptyTrimmedStringSchema,
+  noteId: optionalTrimmedStringSchema,
+  passageId: optionalTrimmedStringSchema,
+  correction: nonEmptyTrimmedStringSchema,
+  rationale: nonEmptyTrimmedStringSchema,
   severity: z.enum(["minor", "major", "safety"]),
-  contextText: z.string().optional()
-}).refine((data) => data.noteId !== undefined || data.passageId !== undefined || data.contextText !== undefined, {
+  contextText: optionalTrimmedStringSchema
+}).strict().refine((data) => data.noteId !== undefined || data.passageId !== undefined || data.contextText !== undefined, {
   message: "At least one correction target or contextText is required"
 });
 
 export type LanguageCreatePayload = z.infer<typeof languageCreatePayloadSchema>;
 export type LanguagePatchPayload = z.infer<typeof languagePatchPayloadSchema>;
+export type SourceTextRegistrationKind = z.infer<typeof sourceTextRegistrationKindSchema>;
+export type SourceUploadKind = z.infer<typeof sourceUploadKindSchema>;
 export type SourceRegistrationPayload = z.infer<typeof sourceRegistrationPayloadSchema>;
+export type ObsidianVaultImportPayload = z.infer<typeof obsidianVaultImportPayloadSchema>;
+export type ObsidianVaultImportResponse = z.infer<typeof obsidianVaultImportResponseSchema>;
 export type ProcessSourceOptions = z.infer<typeof processSourceOptionsSchema>;
 export type ProcessSourceResponse = z.infer<typeof processSourceResponseSchema>;
 export type ExerciseSubmissionPayload = z.infer<typeof exerciseSubmissionPayloadSchema>;

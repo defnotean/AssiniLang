@@ -48,6 +48,13 @@ export const llmStatusSchema = z.object({
     baseUrlVariable: z.string(),
     modelVariable: z.string()
   }),
+  ocr: z.object({
+    configured: z.boolean(),
+    baseUrl: z.string().optional(),
+    model: z.string().optional(),
+    baseUrlVariable: z.string(),
+    modelVariable: z.string()
+  }),
   setup: z.object({
     localExamples: z.array(z.string()),
     remoteExamples: z.array(z.string())
@@ -80,6 +87,9 @@ export const runtimeSettingsSchema = z.object({
   transcriptionBaseUrl: z.string(),
   transcriptionModel: z.string(),
   transcriptionApiKeyConfigured: z.boolean(),
+  ocrBaseUrl: z.string(),
+  ocrModel: z.string(),
+  ocrApiKeyConfigured: z.boolean(),
   ocrLang: z.string(),
   allowPrivateUrls: z.boolean()
 });
@@ -99,16 +109,54 @@ export const runtimeSettingsPatchSchema = z.object({
   transcriptionModel: z.string().trim().max(256).optional(),
   transcriptionApiKey: z.string().max(4096).optional(),
   clearTranscriptionApiKey: z.boolean().optional(),
+  ocrBaseUrl: z.string().trim().max(2048).optional(),
+  ocrModel: z.string().trim().max(256).optional(),
+  ocrApiKey: z.string().max(4096).optional(),
+  clearOcrApiKey: z.boolean().optional(),
   ocrLang: z.string().trim().min(1).max(32).optional(),
   allowPrivateUrls: z.boolean().optional()
 }).strict();
 
 export type RuntimeSettingsPatch = z.infer<typeof runtimeSettingsPatchSchema>;
 
+export const llmModelProfileSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  provider: z.enum(LLM_PROVIDERS),
+  baseUrl: z.string(),
+  model: z.string(),
+  apiKeyConfigured: z.boolean(),
+  timeoutMs: z.number(),
+  maxTokens: z.number(),
+  jsonMode: z.boolean(),
+  transcriptionBaseUrl: z.string(),
+  transcriptionModel: z.string(),
+  transcriptionApiKeyConfigured: z.boolean(),
+  ocrBaseUrl: z.string(),
+  ocrModel: z.string(),
+  ocrApiKeyConfigured: z.boolean(),
+  ocrLang: z.string(),
+  allowPrivateUrls: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string()
+});
+
+export type LlmModelProfile = z.infer<typeof llmModelProfileSchema>;
+
+export const modelProfileSavePayloadSchema = runtimeSettingsPatchSchema.extend({
+  id: z.string().trim().min(1).max(96).optional(),
+  name: z.string().trim().min(1).max(80),
+  activate: z.boolean().optional()
+}).strict();
+
+export type ModelProfileSavePayload = z.infer<typeof modelProfileSavePayloadSchema>;
+
 export const runtimeSettingsResponseSchema = z.object({
   settings: runtimeSettingsSchema,
   status: llmStatusSchema,
-  persisted: z.boolean()
+  persisted: z.boolean(),
+  profiles: z.array(llmModelProfileSchema).default([]),
+  activeProfileId: z.string().min(1).optional()
 });
 
 export type RuntimeSettingsResponse = z.infer<typeof runtimeSettingsResponseSchema>;

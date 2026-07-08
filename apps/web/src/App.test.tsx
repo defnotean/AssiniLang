@@ -357,6 +357,20 @@ function createDeterministicLlmStatus() {
       localExamples: ["ASSINI_LLM_PROVIDER=openai-compatible ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1 ASSINI_LLM_MODEL=llama3.1"],
       remoteExamples: ["ASSINI_LLM_PROVIDER=openai ASSINI_LLM_MODEL=gpt-4o-mini ASSINI_LLM_API_KEY=<server-side-key>"]
     },
+    transcription: {
+      configured: false,
+      baseUrl: undefined as string | undefined,
+      model: undefined as string | undefined,
+      baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL",
+      modelVariable: "ASSINI_TRANSCRIBE_MODEL"
+    },
+    ocr: {
+      configured: false,
+      baseUrl: undefined as string | undefined,
+      model: undefined as string | undefined,
+      baseUrlVariable: "ASSINI_OCR_BASE_URL",
+      modelVariable: "ASSINI_OCR_MODEL"
+    },
     warnings: ["No LLM provider configured; using deterministic fallback for safe local development."]
   };
 }
@@ -386,6 +400,9 @@ function createRuntimeSettingsResponse(status = createDeterministicLlmStatus()) 
       transcriptionBaseUrl: "",
       transcriptionModel: "whisper-1",
       transcriptionApiKeyConfigured: false,
+      ocrBaseUrl: "",
+      ocrModel: "llava",
+      ocrApiKeyConfigured: false,
       ocrLang: "eng",
       allowPrivateUrls: false
     },

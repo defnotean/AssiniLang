@@ -1,6 +1,6 @@
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -75,11 +75,14 @@ describe("api server", () => {
     expect(health.statusCode).toBe(200);
     expect(health.json()).toEqual({ ok: true });
 
-    const llmStatus = await app.inject({ method: "GET", url: "/llm/status" });
+    const llmStatus = await app.inject({ method: "GET", url: "/llm/status", headers: authHeaders("programmer-1") });
     expect(llmStatus.statusCode).toBe(200);
     expect(llmStatus.json()).toMatchObject({ configured: true, apiKey: { configured: false } });
     expect(llmStatus.json().apiKey).not.toHaveProperty("value");
     expect(llmStatus.json().apiKey).not.toHaveProperty("redactedValue");
+
+    const llmStatusUnauthorized = await app.inject({ method: "GET", url: "/llm/status" });
+    expect(llmStatusUnauthorized.statusCode).toBe(401);
 
     const notes = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(notes.statusCode).toBe(200);
@@ -287,6 +290,8 @@ describe("api server", () => {
 
   describe("GET/PUT /llm/settings", () => {
     it("discovers exposed model endpoints for programmer actors", async () => {
+      const previousAllowPrivate = process.env.ASSINI_ALLOW_PRIVATE_URLS;
+      process.env.ASSINI_ALLOW_PRIVATE_URLS = "1";
       const fetchStub: typeof fetch = async (input) => {
         if (input.toString() === "http://irene-box:8080/v1/models") {
           return new Response(JSON.stringify({
@@ -298,26 +303,31 @@ describe("api server", () => {
         }
         return new Response("not found", { status: 404 });
       };
-      const app = createServer({
-        initialState: buildTestWorkspaceState(),
-        ingestionFetch: fetchStub
-      });
 
-      const response = await app.inject({
-        method: "GET",
-        url: "/llm/models?baseUrl=http%3A%2F%2Firene-box%3A8080",
-        headers: authHeaders("programmer-1")
-      });
+      try {
+        const app = createServer({
+          initialState: buildTestWorkspaceState(),
+          ingestionFetch: fetchStub
+        });
 
-      expect(response.statusCode).toBe(200);
-      expect(response.headers["cache-control"]).toBe("no-store, max-age=0");
-      expect(response.json().models).toEqual(expect.arrayContaining([
-        expect.objectContaining({
-          provider: "openai-compatible",
-          baseUrl: "http://irene-box:8080/v1",
-          model: "irene-fusion"
-        })
-      ]));
+        const response = await app.inject({
+          method: "GET",
+          url: "/llm/models?baseUrl=http%3A%2F%2Firene-box%3A8080",
+          headers: authHeaders("programmer-1")
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.headers["cache-control"]).toBe("no-store, max-age=0");
+        expect(response.json().models).toEqual(expect.arrayContaining([
+          expect.objectContaining({
+            provider: "openai-compatible",
+            baseUrl: "http://irene-box:8080/v1",
+            model: "irene-fusion"
+          })
+        ]));
+      } finally {
+        restoreEnv("ASSINI_ALLOW_PRIVATE_URLS", previousAllowPrivate);
+      }
     });
 
     it("persists sanitized model settings and hot-swaps the active provider", async () => {
@@ -946,7 +956,7 @@ describe("api server", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toHaveLength(1);
 
-    const evaluations = await app.inject({ method: "GET", url: "/evaluations" });
+    const evaluations = await app.inject({ method: "GET", url: "/evaluations", headers: authHeaders("reviewer-1") });
     expect(evaluations.statusCode).toBe(200);
     expect(evaluations.json()).toHaveLength(1);
   });
@@ -962,7 +972,7 @@ describe("api server", () => {
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "No languages available to evaluate" });
 
-    const evaluations = await app.inject({ method: "GET", url: "/evaluations" });
+    const evaluations = await app.inject({ method: "GET", url: "/evaluations", headers: authHeaders("reviewer-1") });
     expect(evaluations.statusCode).toBe(200);
     expect(evaluations.json()).toEqual([existingRun]);
   });
@@ -1010,7 +1020,7 @@ describe("api server", () => {
     });
     expect(response.json().id).toMatch(/^governance-testlang-generation-/);
 
-    const governance = await app.inject({ method: "GET", url: "/governance" });
+    const governance = await app.inject({ method: "GET", url: "/governance", headers: authHeaders("lead-1") });
     expect(governance.statusCode).toBe(200);
     expect(governance.json()).toEqual([response.json()]);
   });
@@ -1510,7 +1520,7 @@ describe("api server", () => {
     expect(response.statusCode).toBe(statusCode);
     expect(response.json()).toEqual({ error });
 
-    const governance = await app.inject({ method: "GET", url: "/governance" });
+    const governance = await app.inject({ method: "GET", url: "/governance", headers: authHeaders("lead-1") });
     expect(governance.json()).toEqual([]);
   });
 
@@ -1532,7 +1542,7 @@ describe("api server", () => {
     expect(response.statusCode).toBe(error.startsWith("Language not found") ? 404 : 400);
     expect(response.json()).toEqual({ error });
 
-    const governance = await app.inject({ method: "GET", url: "/governance" });
+    const governance = await app.inject({ method: "GET", url: "/governance", headers: authHeaders("lead-1") });
     expect(governance.json()).toEqual([]);
   });
 
@@ -2046,7 +2056,11 @@ describe("api server", () => {
     expect(response.json()).not.toHaveProperty("answer");
     expect(response.json()).not.toHaveProperty("learnerId");
 
-    const submissions = await app.inject({ method: "GET", url: `/exercises/${submissionExerciseId}/submissions` });
+    const submissions = await app.inject({
+      method: "GET",
+      url: `/exercises/${submissionExerciseId}/submissions`,
+      headers: authHeaders("learner-1")
+    });
     expect(submissions.statusCode).toBe(200);
     expect(submissions.json()).toHaveLength(1);
     expect(submissions.json()[0]).toMatchObject({
@@ -2092,7 +2106,11 @@ describe("api server", () => {
       payload: { answer: "saku talo-ki" }
     });
 
-    const submissions = await app.inject({ method: "GET", url: `/exercises/${submissionExerciseId}/submissions` });
+    const submissions = await app.inject({
+      method: "GET",
+      url: `/exercises/${submissionExerciseId}/submissions`,
+      headers: authHeaders("learner-1")
+    });
 
     expect(submissions.statusCode).toBe(200);
     expect(submissions.json()[0]).toMatchObject({
@@ -2103,6 +2121,18 @@ describe("api server", () => {
     expect(submissions.json()[0]).not.toHaveProperty("answer");
     expect(submissions.json()[0]).not.toHaveProperty("learnerId");
     expect(JSON.stringify(submissions.json())).not.toContain("saku talo-ki");
+  });
+
+  it("rejects anonymous exercise submission history reads", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const submissions = await app.inject({
+      method: "GET",
+      url: `/exercises/${submissionExerciseId}/submissions`
+    });
+
+    expect(submissions.statusCode).toBe(401);
+    expect(submissions.json()).toEqual({ error: "Unauthorized" });
   });
 
   it("grades incorrect exercise submissions without exposing answer keys", async () => {
@@ -3457,8 +3487,39 @@ describe("api server", () => {
 
   it("returns a programmer-only neural map and rate limits protected writes", async () => {
     let now = 1_000;
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(
+      {
+        id: "source-right",
+        languageId: TEST_LANGUAGE_ID,
+        kind: "text",
+        title: "Shared title",
+        rawText: "right",
+        status: "processed",
+        createdBy: "reviewer-1",
+        createdAt: "2026-01-01T00:00:00.000Z"
+      },
+      {
+        id: "source-wrong",
+        languageId: TEST_LANGUAGE_ID,
+        kind: "text",
+        title: "Shared title",
+        rawText: "wrong",
+        status: "processed",
+        createdBy: "reviewer-1",
+        createdAt: "2026-01-01T00:00:00.000Z"
+      }
+    );
+    const firstPassage = state.corpus[0];
+    if (!firstPassage) throw new Error("Missing first corpus passage");
+    state.corpus[0] = {
+      ...firstPassage,
+      source: "source-asset:Shared title",
+      sourceAssetId: "source-right"
+    };
+    const firstPassageId = firstPassage.id;
     const app = createServer({
-      initialState: buildTestWorkspaceState(),
+      initialState: state,
       rateLimit: { max: 2, windowMs: 60_000, now: () => now }
     });
 
@@ -3472,6 +3533,16 @@ describe("api server", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: `language:${TEST_LANGUAGE_ID}`, type: "language" }),
         expect.objectContaining({ id: `note:${reviewedNoteId}`, type: "note" })
+      ])
+    );
+    expect(neuralMap.json().edges).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "source_asset:source-right", target: `corpus:${firstPassageId}` })
+      ])
+    );
+    expect(neuralMap.json().edges).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ source: "source_asset:source-wrong", target: `corpus:${firstPassageId}` })
       ])
     );
     expect(JSON.stringify(neuralMap.json())).not.toContain("expectedAnswers");
@@ -3573,7 +3644,8 @@ describe("api server", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`,
+      headers: authHeaders("reviewer-1")
     });
     expect(response.statusCode).toBe(200);
     const byId = new Map<string, { duplicate?: unknown }>(
@@ -3589,6 +3661,18 @@ describe("api server", () => {
     expect(byId.get("draft-unique")?.duplicate).toBeUndefined();
   });
 
+  it("rejects anonymous extraction draft list reads", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "GET",
+      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ error: "Unauthorized" });
+  });
+
   describe("background source processing", () => {
     async function registerWordlistSource(app: ReturnType<typeof createServer>, title: string): Promise<string> {
       const registered = await app.inject({
@@ -3602,10 +3686,126 @@ describe("api server", () => {
     }
 
     async function fetchStoredSource(app: ReturnType<typeof createServer>, sourceId: string) {
-      const sources = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/sources` });
+      const sources = await app.inject({
+        method: "GET",
+        url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+        headers: authHeaders("reviewer-1")
+      });
       expect(sources.statusCode).toBe(200);
       return sources.json().find((item: { id: string }) => item.id === sourceId);
     }
+
+    it("imports Obsidian Markdown files as pending text sources", async () => {
+      const previousVaultRoots = process.env.ASSINI_OBSIDIAN_VAULT_ROOTS;
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const vaultPath = await mkdtemp(join(tmpdir(), "assini-vault-"));
+      process.env.ASSINI_OBSIDIAN_VAULT_ROOTS = vaultPath;
+      await writeFile(
+        join(vaultPath, "Story.md"),
+        "---\ntags: [river]\n---\n[[mira|river]] water note\n![[field-image.png]]",
+        "utf8"
+      );
+      await writeFile(join(vaultPath, "Empty.md"), "---\ntags: [empty]\n---\n", "utf8");
+
+      try {
+        const response = await app.inject({
+          method: "POST",
+          url: `/languages/${TEST_LANGUAGE_ID}/sources/obsidian-vault`,
+          headers: authHeaders("reviewer-1"),
+          payload: {
+            vaultPath,
+            includeSubfolders: true,
+            maxFiles: 10
+          }
+        });
+
+        expect(response.statusCode).toBe(201);
+        expect(response.json().summary).toMatchObject({ scanned: 2, imported: 1, skipped: 1 });
+        expect(response.json().imported[0]).toMatchObject({
+          kind: "text",
+          title: "Story",
+          status: "pending",
+          rawText: "river water note\nfield-image.png"
+        });
+        expect(response.json().skipped[0]).toMatchObject({ path: "Empty.md" });
+
+        const audit = await app.inject({
+          method: "GET",
+          url: "/audit/events",
+          headers: authHeaders("programmer-1")
+        });
+        expect(audit.statusCode).toBe(200);
+        const importEvent = audit.json().find((event: { action: string }) => event.action === "source_asset.obsidian_vault_imported");
+        expect(importEvent).toBeDefined();
+        expect(importEvent.summary).toContain(basename(vaultPath));
+        expect(importEvent.summary).not.toContain(vaultPath);
+        expect(importEvent.metadata).toMatchObject({ vaultName: basename(vaultPath), imported: 1, skipped: 1 });
+        expect(importEvent.metadata).not.toHaveProperty("vaultPath");
+
+        const sources = await app.inject({
+          method: "GET",
+          url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+          headers: authHeaders("reviewer-1")
+        });
+        expect(sources.statusCode).toBe(200);
+        expect(sources.json().some((source: { title: string }) => source.title === "Story")).toBe(true);
+      } finally {
+        restoreEnv("ASSINI_OBSIDIAN_VAULT_ROOTS", previousVaultRoots);
+      }
+    });
+
+    it("rejects Obsidian vault paths outside ASSINI_OBSIDIAN_VAULT_ROOTS with 400", async () => {
+      const previousVaultRoots = process.env.ASSINI_OBSIDIAN_VAULT_ROOTS;
+      const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
+      const outsideVault = await mkdtemp(join(tmpdir(), "assini-outside-"));
+      process.env.ASSINI_OBSIDIAN_VAULT_ROOTS = allowedRoot;
+      await writeFile(join(outsideVault, "Secret.md"), "should not import", "utf8");
+
+      try {
+        const app = createServer({ initialState: buildTestWorkspaceState() });
+        const response = await app.inject({
+          method: "POST",
+          url: `/languages/${TEST_LANGUAGE_ID}/sources/obsidian-vault`,
+          headers: authHeaders("reviewer-1"),
+          payload: {
+            vaultPath: outsideVault,
+            includeSubfolders: true,
+            maxFiles: 10
+          }
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toMatch(/ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/);
+      } finally {
+        restoreEnv("ASSINI_OBSIDIAN_VAULT_ROOTS", previousVaultRoots);
+      }
+    });
+
+    it("rejects Obsidian vault import when ASSINI_OBSIDIAN_VAULT_ROOTS is unset", async () => {
+      const previousVaultRoots = process.env.ASSINI_OBSIDIAN_VAULT_ROOTS;
+      delete process.env.ASSINI_OBSIDIAN_VAULT_ROOTS;
+      const vaultPath = await mkdtemp(join(tmpdir(), "assini-vault-"));
+      await writeFile(join(vaultPath, "Note.md"), "note text", "utf8");
+
+      try {
+        const app = createServer({ initialState: buildTestWorkspaceState() });
+        const response = await app.inject({
+          method: "POST",
+          url: `/languages/${TEST_LANGUAGE_ID}/sources/obsidian-vault`,
+          headers: authHeaders("reviewer-1"),
+          payload: {
+            vaultPath,
+            includeSubfolders: true,
+            maxFiles: 10
+          }
+        });
+
+        expect(response.statusCode).toBe(400);
+        expect(response.json().error).toMatch(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/);
+      } finally {
+        restoreEnv("ASSINI_OBSIDIAN_VAULT_ROOTS", previousVaultRoots);
+      }
+    });
 
     it("accepts async processing with 202, then persists drafts and the processed status", async () => {
       const app = createServer({ initialState: buildTestWorkspaceState() });
@@ -3636,7 +3836,8 @@ describe("api server", () => {
 
       const drafts = await app.inject({
         method: "GET",
-        url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+        url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`,
+        headers: authHeaders("reviewer-1")
       });
       expect(drafts.statusCode).toBe(200);
       const sourceDrafts = drafts.json().filter((draft: { sourceAssetId: string }) => draft.sourceAssetId === sourceId);
@@ -3767,6 +3968,49 @@ describe("api server", () => {
       expect(processed.json().asset).toMatchObject({ id: sourceId, status: "processed" });
       expect(processed.json().drafts.length).toBeGreaterThanOrEqual(2);
       expect(Array.isArray(processed.json().warnings)).toBe(true);
+    });
+
+    it("returns 409 for a concurrent synchronous process request", async () => {
+      let release: (value: string) => void = () => {};
+      let markStarted: () => void = () => {};
+      const blocked = new Promise<string>((resolve) => {
+        release = resolve;
+      });
+      const started = new Promise<void>((resolve) => {
+        markStarted = resolve;
+      });
+      const llmProvider: LlmProvider = {
+        name: "blocking-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          markStarted();
+          return blocked;
+        }
+      };
+      const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
+      const sourceId = await registerWordlistSource(app, "Slow sync word list");
+
+      const firstRequest = app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      await started;
+
+      const conflict = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json().error).toContain("already processing");
+
+      release(JSON.stringify({ summary: "Done.", lexemes: [{ form: "mira", gloss: "river" }] }));
+      const processed = await firstRequest;
+      expect(processed.statusCode).toBe(200);
+      expect(processed.json().asset).toMatchObject({ id: sourceId, status: "processed" });
     });
 
     it("persists source processing failures with audit-safe redacted secrets", async () => {
@@ -3901,9 +4145,10 @@ describe("api server", () => {
 
       const sources = await app.inject({
         method: "GET",
-        url: `/languages/${TEST_LANGUAGE_ID}/sources`
+        url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+        headers: authHeaders("reviewer-1")
       });
-      const stuck = sources.json().find((item) => item.id === "stuck-asset-id");
+      const stuck = sources.json().find((item: { id: string }) => item.id === "stuck-asset-id");
       expect(stuck).toBeDefined();
       expect(stuck.status).toBe("failed");
       expect(stuck.error).toContain("interrupted by a server restart");

@@ -12,6 +12,7 @@ export type LlmEnvConfig = {
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 export const DEFAULT_LLM_MAX_TOKENS = 4096;
 export const DEFAULT_TRANSCRIPTION_MODEL = "whisper-1";
+export const DEFAULT_OCR_MODEL = "llava";
 export const DEFAULT_OCR_LANG = "eng";
 
 export function trimValue(value: string | undefined): string | undefined {

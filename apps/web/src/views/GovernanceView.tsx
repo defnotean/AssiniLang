@@ -1,82 +1,51 @@
-import type { FormEvent } from "react";
-import type { AuditEvent, GovernanceRecord, ReviewDisposition, ReviewPolicy } from "@assini/db";
+import type { GovernanceRecord } from "@assini/db";
+import type { GovernanceWorkspace } from "../hooks/useGovernanceWorkspace";
 import { formatStatus, safeDomId } from "../lib/format";
 import { useI18n } from "../i18n";
-import type { AsyncState, SnapshotDownload } from "../lib/types";
 
 export function GovernanceView({
   selectedLanguageId,
-  governanceState,
-  auditEventState,
-  policyType,
-  policyEffectiveDate,
-  policyContent,
-  governanceSuccess,
-  governanceError,
-  isSubmittingGovernance,
-  reviewPolicyState,
-  reviewPolicyReviewerIds,
-  reviewPolicyApprovalThreshold,
-  reviewPolicyRequiresAssigned,
-  reviewPolicySuccess,
-  reviewPolicyError,
-  isSubmittingReviewPolicy,
-  reviewDispositionState,
-  reviewDispositionDrafts,
-  reviewDispositionSuccess,
-  reviewDispositionError,
-  resolvingReviewDispositionId,
-  snapshotDownload,
-  snapshotError,
-  isExportingSnapshot,
-  onPolicyTypeChange,
-  onEffectiveDateChange,
-  onContentChange,
-  onSubmit,
-  onReviewPolicyReviewerIdsChange,
-  onReviewPolicyApprovalThresholdChange,
-  onReviewPolicyRequiresAssignedChange,
-  onReviewPolicySubmit,
-  onReviewDispositionDraftChange,
-  onResolveReviewDisposition,
-  onExportSnapshot
+  governance
 }: {
   selectedLanguageId: string;
-  governanceState: AsyncState<GovernanceRecord[]>;
-  auditEventState: AsyncState<AuditEvent[]>;
-  policyType: GovernanceRecord["policyType"];
-  policyEffectiveDate: string;
-  policyContent: string;
-  governanceSuccess: string | null;
-  governanceError: string | null;
-  isSubmittingGovernance: boolean;
-  reviewPolicyState: AsyncState<ReviewPolicy>;
-  reviewPolicyReviewerIds: string;
-  reviewPolicyApprovalThreshold: string;
-  reviewPolicyRequiresAssigned: boolean;
-  reviewPolicySuccess: string | null;
-  reviewPolicyError: string | null;
-  isSubmittingReviewPolicy: boolean;
-  reviewDispositionState: AsyncState<ReviewDisposition[]>;
-  reviewDispositionDrafts: Record<string, string>;
-  reviewDispositionSuccess: string | null;
-  reviewDispositionError: string | null;
-  resolvingReviewDispositionId: string | null;
-  snapshotDownload: SnapshotDownload | null;
-  snapshotError: string | null;
-  isExportingSnapshot: boolean;
-  onPolicyTypeChange: (value: GovernanceRecord["policyType"]) => void;
-  onEffectiveDateChange: (value: string) => void;
-  onContentChange: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
-  onReviewPolicyReviewerIdsChange: (value: string) => void;
-  onReviewPolicyApprovalThresholdChange: (value: string) => void;
-  onReviewPolicyRequiresAssignedChange: (value: boolean) => void;
-  onReviewPolicySubmit: (event: FormEvent) => void;
-  onReviewDispositionDraftChange: (dispositionId: string, summary: string) => void;
-  onResolveReviewDisposition: (dispositionId: string) => void;
-  onExportSnapshot: () => void;
+  governance: GovernanceWorkspace;
 }) {
+  const {
+    governanceState,
+    auditEventState,
+    policyType,
+    policyEffectiveDate,
+    policyContent,
+    governanceSuccess,
+    governanceError,
+    isSubmittingGovernance,
+    reviewPolicyState,
+    reviewPolicyReviewerIds,
+    reviewPolicyApprovalThreshold,
+    reviewPolicyRequiresAssigned,
+    reviewPolicySuccess,
+    reviewPolicyError,
+    isSubmittingReviewPolicy,
+    reviewDispositionState,
+    reviewDispositionDrafts,
+    reviewDispositionSuccess,
+    reviewDispositionError,
+    resolvingReviewDispositionId,
+    snapshotDownload,
+    snapshotError,
+    isExportingSnapshot,
+    setPolicyType: onPolicyTypeChange,
+    setPolicyEffectiveDate: onEffectiveDateChange,
+    setPolicyContent: onContentChange,
+    handleSubmitGovernance: onSubmit,
+    setReviewPolicyReviewerIds: onReviewPolicyReviewerIdsChange,
+    setReviewPolicyApprovalThreshold: onReviewPolicyApprovalThresholdChange,
+    setReviewPolicyRequiresAssigned: onReviewPolicyRequiresAssignedChange,
+    handleSubmitReviewPolicy: onReviewPolicySubmit,
+    setReviewDispositionDrafts,
+    handleResolveReviewDisposition: onResolveReviewDisposition,
+    handleExportSnapshot: onExportSnapshot
+  } = governance;
   const { t } = useI18n();
   const records = governanceState.status === "ready"
     ? governanceState.data.filter((record) => record.languageId === selectedLanguageId)
@@ -89,6 +58,10 @@ export function GovernanceView({
     : [];
   const loadedReviewPolicy = reviewPolicyState.status === "ready" ? reviewPolicyState.data : null;
   const reviewPolicySummary = loadedReviewPolicy ? t("governance.approvalsRequired", { count: loadedReviewPolicy.approvalThreshold }) : null;
+
+  function onReviewDispositionDraftChange(dispositionId: string, summary: string) {
+    setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: summary }));
+  }
 
   return (
     <div className="governance-view">

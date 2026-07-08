@@ -9,11 +9,13 @@ This document explains how a raw source becomes reviewable extraction drafts. Th
 | `text` | `POST /languages/:languageId/sources` with `rawText` | Pasted prose, field notes, stories | Used as-is | Offline heuristic parsing of delimited lines |
 | `wordlist` | Same route with `kind: "wordlist"` | Delimited word lists (`form = gloss` and similar) | Used as-is; the model prompt prefers lexeme extraction | Offline heuristic parsing |
 | `url` | Same route with a `url` | Public http(s) pages, capped at 2 MB | Server-side fetch, HTML converted to plain text, SSRF guard applied | Offline heuristic parsing of the fetched text |
-| `image` | `POST /languages/:languageId/sources/upload` (image MIME/extension) | Photos or scans of printed/handwritten material | Vision-capable model reads the image directly; otherwise local OCR (tesseract.js) extracts text first | OCR text then offline heuristic parsing |
+| `image` | `POST /languages/:languageId/sources/upload` (image MIME/extension) | Photos or scans of printed/handwritten material | OCR model (`ASSINI_OCR_BASE_URL`) when configured; else vision-capable main LLM; else local tesseract.js | OCR/tesseract text then offline heuristic parsing |
 | `audio` | Upload (audio MIME/extension) | Recordings | Transcribed via the `ASSINI_TRANSCRIBE_BASE_URL` endpoint; the transcript is stored on the asset and reused on reprocess | None - transcription endpoint is required |
 | `document` | Upload (everything else) | `txt`, `md`, `markdown`, `csv`, `tsv`, `json`, `text`, plus PDF (`unpdf`) and DOCX (`mammoth`) | File parsed to plain text | Offline heuristic parsing of the parsed text |
 
 Uploads are multipart, one file, 25 MB cap, stored under `data/assets/<languageId>/`. The upload route detects the kind from MIME type and extension.
+
+Obsidian vault import is a bulk intake helper, not a separate persisted source kind. `POST /languages/:languageId/sources/obsidian-vault` reads local Markdown files from a vault folder, skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, and registers each readable note as a pending `text` source. Those sources then use the same processing, warnings, draft review, and audit paths as pasted text. Vault folders must sit under `ASSINI_OBSIDIAN_VAULT_ROOTS` (fail-closed when unset); see [configuration](configuration.md#ingestion-safety-and-ocr).
 
 ## Processing flow
 
@@ -24,21 +26,25 @@ flowchart TD
     B -->|audio| D[Transcribe via<br>ASSINI_TRANSCRIBE_BASE_URL]
     B -->|document| E[Parse PDF / DOCX /<br>plain-text formats]
     B -->|text / wordlist| F[Raw text]
-    B -->|image| G{Vision model<br>configured?}
-    G -->|yes| H[Model reads image<br>as base64 content]
-    G -->|no| I[Local OCR<br>tesseract.js]
+    B -->|image| G{OCR model<br>configured?}
+    G -->|yes| H[OCR model reads image<br>ASSINI_OCR_BASE_URL]
+    G -->|no| G2{Vision main LLM<br>configured?}
+    G2 -->|yes| H2[Main LLM reads image<br>as base64 content]
+    G2 -->|no| I[Local OCR<br>tesseract.js]
     C --> J[Normalized text]
     D --> J
     E --> J
     F --> J
     I --> J
+    H --> J
+    H2 --> J
     J --> K{Chat model<br>configured?}
     K -->|yes| L[Chunk ~12k chars,<br>max 8 chunks]
     L --> M[Per-chunk LLM extraction<br>strict JSON contract]
     M --> N[Merge + dedupe candidates]
     K -->|no| O[Offline heuristic:<br>delimited-line parsing]
     M -->|all chunks unparseable| O
-    H --> P[Parse extraction JSON]
+    H2 --> P[Parse extraction JSON]
     N --> Q[Proposed extraction drafts]
     O --> Q
     P --> Q
@@ -81,14 +87,17 @@ URL sources are fetched server-side, so the fetcher refuses to be a proxy into t
 
 Responses are capped at 2 MB and must contain readable text after HTML stripping.
 
-## OCR fallback (images)
+## Image OCR pipeline
 
-When no chat-capable model is configured, image sources go through local OCR with tesseract.js:
+Image sources resolve text in priority order:
+
+1. **OCR model** — when `ASSINI_OCR_BASE_URL` is set, the image is sent to that OpenAI-compatible `/chat/completions` endpoint with `ASSINI_OCR_MODEL` (default `llava`) and an optional `ASSINI_OCR_API_KEY` bearer token. This lets you use a dedicated vision model separate from the main extraction LLM.
+2. **Vision main LLM** — when no OCR model is configured but the main provider is chat-capable, the image is sent as base64 chat content to `ASSINI_LLM_BASE_URL` / `ASSINI_LLM_MODEL`.
+3. **Local tesseract fallback** — when neither endpoint is configured (or the model calls above fail and the pipeline falls back), tesseract.js extracts text offline:
 
 - The language comes from `ASSINI_OCR_LANG` (default `eng`).
 - The first run for a given language downloads its trained data from the tesseract.js CDN (a few MB, internet required once) and caches it under `data/ocr-cache/`; later runs are offline.
 - OCR output feeds the same downstream extraction as pasted text, and the result carries the warning `No vision model configured; used local OCR (tesseract.js) to read the image.`
-- When a vision-capable model is configured, the image is sent as base64 chat content instead and OCR never runs.
 
 OCR applies only to `image` sources. Scanned PDFs with no text layer fail with an explicit error; convert pages to images or run external OCR first.
 
@@ -98,7 +107,7 @@ Audio assets are sent as multipart form data to `<ASSINI_TRANSCRIBE_BASE_URL>/au
 
 ## Duplicate flags on drafts
 
-`GET /languages/:languageId/extraction-drafts` computes a read-time `duplicate` flag on proposed drafts. Flags are advisory, computed per request, never persisted, and never block accept/reject. Each draft gets at most one flag; existing-entity matches win over pending matches.
+`GET /languages/:languageId/extraction-drafts` (roles: reviewer, lead, admin) computes a read-time `duplicate` flag on proposed drafts. Flags are advisory, computed per request, never persisted, and never block accept/reject. Each draft gets at most one flag; existing-entity matches win over pending matches.
 
 | Flag kind | Badge in the web console | Meaning |
 | --- | --- | --- |
@@ -129,14 +138,16 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Source is already processing: ...` | 409 | A sync or async run is in flight (or a crash left the asset stuck) | Wait for polling to finish; after a crash, see [troubleshooting](troubleshooting.md). |
 | `Source URL is not a valid URL: ...` / `Source URLs must use http or https.` | 422 | Unparseable URL or wrong scheme | Use a full http(s) URL. |
 | `Source URL points at a private or local network ... and was blocked.` | 422 | SSRF guard blocked the hostname/IP | Use a public URL, or set `ASSINI_ALLOW_PRIVATE_URLS=1` in a trusted local setup. |
+| `Obsidian vault import is disabled until ASSINI_OBSIDIAN_VAULT_ROOTS is set ...` / `Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.` | 400 | Vault roots unset, or path outside allowlist (`..` / symlink escapes included) | Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to semicolon-separated absolute roots and import a path under one of them. |
 | `Source URL hostname ... resolves to a private or local network address and was blocked.` | 422 | DNS resolved to a private range | Same as above. |
 | `Fetching source URL failed with status N.` | 422 | The remote server returned an error | Check the URL is reachable and public. |
 | `Source URL content is too large to process locally.` | 422 | Response over 2 MB | Save the relevant part as text and paste or upload it. |
 | `Source URL returned no readable text content.` | 422 | Page had no extractable text | Paste the text manually. |
 | `Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL ...` | 422 | No transcription server configured | Configure a whisper-style server; see [configuration](configuration.md#transcription-audio-sources). |
 | `Transcription request failed with status N.` / `Transcription endpoint returned no text.` | 422 | Transcription server error or empty result | Check the server, model name, and audio file. |
-| `Local OCR could not read the image: ... Configure a vision-capable model via ASSINI_LLM_PROVIDER ...` | 422 | OCR failed (often `OCR found no readable text in the image.`) | Provide a clearer image or configure a vision model such as llava. |
-| `The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset.` | 422 | An image source was sent to a configured but non-vision model | Either configure a vision model (for example `llava`) in `ASSINI_LLM_MODEL`, or leave the model unset so the image falls back to local OCR. |
+| `OCR model request failed with status N.` / `OCR endpoint returned no text.` | 422 | OCR model server error or empty result | Check `ASSINI_OCR_BASE_URL`, `ASSINI_OCR_MODEL`, and that the vision model is loaded (for example `ollama pull llava`). |
+| `Local OCR could not read the image: ...` | 422 | Tesseract fallback failed (often `OCR found no readable text in the image.`) | Provide a clearer image, set `ASSINI_OCR_LANG` to match the script, or configure `ASSINI_OCR_BASE_URL` / a vision-capable main LLM. |
+| `The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or configure ASSINI_OCR_BASE_URL, or rely on the local OCR fallback by leaving both unset.` | 422 | An image source was sent to a configured but non-vision main LLM with no OCR model | Configure `ASSINI_OCR_BASE_URL` with a vision model, set a vision-capable `ASSINI_LLM_MODEL`, or leave both unset so the image falls back to local tesseract. |
 | `The model response could not be parsed as extraction JSON. Try again or use a larger model.` | 422 | A vision model replied with non-JSON output | Retry, or use a model that follows JSON instructions. |
 | `The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Scanned/image-only PDF | Convert pages to images and upload those, or OCR externally. |
 | `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
@@ -144,7 +155,7 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Text source asset has no content.` / `... has no stored file.` / `URL source asset has no URL.` | 422 | The asset record is incomplete (usually hand-edited state) | Re-register or re-upload the source. |
 | `Source contains no readable text.` | 422 | Resolved text was empty after normalization | Check the source content. |
 
-Warnings (extraction still succeeds, result is flagged). Processing warnings are persisted on the source asset (`warnings`) and surfaced in the Sources & intake view under the source, so a user can see when processing fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts:
+Warnings (extraction still succeeds, result is flagged). Processing warnings are persisted on the source asset (`warnings`) and surfaced in the Build tab under the source, so a user can see when processing fell back to a heuristic or OCR rather than only inferring it from low-confidence drafts:
 
 | Warning | Meaning |
 | --- | --- |
@@ -152,7 +163,8 @@ Warnings (extraction still succeeds, result is flagged). Processing warnings are
 | `Model output was not valid extraction JSON; fell back to offline heuristics.` | The model replied with unparseable output; heuristics ran instead. |
 | `Model output for part N of M was not valid extraction JSON; that part was skipped.` | One chunk of a long source failed to parse; the rest merged normally. |
 | `Source text is very long; only the first 8 parts were processed and N characters were skipped.` | The source exceeded the chunk cap. |
-| `No vision model configured; used local OCR (tesseract.js) to read the image.` | The OCR fallback path ran for an image source. |
+| `No vision model configured; used local OCR (tesseract.js) to read the image.` | The tesseract fallback path ran for an image source (no OCR model or vision LLM succeeded). |
+| `Used configured OCR model to read the image.` | The `ASSINI_OCR_BASE_URL` endpoint read the image successfully. |
 
 ## After extraction
 

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { AppState, EvaluationRun } from "@assini/db";
 import { scoreLanguageEvaluation } from "./scoring.js";
 import { draftNotesForLanguage } from "./studyLoop.js";
@@ -20,26 +21,45 @@ export const EVALUATION_CATEGORY_THRESHOLDS: Record<string, number> = {
   generationPolicy: 1
 };
 
+function modelDraftsCoverAnswerKeyTopics(
+  modelDrafts: { topic: string }[],
+  answerKeyTopics: string[]
+): boolean {
+  if (answerKeyTopics.length === 0 || modelDrafts.length === 0) return false;
+  const draftTopics = new Set(modelDrafts.map((draft) => draft.topic));
+  return answerKeyTopics.every((topic) => draftTopics.has(topic));
+}
+
 export function runEvaluationForState(state: AppState): EvaluationRun[] {
   return state.languages.map((language) => {
     const modelDrafts = state.notes.filter(
       (note) => note.languageId === language.id && note.id.startsWith("model-draft-")
     );
-    const useModelDrafts = modelDrafts.length > 0;
+    const answerKeyTopics = [
+      ...new Set(
+        state.noteAnswerKeys
+          .filter((note) => note.languageId === language.id)
+          .map((note) => note.topic)
+      )
+    ];
+    const useModelDrafts = modelDraftsCoverAnswerKeyTopics(modelDrafts, answerKeyTopics);
     const drafted = useModelDrafts ? modelDrafts : draftNotesForLanguage(language.id, state);
     const result = scoreLanguageEvaluation(language.id, state, drafted);
-    const average =
-      (Object.values(result.scores) as number[]).reduce((sum: number, score: number) => sum + score, 0) / Object.values(result.scores).length;
+    const scoreValues = Object.values(result.scores) as number[];
+    const categoryCount = scoreValues.length;
+    const average = categoryCount === 0
+      ? 0
+      : scoreValues.reduce((sum: number, score: number) => sum + score, 0) / categoryCount;
 
     return {
-      id: `eval-${language.id}-${Date.now()}`,
+      id: `eval-${language.id}-${randomUUID()}`,
       languageId: language.id,
       createdAt: new Date().toISOString(),
       systemVersion: useModelDrafts ? "model-study-loop-v1" : "deterministic-study-loop-v1",
       fixtureVersion: "workspace-corpus-v1",
       scores: result.scores,
       failures: result.failures,
-      summary: `${language.name}: ${(average * 100).toFixed(1)}% average score across ${Object.keys(result.scores).length} categories.`
+      summary: `${language.name}: ${(average * 100).toFixed(1)}% average score across ${categoryCount} categories.`
     };
   });
 }
@@ -68,13 +88,32 @@ function thresholdFailureLines(run: EvaluationRun): string[] {
   });
 }
 
+function unscoredCriticalCategoryLines(run: EvaluationRun): string[] {
+  // Fail closed when every critical category was empty (no answer keys / exercises).
+  // Do not treat real 0% scores from graded items as "unscored".
+  const criticalCategories = Object.keys(EVALUATION_CATEGORY_THRESHOLDS);
+  const emptyCategories = new Set(
+    run.failures
+      .filter((failure) => failure.itemId === `${failure.category}:empty`)
+      .map((failure) => failure.category)
+  );
+  if (!criticalCategories.every((category) => emptyCategories.has(category))) {
+    return [];
+  }
+
+  return [
+    `${languageLabelForRun(run, run.languageId)} evaluation gate: no scored evaluation items; language cannot pass without answer keys or exercises.`
+  ];
+}
+
 export function summarizeEvaluationGate(runs: EvaluationRun[]): EvaluationGateSummary {
   const failureLines = runs.flatMap((run) =>
     [
       ...run.failures.map((failure) =>
         `${languageLabelForRun(run, failure.languageId)} ${failure.category} ${failure.itemId}: ${failure.message}`
       ),
-      ...thresholdFailureLines(run)
+      ...thresholdFailureLines(run),
+      ...unscoredCriticalCategoryLines(run)
     ]
   );
 

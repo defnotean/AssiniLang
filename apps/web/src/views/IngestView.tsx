@@ -4,7 +4,13 @@ import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import { extractionDraftSummary, formatCount } from "../lib/format";
 import { useI18n } from "../i18n";
 
-export function IngestView({ languageId }: { languageId: string }) {
+export function IngestView({
+  languageId,
+  onIntakeCommitted
+}: {
+  languageId: string;
+  onIntakeCommitted?: () => Promise<void> | void;
+}) {
   const { t } = useI18n();
   const {
     sources,
@@ -27,6 +33,15 @@ export function IngestView({ languageId }: { languageId: string }) {
     uploadFile,
     setUploadFile,
     isUploadingSource,
+    vaultPath,
+    setVaultPath,
+    vaultIncludeSubfolders,
+    setVaultIncludeSubfolders,
+    vaultMaxFiles,
+    setVaultMaxFiles,
+    isImportingVault,
+    vaultNotice,
+    vaultError,
     processingSourceId,
     processNotice,
     processError,
@@ -40,12 +55,13 @@ export function IngestView({ languageId }: { languageId: string }) {
     bulkFailures,
     handleRegisterSource,
     handleUploadSource,
+    handleImportVault,
     handleProcessSource,
     handleDraftDecision,
     toggleDraftSelection,
     toggleSelectAllProposed,
     handleBulkReview
-  } = useIngestExtraction(languageId, t);
+  } = useIngestExtraction(languageId, t, onIntakeCommitted);
 
   if (isLoadingIntake) {
     return (
@@ -115,6 +131,49 @@ export function IngestView({ languageId }: { languageId: string }) {
         </button>
       </form>
 
+      <form className="record-card form-panel compact" aria-label={t("ingest.obsidianVaultAria")} onSubmit={handleImportVault}>
+        <div>
+          <span className="detail-label">{t("ingest.obsidianVault")}</span>
+          <h3>{t("ingest.importVault")}</h3>
+        </div>
+        {vaultNotice && <p className="result-notice" role="status" aria-live="polite">{vaultNotice}</p>}
+        {vaultError && <p className="result-notice error" role="alert">{vaultError}</p>}
+        <div className="form-group">
+          <label htmlFor="ingest-vault-path">{t("ingest.vaultPath")}</label>
+          <input
+            id="ingest-vault-path"
+            value={vaultPath}
+            onChange={(event) => setVaultPath(event.target.value)}
+            placeholder={t("ingest.vaultPathPlaceholder")}
+          />
+        </div>
+        <div className="settings-grid">
+          <label className="checkbox-row settings-checkbox" htmlFor="ingest-vault-subfolders">
+            <input
+              id="ingest-vault-subfolders"
+              type="checkbox"
+              checked={vaultIncludeSubfolders}
+              onChange={(event) => setVaultIncludeSubfolders(event.target.checked)}
+            />
+            {t("ingest.includeSubfolders")}
+          </label>
+          <div className="form-group">
+            <label htmlFor="ingest-vault-max-files">{t("ingest.maxMarkdownFiles")}</label>
+            <input
+              id="ingest-vault-max-files"
+              type="number"
+              min="1"
+              max="500"
+              value={vaultMaxFiles}
+              onChange={(event) => setVaultMaxFiles(event.target.value)}
+            />
+          </div>
+        </div>
+        <button type="submit" className="secondary" disabled={isImportingVault}>
+          {isImportingVault ? t("ingest.importingVault") : t("ingest.importVaultSources")}
+        </button>
+      </form>
+
       <form className="record-card form-panel compact" aria-label={t("ingest.uploadSourceFileAria")} onSubmit={handleUploadSource}>
         <div>
           <span className="detail-label">{t("ingest.fileIntake")}</span>
@@ -181,10 +240,12 @@ export function IngestView({ languageId }: { languageId: string }) {
                 <button
                   type="button"
                   className="secondary"
-                  disabled={processingSourceId !== null}
+                  disabled={processingSourceId !== null || source.status === "processing"}
                   onClick={() => handleProcessSource(source.id)}
                 >
-                  {processingSourceId === source.id ? t("ingest.processing") : t("ingest.processSource", { title: source.title })}
+                  {processingSourceId === source.id || source.status === "processing"
+                    ? t("ingest.processing")
+                    : t("ingest.processSource", { title: source.title })}
                 </button>
               </article>
             ))}

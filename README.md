@@ -2,7 +2,7 @@
 
 A local-first workbench for documenting a language from raw materials and proving a language-learning AI workflow before any real community data is used.
 
-The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Every extracted item is a reviewable draft: nothing enters the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
+The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, Obsidian Markdown vaults, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Every extracted item is a reviewable draft: nothing enters the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
 
 On top of the reviewed data sit learner exercises with private answer keys, a deterministic evaluation harness, review policies and dispositions, elder corrections, audit trails, sanitized SHA-256-integrity exports, and AI-session observability.
 
@@ -19,16 +19,17 @@ flowchart LR
 
 ## Features
 
-- Ingestion: six source kinds, chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
+- Ingestion: six source kinds plus Obsidian vault import, chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
 - Review and governance: single and bulk extraction-draft review, note review queue with per-language policies and approval thresholds, model-drafted notes with automatic grounding scores, review dispositions, elder corrections, audit events.
 - Learning and evaluation: server-graded exercises with private answer keys and adversarial probes, spaced-repetition practice recommendations, deterministic evaluation across seven categories, paradigm-gap detection as a fieldwork to-do.
 - AI Assistant: grounded chat with the configured local model - natural-language corrections, standing setup instructions, per-reply fallback labeling, conversations that survive reloads.
-- Console ergonomics: command palette (Ctrl+K), interlinear glossed text and concordance in the corpus browser, persisted theme/view/language selection.
+- Console ergonomics: command palette (Ctrl+K), interlinear glossed text, concordance, and corpus graph in the examples browser, persisted theme/view/language selection.
+- Model setup: discovers local/OpenAI-compatible models, saves named model profiles, hot-swaps the active provider, and keeps provider keys server-side.
 - Safety boundaries: public projection layer strips answer keys and internals, exports carry SHA-256 integrity manifests, provider keys never reach the browser, corrupted local data fails loudly, validated database backup/restore.
 
 ## Quick start
 
-Windows-first (use plain `npm` on macOS/Linux):
+Windows-first (use plain `npm` on macOS/Linux; requires Node `^20.19.0 || >=22.12.0` and npm `>=10`):
 
 ```powershell
 npm.cmd install
@@ -104,6 +105,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run eval` | Deterministic evaluation CLI. |
 | `npm.cmd run build` | Build all workspaces. |
 | `npm.cmd run smoke` | End-to-end ingestion smoke script. |
+| `npm.cmd run model:verify` | Probe discovered local models and run a model-backed language workflow check. |
 | `npm.cmd run db:backup` | Validated backup of the local database to `data/backups/`. |
 | `npm.cmd run demo` | Seed, evaluate, and start the prototype. |
 

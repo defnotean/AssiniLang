@@ -14,6 +14,7 @@ interface WorkspaceHeaderProps {
   isEvaluating: boolean;
   modelDraftMessage: string | null;
   modelDraftError: string | null;
+  actionError: string | null;
   onGenerateDrafts: () => void;
   onGenerateModelDrafts: () => void;
   onRunEval: () => void;
@@ -31,6 +32,7 @@ export function WorkspaceHeader({
   isEvaluating,
   modelDraftMessage,
   modelDraftError,
+  actionError,
   onGenerateDrafts,
   onGenerateModelDrafts,
   onRunEval
@@ -72,12 +74,24 @@ export function WorkspaceHeader({
                 {modelDraftError}
               </p>
             )}
+            {actionError && (
+              <p className="result-notice error header-notice" role="alert">
+                {actionError}
+              </p>
+            )}
           </>
         )}
         {view === "model" && (
-          <button type="button" onClick={onRunEval} disabled={isWorkflowBusy}>
-            {isEvaluating ? t("eval.evaluating") : t("eval.runSystemEval")}
-          </button>
+          <>
+            <button type="button" onClick={onRunEval} disabled={isWorkflowBusy}>
+              {isEvaluating ? t("eval.evaluating") : t("eval.runSystemEval")}
+            </button>
+            {actionError && (
+              <p className="result-notice error header-notice" role="alert">
+                {actionError}
+              </p>
+            )}
+          </>
         )}
       </div>
     </section>

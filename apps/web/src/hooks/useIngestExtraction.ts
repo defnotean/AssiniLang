@@ -4,6 +4,7 @@ import {
   bulkReviewExtractionDrafts,
   fetchExtractionDrafts,
   fetchSources,
+  importObsidianVault,
   processSource,
   registerSource,
   rejectExtractionDraft,
@@ -12,7 +13,11 @@ import {
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
 import type { Translate } from "../i18n";
 
-export function useIngestExtraction(languageId: string, t: Translate) {
+export function useIngestExtraction(
+  languageId: string,
+  t: Translate,
+  onIntakeCommitted?: () => Promise<void> | void
+) {
   const [sources, setSources] = useState<SourceAsset[]>([]);
   const [drafts, setDrafts] = useState<ExtractionDraftView[]>([]);
   const [isLoadingIntake, setIsLoadingIntake] = useState(true);
@@ -29,6 +34,12 @@ export function useIngestExtraction(languageId: string, t: Translate) {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploadingSource, setIsUploadingSource] = useState(false);
+  const [vaultPath, setVaultPath] = useState("");
+  const [vaultIncludeSubfolders, setVaultIncludeSubfolders] = useState(true);
+  const [vaultMaxFiles, setVaultMaxFiles] = useState("100");
+  const [isImportingVault, setIsImportingVault] = useState(false);
+  const [vaultNotice, setVaultNotice] = useState<string | null>(null);
+  const [vaultError, setVaultError] = useState<string | null>(null);
 
   const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
   const [pollingSource, setPollingSource] = useState<{ id: string; title: string } | null>(null);
@@ -51,6 +62,8 @@ export function useIngestExtraction(languageId: string, t: Translate) {
     setIntakeError(null);
     setRegisterNotice(null);
     setRegisterError(null);
+    setVaultNotice(null);
+    setVaultError(null);
     setProcessingSourceId(null);
     setPollingSource(null);
     setProcessNotice(null);
@@ -67,6 +80,12 @@ export function useIngestExtraction(languageId: string, t: Translate) {
         if (!isCurrent) return;
         setSources(loadedSources);
         setDrafts(loadedDrafts);
+        // Resume polling if a source was already mid-process when the view loaded.
+        const inFlight = loadedSources.find((item) => item.status === "processing");
+        if (inFlight) {
+          setProcessingSourceId(inFlight.id);
+          setPollingSource({ id: inFlight.id, title: inFlight.title });
+        }
       })
       .catch((error: Error) => {
         if (isCurrent) setIntakeError(error.message);
@@ -157,6 +176,48 @@ export function useIngestExtraction(languageId: string, t: Translate) {
     }
   }
 
+  async function handleImportVault(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedPath = vaultPath.trim();
+    const maxFiles = Number(vaultMaxFiles);
+    if (!trimmedPath) {
+      setVaultNotice(null);
+      setVaultError(t("ingest.errorVaultPathRequired"));
+      return;
+    }
+    if (!Number.isInteger(maxFiles) || maxFiles < 1 || maxFiles > 500) {
+      setVaultNotice(null);
+      setVaultError(t("ingest.errorVaultMaxFiles"));
+      return;
+    }
+
+    setIsImportingVault(true);
+    setVaultNotice(null);
+    setVaultError(null);
+    try {
+      const result = await importObsidianVault(languageId, {
+        vaultPath: trimmedPath,
+        includeSubfolders: vaultIncludeSubfolders,
+        maxFiles
+      });
+      const summary = t("ingest.vaultImported", {
+        imported: result.summary.imported,
+        skipped: result.summary.skipped
+      });
+      setVaultNotice(
+        result.warnings.length > 0
+          ? `${summary} ${result.warnings.join(" ")}`
+          : summary
+      );
+      await refreshIntake();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("ingest.vaultImportFailed");
+      setVaultError(message);
+    } finally {
+      setIsImportingVault(false);
+    }
+  }
+
   // Poll the source list while a background extraction is running. The
   // first poll fires immediately, then every 2.5s until the asset leaves
   // "processing"; cleanup cancels the loop on unmount or language change.
@@ -180,10 +241,15 @@ export function useIngestExtraction(languageId: string, t: Translate) {
 
         setPollingSource(null);
         setProcessingSourceId(null);
-        if (asset && asset.status === "failed") {
+        if (!asset) {
+          setProcessError(t("ingest.processingFailed", { title: pollingSource.title }));
+          setProcessWarnings([]);
+        } else if (asset.status === "failed") {
           setProcessError(asset.error ?? t("ingest.processingFailed", { title: pollingSource.title }));
+          setProcessWarnings(asset.warnings ?? []);
         } else {
           setProcessNotice(t("ingest.processingFinished", { title: pollingSource.title }));
+          setProcessWarnings(asset.warnings ?? []);
         }
 
         const loadedDrafts = await fetchExtractionDrafts(languageId, "proposed");
@@ -233,6 +299,7 @@ export function useIngestExtraction(languageId: string, t: Translate) {
         setDraftNotice(t("ingest.draftRejected", { label: t(`draftKind.${rejected.kind}`) }));
       }
       await refreshIntake();
+      await onIntakeCommitted?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : t("ingest.draftReviewFailed");
       setDraftError(message);
@@ -281,6 +348,9 @@ export function useIngestExtraction(languageId: string, t: Translate) {
         setDraftNotice(summary);
       }
       await refreshIntake();
+      if (succeeded > 0) {
+        await onIntakeCommitted?.();
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : t("ingest.bulkReviewFailed");
       setDraftError(message);
@@ -310,6 +380,15 @@ export function useIngestExtraction(languageId: string, t: Translate) {
     uploadFile,
     setUploadFile,
     isUploadingSource,
+    vaultPath,
+    setVaultPath,
+    vaultIncludeSubfolders,
+    setVaultIncludeSubfolders,
+    vaultMaxFiles,
+    setVaultMaxFiles,
+    isImportingVault,
+    vaultNotice,
+    vaultError,
     processingSourceId,
     processNotice,
     processError,
@@ -323,6 +402,7 @@ export function useIngestExtraction(languageId: string, t: Translate) {
     bulkFailures,
     handleRegisterSource,
     handleUploadSource,
+    handleImportVault,
     handleProcessSource,
     handleDraftDecision,
     toggleDraftSelection,

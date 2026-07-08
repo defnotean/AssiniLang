@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useI18n, type MessageKey } from "../i18n";
 
 export interface TourStep {
@@ -59,9 +60,17 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
   const [rect, setRect] = useState<Rect | null>(null);
   const [cardSize, setCardSize] = useState({ width: CARD_WIDTH, height: 220 });
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  const overlayRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const step = steps[index];
   const isLast = index === steps.length - 1;
+
+  useFocusTrap(overlayRef);
+
+  useEffect(() => {
+    const firstButton = overlayRef.current?.querySelector<HTMLElement>("button");
+    firstButton?.focus();
+  }, []);
 
   // Scroll the spotlight target into view once per step (not on every measure,
   // which would feed scroll events back into the measure listener).
@@ -123,7 +132,7 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
   const cardStyle = placeCard(rect, cardSize.width, cardSize.height, viewport.width, viewport.height);
 
   return (
-    <div className="tour-overlay" role="dialog" aria-modal="true" aria-label={t("tour.aria")}>
+    <div ref={overlayRef} className="tour-overlay" role="dialog" aria-modal="true" aria-label={t("tour.aria")}>
       {rect ? (
         <div
           className="tour-spotlight"

@@ -639,6 +639,20 @@ export async function discoverLlmModels(options: {
 
   await Promise.all(targets.map(async (target) => {
     try {
+      await assertOutboundHttpUrlAllowed(target.baseUrl, { env, lookupFn: options.lookupFn });
+    } catch (error) {
+      if (target.reportErrors) {
+        const detail = error instanceof Error ? error.message : "Discovery endpoint was blocked.";
+        errors.push({
+          source: target.source,
+          baseUrl: target.baseUrl,
+          detail
+        });
+      }
+      return;
+    }
+
+    try {
       const result = await scanTarget(fetchFn, target, timeoutMs);
       const endpoint: LlmModelDiscoveryEndpoint = {
         source: target.source,

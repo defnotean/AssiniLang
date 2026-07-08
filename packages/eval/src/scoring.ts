@@ -10,7 +10,23 @@ function normalize(input: string): string {
 }
 
 function scoreRatio(pass: number, total: number): number {
-  return total === 0 ? 1 : Number((pass / total).toFixed(4));
+  // Empty categories must not auto-pass: a language with no answer keys /
+  // exercises would otherwise green-gate every threshold via 0/0 === 1.
+  return total === 0 ? 0 : Number((pass / total).toFixed(4));
+}
+
+function recordEmptyCategoryFailure(
+  failures: EvaluationFailure[],
+  category: string,
+  languageId: string,
+  message: string
+): void {
+  failures.push({
+    category,
+    languageId,
+    itemId: `${category}:empty`,
+    message
+  });
 }
 
 function answerKeyTopicMap(languageId: string, state: AppState): Map<string, Note> {
@@ -279,6 +295,23 @@ export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accep
   };
 }
 
+export function exerciseGradingFailureMessage(
+  acceptsExpectedAnswers: boolean,
+  rejectsNegativeProbes: boolean,
+  rejectsAdversarialProbes: boolean
+): string | null {
+  if (acceptsExpectedAnswers && rejectsNegativeProbes && rejectsAdversarialProbes) {
+    return null;
+  }
+  if (!acceptsExpectedAnswers) {
+    return "Expected answer was rejected by the grader.";
+  }
+  if (!rejectsNegativeProbes) {
+    return "Deterministic invalid answer was accepted by the grader.";
+  }
+  return "Curated adversarial answer was accepted by the grader.";
+}
+
 export function scoreLanguageEvaluation(languageId: string, state: AppState, draftedNotes: Note[]): LanguageScoreResult {
   const failures: EvaluationFailure[] = [];
   const expectedByTopic = answerKeyTopicMap(languageId, state);
@@ -337,18 +370,19 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
       (probe) => !gradeExerciseAnswer(exercise, probe.answer).accepted
     );
 
-    if (acceptsExpectedAnswers && rejectsNegativeProbes && rejectsAdversarialProbes) {
+    const failureMessage = exerciseGradingFailureMessage(
+      acceptsExpectedAnswers,
+      rejectsNegativeProbes,
+      rejectsAdversarialProbes
+    );
+    if (!failureMessage) {
       exercisePass += 1;
     } else {
       failures.push({
         category: "exerciseGrading",
         languageId,
         itemId: exercise.id,
-        message: !acceptsExpectedAnswers
-          ? "Expected answer was rejected by the grader."
-          : rejectsNegativeProbes
-            ? "Curated adversarial answer was accepted by the grader."
-            : "Deterministic invalid answer was accepted by the grader."
+        message: failureMessage
       });
     }
   }
@@ -371,6 +405,60 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
         message: "Expected answer uses forms outside the exercise allowed vocabulary."
       });
     }
+  }
+
+  if (expectedByTopic.size === 0) {
+    recordEmptyCategoryFailure(
+      failures,
+      "noteCoverage",
+      languageId,
+      "No note answer keys to score; empty noteCoverage fails closed."
+    );
+    recordEmptyCategoryFailure(
+      failures,
+      "noteAccuracy",
+      languageId,
+      "No note answer keys to score; empty noteAccuracy fails closed."
+    );
+    recordEmptyCategoryFailure(
+      failures,
+      "evidenceAccuracy",
+      languageId,
+      "No note answer keys to score; empty evidenceAccuracy fails closed."
+    );
+  }
+
+  if (corpusScores.total === 0) {
+    recordEmptyCategoryFailure(
+      failures,
+      "segmentationAccuracy",
+      languageId,
+      "No corpus answer keys to score; empty segmentationAccuracy fails closed."
+    );
+    recordEmptyCategoryFailure(
+      failures,
+      "translationAccuracy",
+      languageId,
+      "No corpus answer keys to score; empty translationAccuracy fails closed."
+    );
+  }
+
+  if (languageExercises.length === 0) {
+    recordEmptyCategoryFailure(
+      failures,
+      "exerciseGrading",
+      languageId,
+      "No exercises to score; empty exerciseGrading fails closed."
+    );
+  }
+
+  if (generationCheckedExercises.length === 0) {
+    recordEmptyCategoryFailure(
+      failures,
+      "generationPolicy",
+      languageId,
+      "No generation-policy exercises to score; empty generationPolicy fails closed."
+    );
   }
 
   return {

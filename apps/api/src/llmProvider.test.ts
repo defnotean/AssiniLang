@@ -188,17 +188,20 @@ describe("llm provider", () => {
     expect(JSON.stringify(status)).not.toContain("super-secret-key");
   });
 
-  it("sanitizes configured LLM and transcription base URLs in readiness output", () => {
+  it("sanitizes configured LLM, transcription, and OCR base URLs in readiness output", () => {
     const status = describeLlmProviderFromEnv({
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: " http://user:password@127.0.0.1:11434/v1?api_key=secret#fragment ",
       ASSINI_LLM_MODEL: "irene-fusion",
       ASSINI_TRANSCRIBE_BASE_URL: "https://token:secret@transcribe.example.test/v1?api_key=hidden#fragment",
-      ASSINI_TRANSCRIBE_MODEL: "whisper-local"
+      ASSINI_TRANSCRIBE_MODEL: "whisper-local",
+      ASSINI_OCR_BASE_URL: "https://token:secret@ocr.example.test/v1?api_key=hidden#fragment",
+      ASSINI_OCR_MODEL: "llava-local"
     });
 
     expect(status.baseUrl).toBe("http://127.0.0.1:11434/v1");
     expect(status.transcription.baseUrl).toBe("https://transcribe.example.test/v1");
+    expect(status.ocr.baseUrl).toBe("https://ocr.example.test/v1");
     expect(JSON.stringify(status)).not.toContain("password");
     expect(JSON.stringify(status)).not.toContain("secret");
     expect(JSON.stringify(status)).not.toContain("api_key");
@@ -243,6 +246,34 @@ describe("llm provider", () => {
     });
     expect(invalid.transcription.configured).toBe(false);
     expect(invalid.transcription.baseUrl).toBe("[configured but not a valid http(s) URL]");
+  });
+
+  it("describes OCR readiness from the ASSINI_OCR_* environment variables", () => {
+    const unconfigured = describeLlmProviderFromEnv({});
+    expect(unconfigured.ocr).toMatchObject({
+      configured: false,
+      baseUrlVariable: "ASSINI_OCR_BASE_URL",
+      modelVariable: "ASSINI_OCR_MODEL"
+    });
+    expect(unconfigured.ocr.baseUrl).toBeUndefined();
+
+    const configured = describeLlmProviderFromEnv({
+      ASSINI_OCR_BASE_URL: "http://127.0.0.1:11434/v1/",
+      ASSINI_OCR_MODEL: "llava"
+    });
+    expect(configured.ocr).toMatchObject({
+      configured: true,
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "llava",
+      baseUrlVariable: "ASSINI_OCR_BASE_URL",
+      modelVariable: "ASSINI_OCR_MODEL"
+    });
+
+    const invalid = describeLlmProviderFromEnv({
+      ASSINI_OCR_BASE_URL: "not-a-url"
+    });
+    expect(invalid.ocr.configured).toBe(false);
+    expect(invalid.ocr.baseUrl).toBe("[configured but not a valid http(s) URL]");
   });
 
   it("warns when timeout environment values are invalid", () => {

@@ -5,6 +5,10 @@ import { createServer } from "./server.js";
 const SOURCE_ASSET_ID = "source-grounding-route";
 const emptyPayload = { tags: [], morphologicalSegmentation: [], topicTags: [] };
 
+function authHeaders(userId: string) {
+  return { "x-assini-user-id": userId, "x-assini-dev-token": "test" };
+}
+
 function lexeme(form: string, gloss: string): Lexeme {
   return {
     id: `lex-${form}`,
@@ -68,7 +72,8 @@ describe("GET /languages/:languageId/extraction-drafts grounding flags", () => {
 
     const response = await app.inject({
       method: "GET",
-      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`
+      url: `/languages/${TEST_LANGUAGE_ID}/extraction-drafts?status=proposed`,
+      headers: authHeaders("reviewer-1")
     });
 
     expect(response.statusCode).toBe(200);

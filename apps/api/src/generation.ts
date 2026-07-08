@@ -1,10 +1,9 @@
 import { z } from "zod";
 import type { CorpusPassage, Exercise, Language, Lexeme, Note } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { readLlmEnvConfig, type Env } from "./llmEnvShared.js";
 import { parseModelJson } from "./modelJson.js";
 import { retrieveTopKPassages } from "@assini/eval";
-
-type Env = Record<string, string | undefined>;
 
 /**
  * Model-backed, GROUNDED generation of draft grammar notes and a draft
@@ -556,6 +555,17 @@ function isReasoningOnlyGenerationError(error: unknown): boolean {
   return error instanceof Error && REASONING_ONLY_PATTERN.test(error.message);
 }
 
+function buildRetrievalLlmConfig(env: Env) {
+  const { provider, baseUrl, model, explicitApiKey, remoteApiKey } = readLlmEnvConfig(env);
+  const isRemoteProvider = provider === "openai" || provider === "remote";
+  return {
+    baseUrl,
+    apiKey: isRemoteProvider ? remoteApiKey : explicitApiKey,
+    model,
+    provider
+  };
+}
+
 // --- orchestrators ---------------------------------------------------------
 
 export async function generateModelDraftNotes(params: {
@@ -571,12 +581,7 @@ export async function generateModelDraftNotes(params: {
   }
 
   const env = params.env ?? process.env;
-  const llmConfig = {
-    baseUrl: env.ASSINI_LLM_BASE_URL,
-    apiKey: env.ASSINI_LLM_API_KEY || env.OPENAI_API_KEY,
-    model: env.ASSINI_LLM_MODEL || env.OPENAI_MODEL,
-    provider: env.ASSINI_LLM_PROVIDER
-  };
+  const llmConfig = buildRetrievalLlmConfig(env);
 
   const query = `${params.language.name} ${params.language.description} ${params.language.orthography}`;
   const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 4, llmConfig);
@@ -586,7 +591,9 @@ export async function generateModelDraftNotes(params: {
     lexemes: params.lexemes,
     notes: params.existingNotes
   });
-  const grounding = buildNoteGrounding(retrievedCorpus, params.existingNotes);
+  // Ground against the full approved corpus so a cited passage that exists in
+  // the language is kept even when retrieval only surfaced a subset in-prompt.
+  const grounding = buildNoteGrounding(params.corpus, params.existingNotes);
   try {
     const content = await params.provider.completeChat(messages);
     return parseGeneratedNotes(content, grounding);
@@ -649,17 +656,26 @@ export async function generateModelExercise(params: {
     }
   }
 
-  const retryContent = await params.provider.completeChat(buildCompactExerciseGenerationMessages(
-    params.language,
-    { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
-    { type: params.type }
-  ));
-  const retryResult = parseGeneratedExercise(retryContent, grounding);
-  return {
-    exercise: retryResult.exercise,
-    warnings: [
-      "Model returned only reasoning_content for exercise generation; retried with a smaller JSON-only prompt.",
-      ...retryResult.warnings
-    ]
-  };
+  const retryWarnings = [
+    "Model returned only reasoning_content for exercise generation; retried with a smaller JSON-only prompt."
+  ];
+  try {
+    const retryContent = await params.provider.completeChat(buildCompactExerciseGenerationMessages(
+      params.language,
+      { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
+      { type: params.type }
+    ));
+    const retryResult = parseGeneratedExercise(retryContent, grounding);
+    return {
+      exercise: retryResult.exercise,
+      warnings: [...retryWarnings, ...retryResult.warnings]
+    };
+  } catch (retryError) {
+    if (!isReasoningOnlyGenerationError(retryError)) {
+      throw retryError;
+    }
+    throw new Error(
+      "Model returned only reasoning_content for exercise generation twice; no draft exercise was created. Try again or author manually."
+    );
+  }
 }

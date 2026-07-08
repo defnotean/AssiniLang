@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState } from "@assini/db";
 import { createServer } from "./server.js";
-import { DEFAULT_PROTOTYPE_SESSION_TTL_MS, readPrototypeSessionTtlMs } from "./routeHelpers.js";
+import {
+  DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+  prototypeSessionCookieSecure,
+  readPrototypeSessionTtlMs
+} from "./routeHelpers.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -175,5 +179,59 @@ describe("prototype session lifecycle", () => {
     const setCookie = response.headers["set-cookie"];
     const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
     expect(cookieHeader).toContain("Max-Age=90");
+  });
+
+  it("appends Secure on Set-Cookie when ASSINI_COOKIE_SECURE is enabled", async () => {
+    const previous = process.env.ASSINI_COOKIE_SECURE;
+    process.env.ASSINI_COOKIE_SECURE = "1";
+    try {
+      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "1" })).toBe(true);
+      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "true" })).toBe(true);
+      expect(prototypeSessionCookieSecure({ NODE_ENV: "production" })).toBe(true);
+      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "0", NODE_ENV: "production" })).toBe(false);
+      expect(prototypeSessionCookieSecure({})).toBe(false);
+
+      const clock = createClock();
+      const app = createSessionServer(clock);
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/prototype-session",
+        payload: { userId: "learner-1" }
+      });
+      expect(response.statusCode).toBe(200);
+      const setCookie = response.headers["set-cookie"];
+      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+      expect(cookieHeader).toContain("Secure");
+      expect(cookieHeader).toContain("HttpOnly");
+      expect(cookieHeader).toContain("SameSite=Strict");
+    } finally {
+      if (previous === undefined) delete process.env.ASSINI_COOKIE_SECURE;
+      else process.env.ASSINI_COOKIE_SECURE = previous;
+    }
+  });
+
+  it("omits Secure on Set-Cookie for local HTTP when ASSINI_COOKIE_SECURE is unset", async () => {
+    const previousSecure = process.env.ASSINI_COOKIE_SECURE;
+    const previousNodeEnv = process.env.NODE_ENV;
+    delete process.env.ASSINI_COOKIE_SECURE;
+    process.env.NODE_ENV = "test";
+    try {
+      const clock = createClock();
+      const app = createSessionServer(clock);
+      const response = await app.inject({
+        method: "POST",
+        url: "/auth/prototype-session",
+        payload: { userId: "learner-1" }
+      });
+      expect(response.statusCode).toBe(200);
+      const setCookie = response.headers["set-cookie"];
+      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+      expect(cookieHeader).not.toMatch(/(?:^|;\s*)Secure(?:;|$)/);
+    } finally {
+      if (previousSecure === undefined) delete process.env.ASSINI_COOKIE_SECURE;
+      else process.env.ASSINI_COOKIE_SECURE = previousSecure;
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 });

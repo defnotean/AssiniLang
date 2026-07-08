@@ -20,7 +20,7 @@ export const languagePhonologySchema = z.object({
   vowels: z.array(z.string().min(1)).default([]),
   syllableTemplate: z.string().optional(),
   stress: z.string().optional(),
-  notes: z.array(z.string()).default([])
+  notes: z.array(z.string().min(1)).default([])
 });
 
 export const languageSchema = z.object({
@@ -353,7 +353,10 @@ export const aiMessageRoleSchema = z.enum(["system", "user", "assistant", "tool"
 export const aiTraceStepKindSchema = z.enum(["input", "retrieval", "policy_check", "generation", "correction", "output"]);
 export const neuralMapNodeTypeSchema = z.enum([
   "language",
+  "source_asset",
   "corpus",
+  "morpheme",
+  "topic_tag",
   "note",
   "exercise",
   "ai_session",
@@ -362,6 +365,10 @@ export const neuralMapNodeTypeSchema = z.enum([
 ]);
 export const neuralMapEdgeRelationSchema = z.enum([
   "has_corpus",
+  "from_source",
+  "contains_morpheme",
+  "tagged",
+  "co_occurs",
   "has_note",
   "has_exercise",
   "uses_context",
@@ -757,6 +764,43 @@ function addLanguageIntegrityIssues(
         path: ["languages", languagePathId]
       });
     }
+
+    if (language.phonology) {
+      for (const [field, values] of [
+        ["consonants", language.phonology.consonants],
+        ["vowels", language.phonology.vowels],
+        ["notes", language.phonology.notes]
+      ] as const) {
+        for (const value of values) {
+          if (isBlankPersistedValue(value)) {
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `Language phonology ${field} must not be blank: ${languagePathId}`,
+              path: ["languages", languagePathId]
+            });
+          }
+        }
+      }
+
+      if (
+        language.phonology.syllableTemplate !== undefined
+        && isBlankPersistedValue(language.phonology.syllableTemplate)
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Language phonology syllableTemplate must not be blank: ${languagePathId}`,
+          path: ["languages", languagePathId]
+        });
+      }
+
+      if (language.phonology.stress !== undefined && isBlankPersistedValue(language.phonology.stress)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Language phonology stress must not be blank: ${languagePathId}`,
+          path: ["languages", languagePathId]
+        });
+      }
+    }
   }
 }
 
@@ -765,9 +809,11 @@ function addLexemeIntegrityIssues(
   state: {
     languages: Array<z.infer<typeof languageSchema>>;
     lexemes: Array<z.infer<typeof lexemeSchema>>;
+    sourceAssets: Array<z.infer<typeof sourceAssetSchema>>;
   }
 ) {
   const languageIds = new Set(state.languages.map((language) => language.id));
+  const sourceAssetsById = new Map(state.sourceAssets.map((asset) => [asset.id, asset]));
   const seenForms = new Set<string>();
 
   for (const lexeme of state.lexemes) {
@@ -784,6 +830,46 @@ function addLexemeIntegrityIssues(
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: `Lexeme ${field} must not be blank: ${lexeme.id}`,
+          path: ["lexemes", lexeme.id]
+        });
+      }
+    }
+
+    const seenSourceAssetIds = new Set<string>();
+    for (const sourceAssetId of lexeme.sourceAssetIds) {
+      if (isBlankPersistedValue(sourceAssetId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Lexeme sourceAssetId must not be blank: ${lexeme.id}`,
+          path: ["lexemes", lexeme.id]
+        });
+        continue;
+      }
+
+      if (seenSourceAssetIds.has(sourceAssetId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Lexeme sourceAssetId is duplicated: ${sourceAssetId}`,
+          path: ["lexemes", lexeme.id]
+        });
+        continue;
+      }
+      seenSourceAssetIds.add(sourceAssetId);
+
+      const sourceAsset = sourceAssetsById.get(sourceAssetId);
+      if (!sourceAsset) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Lexeme references missing source asset: ${sourceAssetId}`,
+          path: ["lexemes", lexeme.id]
+        });
+        continue;
+      }
+
+      if (sourceAsset.languageId !== lexeme.languageId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Lexeme source asset ${sourceAssetId} belongs to language ${sourceAsset.languageId}, not ${lexeme.languageId}`,
           path: ["lexemes", lexeme.id]
         });
       }
@@ -859,6 +945,42 @@ function addSourceAssetIntegrityIssues(
       });
     }
 
+    if (asset.processedAt !== undefined && Number.isNaN(Date.parse(asset.processedAt))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Source asset processedAt must be a parseable timestamp: ${asset.id}`,
+        path: ["sourceAssets", asset.id]
+      });
+    }
+
+    if (asset.status === "failed" && (asset.error === undefined || isBlankPersistedValue(asset.error))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Failed source asset requires an error: ${asset.id}`,
+        path: ["sourceAssets", asset.id]
+      });
+    }
+
+    if (asset.status !== "failed" && asset.error !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Non-failed source asset must not carry an error: ${asset.id}`,
+        path: ["sourceAssets", asset.id]
+      });
+    }
+
+    if (asset.warnings) {
+      for (const warning of asset.warnings) {
+        if (isBlankPersistedValue(warning)) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Source asset warning must not be blank: ${asset.id}`,
+            path: ["sourceAssets", asset.id]
+          });
+        }
+      }
+    }
+
     if (asset.filePath !== undefined) {
       const filePathIssue = sourceAssetFilePathIssue(asset.filePath, asset.languageId);
       if (filePathIssue) {
@@ -876,12 +998,18 @@ function addExtractionDraftIntegrityIssues(
   context: z.RefinementCtx,
   state: {
     languages: Array<z.infer<typeof languageSchema>>;
+    corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    notes: Array<z.infer<typeof noteSchema>>;
+    lexemes: Array<z.infer<typeof lexemeSchema>>;
     sourceAssets: Array<z.infer<typeof sourceAssetSchema>>;
     extractionDrafts: Array<z.infer<typeof extractionDraftSchema>>;
   }
 ) {
   const languageIds = new Set(state.languages.map((language) => language.id));
-  const assetIds = new Set(state.sourceAssets.map((asset) => asset.id));
+  const sourceAssetsById = new Map(state.sourceAssets.map((asset) => [asset.id, asset]));
+  const corpusById = new Map(state.corpus.map((passage) => [passage.id, passage]));
+  const notesById = new Map(state.notes.map((note) => [note.id, note]));
+  const lexemesById = new Map(state.lexemes.map((lexeme) => [lexeme.id, lexeme]));
 
   for (const draft of state.extractionDrafts) {
     if (!languageIds.has(draft.languageId)) {
@@ -892,10 +1020,17 @@ function addExtractionDraftIntegrityIssues(
       });
     }
 
-    if (!assetIds.has(draft.sourceAssetId)) {
+    const sourceAsset = sourceAssetsById.get(draft.sourceAssetId);
+    if (!sourceAsset) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: `Extraction draft references missing source asset: ${draft.sourceAssetId}`,
+        path: ["extractionDrafts", draft.id]
+      });
+    } else if (sourceAsset.languageId !== draft.languageId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Extraction draft source asset ${draft.sourceAssetId} belongs to language ${sourceAsset.languageId}, not ${draft.languageId}`,
         path: ["extractionDrafts", draft.id]
       });
     }
@@ -947,6 +1082,51 @@ function addExtractionDraftIntegrityIssues(
         path: ["extractionDrafts", draft.id]
       });
     }
+
+    if (draft.status !== "accepted" && draft.committedEntityId !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Non-accepted extraction draft must not carry committedEntityId: ${draft.id}`,
+        path: ["extractionDrafts", draft.id]
+      });
+    }
+
+    if (draft.status === "accepted") {
+      if (draft.committedEntityId === undefined || isBlankPersistedValue(draft.committedEntityId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Accepted extraction draft requires committedEntityId: ${draft.id}`,
+          path: ["extractionDrafts", draft.id]
+        });
+      } else {
+        const committedEntity = draft.kind === "lexeme"
+          ? lexemesById.get(draft.committedEntityId)
+          : draft.kind === "corpus_passage"
+            ? corpusById.get(draft.committedEntityId)
+            : notesById.get(draft.committedEntityId);
+        if (!committedEntity) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Extraction draft committedEntityId references missing ${draft.kind} entity: ${draft.committedEntityId}`,
+            path: ["extractionDrafts", draft.id]
+          });
+        } else if (committedEntity.languageId !== draft.languageId) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Extraction draft committedEntityId ${draft.committedEntityId} belongs to language ${committedEntity.languageId}, not ${draft.languageId}`,
+            path: ["extractionDrafts", draft.id]
+          });
+        }
+      }
+    }
+
+    if (draft.reviewedAt !== undefined && Number.isNaN(Date.parse(draft.reviewedAt))) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Extraction draft reviewedAt must be a parseable timestamp: ${draft.id}`,
+        path: ["extractionDrafts", draft.id]
+      });
+    }
   }
 }
 
@@ -989,9 +1169,11 @@ function addCorpusIntegrityIssues(
   state: {
     languages: Array<z.infer<typeof languageSchema>>;
     corpus: Array<z.infer<typeof corpusPassageSchema>>;
+    sourceAssets: Array<z.infer<typeof sourceAssetSchema>>;
   }
 ) {
   const languageIds = new Set(state.languages.map((language) => language.id));
+  const sourceAssetsById = new Map(state.sourceAssets.map((asset) => [asset.id, asset]));
 
   for (const passage of state.corpus) {
     if (isBlankPersistedValue(passage.languageId)) {
@@ -1006,6 +1188,34 @@ function addCorpusIntegrityIssues(
         message: `Corpus passage references missing language: ${passage.languageId}`,
         path: ["corpus", passage.id]
       });
+    }
+
+    if (passage.sourceAssetId !== undefined) {
+      if (isBlankPersistedValue(passage.sourceAssetId)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Corpus passage sourceAssetId must not be blank: ${passage.id}`,
+          path: ["corpus", passage.id]
+        });
+      } else {
+        const sourceAsset = sourceAssetsById.get(passage.sourceAssetId);
+        if (!sourceAsset) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Corpus passage references missing source asset: ${passage.sourceAssetId}`,
+            path: ["corpus", passage.id]
+          });
+        } else if (
+          !isBlankPersistedValue(passage.languageId)
+          && sourceAsset.languageId !== passage.languageId
+        ) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Corpus passage source asset ${passage.sourceAssetId} belongs to language ${sourceAsset.languageId}, not ${passage.languageId}`,
+            path: ["corpus", passage.id]
+          });
+        }
+      }
     }
 
     if (isBlankPersistedValue(passage.source)) {
@@ -2576,8 +2786,11 @@ function duplicateReviewApprovalKey(
   return undefined;
 }
 
+/** Current AppState schema version written and accepted by this package. */
+export const CURRENT_SCHEMA_VERSION = 8 as const;
+
 export const appStateSchema = z.object({
-  schemaVersion: z.literal(8),
+  schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
   languages: z.array(languageSchema),
   corpus: z.array(corpusPassageSchema),
   corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
@@ -2865,7 +3078,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacy.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacy.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       noteAnswerKeys: legacy.data.notes.map(migrateLegacyNoteToAnswerKey),
       exerciseSubmissions: [],
       auditEvents: [],
@@ -2879,7 +3092,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV2.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV2.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       exerciseSubmissions: [],
       auditEvents: [],
       reviewPolicies: [],
@@ -2892,7 +3105,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV3.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV3.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       auditEvents: [],
       reviewPolicies: [],
       reviewApprovals: [],
@@ -2904,7 +3117,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV4.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV4.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       auditEvents: [],
       reviewPolicies: [],
       reviewApprovals: [],
@@ -2916,7 +3129,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV5.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV5.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       reviewPolicies: [],
       reviewApprovals: [],
       reviewDispositions: []
@@ -2927,7 +3140,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV6.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV6.data,
-      schemaVersion: 8,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       reviewDispositions: []
     }));
   }
@@ -2936,7 +3149,7 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV7.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV7.data,
-      schemaVersion: 8
+      schemaVersion: CURRENT_SCHEMA_VERSION
     }));
   }
 

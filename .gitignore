@@ -37,3 +37,10 @@ Thumbs.db
 
 # Local editor/agent tooling
 .claude/
+
+# Local scratch / session junk (never commit)
+cookies.txt
+tmp-session.json
+delete-body.txt
+tmp-*.txt
+tmp-*.json

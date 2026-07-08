@@ -91,6 +91,11 @@ export function ElderPage({
   return (
     <div className="elder-page">
       <p className="elder-intro">{t("elderPage.intro")}</p>
+      {!elder.elderContext && elder.correctionError && (
+        <p className="result-notice error" role="alert">
+          {elder.correctionError}
+        </p>
+      )}
 
       <section className="elder-card elder-suggest" aria-label={t("elderPage.suggestHeading")}>
         <div className="elder-card-head">
@@ -111,7 +116,11 @@ export function ElderPage({
           </div>
         ) : (
           <>
-            {elder.correctionError && <p className="result-notice error">{elder.correctionError}</p>}
+            {elder.elderContext && elder.correctionError && (
+              <p className="result-notice error" role="alert">
+                {elder.correctionError}
+              </p>
+            )}
 
             {step === 1 && (
               <div className="elder-step">

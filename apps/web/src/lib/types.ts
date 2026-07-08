@@ -13,6 +13,7 @@ export type AsyncState<T> =
 export type DashboardLoadState = Exclude<AsyncState<DashboardData>, { status: "idle" }>;
 export type Language = DashboardData["languages"][number];
 export type CorpusPassage = DashboardData["corpus"][number];
+export type PublicNote = DashboardData["notes"][number];
 export type PublicExercise = DashboardData["exercises"][number];
 export type Theme = "light" | "dark";
 export type ThemeReader = Pick<Storage, "getItem">;

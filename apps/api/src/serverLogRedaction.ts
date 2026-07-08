@@ -4,5 +4,6 @@ export const FASTIFY_LOGGER_REDACT_PATHS = [
   "res.headers['set-cookie']",
   "body.apiKey",
   "body.transcriptionApiKey",
+  "body.ocrApiKey",
   "body.password"
 ] as const;

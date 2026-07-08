@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
-import { gradeExerciseAnswer, scoreLanguageEvaluation } from "./scoring.js";
+import { exerciseGradingFailureMessage, gradeExerciseAnswer, scoreLanguageEvaluation } from "./scoring.js";
 import { draftNotesForLanguage } from "./studyLoop.js";
 
 describe("evaluation scoring", () => {
@@ -177,7 +177,8 @@ describe("evaluation scoring", () => {
       expect.arrayContaining([
         expect.objectContaining({
           category: "exerciseGrading",
-          itemId: "testlang-ex-002"
+          itemId: "testlang-ex-002",
+          message: "Deterministic invalid answer was accepted by the grader."
         })
       ])
     );
@@ -203,6 +204,19 @@ describe("evaluation scoring", () => {
           message: "Curated adversarial answer was accepted by the grader."
         })
       ])
+    );
+  });
+
+  it("maps each exercise grading failure branch to the matching message", () => {
+    expect(exerciseGradingFailureMessage(true, true, true)).toBeNull();
+    expect(exerciseGradingFailureMessage(false, true, true)).toBe(
+      "Expected answer was rejected by the grader."
+    );
+    expect(exerciseGradingFailureMessage(true, false, true)).toBe(
+      "Deterministic invalid answer was accepted by the grader."
+    );
+    expect(exerciseGradingFailureMessage(true, true, false)).toBe(
+      "Curated adversarial answer was accepted by the grader."
     );
   });
 
@@ -257,4 +271,35 @@ describe("evaluation scoring", () => {
       );
     }
   );
+
+  it("fails closed when a language has no answer keys or exercises", () => {
+    const state = buildTestWorkspaceState();
+    state.noteAnswerKeys = state.noteAnswerKeys.filter((note) => note.languageId !== TEST_LANGUAGE_ID);
+    state.corpusAnswerKeys = (state.corpusAnswerKeys ?? []).filter((key) => key.languageId !== TEST_LANGUAGE_ID);
+    state.corpus = state.corpus.filter((passage) => passage.languageId !== TEST_LANGUAGE_ID);
+    state.exercises = state.exercises.filter((exercise) => exercise.languageId !== TEST_LANGUAGE_ID);
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, []);
+
+    expect(result.scores).toEqual({
+      noteCoverage: 0,
+      noteAccuracy: 0,
+      evidenceAccuracy: 0,
+      segmentationAccuracy: 0,
+      translationAccuracy: 0,
+      exerciseGrading: 0,
+      generationPolicy: 0
+    });
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: "noteCoverage", itemId: "noteCoverage:empty" }),
+        expect.objectContaining({ category: "noteAccuracy", itemId: "noteAccuracy:empty" }),
+        expect.objectContaining({ category: "evidenceAccuracy", itemId: "evidenceAccuracy:empty" }),
+        expect.objectContaining({ category: "segmentationAccuracy", itemId: "segmentationAccuracy:empty" }),
+        expect.objectContaining({ category: "translationAccuracy", itemId: "translationAccuracy:empty" }),
+        expect.objectContaining({ category: "exerciseGrading", itemId: "exerciseGrading:empty" }),
+        expect.objectContaining({ category: "generationPolicy", itemId: "generationPolicy:empty" })
+      ])
+    );
+  });
 });
