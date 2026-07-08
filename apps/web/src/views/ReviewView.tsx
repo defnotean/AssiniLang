@@ -164,8 +164,8 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.evidenceCitations")}>
               <div className="pill-row">
-                {selectedNote.evidencePassageIds.map((passageId) => (
-                  <span key={passageId} className="pill">
+                {selectedNote.evidencePassageIds.map((passageId, index) => (
+                  <span key={`${index}:${passageId}`} className="pill">
                     {passageId}
                   </span>
                 ))}
@@ -177,8 +177,8 @@ export function ReviewView({
                 <p className="inline-empty">{t("reviewView.noExamplesSupplied")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.examples.map((example) => (
-                    <div key={example.passageId} className="detail-row example-row">
+                  {selectedNote.examples.map((example, index) => (
+                    <div key={`${index}:${example.passageId}`} className="detail-row example-row">
                       <code>{example.target}</code>
                       <span>{example.translation}</span>
                     </div>
@@ -192,8 +192,8 @@ export function ReviewView({
                 <p className="inline-empty">{t("reviewView.noReviewerComments")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.reviewer.comments.map((comment) => (
-                    <p key={comment} className="detail-row">
+                  {selectedNote.reviewer.comments.map((comment, index) => (
+                    <p key={`${index}:${comment}`} className="detail-row">
                       {comment}
                     </p>
                   ))}
@@ -206,8 +206,8 @@ export function ReviewView({
                 <p className="inline-empty">{t("reviewView.noEditHistory")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.editHistory.map((entry) => (
-                    <div key={`${entry.at}-${entry.action}-${entry.summary}`} className="detail-row">
+                  {selectedNote.editHistory.map((entry, index) => (
+                    <div key={`${index}:${entry.at}:${entry.action}:${entry.summary}`} className="detail-row">
                       <strong>{entry.action}</strong>
                       <span>{entry.summary}</span>
                       <span className="muted">{entry.by}</span>

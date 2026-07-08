@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
+  checkLlmReachability,
   closePrototypeSession,
   fetchCurrentUser,
   fetchAuditEvents,
   fetchDashboardData,
   fetchEvaluationArtifact,
+  fetchExerciseSubmissions,
   fetchLanguageProfile,
   fetchLanguageSnapshot,
   fetchDiscoveredModels,
@@ -15,6 +17,7 @@ import {
   fetchReviewDispositions,
   generateDraftNotes,
   createExercise,
+  generateModelExercise,
   importCorpusPassage,
   createGovernanceRecord,
   updateReviewPolicy,
@@ -26,6 +29,13 @@ import {
   fetchRecommendedExercises,
   createAiSession,
   bulkReviewExtractionDrafts,
+  acceptExtractionDraft,
+  fetchExtractionDrafts,
+  fetchSources,
+  processSource,
+  registerSource,
+  rejectExtractionDraft,
+  uploadSourceFile,
   updateRuntimeSettings
 } from "./api";
 
@@ -130,6 +140,19 @@ describe("fetchDashboardData", () => {
     });
   });
 
+  it("fetches encoded exercise submission history without reviewer auth", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => []
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchExerciseSubmissions("exercise/1");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/exercises/exercise%2F1/submissions", undefined);
+  });
+
   it("opens a reviewer prototype session before creating encoded exercises", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
@@ -157,6 +180,42 @@ describe("fetchDashboardData", () => {
       method: "POST",
       ...jsonRequest,
       body: JSON.stringify(payload)
+    });
+  });
+
+  it("opens a reviewer prototype session before generating encoded model exercises", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exercise: { type: "translate_to_target" }, warnings: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateModelExercise("avenik/test language", { type: " translate_to_target " });
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/exercises/generate", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ type: "translate_to_target" })
+    });
+  });
+
+  it("sends an empty body when generating model exercises without a type", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ exercise: { type: "translate_to_target" }, warnings: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await generateModelExercise("avenik", { type: "   " });
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik/exercises/generate", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({})
     });
   });
 
@@ -303,6 +362,23 @@ describe("fetchDashboardData", () => {
       body: JSON.stringify(payload)
     });
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("x-assini-dev-token");
+  });
+
+  it("checks LLM reachability through a programmer prototype session", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, status: "reachable" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await checkLlmReachability();
+
+    expectPrototypeSession(fetchMock, "programmer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/llm/health-check", {
+      method: "POST",
+      ...actorRequest
+    });
   });
 
   it("fetches encoded language profiles", async () => {
@@ -610,6 +686,141 @@ describe("fetchDashboardData", () => {
     await expect(reviewNote("note-1", { status: "contested" })).rejects.toThrow(
       "Note review failed (400): Contested notes require a substantive reviewer comment."
     );
+  });
+
+  it("fetches encoded source lists without reviewer auth", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => []
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchSources("avenik/test language");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/languages/avenik%2Ftest%20language/sources", undefined);
+  });
+
+  it("opens a reviewer prototype session before registering encoded sources", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ id: "source-1" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      kind: "text" as const,
+      title: "Elder story",
+      rawText: "mira talo-mi-na",
+      url: "https://example.test/story"
+    };
+    await registerSource("avenik/test language", payload);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/sources", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify(payload)
+    });
+  });
+
+  it("uploads encoded source files as multipart without a manual content-type", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ id: "source-upload-1" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const file = new File(["audio-bytes"], "elder recording.wav", { type: "audio/wav" });
+    await uploadSourceFile("avenik/test language", file, "  Elder recording  ");
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    const uploadCall = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(uploadCall[0]).toBe("/api/languages/avenik%2Ftest%20language/sources/upload");
+    const request = uploadCall[1];
+    expect(request.method).toBe("POST");
+    expect(request.credentials).toBe("include");
+    expect(request.headers).toEqual({});
+    expect(request.body).toBeInstanceOf(FormData);
+    const formData = request.body as FormData;
+    expect(formData.get("file")).toBe(file);
+    expect(formData.get("title")).toBe("Elder recording");
+  });
+
+  it("processes encoded sources synchronously without a JSON body by default", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ asset: { id: "source-1" }, drafts: [], warnings: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processSource("source/1");
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/sources/source%2F1/process", {
+      method: "POST",
+      ...actorRequest
+    });
+  });
+
+  it("processes encoded sources asynchronously with the async JSON flag", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ asset: { id: "source-1" }, drafts: [], warnings: [] })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await processSource("source/1", { async: true });
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/sources/source%2F1/process", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ async: true })
+    });
+  });
+
+  it("fetches encoded proposed extraction drafts", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => []
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchExtractionDrafts("avenik/test language", "proposed");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/languages/avenik%2Ftest%20language/extraction-drafts?status=proposed",
+      undefined
+    );
+  });
+
+  it("opens a reviewer prototype session before accepting and rejecting encoded drafts", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ id: "draft/1" })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await acceptExtractionDraft("draft/1");
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/extraction-drafts/draft%2F1/accept", {
+      method: "POST",
+      ...actorRequest
+    });
+
+    await rejectExtractionDraft("draft/2");
+    expectPrototypeSession(fetchMock, "reviewer-1", 2);
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/extraction-drafts/draft%2F2/reject", {
+      method: "POST",
+      ...actorRequest
+    });
   });
 
   it("posts bulk extraction draft reviews as a reviewer", async () => {

@@ -1,8 +1,7 @@
 import { resolve as resolvePath } from "node:path";
+import type { Env } from "./llmEnvShared.js";
 import { loadRuntimeEnvFile } from "./runtimeEnv.js";
 import { resolveRuntimeSettingsPath } from "./runtimePath.js";
-
-type Env = Record<string, string | undefined>;
 
 export type RuntimeEnvLoadOptions = {
   moduleUrl?: string;

@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import {
   GOVERNANCE_APPROVER_ROLES,
   isReviewPolicyAssignableRole,
@@ -10,8 +11,9 @@ import {
   type ReviewPolicy,
   type User
 } from "@assini/db";
-import { appendAuditEvent, parseStringArray, requireActor, usersForState } from "../routeHelpers.js";
+import { appendAuditEvent, requireActor, usersForState } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
+import { parseSchemaBody } from "./requestBody.js";
 
 type GovernanceBody = Pick<GovernanceRecord, "languageId" | "policyType" | "content" | "effectiveDate">;
 
@@ -25,47 +27,41 @@ type ReviewDispositionResolveByIdBody = ReviewDispositionResolveBody & {
   dispositionId: string;
 };
 
+const trimmedNonEmptyStringSchema = z.string()
+  .transform((value) => value.trim())
+  .refine((value) => value.length > 0);
+
+const parseableDateStringSchema = z.string()
+  .transform((value) => value.trim())
+  .refine((value) => value.length > 0 && !Number.isNaN(Date.parse(value)));
+
+const governanceBodySchema = z.object({
+  languageId: trimmedNonEmptyStringSchema,
+  policyType: z.enum(["consent", "access", "generation"]),
+  content: trimmedNonEmptyStringSchema,
+  effectiveDate: parseableDateStringSchema
+});
+
+const reviewPolicyBodySchema = z.object({
+  assignedReviewerIds: z.array(trimmedNonEmptyStringSchema).min(1),
+  approvalThreshold: z.number().int().min(1),
+  requiresAssignedReviewer: z.boolean().default(true)
+});
+
+const reviewDispositionResolveBodySchema = z.object({
+  resolutionSummary: trimmedNonEmptyStringSchema
+});
+
+const reviewDispositionResolveByIdBodySchema = reviewDispositionResolveBodySchema.extend({
+  dispositionId: trimmedNonEmptyStringSchema
+});
+
 function parseGovernanceBody(input: unknown): GovernanceBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  const languageId = typeof body.languageId === "string" ? body.languageId.trim() : "";
-  const policyType = body.policyType === "consent" || body.policyType === "access" || body.policyType === "generation"
-    ? body.policyType
-    : undefined;
-  const content = typeof body.content === "string" ? body.content.trim() : "";
-  const effectiveDate = typeof body.effectiveDate === "string" ? body.effectiveDate.trim() : "";
-
-  if (!languageId || !policyType || !content || !effectiveDate || Number.isNaN(Date.parse(effectiveDate))) {
-    return undefined;
-  }
-
-  return { languageId, policyType, content, effectiveDate };
+  return parseSchemaBody(governanceBodySchema, input);
 }
 
 function parseReviewPolicyBody(input: unknown): ReviewPolicyBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  const assignedReviewerIds = parseStringArray(body.assignedReviewerIds);
-  const approvalThreshold = typeof body.approvalThreshold === "number" && Number.isInteger(body.approvalThreshold)
-    ? body.approvalThreshold
-    : undefined;
-  const requiresAssignedReviewer = body.requiresAssignedReviewer === undefined
-    ? true
-    : typeof body.requiresAssignedReviewer === "boolean"
-      ? body.requiresAssignedReviewer
-      : undefined;
-
-  if (!assignedReviewerIds || assignedReviewerIds.length === 0 || !approvalThreshold || approvalThreshold < 1 || requiresAssignedReviewer === undefined) {
-    return undefined;
-  }
-
-  return { assignedReviewerIds, approvalThreshold, requiresAssignedReviewer };
+  return parseSchemaBody(reviewPolicyBodySchema, input);
 }
 
 function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): string | undefined {
@@ -109,24 +105,11 @@ function reviewPolicyAuthorityActor(state: AppState, actor: User): User | undefi
 }
 
 function parseReviewDispositionResolveBody(input: unknown): ReviewDispositionResolveBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  const resolutionSummary = typeof body.resolutionSummary === "string" ? body.resolutionSummary.trim() : "";
-  return resolutionSummary.length > 0 ? { resolutionSummary } : undefined;
+  return parseSchemaBody(reviewDispositionResolveBodySchema, input);
 }
 
 function parseReviewDispositionResolveByIdBody(input: unknown): ReviewDispositionResolveByIdBody | undefined {
-  const body = parseReviewDispositionResolveBody(input);
-  if (!body || !input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const rawDispositionId = (input as Record<string, unknown>).dispositionId;
-  const dispositionId = typeof rawDispositionId === "string" ? rawDispositionId.trim() : "";
-  return dispositionId.length > 0 ? { ...body, dispositionId } : undefined;
+  return parseSchemaBody(reviewDispositionResolveByIdBodySchema, input);
 }
 
 export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext): void {

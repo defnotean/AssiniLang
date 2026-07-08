@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { CorpusPassage, Exercise, Language, Lexeme, Note } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { parseModelJson } from "./modelJson.js";
 import { retrieveTopKPassages } from "@assini/eval";
 
 type Env = Record<string, string | undefined>;
@@ -144,54 +145,15 @@ function dedupeStrings(values: string[]): string[] {
   return cleaned;
 }
 
-// --- model-JSON tolerance (mirrors ingestion.ts) ---------------------------
-
-function stripCodeFences(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return fenced?.[1] ?? content;
-}
-
-function extractFirstJsonObject(content: string): string | undefined {
-  const start = content.indexOf("{");
-  if (start < 0) return undefined;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = start; index < content.length; index += 1) {
-    const char = content[index];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-    } else if (char === "{") {
-      depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return content.slice(start, index + 1);
-      }
-    }
-  }
-  return undefined;
-}
-
-function parseModelJson(content: string): unknown | undefined {
-  const candidate = extractFirstJsonObject(stripCodeFences(content));
-  if (!candidate) return undefined;
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    return undefined;
-  }
+function partitionGroundedStrings(
+  values: string[] | undefined,
+  isAllowed: (value: string) => boolean
+): { kept: string[]; dropped: string[] } {
+  const requested = dedupeStrings(values ?? []);
+  return {
+    kept: requested.filter(isAllowed),
+    dropped: requested.filter((value) => !isAllowed(value))
+  };
 }
 
 // --- context building ------------------------------------------------------
@@ -438,8 +400,10 @@ export function parseGeneratedNotes(content: string, grounding: NoteGrounding): 
       continue;
     }
 
-    const validEvidence = dedupeStrings(raw.evidencePassageIds ?? []).filter((id) => grounding.passageIds.has(id));
-    const droppedEvidence = dedupeStrings(raw.evidencePassageIds ?? []).filter((id) => !grounding.passageIds.has(id));
+    const { kept: validEvidence, dropped: droppedEvidence } = partitionGroundedStrings(
+      raw.evidencePassageIds,
+      (id) => grounding.passageIds.has(id)
+    );
     if (validEvidence.length === 0) {
       warnings.push(
         `Dropped ungrounded generated note "${topic}" because none of its evidence passages (${droppedEvidence.join(", ") || "none provided"}) exist in the approved corpus.`
@@ -504,16 +468,18 @@ export function parseGeneratedExercise(content: string, grounding: ExerciseGroun
   const warnings: string[] = [];
   const type = coerceExerciseType(raw.type, warnings);
 
-  const requestedVocabulary = dedupeStrings(raw.allowedVocabulary ?? []);
-  const allowedVocabulary = requestedVocabulary.filter((form) => grounding.lexemeForms.has(normalizeForm(form)));
-  const droppedVocabulary = requestedVocabulary.filter((form) => !grounding.lexemeForms.has(normalizeForm(form)));
+  const { kept: allowedVocabulary, dropped: droppedVocabulary } = partitionGroundedStrings(
+    raw.allowedVocabulary,
+    (form) => grounding.lexemeForms.has(normalizeForm(form))
+  );
   if (droppedVocabulary.length > 0) {
     warnings.push(`Dropped ${droppedVocabulary.length} hallucinated vocabulary form(s) not in the approved lexicon: ${droppedVocabulary.join(", ")}.`);
   }
 
-  const requestedRuleIds = dedupeStrings(raw.allowedRuleIds ?? []);
-  const allowedRuleIds = requestedRuleIds.filter((id) => grounding.noteIds.has(id));
-  const droppedRuleIds = requestedRuleIds.filter((id) => !grounding.noteIds.has(id));
+  const { kept: allowedRuleIds, dropped: droppedRuleIds } = partitionGroundedStrings(
+    raw.allowedRuleIds,
+    (id) => grounding.noteIds.has(id)
+  );
   if (droppedRuleIds.length > 0) {
     warnings.push(`Dropped ${droppedRuleIds.length} rule id(s) that do not match an existing note: ${droppedRuleIds.join(", ")}.`);
   }

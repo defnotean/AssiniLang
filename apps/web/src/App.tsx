@@ -15,11 +15,12 @@ import {
   reviewNote,
   runEvaluation
 } from "./api";
-import { CommandPalette, type PaletteCommand } from "./components/CommandPalette";
+import { CommandPalette } from "./components/CommandPalette";
 import { SignOutButton } from "./components/SignOutButton";
+import { SidebarLanguageNav } from "./components/SidebarLanguageNav";
 import { StatusScreen } from "./components/StatusScreen";
-import { CompassMark, DiamondBand, TypologyMark, ViewGlyph } from "./components/marks";
-import { formatOrthographyMeta } from "./lib/format";
+import { WorkspaceHeader } from "./components/WorkspaceHeader";
+import { CompassMark, DiamondBand } from "./components/marks";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
@@ -28,7 +29,7 @@ import type {
   Theme,
   ViewMode
 } from "./lib/types";
-import { REVIEWER_COMMENTS, VIEW_ORDER } from "./lib/viewConfig";
+import { REVIEWER_COMMENTS } from "./lib/viewConfig";
 import { useI18n } from "./i18n";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
@@ -36,6 +37,8 @@ import { useElderWorkspace } from "./hooks/useElderWorkspace";
 import { useGovernanceWorkspace } from "./hooks/useGovernanceWorkspace";
 import { useLearnerWorkspace } from "./hooks/useLearnerWorkspace";
 import { useModelWorkspace } from "./hooks/useModelWorkspace";
+import { useWorkspacePaletteCommands } from "./hooks/useWorkspacePaletteCommands";
+import { TOUR_STEPS, useWorkspaceTour } from "./hooks/useWorkspaceTour";
 import { AssistantView } from "./views/AssistantView";
 import { CorpusView } from "./views/CorpusView";
 import { CreateLanguageForm } from "./views/CreateLanguageForm";
@@ -48,25 +51,10 @@ import { LearnerView } from "./views/LearnerView";
 import { ModelSetupView } from "./views/ModelSetupView";
 import { NoLanguageNotice } from "./views/NoLanguageNotice";
 import { ReviewView } from "./views/ReviewView";
-import { GuidedTour, type TourStep } from "./components/GuidedTour";
+import { GuidedTour } from "./components/GuidedTour";
 import "./styles.css";
 
 export { getInitialTheme } from "./lib/theme";
-
-const TOUR_STORAGE_KEY = "workspace.tourSeen";
-const TOUR_STEPS: TourStep[] = [
-  { titleKey: "tour.welcomeTitle", bodyKey: "tour.welcomeBody" },
-  { selector: ".sidebar", titleKey: "tour.sidebarTitle", bodyKey: "tour.sidebarBody" },
-  { selector: ".brand-controls", titleKey: "tour.settingsTitle", bodyKey: "tour.settingsBody" },
-  { selector: ".language-nav", titleKey: "tour.languagesTitle", bodyKey: "tour.languagesBody" },
-  { selector: ".sidebar-footer", titleKey: "tour.createTitle", bodyKey: "tour.createBody" },
-  { titleKey: "tour.workflowTitle", bodyKey: "tour.workflowBody" },
-  { selector: ".prototype-notice", titleKey: "tour.prototypeTitle", bodyKey: "tour.prototypeBody" },
-  { selector: ".stat-strip", titleKey: "tour.statsTitle", bodyKey: "tour.statsBody" },
-  { selector: ".section-nav", titleKey: "tour.screensTitle", bodyKey: "tour.screensBody" },
-  { titleKey: "tour.paletteTitle", bodyKey: "tour.paletteBody" },
-  { titleKey: "tour.doneTitle", bodyKey: "tour.doneBody" }
-];
 
 export function App() {
   const { t } = useI18n();
@@ -77,24 +65,7 @@ export function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
-  const [showTour, setShowTour] = useState(() => {
-    try {
-      const storage = getBrowserThemeStorage();
-      return !!storage && storage.getItem(TOUR_STORAGE_KEY) !== "1";
-    } catch {
-      return false;
-    }
-  });
-
-  function dismissTour() {
-    try {
-      getBrowserThemeStorage()?.setItem(TOUR_STORAGE_KEY, "1");
-    } catch {
-      // Ignore localStorage failures in test runners or locked-down browsers.
-    }
-    setShowTour(false);
-  }
-
+  const { showTour, setShowTour, dismissTour } = useWorkspaceTour();
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [isDrafting, setIsDrafting] = useState(false);
   const [isModelDrafting, setIsModelDrafting] = useState(false);
@@ -221,28 +192,13 @@ export function App() {
     ];
   }, [data, t]);
 
-  const paletteCommands = useMemo<PaletteCommand[]>(() => {
-    const languageCommands: PaletteCommand[] = (data?.languages ?? []).map((language) => ({
-      id: `language-${language.id}`,
-      label: t("palette.goTo", { name: language.name }),
-      run: () => handleLanguageSelect(language.id)
-    }));
-    const viewCommands: PaletteCommand[] = VIEW_ORDER.map((mode) => ({
-      id: `view-${mode}`,
-      label: t("palette.open", { label: t(`viewConfig.${mode}.label`) }),
-      run: () => handleViewSelect(mode)
-    }));
-    return [
-      ...languageCommands,
-      ...viewCommands,
-      {
-        id: "toggle-theme",
-        label: t("palette.toggleTheme"),
-        run: () => setTheme((current) => (current === "dark" ? "light" : "dark"))
-      }
-    ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, t]);
+  const paletteCommands = useWorkspacePaletteCommands({
+    workspace: data,
+    t,
+    onLanguageSelect: handleLanguageSelect,
+    onViewSelect: handleViewSelect,
+    setTheme
+  });
 
   async function refreshDashboard() {
     const refreshed = await fetchDashboardData(selectedLanguageId ?? undefined);
@@ -433,52 +389,15 @@ export function App() {
         <DiamondBand />
 
         <div className="sidebar-section-label">{t("sidebar.languages")}</div>
-        <nav className="language-nav" aria-label={t("sidebar.languagesNav")}>
-          {data.languages.length === 0 && (
-            <p className="empty-state">{t("sidebar.noLanguages")}</p>
-          )}
-          {data.languages.map((language) => {
-            const isActive = language.id === selectedLanguageId;
-            return (
-              <div className="language-nav-group" key={language.id}>
-                <button
-                  type="button"
-                  className={`language-button${isActive ? " active" : ""}`}
-                  aria-pressed={isActive}
-                  disabled={isWorkflowBusy}
-                  onClick={() => handleLanguageSelect(language.id)}
-                >
-                  <span className="typology-frame">
-                    <TypologyMark typology={language.typology} />
-                  </span>
-                  <span className="language-copy">
-                    <strong>{language.name}</strong>
-                    <span>{language.typology}</span>
-                  </span>
-                </button>
-
-                {isActive && (
-                  <nav className="section-nav" aria-label={t("sidebar.sectionsAria", { name: language.name })}>
-                    {VIEW_ORDER.map((mode) => (
-                      <button
-                        type="button"
-                        key={mode}
-                        className={view === mode ? "active" : ""}
-                        aria-current={view === mode ? "page" : undefined}
-                        disabled={isWorkflowBusy}
-                        onClick={() => handleViewSelect(mode)}
-                      >
-                        <ViewGlyph view={mode} />
-                        <span>{t(`viewConfig.${mode}.label`)}</span>
-                        {sectionCounts[mode] != null && <span className="section-count" aria-hidden="true">{sectionCounts[mode]}</span>}
-                      </button>
-                    ))}
-                  </nav>
-                )}
-              </div>
-            );
-          })}
-        </nav>
+        <SidebarLanguageNav
+          languages={data.languages}
+          selectedLanguageId={selectedLanguageId}
+          view={view}
+          isWorkflowBusy={isWorkflowBusy}
+          sectionCounts={sectionCounts}
+          onLanguageSelect={handleLanguageSelect}
+          onViewSelect={handleViewSelect}
+        />
 
         <div className="sidebar-footer">
           <CreateLanguageForm isWorkflowBusy={isWorkflowBusy} onCreate={handleCreateLanguage} />
@@ -505,49 +424,22 @@ export function App() {
           <span>{t("app.dataStaysLocal")}</span>
         </div>
 
-        <section className="workspace-header" aria-label={t("header.overviewAria")}>
-          <div className="star-field" aria-hidden="true" />
-          <div className="title-block">
-            <p className="breadcrumb">{currentBreadcrumb}</p>
-            <p className="eyebrow">{currentEyebrow}</p>
-            <h1>{currentTitle}</h1>
-            {view !== "elder" && (
-              <div className="language-metadata" aria-label={t("header.metadataAria")}>
-                <span>{selectedLanguage?.typology ?? t("common.unknown")}</span>
-                <span>{formatOrthographyMeta(selectedLanguage?.orthography)}</span>
-                <span>{t("header.statusWorkspace", { status: selectedLanguage?.status ?? t("common.draft") })}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="header-actions">
-            {view === "ingest" && (
-              <>
-                <button type="button" onClick={handleGenerateDrafts} disabled={isWorkflowBusy}>
-                  {isDrafting ? t("review.drafting") : t("review.generateAiDrafts")}
-                </button>
-                <button type="button" onClick={handleGenerateModelDrafts} disabled={isWorkflowBusy}>
-                  {isModelDrafting ? t("review.draftingWithModel") : t("review.draftNotesWithModel")}
-                </button>
-                {modelDraftMessage && (
-                  <p className="result-notice header-notice" role="status" aria-live="polite">
-                    {modelDraftMessage}
-                  </p>
-                )}
-                {modelDraftError && (
-                  <p className="result-notice error header-notice" role="alert">
-                    {modelDraftError}
-                  </p>
-                )}
-              </>
-            )}
-            {view === "model" && (
-              <button type="button" onClick={handleRunEval} disabled={isWorkflowBusy}>
-                {isEvaluating ? t("eval.evaluating") : t("eval.runSystemEval")}
-              </button>
-            )}
-          </div>
-        </section>
+        <WorkspaceHeader
+          view={view}
+          currentTitle={currentTitle}
+          currentEyebrow={currentEyebrow}
+          currentBreadcrumb={currentBreadcrumb}
+          selectedLanguage={selectedLanguage}
+          isWorkflowBusy={isWorkflowBusy}
+          isDrafting={isDrafting}
+          isModelDrafting={isModelDrafting}
+          isEvaluating={isEvaluating}
+          modelDraftMessage={modelDraftMessage}
+          modelDraftError={modelDraftError}
+          onGenerateDrafts={handleGenerateDrafts}
+          onGenerateModelDrafts={handleGenerateModelDrafts}
+          onRunEval={handleRunEval}
+        />
 
         <DiamondBand compact />
 

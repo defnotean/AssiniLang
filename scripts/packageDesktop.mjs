@@ -1,35 +1,19 @@
-import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, cp, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
+import { readJsonFile } from "./lib/jsonHelpers.mjs";
+import { npmSpawnSpec, run } from "./lib/processHelpers.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputRoot = join(repoRoot, "dist-desktop");
-const packageRoot = join(outputRoot, "AssiniLang-win32-x64");
-const archivePath = join(outputRoot, "AssiniLang-win32-x64.zip");
-const appRoot = join(packageRoot, "resources", "app");
-const electronDist = join(repoRoot, "node_modules", "electron", "dist");
-
-function quoteCmdArg(value) {
-  if (/^[\w@./:\\=-]+$/.test(value)) return value;
-  return `"${value.replace(/"/g, "\\\"")}"`;
-}
-
-function npmSpawnSpec(args) {
-  if (process.platform !== "win32") {
-    return { command: "npm", args };
-  }
-
-  return {
-    command: process.env.ComSpec || "cmd.exe",
-    args: ["/d", "/s", "/c", ["npm.cmd", ...args].map(quoteCmdArg).join(" ")]
-  };
-}
-
-async function readJson(path) {
-  return JSON.parse(await readFile(path, "utf8"));
-}
+const {
+  appRoot,
+  archivePath,
+  electronDist,
+  outputRoot,
+  packageRoot
+} = desktopPackagePaths(repoRoot);
 
 async function assertExists(path, label) {
   try {
@@ -55,25 +39,6 @@ function externalDependencies(...dependencySets) {
   return dependencies;
 }
 
-async function run(command, args, options = {}) {
-  console.log(`[desktop-package] ${command} ${args.join(" ")}`);
-  await new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, {
-      stdio: "inherit",
-      windowsHide: true,
-      ...options
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) {
-        resolvePromise();
-        return;
-      }
-      reject(new Error(`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}.`));
-    });
-  });
-}
-
 function psQuote(value) {
   return `'${value.replace(/'/g, "''")}'`;
 }
@@ -88,7 +53,9 @@ async function createPortableArchive() {
     "Get-ChildItem -LiteralPath $source -Recurse -Force | Where-Object { $_.LastWriteTime -lt $zipEpoch } | ForEach-Object { $_.LastWriteTime = $zipEpoch }",
     "Compress-Archive -LiteralPath $source -DestinationPath $destination -Force"
   ].join("; ");
-  await run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", archiveCommand]);
+  await run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", archiveCommand], {
+    logPrefix: "[desktop-package]"
+  });
 }
 
 async function copyDir(source, target) {
@@ -282,11 +249,11 @@ function uninstallScript() {
 
 async function stageDesktopApp() {
   const [rootPackage, apiPackage, dbPackage, apiContractPackage, evalPackage] = await Promise.all([
-    readJson(join(repoRoot, "package.json")),
-    readJson(join(repoRoot, "apps", "api", "package.json")),
-    readJson(join(repoRoot, "packages", "db", "package.json")),
-    readJson(join(repoRoot, "packages", "api-contract", "package.json")),
-    readJson(join(repoRoot, "packages", "eval", "package.json"))
+    readJsonFile(join(repoRoot, "package.json")),
+    readJsonFile(join(repoRoot, "apps", "api", "package.json")),
+    readJsonFile(join(repoRoot, "packages", "db", "package.json")),
+    readJsonFile(join(repoRoot, "packages", "api-contract", "package.json")),
+    readJsonFile(join(repoRoot, "packages", "eval", "package.json"))
   ]);
 
   await rm(outputRoot, { recursive: true, force: true });
@@ -325,7 +292,7 @@ async function stageDesktopApp() {
   await copyDir(join(repoRoot, "apps", "web", "dist"), join(appRoot, "apps", "web", "dist"));
 
   const npmInstall = npmSpawnSpec(["install", "--omit=dev", "--no-audit", "--no-fund"]);
-  await run(npmInstall.command, npmInstall.args, { cwd: appRoot });
+  await run(npmInstall.command, npmInstall.args, { cwd: appRoot, logPrefix: "[desktop-package]" });
 
   await copyPackageRuntime("api-contract", join(repoRoot, "packages", "api-contract"));
   await copyPackageRuntime("db", join(repoRoot, "packages", "db"));

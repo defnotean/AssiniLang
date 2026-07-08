@@ -37,6 +37,18 @@ describe("runtime app settings", () => {
     expect(JSON.stringify(settings)).not.toContain("secret-transcribe-key");
   });
 
+  it("keeps legacy OpenAI model and API key fallbacks sanitized", () => {
+    const settings = readRuntimeSettingsFromEnv({
+      OPENAI_MODEL: "gpt-4o-mini",
+      OPENAI_API_KEY: "legacy-secret"
+    });
+
+    expect(settings.provider).toBe("deterministic");
+    expect(settings.model).toBe("gpt-4o-mini");
+    expect(settings.apiKeyConfigured).toBe(true);
+    expect(JSON.stringify(settings)).not.toContain("legacy-secret");
+  });
+
   it("updates known .env keys while preserving comments and unknown values", () => {
     const next = updateEnvFileText(
       [

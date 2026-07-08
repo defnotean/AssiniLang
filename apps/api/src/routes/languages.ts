@@ -1,21 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { languageCreatePayloadSchema, languagePatchPayloadSchema } from "@assini/api-contract";
+import {
+  languageCreatePayloadSchema,
+  languagePatchPayloadSchema,
+  type LanguageCreatePayload,
+  type LanguagePatchPayload
+} from "@assini/api-contract";
 import { isReviewPolicyAssignableRole, type Language, type ReviewPolicy } from "@assini/db";
 import { buildLanguageProfile } from "../publicLanguageViews.js";
 import { deleteLanguageAssetDirectory, purgeLanguageFromState } from "../languageDeletion.js";
-import { appendAuditEvent, parseStringArray, requireActor } from "../routeHelpers.js";
+import { appendAuditEvent, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
-
-type LanguageCreateBody = {
-  name: string;
-  description: string;
-  orthography: string;
-  typology: Language["typology"];
-  phonology?: Language["phonology"];
-};
-
-type LanguagePatchBody = Partial<LanguageCreateBody>;
+import { parseSchemaBody } from "./requestBody.js";
 
 function slugifyLanguageName(name: string): string {
   return name
@@ -27,33 +23,12 @@ function slugifyLanguageName(name: string): string {
     .slice(0, 40);
 }
 
-function parseLanguagePhonology(value: unknown): Language["phonology"] | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value !== "object" || Array.isArray(value)) return undefined;
-  const record = value as Record<string, unknown>;
-  const consonants = parseStringArray(record.consonants);
-  const vowels = parseStringArray(record.vowels);
-  const notes = parseStringArray(record.notes);
-  if (!consonants || !vowels || !notes) return undefined;
-  const syllableTemplate = typeof record.syllableTemplate === "string" ? record.syllableTemplate.trim() : undefined;
-  const stress = typeof record.stress === "string" ? record.stress.trim() : undefined;
-  return {
-    consonants,
-    vowels,
-    notes,
-    syllableTemplate: syllableTemplate || undefined,
-    stress: stress || undefined
-  };
+function parseLanguageCreateBody(input: unknown): LanguageCreatePayload | undefined {
+  return parseSchemaBody(languageCreatePayloadSchema, input);
 }
 
-function parseLanguageCreateBody(input: unknown): LanguageCreateBody | undefined {
-  const result = languageCreatePayloadSchema.safeParse(input);
-  return result.success ? (result.data as LanguageCreateBody) : undefined;
-}
-
-function parseLanguagePatchBody(input: unknown): LanguagePatchBody | undefined {
-  const result = languagePatchPayloadSchema.safeParse(input);
-  return result.success ? (result.data as LanguagePatchBody) : undefined;
+function parseLanguagePatchBody(input: unknown): LanguagePatchPayload | undefined {
+  return parseSchemaBody(languagePatchPayloadSchema, input);
 }
 
 export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext): void {

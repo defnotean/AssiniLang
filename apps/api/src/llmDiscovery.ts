@@ -8,7 +8,9 @@ import {
   ensureV1BaseUrl,
   normalizeBaseUrl,
   normalizeHttpBaseUrl,
-  trimValue
+  readLlmEnvConfig,
+  trimValue,
+  type Env
 } from "./llmEnvShared.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
@@ -19,8 +21,6 @@ export type {
   LlmModelDiscoveryResponse
 } from "@assini/api-contract";
 
-type Env = Record<string, string | undefined>;
-
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_DISCOVERY_TIMEOUT_MS = 1_800;
 const MAX_DISCOVERY_BASE_URLS = 12;
@@ -29,6 +29,7 @@ const SECRET_PATTERN = /\bsk-[A-Za-z0-9._-]+/g;
 type DiscoveryProvider = DiscoveredLlmModel["provider"];
 type DiscoveryKind = "openai-models" | "ollama-tags" | "lm-studio-native-v1" | "lm-studio-native-v0";
 type FetchFn = typeof fetch;
+type ModelIdParser = (payload: unknown) => string[];
 
 type DiscoveryTarget = {
   provider: DiscoveryProvider;
@@ -97,7 +98,7 @@ function inferProvider(baseUrl: string): DiscoveryProvider {
 }
 
 function providerFromEnv(env: Env, baseUrl: string): DiscoveryProvider {
-  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
+  const provider = readLlmEnvConfig(env).provider;
   if (provider === "ollama" || provider === "lm-studio" || provider === "openai") return provider;
   if (provider === "remote") return "openai";
   if (provider === "openai-compatible" || provider === "local") return "openai-compatible";
@@ -105,20 +106,18 @@ function providerFromEnv(env: Env, baseUrl: string): DiscoveryProvider {
 }
 
 function configuredBaseUrl(env: Env): string | undefined {
-  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
-  const baseUrl = normalizeHttpBaseUrl(env.ASSINI_LLM_BASE_URL);
-  const apiKeyConfigured = Boolean(trimValue(env.ASSINI_LLM_API_KEY) ?? trimValue(env.OPENAI_API_KEY));
+  const llmEnv = readLlmEnvConfig(env);
+  const baseUrl = normalizeHttpBaseUrl(llmEnv.baseUrl);
 
   if (baseUrl) return baseUrl;
-  if ((provider === "openai" || provider === "remote" || !provider) && apiKeyConfigured) {
+  if ((llmEnv.provider === "openai" || llmEnv.provider === "remote" || !llmEnv.provider) && llmEnv.apiKeyConfigured) {
     return DEFAULT_REMOTE_OPENAI_BASE_URL;
   }
   return undefined;
 }
 
 function apiKeyForTarget(env: Env, baseUrl: string, provider: DiscoveryProvider): string | undefined {
-  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
-  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
+  const { explicitApiKey, remoteApiKey } = readLlmEnvConfig(env);
   const configured = configuredBaseUrl(env);
   const normalized = normalizeHttpBaseUrl(baseUrl);
 
@@ -428,17 +427,21 @@ function modelIdFromValue(value: unknown): string | undefined {
   return undefined;
 }
 
+function modelIdsFromValues(values: unknown[]): string[] {
+  return values.map(modelIdFromValue).filter((item): item is string => Boolean(item));
+}
+
 function parseOpenAiModelIds(payload: unknown): string[] {
   if (!payload || typeof payload !== "object") return [];
   const record = payload as Record<string, unknown>;
   const data = record.data;
   if (Array.isArray(data)) {
-    return data.map(modelIdFromValue).filter((item): item is string => Boolean(item));
+    return modelIdsFromValues(data);
   }
 
   const models = record.models;
   if (Array.isArray(models)) {
-    return models.map(modelIdFromValue).filter((item): item is string => Boolean(item));
+    return modelIdsFromValues(models);
   }
 
   return [];
@@ -448,7 +451,7 @@ function parseOllamaModelIds(payload: unknown): string[] {
   if (!payload || typeof payload !== "object") return [];
   const models = (payload as Record<string, unknown>).models;
   if (!Array.isArray(models)) return [];
-  return models.map(modelIdFromValue).filter((item): item is string => Boolean(item));
+  return modelIdsFromValues(models);
 }
 
 function modelListFromPayload(payload: unknown): unknown[] {
@@ -503,6 +506,13 @@ function parseLmStudioNativeV0ModelIds(payload: unknown): string[] {
     .filter((item): item is string => Boolean(item));
 }
 
+const MODEL_ID_PARSERS: Record<DiscoveryKind, ModelIdParser> = {
+  "openai-models": parseOpenAiModelIds,
+  "ollama-tags": parseOllamaModelIds,
+  "lm-studio-native-v1": parseLmStudioNativeV1ModelIds,
+  "lm-studio-native-v0": parseLmStudioNativeV0ModelIds
+};
+
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
@@ -513,17 +523,7 @@ async function scanTarget(
   timeoutMs: number
 ): Promise<{ models: DiscoveredLlmModel[]; status: number }> {
   const { payload, status } = await fetchJsonWithTimeout(fetchFn, target, timeoutMs);
-  let parsedModelIds: string[];
-  if (target.kind === "ollama-tags") {
-    parsedModelIds = parseOllamaModelIds(payload);
-  } else if (target.kind === "lm-studio-native-v1") {
-    parsedModelIds = parseLmStudioNativeV1ModelIds(payload);
-  } else if (target.kind === "lm-studio-native-v0") {
-    parsedModelIds = parseLmStudioNativeV0ModelIds(payload);
-  } else {
-    parsedModelIds = parseOpenAiModelIds(payload);
-  }
-  const modelIds = uniqueSorted(parsedModelIds);
+  const modelIds = uniqueSorted(MODEL_ID_PARSERS[target.kind](payload));
 
   return {
     status,

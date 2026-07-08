@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { npmSpawnSpec } from "./lib/processHelpers.mjs";
 
 const DEFAULT_HOST = "127.0.0.1";
 const DEFAULT_API_PORT = "4321";
@@ -15,20 +16,8 @@ function forwardStream(stream, destination) {
   });
 }
 
-function quoteCmdArg(value) {
-  if (/^[\w@./:\\-]+$/.test(value)) return value;
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
 function createNpmSpawnSpec(platform, env, args) {
-  if (platform !== "win32") {
-    return { command: "npm", args };
-  }
-
-  return {
-    command: readString(env.ComSpec, "cmd.exe"),
-    args: ["/d", "/s", "/c", ["npm.cmd", ...args].map(quoteCmdArg).join(" ")]
-  };
+  return npmSpawnSpec(args, { comSpec: readString(env.ComSpec, "cmd.exe"), platform });
 }
 
 export function createDevProcessSpecs({ platform = process.platform, env = process.env } = {}) {

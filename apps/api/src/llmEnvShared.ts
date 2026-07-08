@@ -1,4 +1,13 @@
-type Env = Record<string, string | undefined>;
+export type Env = Record<string, string | undefined>;
+
+export type LlmEnvConfig = {
+  provider?: string;
+  baseUrl?: string;
+  model?: string;
+  explicitApiKey?: string;
+  remoteApiKey?: string;
+  apiKeyConfigured: boolean;
+};
 
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 export const DEFAULT_LLM_MAX_TOKENS = 4096;
@@ -25,6 +34,20 @@ export function parseBooleanFlag(value: string | undefined): boolean {
 
 export function envValue(value: string | undefined, fallback = ""): string {
   return trimValue(value) ?? fallback;
+}
+
+export function readLlmEnvConfig(env: Env = process.env): LlmEnvConfig {
+  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
+  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
+
+  return {
+    provider: trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase(),
+    baseUrl: trimValue(env.ASSINI_LLM_BASE_URL),
+    model: trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL),
+    explicitApiKey,
+    remoteApiKey,
+    apiKeyConfigured: Boolean(remoteApiKey)
+  };
 }
 
 export function normalizeBaseUrl(baseUrl: string): string {

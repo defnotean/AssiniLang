@@ -128,8 +128,8 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
               </div>
               <ConfidenceBadge confidence={rule.confidence} />
               <div className="pill-row">
-                {rule.evidencePassageIds.map((passageId) => (
-                  <span className="pill" key={passageId}>{passageId}</span>
+                {rule.evidencePassageIds.map((passageId, index) => (
+                  <span className="pill" key={`${index}:${passageId}`}>{passageId}</span>
                 ))}
               </div>
             </article>
@@ -151,8 +151,8 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
               <strong>{item.gloss}</strong>
               <span>{item.partOfSpeech}</span>
               <div className="pill-row">
-                {item.tags.map((tag) => (
-                  <span className="pill" key={tag}>{tag}</span>
+                {item.tags.map((tag, index) => (
+                  <span className="pill" key={`${item.id}:${index}:${tag}`}>{tag}</span>
                 ))}
               </div>
             </article>
@@ -168,8 +168,8 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </div>
         <div className="morpheme-grid">
-          {morphemeInventory.map((item) => (
-            <article className="morpheme-entry" key={`${item.surface}-${item.lemma}`}>
+          {morphemeInventory.map((item, index) => (
+            <article className="morpheme-entry" key={`${index}:${item.surface}:${item.lemma}`}>
               <div className="morpheme-entry-topline">
                 <code>{item.surface}</code>
                 <span className="id-badge">{formatCount(item.occurrenceCount, "corpus use")}</span>
@@ -180,13 +180,13 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
                 <small>{item.vocabulary.partOfSpeech}: {item.vocabulary.gloss}</small>
               )}
               <div className="pill-row">
-                {item.features.map((feature) => (
-                  <span className="pill" key={`${item.surface}-${feature}`}>{feature}</span>
+                {item.features.map((feature, index) => (
+                  <span className="pill" key={`${item.surface}:feature:${index}:${feature}`}>{feature}</span>
                 ))}
               </div>
               <div className="pill-row">
-                {item.passageIds.map((passageId) => (
-                  <span className="pill" key={`${item.surface}-${passageId}`}>{passageId}</span>
+                {item.passageIds.map((passageId, index) => (
+                  <span className="pill" key={`${item.surface}:passage:${index}:${passageId}`}>{passageId}</span>
                 ))}
               </div>
             </article>
@@ -207,8 +207,8 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </p>
         ) : (
           <div className="detail-list">
-            {paradigmGaps.map((gap) => (
-              <article className="detail-row paradigm-gap-row" key={`${gap.lemma}-${gap.dimension}`}>
+            {paradigmGaps.map((gap, index) => (
+              <article className="detail-row paradigm-gap-row" key={`${index}:${gap.lemma}:${gap.dimension}`}>
                 <div className="paradigm-gap-topline">
                   <code>{gap.lemma}</code>
                   <span className="paradigm-gap-dimension">{gap.dimension}</span>
@@ -217,11 +217,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
                   </span>
                 </div>
                 <div className="pill-row">
-                  {gap.attested.map((cell) => (
-                    <span className="pill paradigm-cell-attested" key={`${gap.lemma}-attested-${cell}`}>{cell}</span>
+                  {gap.attested.map((cell, index) => (
+                    <span className="pill paradigm-cell-attested" key={`${gap.lemma}:attested:${index}:${cell}`}>{cell}</span>
                   ))}
-                  {gap.missing.map((cell) => (
-                    <span className="pill paradigm-cell-missing" key={`${gap.lemma}-missing-${cell}`}>
+                  {gap.missing.map((cell, index) => (
+                    <span className="pill paradigm-cell-missing" key={`${gap.lemma}:missing:${index}:${cell}`}>
                       {t("profile.missingCell", { cell })}
                     </span>
                   ))}

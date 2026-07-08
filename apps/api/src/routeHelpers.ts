@@ -1,11 +1,15 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
 import {
-  findInvalidOrthographySymbols,
+  PROTOTYPE_SESSION_COOKIE,
+  isPrototypeSessionActive,
+  type PrototypeSessionMap,
+  type PrototypeSessionRecord
+} from "./prototypeSessions.js";
+import {
   LOCAL_PROTOTYPE_USERS,
   type AuditEvent,
   type AppState,
-  type CorpusPassage,
   type NeuralMap,
   type User,
   type UserRole
@@ -13,39 +17,27 @@ import {
 
 export const MODEL_REQUIRED_MESSAGE =
   "A configured model is required to generate draft notes. Set ASSINI_LLM_* (see the configuration reference) and retry.";
-export const PROTOTYPE_SESSION_COOKIE = "assini_prototype_session";
-export const PROTOTYPE_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8;
-export const DEFAULT_PROTOTYPE_SESSION_TTL_MS = PROTOTYPE_SESSION_MAX_AGE_SECONDS * 1000;
-export const PROTOTYPE_SESSION_TTL_ENV_NAME = "ASSINI_PROTOTYPE_SESSION_TTL_MS";
-const SECRET_ENV_NAMES = ["ASSINI_LLM_API_KEY", "OPENAI_API_KEY"] as const;
 
-export type PrototypeSessionRecord = {
-  userId: string;
-  createdAt: number;
-  /** Absolute epoch-ms deadline. Refreshed on every successful session use (sliding renewal). */
-  expiresAt: number;
-  /** TTL captured at session creation so renewal keeps the configured window. */
-  ttlMs: number;
-};
-
-/**
- * Session map with an optional injectable clock attached at creation time
- * (createServer options.now). Keeps every requireActor/resolveActor call site
- * unchanged while letting lifecycle tests control time deterministically.
- */
-export type PrototypeSessionMap = Map<string, PrototypeSessionRecord> & { now?: () => number };
-
-/** Reads ASSINI_PROTOTYPE_SESSION_TTL_MS following the readPositiveInteger pattern in runtimeConfig.ts. */
-export function readPrototypeSessionTtlMs(env: Record<string, string | undefined> = process.env): number {
-  const raw = env[PROTOTYPE_SESSION_TTL_ENV_NAME]?.trim();
-  if (!raw) return DEFAULT_PROTOTYPE_SESSION_TTL_MS;
-
-  const value = Number(raw);
-  if (!Number.isInteger(value) || value < 1 || value > Number.MAX_SAFE_INTEGER) {
-    throw new Error(`${PROTOTYPE_SESSION_TTL_ENV_NAME} must be an integer between 1 and ${Number.MAX_SAFE_INTEGER}`);
-  }
-  return value;
-}
+export { parseStringArray } from "./parseArrays.js";
+export {
+  DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+  PROTOTYPE_SESSION_COOKIE,
+  PROTOTYPE_SESSION_MAX_AGE_SECONDS,
+  PROTOTYPE_SESSION_TTL_ENV_NAME,
+  isPrototypeSessionActive,
+  pruneExpiredPrototypeSessions,
+  readPrototypeSessionTtlMs,
+  serializeExpiredPrototypeSessionCookie,
+  serializePrototypeSessionCookie
+} from "./prototypeSessions.js";
+export type { PrototypeSessionMap, PrototypeSessionRecord } from "./prototypeSessions.js";
+export { redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.js";
+export {
+  corpusPhonologyValidationError,
+  corpusTargetContainsSurface,
+  firstDuplicateNormalizedValue,
+  normalizeAuthoredAnswer
+} from "./corpusValidation.js";
 
 export type ResolvedActor = {
   actor: User;
@@ -95,24 +87,6 @@ export function appendAuditEvent(state: AppState, draft: AuditEventDraft): AppSt
   return appendAuditEvents(state, [draft]);
 }
 
-export function redactConfiguredSecrets(message: string): string {
-  let redacted = message;
-  for (const name of SECRET_ENV_NAMES) {
-    const value = process.env[name]?.trim();
-    if (value && value.length >= 8) {
-      redacted = redacted.split(value).join("[redacted-secret]");
-    }
-  }
-  return redacted;
-}
-
-export function redactErrorSecrets(message: string): string {
-  return redactConfiguredSecrets(message)
-    .replace(/\bsk-[A-Za-z0-9._-]+/g, "[redacted-secret]")
-    .replace(/\b(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY)=\S+/g, "[redacted-secret]")
-    .replace(/\bBearer\s+\S+/gi, "[redacted-secret]");
-}
-
 export function sanitizeNeuralMapForActor(neuralMap: NeuralMap, actor: User): NeuralMap {
   const correctionNodeIds = new Set(
     neuralMap.nodes.filter((node) => node.type === "elder_correction").map((node) => node.id)
@@ -137,65 +111,6 @@ export function sanitizeNeuralMapForActor(neuralMap: NeuralMap, actor: User): Ne
   }
 
   return neuralMap;
-}
-
-export function parseStringArray(value: unknown): string[] | undefined {
-  if (value === undefined) return [];
-  if (!Array.isArray(value)) return undefined;
-  const values = value.map((item) => (typeof item === "string" ? item.trim() : ""));
-  return values.every((item) => item.length > 0) ? values : undefined;
-}
-
-export function normalizeAuthoredAnswer(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
-}
-
-export function firstDuplicateNormalizedValue(values: string[]): string | undefined {
-  const seen = new Set<string>();
-  for (const value of values) {
-    const normalizedValue = normalizeAuthoredAnswer(value);
-    if (seen.has(normalizedValue)) {
-      return normalizedValue;
-    }
-    seen.add(normalizedValue);
-  }
-  return undefined;
-}
-
-export function corpusTargetContainsSurface(textTarget: string, surface: string): boolean {
-  const normalizedSurface = normalizeAuthoredAnswer(surface).toLowerCase().replace(/-/g, "");
-  return normalizeAuthoredAnswer(textTarget)
-    .toLowerCase()
-    .split(/\s+/)
-    .some((token) => {
-      const normalizedToken = token.replace(/-/g, "");
-      return normalizedToken === normalizedSurface || normalizedToken.includes(normalizedSurface);
-    });
-}
-
-export function corpusPhonologyValidationError(
-  state: AppState,
-  languageId: string,
-  body: Pick<CorpusPassage, "textTarget">
-): string | undefined {
-  const language = state.languages.find((item) => item.id === languageId);
-  if (!language) {
-    return `Corpus import language not found: ${languageId}`;
-  }
-
-  const phonology = language.phonology;
-  if (!phonology || (phonology.consonants.length === 0 && phonology.vowels.length === 0)) {
-    // The language has not declared a phonology inventory, so the
-    // orthography scan is skipped instead of rejecting unknown symbols.
-    return undefined;
-  }
-
-  const invalidTargetSymbols = findInvalidOrthographySymbols(body.textTarget, phonology);
-  if (invalidTargetSymbols.length > 0) {
-    return `Corpus target text uses ${invalidTargetSymbols.join(", ")} outside ${language.name} phonology inventory: ${body.textTarget}`;
-  }
-
-  return undefined;
 }
 
 export function getHeaderValue(request: FastifyRequest, name: string): string | undefined {
@@ -229,39 +144,6 @@ export function cookieValue(request: FastifyRequest, name: string): string | und
   }
 
   return undefined;
-}
-
-export function serializePrototypeSessionCookie(
-  sessionId: string,
-  maxAgeSeconds: number = PROTOTYPE_SESSION_MAX_AGE_SECONDS
-): string {
-  return [
-    `${PROTOTYPE_SESSION_COOKIE}=${encodeURIComponent(sessionId)}`,
-    "HttpOnly",
-    "SameSite=Strict",
-    "Path=/",
-    `Max-Age=${maxAgeSeconds}`
-  ].join("; ");
-}
-
-/** Same attributes as the create path, but Max-Age=0 so the browser drops the cookie immediately. */
-export function serializeExpiredPrototypeSessionCookie(): string {
-  return serializePrototypeSessionCookie("", 0);
-}
-
-export function isPrototypeSessionActive(session: PrototypeSessionRecord, now = Date.now()): boolean {
-  return now <= session.expiresAt;
-}
-
-export function pruneExpiredPrototypeSessions(
-  prototypeSessions: Map<string, PrototypeSessionRecord>,
-  now = Date.now()
-): void {
-  prototypeSessions.forEach((session, sessionId) => {
-    if (!isPrototypeSessionActive(session, now)) {
-      prototypeSessions.delete(sessionId);
-    }
-  });
 }
 
 export function resolveActorContext(

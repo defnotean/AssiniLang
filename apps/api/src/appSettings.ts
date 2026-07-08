@@ -12,9 +12,11 @@ import {
   DEFAULT_LLM_TIMEOUT_MS,
   DEFAULT_OCR_LANG,
   DEFAULT_TRANSCRIPTION_MODEL,
+  type Env,
   envValue,
   parseBooleanFlag,
   parsePositiveInteger,
+  readLlmEnvConfig,
   trimValue
 } from "./llmEnvShared.js";
 
@@ -24,8 +26,6 @@ export {
   type RuntimeSettingsPatch,
   type RuntimeSettingsResponse
 } from "@assini/api-contract";
-
-type Env = Record<string, string | undefined>;
 
 const RUNTIME_ENV_KEYS = [
   "ASSINI_LLM_PROVIDER",
@@ -46,11 +46,13 @@ const RUNTIME_ENV_KEYS = [
 let settingsWriteQueue: Promise<void> = Promise.resolve();
 
 export function readRuntimeSettingsFromEnv(env: Env = process.env): RuntimeSettings {
+  const llmEnv = readLlmEnvConfig(env);
+
   return {
     provider: envValue(env.ASSINI_LLM_PROVIDER, "deterministic"),
-    baseUrl: envValue(env.ASSINI_LLM_BASE_URL),
-    model: envValue(env.ASSINI_LLM_MODEL ?? env.OPENAI_MODEL),
-    apiKeyConfigured: Boolean(trimValue(env.ASSINI_LLM_API_KEY) ?? trimValue(env.OPENAI_API_KEY)),
+    baseUrl: llmEnv.baseUrl ?? "",
+    model: envValue(env.ASSINI_LLM_MODEL ?? llmEnv.model),
+    apiKeyConfigured: llmEnv.apiKeyConfigured,
     timeoutMs: parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS),
     maxTokens: parsePositiveInteger(env.ASSINI_LLM_MAX_TOKENS, DEFAULT_LLM_MAX_TOKENS),
     jsonMode: parseBooleanFlag(env.ASSINI_LLM_JSON_MODE),

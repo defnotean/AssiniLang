@@ -2,18 +2,12 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve as resolvePath } from "node:path";
 import type { FastifyInstance } from "fastify";
-import { sourceRegistrationPayloadSchema } from "@assini/api-contract";
+import { sourceRegistrationPayloadSchema, type SourceRegistrationPayload } from "@assini/api-contract";
 import type { AppState, ExtractionDraft, SourceAsset, SourceAssetKind, User } from "@assini/db";
 import { extractCandidatesForAsset, type SourceExtractionResult } from "../ingestion.js";
 import { appendAuditEvent, redactErrorSecrets, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
-
-type SourceRegistrationBody = {
-  kind: Extract<SourceAssetKind, "text" | "wordlist" | "url">;
-  title: string;
-  rawText?: string;
-  url?: string;
-};
+import { parseSchemaBody } from "./requestBody.js";
 
 type SourceProcessCompletionInput = {
   sourceId: string;
@@ -115,9 +109,8 @@ function isAsyncProcessRequested(body: unknown): boolean {
   );
 }
 
-function parseSourceRegistrationBody(input: unknown): SourceRegistrationBody | undefined {
-  const result = sourceRegistrationPayloadSchema.safeParse(input);
-  return result.success ? (result.data as SourceRegistrationBody) : undefined;
+function parseSourceRegistrationBody(input: unknown): SourceRegistrationPayload | undefined {
+  return parseSchemaBody(sourceRegistrationPayloadSchema, input);
 }
 
 function sanitizeStoredFileName(name: string): string {

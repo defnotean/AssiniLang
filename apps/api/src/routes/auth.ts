@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { UserRole } from "@assini/db";
+import { z } from "zod";
 import {
   actorById,
   actorCan,
@@ -11,25 +12,18 @@ import {
   serializePrototypeSessionCookie
 } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
+import { parseSchemaBody } from "./requestBody.js";
 
 const PROTOTYPE_AUTH_ROLES: readonly UserRole[] = ["learner", "elder", "programmer", "reviewer"];
 
-type PrototypeSessionBody = {
-  userId: string;
-};
+const prototypeSessionBodySchema = z.object({
+  userId: z.string().trim().min(1)
+});
+
+type PrototypeSessionBody = z.infer<typeof prototypeSessionBodySchema>;
 
 function parsePrototypeSessionBody(input: unknown): PrototypeSessionBody | undefined {
-  if (!input || typeof input !== "object" || Array.isArray(input)) {
-    return undefined;
-  }
-
-  const body = input as Record<string, unknown>;
-  if (typeof body.userId !== "string") {
-    return undefined;
-  }
-
-  const userId = body.userId.trim();
-  return userId.length > 0 ? { userId } : undefined;
+  return parseSchemaBody(prototypeSessionBodySchema, input);
 }
 
 export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): void {

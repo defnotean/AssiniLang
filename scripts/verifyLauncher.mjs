@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { npmSpawnSpec } from "./lib/processHelpers.mjs";
 
 const VERIFY_SCRIPT_NAMES = ["test", "check", "seed", "eval", "build"];
 
@@ -10,20 +11,8 @@ function readString(value, fallback) {
   return trimmed.length > 0 ? trimmed : fallback;
 }
 
-function quoteCmdArg(value) {
-  if (/^[\w@./:\\-]+$/.test(value)) return value;
-  return `"${value.replace(/"/g, '\\"')}"`;
-}
-
 function createNpmSpawnSpec(platform, env, args) {
-  if (platform !== "win32") {
-    return { command: "npm", args };
-  }
-
-  return {
-    command: readString(env.ComSpec, "cmd.exe"),
-    args: ["/d", "/s", "/c", ["npm.cmd", ...args].map(quoteCmdArg).join(" ")]
-  };
+  return npmSpawnSpec(args, { comSpec: readString(env.ComSpec, "cmd.exe"), platform });
 }
 
 export function createVerificationSteps({ platform = process.platform, env = process.env } = {}) {

@@ -1,8 +1,8 @@
-import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { access, readdir, stat } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { npmSpawnSpec, run } from "./lib/processHelpers.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const BUILD_EXTENSIONS = new Set([".cjs", ".css", ".html", ".js", ".json", ".mjs", ".ts", ".tsx"]);
@@ -37,22 +37,6 @@ export const defaultBuildSources = [
   "tsconfig.base.json",
   "vitest.config.ts"
 ];
-
-function quoteCmdArg(value) {
-  if (/^[\w@./:\\=-]+$/.test(value)) return value;
-  return `"${value.replace(/"/g, "\\\"")}"`;
-}
-
-function npmSpawnSpec(args) {
-  if (process.platform !== "win32") {
-    return { command: "npm", args };
-  }
-
-  return {
-    command: process.env.ComSpec || "cmd.exe",
-    args: ["/d", "/s", "/c", ["npm.cmd", ...args].map(quoteCmdArg).join(" ")]
-  };
-}
 
 async function exists(path) {
   try {
@@ -146,24 +130,6 @@ export async function desktopBuildStatus({
     oldestOutputMs,
     reason: needsBuild ? "source files changed since the last build" : "existing build is current"
   };
-}
-
-async function run(command, args, options = {}) {
-  await new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, {
-      stdio: "inherit",
-      windowsHide: true,
-      ...options
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0) {
-        resolvePromise();
-        return;
-      }
-      reject(new Error(`${command} ${args.join(" ")} failed with ${signal ?? `exit code ${code}`}.`));
-    });
-  });
 }
 
 async function main(argv = process.argv.slice(2)) {

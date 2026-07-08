@@ -587,7 +587,7 @@ describe("api server", () => {
     const session = await enabled.inject({
       method: "POST",
       url: "/auth/prototype-session",
-      payload: { userId: "elder-1" }
+      payload: { userId: "  elder-1  " }
     });
 
     expect(session.statusCode).toBe(200);
@@ -1245,6 +1245,27 @@ describe("api server", () => {
         })
       })
     ]));
+  });
+
+  it("trims review policy reviewer ids and defaults assignment enforcement", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const policy = await app.inject({
+      method: "PUT",
+      url: `/languages/${TEST_LANGUAGE_ID}/review-policy`,
+      headers: authHeaders("lead-1"),
+      payload: {
+        assignedReviewerIds: [" reviewer-1 ", " elder-1 "],
+        approvalThreshold: 2
+      }
+    });
+
+    expect(policy.statusCode).toBe(200);
+    expect(policy.json()).toMatchObject({
+      assignedReviewerIds: ["reviewer-1", "elder-1"],
+      approvalThreshold: 2,
+      requiresAssignedReviewer: true
+    });
   });
 
   it("lets prototype reviewers update review policies while preserving lead policy authority", async () => {

@@ -6,28 +6,48 @@ import {
   exerciseSubmissionSchema,
   elderCorrectionSchema,
   languageTypologySchema,
-  languagePhonologySchema,
-  sourceAssetKindSchema,
   aiSessionModeSchema
 } from "@assini/db";
 
+const nonEmptyTrimmedStringSchema = z.string().trim().min(1);
+const optionalTrimmedStringSchema = z.string()
+  .transform((value) => value.trim())
+  .transform((value) => value || undefined)
+  .optional();
+const optionalNullableLanguagePhonologyPayloadSchema = z.preprocess(
+  (value) => (value === null ? undefined : value),
+  z.object({
+    consonants: z.array(nonEmptyTrimmedStringSchema).default([]),
+    vowels: z.array(nonEmptyTrimmedStringSchema).default([]),
+    syllableTemplate: optionalTrimmedStringSchema,
+    stress: optionalTrimmedStringSchema,
+    notes: z.array(nonEmptyTrimmedStringSchema).default([])
+  }).optional()
+);
+
 // Language creation and patching schemas
 export const languageCreatePayloadSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().min(1),
-  orthography: z.string().min(1),
-  typology: languageTypologySchema.optional(),
-  phonology: languagePhonologySchema.optional()
+  name: nonEmptyTrimmedStringSchema,
+  description: nonEmptyTrimmedStringSchema,
+  orthography: nonEmptyTrimmedStringSchema,
+  typology: languageTypologySchema.default("unknown"),
+  phonology: optionalNullableLanguagePhonologyPayloadSchema
 });
 
-export const languagePatchPayloadSchema = languageCreatePayloadSchema.partial();
+export const languagePatchPayloadSchema = z.object({
+  name: nonEmptyTrimmedStringSchema,
+  description: nonEmptyTrimmedStringSchema,
+  orthography: nonEmptyTrimmedStringSchema,
+  typology: languageTypologySchema,
+  phonology: optionalNullableLanguagePhonologyPayloadSchema
+}).partial();
 
 // Source registration schema
 export const sourceRegistrationPayloadSchema = z.object({
   kind: z.enum(["text", "wordlist", "url"]),
-  title: z.string().min(1),
+  title: nonEmptyTrimmedStringSchema,
   rawText: z.string().optional(),
-  url: z.string().optional()
+  url: z.string().trim().optional()
 }).refine((data) => {
   if (data.kind === "url") {
     if (!data.url) return false;
@@ -63,7 +83,7 @@ export const exerciseSubmissionPayloadSchema = z.object({
 export const createAiSessionPayloadSchema = z.object({
   languageId: z.string().min(1),
   mode: aiSessionModeSchema,
-  seedPrompt: z.string().optional(),
+  seedPrompt: z.string().default(""),
   contextNoteIds: z.array(z.string()).default([]),
   contextPassageIds: z.array(z.string()).default([])
 });

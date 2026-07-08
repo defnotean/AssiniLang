@@ -8,6 +8,7 @@ import { discoverLlmModels } from "../llmDiscovery.js";
 import { describeLlmProviderFromEnv, probeLlmProviderReachability } from "../llmProvider.js";
 import { requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
+import { parseSchemaBody } from "./requestBody.js";
 
 function queryBaseUrls(query: unknown): string[] {
   if (!query || typeof query !== "object") return [];
@@ -67,15 +68,15 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
 
-    const parsed = runtimeSettingsPatchSchema.safeParse(request.body ?? {});
-    if (!parsed.success) {
+    const patch = parseSchemaBody(runtimeSettingsPatchSchema, request.body ?? {});
+    if (!patch) {
       reply.code(400);
       return { error: "Invalid runtime settings body" };
     }
 
     return applyRuntimeSettingsPatch({
       settingsPath,
-      patch: parsed.data,
+      patch,
       reloadLlmProvider
     });
   });

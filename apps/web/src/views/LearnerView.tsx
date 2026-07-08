@@ -9,8 +9,7 @@ import {
 import { formatSubmissionStatus, parseAuthoringList } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { AsyncState, PublicExercise } from "../lib/types";
-
-const PRACTICE_NEXT_LIMIT = 3;
+import { LearnerPracticeNextPanel } from "./LearnerPracticeNextPanel";
 
 const EXERCISE_TYPES = ["translate_to_target", "translate_to_english", "segment", "choose_particle"] as const;
 
@@ -172,60 +171,13 @@ export function LearnerView({
     }
   }
 
-  function renderPracticeNext() {
-    if (practiceState.status === "idle" || practiceState.status === "loading") {
-      return (
-        <p className="inline-empty" role="status" aria-live="polite">
-          {t("learner.loadingPracticeRecommendations")}
-        </p>
-      );
-    }
-
-    if (practiceState.status === "error") {
-      return (
-        <p className="result-notice error" role="alert">
-          {practiceState.message}
-        </p>
-      );
-    }
-
-    const { exercises: recommended, rationale } = practiceState.data;
-    if (recommended.length === 0) {
-      return <p className="inline-empty">{t("learner.noPracticeRecommendationsYet")}</p>;
-    }
-
-    return (
-      <div className="practice-next-list">
-        {recommended.slice(0, PRACTICE_NEXT_LIMIT).map((exercise) => {
-          const entry = rationale.find((item) => item.exerciseId === exercise.id);
-          const status = entry?.status ?? "new";
-          return (
-            <div key={exercise.id} className="practice-next-item">
-              <span className={`pill practice-status practice-status-${status}`}>
-                {t(`learner.practiceStatus.${status}`)}
-              </span>
-              <span className="practice-next-prompt">{exercise.prompt}</span>
-              <button
-                type="button"
-                className="secondary"
-                disabled={isWorkflowBusy}
-                onClick={() => onSelectExercise(exercise.id)}
-              >
-                {t("learner.practice")}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
     <div className="exercise-workbench">
-      <section className="record-card practice-next-panel" aria-label={t("learner.practiceNext")}>
-        <h3>{t("learner.practiceNext")}</h3>
-        {renderPracticeNext()}
-      </section>
+      <LearnerPracticeNextPanel
+        practiceState={practiceState}
+        isWorkflowBusy={isWorkflowBusy}
+        onSelectExercise={onSelectExercise}
+      />
 
       <section className="exercise-list" aria-label={t("learner.exerciseSelector")}>
         <div className="panel-heading">{t("learner.exercisesCount", { count: exercises.length })}</div>
@@ -257,16 +209,16 @@ export function LearnerView({
               <div>
                 <dt>{t("learner.allowedVocabulary")}</dt>
                 <dd className="token-list">
-                  {selectedExercise.allowedVocabulary.map((token) => (
-                    <code key={token}>{token}</code>
+                  {selectedExercise.allowedVocabulary.map((token, index) => (
+                    <code key={`${index}:${token}`}>{token}</code>
                   ))}
                 </dd>
               </div>
               <div>
                 <dt>{t("learner.rules")}</dt>
                 <dd className="token-list">
-                  {selectedExercise.allowedRuleIds.map((rule) => (
-                    <span className="pill" key={rule}>{rule}</span>
+                  {selectedExercise.allowedRuleIds.map((rule, index) => (
+                    <span className="pill" key={`${index}:${rule}`}>{rule}</span>
                   ))}
                 </dd>
               </div>

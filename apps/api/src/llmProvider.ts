@@ -5,10 +5,17 @@ import {
   DEFAULT_LLM_TIMEOUT_MS,
   ensureV1BaseUrl,
   normalizeBaseUrl,
+  normalizeHttpBaseUrl,
   parseBooleanFlag,
+  readLlmEnvConfig,
   resolveLlmTimeoutMs,
-  trimValue
+  trimValue,
+  type Env
 } from "./llmEnvShared.js";
+import {
+  parseOpenAiChatCompletionContent,
+  type OpenAiChatCompletionResponse
+} from "./llmResponseParsing.js";
 
 export type { LlmProviderReadiness, LlmReachability } from "@assini/api-contract";
 
@@ -106,57 +113,12 @@ export type OpenAiCompatibleConfig = {
   jsonMode?: boolean;
 };
 
-
-type Env = Record<string, string | undefined>;
-
-type OpenAiChatCompletionResponse = {
-  choices?: Array<{
-    message?: {
-      content?: unknown;
-      reasoning_content?: unknown;
-    };
-  }>;
-};
-type OpenAiChatCompletionMessage = NonNullable<NonNullable<OpenAiChatCompletionResponse["choices"]>[number]["message"]>;
-
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_REMOTE_OPENAI_MODEL = "gpt-4o-mini";
 const MAX_CONTEXT_ITEMS = 8;
 const MAX_TEXT_CHARS = 1_200;
 const MAX_PREVIOUS_MESSAGES = 8;
 const HEALTH_CHECK_MAX_TOKENS = 256;
-const THINKING_ONLY_PATTERN = /^\[(?:think|THINK)\]$/i;
-const REASONING_ONLY_MESSAGE = "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content.";
-
-function parseAssistantMessageContent(content: unknown): string | undefined {
-  if (typeof content === "string") {
-    const trimmed = content.trim();
-    if (trimmed.length === 0 || THINKING_ONLY_PATTERN.test(trimmed)) return undefined;
-    return trimmed;
-  }
-
-  if (Array.isArray(content)) {
-    const text = content
-      .map((part) => {
-        if (!part || typeof part !== "object") return "";
-        const record = part as { type?: unknown; text?: unknown };
-        return record.type === "text" && typeof record.text === "string" ? record.text : "";
-      })
-      .join("")
-      .trim();
-    if (text.length === 0 || THINKING_ONLY_PATTERN.test(text)) return undefined;
-    return text;
-  }
-
-  return undefined;
-}
-
-function hasReasoningOnlyContent(message: OpenAiChatCompletionMessage | undefined): boolean {
-  if (!message) return false;
-  return parseAssistantMessageContent(message.content) === undefined
-    && typeof message.reasoning_content === "string"
-    && message.reasoning_content.trim().length > 0;
-}
 
 function parsePositiveInteger(value: string | undefined, fallback: number): { value: number; warnings: string[] } {
   const trimmed = trimValue(value);
@@ -187,35 +149,16 @@ function redactText(text: string, maxChars = MAX_TEXT_CHARS): string {
   return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
-function parseHttpBaseUrl(baseUrl: string | undefined): URL | undefined {
-  const trimmed = trimValue(baseUrl);
-  if (!trimmed) return undefined;
-
-  try {
-    const url = new URL(trimmed);
-    return url.protocol === "http:" || url.protocol === "https:" ? url : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 function sanitizeConfiguredBaseUrl(baseUrl: string | undefined): string | undefined {
   const trimmed = trimValue(baseUrl);
   if (!trimmed) return undefined;
 
-  const url = parseHttpBaseUrl(trimmed);
-  if (!url) return "[configured but not a valid http(s) URL]";
-
-  url.username = "";
-  url.password = "";
-  url.search = "";
-  url.hash = "";
-  return normalizeBaseUrl(url.toString());
+  return normalizeHttpBaseUrl(trimmed) ?? "[configured but not a valid http(s) URL]";
 }
 
 function baseUrlWarnings(baseUrl: string | undefined, missingMessage: string): string[] {
   if (!baseUrl) return [missingMessage];
-  return parseHttpBaseUrl(baseUrl) ? [] : ["Configured LLM base URL must be a valid http(s) URL."];
+  return normalizeHttpBaseUrl(baseUrl) ? [] : ["Configured LLM base URL must be a valid http(s) URL."];
 }
 
 function completionUrl(baseUrl: string): string {
@@ -377,7 +320,7 @@ function transcriptionReadiness(env: Env): LlmProviderReadiness["transcription"]
   const baseUrl = trimValue(env.ASSINI_TRANSCRIBE_BASE_URL);
   const model = trimValue(env.ASSINI_TRANSCRIBE_MODEL);
   return {
-    configured: Boolean(baseUrl && parseHttpBaseUrl(baseUrl)),
+    configured: Boolean(normalizeHttpBaseUrl(baseUrl)),
     baseUrl: sanitizeConfiguredBaseUrl(baseUrl),
     model,
     baseUrlVariable: "ASSINI_TRANSCRIBE_BASE_URL",
@@ -416,10 +359,7 @@ function baseReadinessFields(timeoutMs: number, env: Env): Pick<LlmProviderReadi
 }
 
 export function describeLlmProviderFromEnv(env: Env = process.env): LlmProviderReadiness {
-  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
-  const apiKeyConfigured = Boolean(trimValue(env.ASSINI_LLM_API_KEY) ?? trimValue(env.OPENAI_API_KEY));
-  const baseUrl = trimValue(env.ASSINI_LLM_BASE_URL);
-  const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
+  const { provider, apiKeyConfigured, baseUrl, model } = readLlmEnvConfig(env);
   const timeout = parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS);
   const timeoutMs = timeout.value;
   const base = baseReadinessFields(timeoutMs, env);
@@ -442,7 +382,7 @@ export function describeLlmProviderFromEnv(env: Env = process.env): LlmProviderR
     const configuredBaseUrl = baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL;
     const warnings = [
       ...timeout.warnings,
-      ...(parseHttpBaseUrl(configuredBaseUrl) ? [] : ["Configured LLM base URL must be a valid http(s) URL."]),
+      ...(normalizeHttpBaseUrl(configuredBaseUrl) ? [] : ["Configured LLM base URL must be a valid http(s) URL."]),
       ...(apiKeyConfigured ? [] : ["Remote API mode requires ASSINI_LLM_API_KEY or OPENAI_API_KEY on the API server."])
     ];
     return {
@@ -646,16 +586,12 @@ export function createOpenAiCompatibleLlmProvider(
       }
 
       const payload = await response.json() as OpenAiChatCompletionResponse;
-      const message = payload.choices?.[0]?.message;
-      const content = parseAssistantMessageContent(message?.content);
-      if (!content) {
-        if (hasReasoningOnlyContent(message)) {
-          throw new Error(REASONING_ONLY_MESSAGE);
-        }
-        throw new Error("LLM provider returned an empty assistant message");
+      const result = parseOpenAiChatCompletionContent(payload, "LLM provider returned an empty assistant message");
+      if (!result.ok) {
+        throw new Error(result.error);
       }
 
-      return content;
+      return result.content;
     } catch (error) {
       if (timedOut || isAbortError(error)) {
         throw new Error(`LLM provider request timed out after ${timeoutMs}ms`, { cause: error });
@@ -679,7 +615,7 @@ export function createOpenAiCompatibleLlmProvider(
 }
 
 export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchFn = globalThis.fetch): LlmProvider {
-  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
+  const { provider, explicitApiKey, remoteApiKey, baseUrl, model } = readLlmEnvConfig(env);
 
   if (provider === "deterministic" || provider === "off" || provider === "mock") {
     return createDeterministicLlmProvider();
@@ -687,10 +623,6 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
 
   // Explicit key only (no remote fallback): a remote OPENAI_API_KEY must never
   // be forwarded toward a local endpoint such as localhost.
-  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
-  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
-  const baseUrl = trimValue(env.ASSINI_LLM_BASE_URL);
-  const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
   const timeoutMs = parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS).value;
   const maxTokens = parseOptionalPositiveInteger(env.ASSINI_LLM_MAX_TOKENS);
   const jsonMode = parseBooleanFlag(env.ASSINI_LLM_JSON_MODE);
@@ -789,11 +721,7 @@ type ResolvedProbeTarget = { baseUrl: string; apiKey?: string };
  * including ollama /v1 normalization and local-mode API key hygiene.
  */
 function resolveProbeTarget(env: Env): ResolvedProbeTarget | undefined {
-  const provider = trimValue(env.ASSINI_LLM_PROVIDER)?.toLowerCase();
-  const explicitApiKey = trimValue(env.ASSINI_LLM_API_KEY);
-  const remoteApiKey = explicitApiKey ?? trimValue(env.OPENAI_API_KEY);
-  const baseUrl = trimValue(env.ASSINI_LLM_BASE_URL);
-  const model = trimValue(env.ASSINI_LLM_MODEL) ?? trimValue(env.OPENAI_MODEL);
+  const { provider, explicitApiKey, remoteApiKey, baseUrl, model } = readLlmEnvConfig(env);
 
   if (provider === "openai" || provider === "remote") {
     return { baseUrl: baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL, apiKey: remoteApiKey };
@@ -896,12 +824,9 @@ export async function probeLlmProviderReachability(
         result.detail = "Chat completions returned invalid JSON.";
         return result;
       }
-      const message = payload.choices?.[0]?.message;
-      const content = parseAssistantMessageContent(message?.content);
-      if (!content) {
-        result.detail = hasReasoningOnlyContent(message)
-          ? REASONING_ONLY_MESSAGE
-          : "Chat completions returned an empty assistant message.";
+      const content = parseOpenAiChatCompletionContent(payload, "Chat completions returned an empty assistant message.");
+      if (!content.ok) {
+        result.detail = content.error;
         return result;
       }
       result.reachable = true;

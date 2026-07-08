@@ -2503,6 +2503,7 @@ label,
 }
 
 .session-row {
+  display: grid;
   grid-template-columns: auto minmax(8rem, 1fr) minmax(4rem, 0.5fr) auto;
 }
 

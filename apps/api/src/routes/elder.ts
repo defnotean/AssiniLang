@@ -8,6 +8,7 @@ import {
 import { toPublicNote, toPublicNotes } from "../publicLanguageViews.js";
 import { appendAuditEvent, appendAuditEvents, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
+import { parseSchemaBody } from "./requestBody.js";
 
 type ElderCorrectionBody = {
   languageId: string;
@@ -28,8 +29,7 @@ type ElderCorrectionApplyBody = {
 };
 
 function parseElderCorrectionBody(input: unknown): ElderCorrectionBody | undefined {
-  const result = elderCorrectionPayloadSchema.safeParse(input);
-  return result.success ? (result.data as ElderCorrectionBody) : undefined;
+  return parseSchemaBody(elderCorrectionPayloadSchema, input);
 }
 
 function parseElderCorrectionReviewBody(input: unknown): ElderCorrectionReviewBody | undefined {

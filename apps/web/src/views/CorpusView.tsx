@@ -308,8 +308,8 @@ export function CorpusView({
                   activeSurface={morphFilter}
                 />
                 <div className="pill-row">
-                  {passage.topicTags.map((tag) => (
-                    <span className="pill" key={tag}>{tag}</span>
+                  {passage.topicTags.map((tag, index) => (
+                    <span className="pill" key={`${index}:${tag}`}>{tag}</span>
                   ))}
                   <span className="pill">{passage.source}</span>
                   <span className="pill">{passage.consentStatus.use}</span>

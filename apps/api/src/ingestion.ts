@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { z } from "zod";
 import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDraftPayload, type Language, type SourceAsset } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
+import { parseModelJson } from "./modelJson.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 type Env = Record<string, string | undefined>;
@@ -295,54 +296,9 @@ export function buildImageExtractionMessages(language: Language, mimeType: strin
   ];
 }
 
-function stripCodeFences(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return fenced?.[1] ?? content;
-}
-
-function extractFirstJsonObject(content: string): string | undefined {
-  const start = content.indexOf("{");
-  if (start < 0) return undefined;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let index = start; index < content.length; index += 1) {
-    const char = content[index];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-    if (char === '"') {
-      inString = true;
-    } else if (char === "{") {
-      depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        return content.slice(start, index + 1);
-      }
-    }
-  }
-  return undefined;
-}
-
 export function parseExtractionResponse(content: string): { candidates: ExtractionCandidate[]; summary: string } | undefined {
-  const candidateJson = extractFirstJsonObject(stripCodeFences(content));
-  if (!candidateJson) return undefined;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(candidateJson);
-  } catch {
-    return undefined;
-  }
+  const parsed = parseModelJson(content);
+  if (parsed === undefined) return undefined;
 
   const result = llmExtractionSchema.safeParse(parsed);
   if (!result.success) return undefined;

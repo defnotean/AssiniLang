@@ -188,6 +188,35 @@ describe("llm provider", () => {
     expect(JSON.stringify(status)).not.toContain("super-secret-key");
   });
 
+  it("sanitizes configured LLM and transcription base URLs in readiness output", () => {
+    const status = describeLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: " http://user:password@127.0.0.1:11434/v1?api_key=secret#fragment ",
+      ASSINI_LLM_MODEL: "irene-fusion",
+      ASSINI_TRANSCRIBE_BASE_URL: "https://token:secret@transcribe.example.test/v1?api_key=hidden#fragment",
+      ASSINI_TRANSCRIBE_MODEL: "whisper-local"
+    });
+
+    expect(status.baseUrl).toBe("http://127.0.0.1:11434/v1");
+    expect(status.transcription.baseUrl).toBe("https://transcribe.example.test/v1");
+    expect(JSON.stringify(status)).not.toContain("password");
+    expect(JSON.stringify(status)).not.toContain("secret");
+    expect(JSON.stringify(status)).not.toContain("api_key");
+  });
+
+  it("reports invalid local LLM base URLs without marking the provider configured", () => {
+    const status = describeLlmProviderFromEnv({
+      ASSINI_LLM_PROVIDER: "openai-compatible",
+      ASSINI_LLM_BASE_URL: "file:///tmp/model",
+      ASSINI_LLM_MODEL: "irene-fusion"
+    });
+
+    expect(status.mode).toBe("local-openai-compatible");
+    expect(status.configured).toBe(false);
+    expect(status.baseUrl).toBe("[configured but not a valid http(s) URL]");
+    expect(status.warnings).toContain("Configured LLM base URL must be a valid http(s) URL.");
+  });
+
   it("describes transcription readiness from the ASSINI_TRANSCRIBE_* environment variables", () => {
     const unconfigured = describeLlmProviderFromEnv({});
     expect(unconfigured.transcription).toMatchObject({

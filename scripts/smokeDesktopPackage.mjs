@@ -1,15 +1,18 @@
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { access, mkdir, rm, stat } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
+import { readJsonFile } from "./lib/jsonHelpers.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const outputRoot = join(repoRoot, "dist-desktop");
-const packageRoot = join(outputRoot, "AssiniLang-win32-x64");
-const executablePath = join(packageRoot, "AssiniLang.exe");
-const defaultReportPath = join(outputRoot, "desktop-smoke-report.json");
-const defaultScreenshotPath = join(outputRoot, "desktop-smoke.png");
+const {
+  defaultReportPath,
+  defaultScreenshotPath,
+  executablePath,
+  packageRoot
+} = desktopPackagePaths(repoRoot);
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MIN_SCREENSHOT_BYTES = 10_000;
 const MIN_NON_WHITE_RATIO = 0.01;
@@ -30,10 +33,6 @@ async function assertFileExists(path, label) {
   } catch {
     throw new Error(`${label} was not found at ${path}. Run npm.cmd run desktop:package first.`);
   }
-}
-
-async function readJson(path) {
-  return JSON.parse(await readFile(path, "utf8"));
 }
 
 function assert(condition, message) {
@@ -217,7 +216,7 @@ export async function runDesktopPackageSmoke({
 
   try {
     await waitForReport(reportPath, child, timeoutMs);
-    const report = await readJson(reportPath);
+    const report = await readJsonFile(reportPath);
     const summary = validateSmokeReport(report);
     const screenshot = await stat(screenshotPath);
     assert(screenshot.size >= MIN_SCREENSHOT_BYTES, `Desktop smoke screenshot is unexpectedly small (${screenshot.size} bytes).`);
