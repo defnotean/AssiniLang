@@ -3297,6 +3297,72 @@ describe("api server", () => {
     });
   });
 
+  it("enforces canWriteAiSessionMessage on POST /ai/sessions/:sessionId/messages", async () => {
+    const llmProvider: LlmProvider = {
+      name: "test-provider",
+      async generateAssistantMessage(input) {
+        return { content: `Safe response: ${input.prompt}`, warnings: [] };
+      }
+    };
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
+    const sessionPayload = {
+      languageId: TEST_LANGUAGE_ID,
+      seedPrompt: "Trace learner practice safely.",
+      contextNoteIds: [reviewedNoteId],
+      contextPassageIds: ["testlang-c001"]
+    };
+
+    async function createSession(mode: "learner_practice" | "elder_review" | "programmer_debug", userId: string) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/ai/sessions",
+        headers: authHeaders(userId),
+        payload: { ...sessionPayload, mode }
+      });
+      expect(response.statusCode).toBe(201);
+      return response.json().id as string;
+    }
+
+    async function appendMessage(sessionId: string, userId: string) {
+      return app.inject({
+        method: "POST",
+        url: `/ai/sessions/${encodeURIComponent(sessionId)}/messages`,
+        headers: authHeaders(userId),
+        payload: { content: "Follow up safely." }
+      });
+    }
+
+    const learnerPracticeId = await createSession("learner_practice", "learner-1");
+    const programmerDebugId = await createSession("programmer_debug", "programmer-1");
+
+    const learnerPracticeWriteAccess = [
+      ["learner-1", 200],
+      ["elder-1", 403],
+      ["reviewer-1", 403],
+      ["lead-1", 403],
+      ["admin-1", 200],
+      ["programmer-1", 403]
+    ] as const;
+    for (const [userId, statusCode] of learnerPracticeWriteAccess) {
+      const response = await appendMessage(learnerPracticeId, userId);
+      expect(response.statusCode).toBe(statusCode);
+      if (statusCode === 403) {
+        expect(response.json()).toEqual({ error: "Forbidden" });
+      }
+    }
+
+    const programmerDebugWriteAccess = [
+      ["programmer-1", 200],
+      ["admin-1", 200],
+      ["lead-1", 403],
+      ["learner-1", 403]
+    ] as const;
+    for (const [userId, statusCode] of programmerDebugWriteAccess) {
+      const response = await appendMessage(programmerDebugId, userId);
+      expect(response.statusCode).toBe(statusCode);
+    }
+  });
+
   it("uses an injected LLM provider for AI sessions without exposing provider secrets or answer-key fields", async () => {
     const providerInputs: unknown[] = [];
     const llmProvider: LlmProvider = {
@@ -4323,6 +4389,37 @@ describe("api server", () => {
       });
       expect(typeof second.json().asset.processingStartedAt).toBe("string");
       expect(typeof second.json().asset.processingHeartbeatAt).toBe("string");
+    });
+
+    it("returns 409 with i18n metadata when processingAttempts reaches the max", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Max-attempt word list");
+
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        const response = await app.inject({
+          method: "POST",
+          url: `/sources/${sourceId}/process`,
+          headers: authHeaders("reviewer-1")
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json().asset).toMatchObject({
+          id: sourceId,
+          status: "processed",
+          processingAttempts: attempt
+        });
+      }
+
+      const refused = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toEqual({
+        error: "Source processing attempt limit reached (5).",
+        i18nKey: "ingest.sourceMaxProcessingAttempts",
+        i18nParams: { max: 5, count: 5 }
+      });
     });
 
     it("returns 409 for a concurrent synchronous process request", async () => {

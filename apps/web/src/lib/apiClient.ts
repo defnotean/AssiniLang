@@ -78,6 +78,8 @@ declare global {
 type ErrorDetails = {
   detail?: string;
   requestId?: string;
+  i18nKey?: string;
+  i18nParams?: Record<string, string | number>;
 };
 
 let actorFetchQueue: Promise<void> = Promise.resolve();
@@ -85,12 +87,24 @@ let actorFetchQueue: Promise<void> = Promise.resolve();
 export class ApiError extends Error {
   readonly status?: number;
   readonly requestId?: string;
+  readonly i18nKey?: string;
+  readonly i18nParams?: Record<string, string | number>;
 
-  constructor(message: string, options: { status?: number; requestId?: string } = {}) {
+  constructor(
+    message: string,
+    options: {
+      status?: number;
+      requestId?: string;
+      i18nKey?: string;
+      i18nParams?: Record<string, string | number>;
+    } = {}
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = options.status;
     this.requestId = options.requestId;
+    this.i18nKey = options.i18nKey;
+    this.i18nParams = options.i18nParams;
   }
 }
 
@@ -162,6 +176,22 @@ function errorDetailsFromBody(body: unknown): ErrorDetails {
     }
   }
 
+  if (typeof record.i18nKey === "string" && record.i18nKey.trim().length > 0) {
+    details.i18nKey = record.i18nKey.trim();
+  }
+
+  if (record.i18nParams && typeof record.i18nParams === "object") {
+    const params: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(record.i18nParams as Record<string, unknown>)) {
+      if (typeof value === "string" || typeof value === "number") {
+        params[key] = value;
+      }
+    }
+    if (Object.keys(params).length > 0) {
+      details.i18nParams = params;
+    }
+  }
+
   return details;
 }
 
@@ -192,7 +222,9 @@ async function errorFromResponse(response: Response, fallback: string): Promise<
 
   return new ApiError(message, {
     status: response.status || undefined,
-    requestId
+    requestId,
+    i18nKey: details.i18nKey,
+    i18nParams: details.i18nParams
   });
 }
 

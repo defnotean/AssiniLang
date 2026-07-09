@@ -30,6 +30,15 @@ export type ModelDraftGroundingCheck = {
   detail: string;
 };
 
+export type ModelDraftFailureCode =
+  | "groundedEvidence:missing"
+  | "groundedEvidence:unresolved"
+  | "knownForms:unknown"
+  | "topicAlignment:mismatch"
+  | "exampleCoverage:missing"
+  | "exampleCoverage:mismatch"
+  | "unknown";
+
 export type ModelDraftGroundingResult = {
   score: number;
   checks: {
@@ -39,7 +48,29 @@ export type ModelDraftGroundingResult = {
     exampleCoverage: ModelDraftGroundingCheck;
   };
   failures: string[];
+  failureCodes: ModelDraftFailureCode[];
 };
+
+/** Maps a scored failure string to a stable taxonomy code for evaluation runs. */
+export function classifyModelDraftFailure(failure: string): ModelDraftFailureCode {
+  const [prefix] = failure.split(":");
+  switch (prefix) {
+    case "groundedEvidence":
+      return failure.includes("cites no evidence") ? "groundedEvidence:missing" : "groundedEvidence:unresolved";
+    case "knownForms":
+      return "knownForms:unknown";
+    case "topicAlignment":
+      return "topicAlignment:mismatch";
+    case "exampleCoverage":
+      return failure.includes("no examples") ? "exampleCoverage:missing" : "exampleCoverage:mismatch";
+    default:
+      return "unknown";
+  }
+}
+
+function failureCodesFromFailures(failures: string[]): ModelDraftFailureCode[] {
+  return Array.from(new Set(failures.map(classifyModelDraftFailure)));
+}
 
 /**
  * Conservative tokenizer for target-language text: lowercases, splits on
@@ -215,6 +246,7 @@ export function scoreModelDraft(
   return {
     score: passedCount / Object.values(checks).length,
     checks,
-    failures
+    failures,
+    failureCodes: failureCodesFromFailures(failures)
   };
 }

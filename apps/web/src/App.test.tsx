@@ -1602,14 +1602,26 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Prune old backups" }));
     const pruneDialog = await screen.findByRole("dialog", { name: "Confirmation" });
-    fireEvent.click(within(pruneDialog).getByRole("button", { name: "Confirm" }));
+    fireEvent.click(within(pruneDialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Confirmation" })).not.toBeInTheDocument());
+    expect(pruneOldDataBackups).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Prune old backups" }));
+    const pruneDialogRetry = await screen.findByRole("dialog", { name: "Confirmation" });
+    fireEvent.click(within(pruneDialogRetry).getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(pruneOldDataBackups).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Pruned 1 old backup.")).toBeInTheDocument();
     expect(await screen.findByText("5 backups")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Restore latest backup" }));
     const restoreDialog = await screen.findByRole("dialog", { name: "Confirmation" });
-    fireEvent.click(within(restoreDialog).getByRole("button", { name: "Confirm" }));
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Confirmation" })).not.toBeInTheDocument());
+    expect(restoreLatestDataBackup).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore latest backup" }));
+    const restoreDialogRetry = await screen.findByRole("dialog", { name: "Confirmation" });
+    fireEvent.click(within(restoreDialogRetry).getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(restoreLatestDataBackup).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Restored latest backup. Reloading workspace...")).toBeInTheDocument();
 

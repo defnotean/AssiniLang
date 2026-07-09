@@ -32,6 +32,7 @@ type SourceProcessCompletionOutput = {
 type VaultSkippedFile = ObsidianVaultImportResponse["skipped"][number];
 
 const MAX_OBSIDIAN_MARKDOWN_BYTES = 1_000_000;
+export const MAX_SOURCE_PROCESSING_ATTEMPTS = 5;
 const OBSIDIAN_SKIPPED_DIRECTORIES = new Set([".obsidian", ".git", "node_modules"]);
 
 function vaultAuditLabel(rootPath: string): string {
@@ -516,6 +517,15 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     if (asset.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
       reply.code(409);
       return { error: `Source is already processing: ${sourceId}` };
+    }
+
+    if ((asset.processingAttempts ?? 0) >= MAX_SOURCE_PROCESSING_ATTEMPTS) {
+      reply.code(409);
+      return {
+        error: `Source processing attempt limit reached (${MAX_SOURCE_PROCESSING_ATTEMPTS}).`,
+        i18nKey: "ingest.sourceMaxProcessingAttempts",
+        i18nParams: { max: MAX_SOURCE_PROCESSING_ATTEMPTS, count: asset.processingAttempts ?? 0 }
+      };
     }
 
     const asyncRequested = isAsyncProcessRequested(request.body);

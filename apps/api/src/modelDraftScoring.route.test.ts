@@ -60,6 +60,7 @@ describe("model-draft grounding scores", () => {
     expect(typeof note.grounding.checks.topicAlignment.passed).toBe("boolean");
     expect(typeof note.grounding.checks.exampleCoverage.passed).toBe("boolean");
     expect(Array.isArray(note.grounding.failures)).toBe(true);
+    expect(Array.isArray(note.grounding.failureCodes)).toBe(true);
 
     // This fixture draft is fully grounded against the test workspace.
     expect(note.grounding.checks.groundedEvidence.passed).toBe(true);

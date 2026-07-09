@@ -74,6 +74,14 @@ export function canReadAiSession(session: AiSession, actor: User): boolean {
   return actor.role === "elder" || actor.role === "reviewer";
 }
 
+export function canWriteAiSessionMessage(session: AiSession, actor: User): boolean {
+  if (!canReadAiSession(session, actor)) {
+    return false;
+  }
+
+  return session.createdBy === actor.id || actor.role === "admin";
+}
+
 function buildThinkingSummary(state: AppState, languageId: string, mode: AiSessionMode): string {
   const notes = state.notes.filter((note) => note.languageId === languageId);
   const corpusCount = state.corpus.filter((passage) => passage.languageId === languageId).length;

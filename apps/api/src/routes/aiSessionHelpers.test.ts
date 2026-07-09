@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { LOCAL_PROTOTYPE_USERS, type AiSession, type AiSessionMode } from "@assini/db";
-import { canReadAiSession, toPublicAiSession } from "./aiSessionHelpers.js";
+import { canReadAiSession, canWriteAiSessionMessage, toPublicAiSession } from "./aiSessionHelpers.js";
 
 function user(id: string) {
   const actor = LOCAL_PROTOTYPE_USERS.find((entry) => entry.id === id);
@@ -66,6 +66,26 @@ describe("canReadAiSession", () => {
     (mode, creatorId, actorId, allowed) => {
       const item = session({ mode, createdBy: creatorId });
       expect(canReadAiSession(item, user(actorId))).toBe(allowed);
+    }
+  );
+});
+
+describe("canWriteAiSessionMessage", () => {
+  it.each([
+    ["learner_practice", "learner-1", "learner-1", true],
+    ["learner_practice", "learner-1", "elder-1", false],
+    ["learner_practice", "learner-1", "reviewer-1", false],
+    ["learner_practice", "learner-1", "lead-1", false],
+    ["learner_practice", "learner-1", "admin-1", true],
+    ["learner_practice", "learner-1", "programmer-1", false],
+    ["programmer_debug", "programmer-1", "programmer-1", true],
+    ["programmer_debug", "programmer-1", "admin-1", true],
+    ["programmer_debug", "programmer-1", "lead-1", false]
+  ] as const satisfies ReadonlyArray<[AiSessionMode, string, string, boolean]>)(
+    "mode=%s creator=%s actor=%s -> %s",
+    (mode, creatorId, actorId, allowed) => {
+      const item = session({ mode, createdBy: creatorId });
+      expect(canWriteAiSessionMessage(item, user(actorId))).toBe(allowed);
     }
   );
 });

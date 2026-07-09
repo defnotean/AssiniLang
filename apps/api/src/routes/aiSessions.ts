@@ -15,6 +15,7 @@ import {
   buildFailedAiSession,
   buildTraceWarnings,
   canReadAiSession,
+  canWriteAiSessionMessage,
   llmGenerationErrorMessage,
   markAiSessionGenerationFailed,
   toPublicAiSession,
@@ -171,7 +172,7 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
       return { error: `AI session not found: ${sessionId}` };
     }
 
-    if (currentSession.createdBy !== actor.id && actor.role !== "admin") {
+    if (!canWriteAiSessionMessage(currentSession, actor)) {
       reply.code(403);
       return { error: "Forbidden" };
     }

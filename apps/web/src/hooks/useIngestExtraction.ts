@@ -8,10 +8,11 @@ import {
   processSource,
   registerSource,
   rejectExtractionDraft,
-  uploadSourceFile
+  uploadSourceFile,
+  ApiError
 } from "../api";
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
-import type { Translate } from "../i18n";
+import type { MessageKey, Translate } from "../i18n";
 
 export const INGEST_POLL_INTERVAL_MS = 2500;
 export const INGEST_POLL_MAX_DURATION_MS = 10 * 60 * 1000;
@@ -308,7 +309,11 @@ export function useIngestExtraction(
       setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
       setPollingSource({ id: result.asset.id, title: result.asset.title });
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.sourceProcessingFailed");
+      const message = error instanceof ApiError && error.i18nKey
+        ? t(error.i18nKey as MessageKey, error.i18nParams)
+        : error instanceof Error
+          ? error.message
+          : t("ingest.sourceProcessingFailed");
       setProcessError(message);
       setProcessingSourceId(null);
     }

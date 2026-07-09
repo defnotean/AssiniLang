@@ -5,7 +5,7 @@ import {
   buildTestNoteAnswerKeys,
   TEST_LANGUAGE_ID
 } from "@assini/db";
-import { scoreModelDraft, type ModelDraftScoringContext } from "./modelDraftScoring.js";
+import { scoreModelDraft, classifyModelDraftFailure, type ModelDraftScoringContext } from "./modelDraftScoring.js";
 
 function buildContext(overrides: Partial<ModelDraftScoringContext> = {}): ModelDraftScoringContext {
   return {
@@ -42,6 +42,7 @@ describe("scoreModelDraft", () => {
     expect(result.checks.topicAlignment.passed).toBe(true);
     expect(result.checks.exampleCoverage.passed).toBe(true);
     expect(result.failures).toEqual([]);
+    expect(result.failureCodes).toEqual([]);
   });
 
   it("detects hallucinated word forms with a named failure reason", () => {
@@ -60,6 +61,7 @@ describe("scoreModelDraft", () => {
 
     expect(result.checks.knownForms.passed).toBe(false);
     expect(result.failures.some((failure) => failure.includes("zorblat"))).toBe(true);
+    expect(result.failureCodes).toContain("knownForms:unknown");
     expect(result.score).toBeLessThan(1);
   });
 
@@ -158,5 +160,19 @@ describe("scoreModelDraft", () => {
     expect(second).toEqual(first);
     expect(draft).toEqual(draftSnapshot);
     expect(context).toEqual(contextSnapshot);
+  });
+});
+
+describe("classifyModelDraftFailure", () => {
+  it.each([
+    ["groundedEvidence: draft cites no evidence passages.", "groundedEvidence:missing"],
+    ['groundedEvidence: evidence passage "x" does not resolve to a passage in language "testlang".', "groundedEvidence:unresolved"],
+    ['knownForms: form "zorblat" does not appear in the lexicon or corpus for language "testlang".', "knownForms:unknown"],
+    ['topicAlignment: topic "phonology" does not overlap any answer-key topic.', "topicAlignment:mismatch"],
+    ["exampleCoverage: draft has no examples.", "exampleCoverage:missing"],
+    ['exampleCoverage: example target text does not match passage "c001".', "exampleCoverage:mismatch"],
+    ["unexpected failure text", "unknown"]
+  ] as const)("maps %s -> %s", (failure, code) => {
+    expect(classifyModelDraftFailure(failure)).toBe(code);
   });
 });

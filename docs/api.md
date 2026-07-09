@@ -67,7 +67,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | PATCH | `/elder/corrections/:correctionId/apply` | elder, lead, admin | Apply an accepted note-linked correction. |
 | POST | `/ai/sessions` | Mode-based: learner_practice = learner/elder/reviewer/lead/admin; elder_review = elder/lead/admin; programmer_debug = programmer/admin | Create an AI session with public language context. |
 | GET | `/ai/sessions/:sessionId` | Session owner, lead, admin, or mode-aware roles (elder/reviewer for learner practice; elder for elder review; programmer for programmer debug) | Return one AI session with role-aware redaction. |
-| POST | `/ai/sessions/:sessionId/messages` | Any actor | Add a message to an AI session. |
+| POST | `/ai/sessions/:sessionId/messages` | Session owner or admin (must also pass the same read gate as GET) | Append a follow-up message to an AI session. |
 | GET | `/observability/metrics` | programmer, admin, lead | Small safe server metrics snapshot. |
 | GET | `/observability/ai-sessions` | programmer, admin, lead | Sanitized AI-session observability. |
 | GET | `/observability/neural-map` | programmer, admin, lead | Role-gated sanitized context graph. |

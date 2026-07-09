@@ -434,6 +434,7 @@ export const en = {
   "ingest.processingWarningsAria": "Processing warnings for {title}",
   "ingest.processing": "Processing...",
   "ingest.processingAttempts": "Attempt {count}",
+  "ingest.sourceMaxProcessingAttempts": "Processing stopped after {max} attempts. Review the source error or contact an operator.",
   "ingest.processingStaleWarning": "Processing has not reported progress in over 10 minutes. It may be stuck — wait for recovery on restart or try again later.",
   "ingest.processSource": "Process {title}",
   "ingest.extractionDraftQueueAria": "Extraction draft queue",

@@ -411,6 +411,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.processingWarningsAria": "تحذيرات معالجة {title}",
   "ingest.processing": "جارٍ المعالجة...",
   "ingest.processingAttempts": "المحاولة {count}",
+  "ingest.sourceMaxProcessingAttempts": "توقفت المعالجة بعد {max} محاولات. راجع خطأ المصدر أو تواصل مع المشغّل.",
   "ingest.processingStaleWarning": "لم تُبلِّغ المعالجة عن أي تقدّم منذ أكثر من 10 دقائق. قد تكون عالقة — انتظر الاستعادة عند إعادة التشغيل أو أعد المحاولة لاحقًا.",
   "ingest.processSource": "معالجة {title}",
   "ingest.extractionDraftQueueAria": "قائمة مسودات الاستخلاص",
