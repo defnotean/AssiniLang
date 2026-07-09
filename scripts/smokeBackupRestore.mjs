@@ -1,6 +1,7 @@
 /**
  * CI / local smoke: JsonStore backup → corrupt live → restore round-trip,
- * plus CLI refusal modes and a SQLite force-overwrite path.
+ * plus CLI refusal modes, a SQLite force-overwrite path, and a timed
+ * backup/restore drill log for the operator recovery acceptance pack.
  *
  * Complements unit tests in packages/db by exercising the operator path
  * (write fixture, backupTo, restoreFrom, runBackupCli) as a short standalone gate.
@@ -216,13 +217,88 @@ async function smokeCliDryRunInvalidWorkspace() {
   console.log("CLI dry-run invalid workspace: no write");
 }
 
+/**
+ * Timed backup → corrupt → restore drill for the operator recovery pack.
+ * Prints a pasteable JSON drill log (elapsedMs per step + total) and fails
+ * if the tiny fixture round-trip exceeds the CI soft bound.
+ */
+async function smokeTimedBackupRestoreDrill() {
+  const dir = await mkdtemp(join(root, "timed-drill-"));
+  const dbPath = join(dir, "local-db.json");
+  const backupPath = join(dir, "timed-backup.json");
+  const store = new JsonStore(dbPath);
+  const fixture = buildTestWorkspaceState();
+  await store.write(fixture);
+  const before = await store.read();
+
+  /** Soft bound for a tiny fixture workspace in CI (not a production SLA). */
+  const MAX_TOTAL_MS = 30_000;
+  const drillStartedAt = new Date().toISOString();
+  const t0 = performance.now();
+
+  const backupStarted = performance.now();
+  await store.backupTo(backupPath);
+  const backupMs = Math.round(performance.now() - backupStarted);
+
+  const corruptStarted = performance.now();
+  writeFileSync(dbPath, "timed-drill-corrupt-payload", "utf8");
+  try {
+    await store.read();
+    fail("timed drill: expected corrupt live database to fail read()");
+  } catch {
+    // expected loud failure before restore
+  }
+  const corruptMs = Math.round(performance.now() - corruptStarted);
+
+  const restoreStarted = performance.now();
+  const restored = await store.restoreFrom(backupPath);
+  const restoreMs = Math.round(performance.now() - restoreStarted);
+  const totalMs = Math.round(performance.now() - t0);
+
+  if (JSON.stringify(restored) !== JSON.stringify(before)) {
+    fail("timed drill: restored workspace does not match pre-backup state");
+  }
+  const after = await store.read();
+  if (JSON.stringify(after) !== JSON.stringify(before)) {
+    fail("timed drill: post-restore read() does not match pre-backup state");
+  }
+  if (totalMs > MAX_TOTAL_MS) {
+    fail(
+      `timed drill: backup→corrupt→restore took ${totalMs}ms (soft bound ${MAX_TOTAL_MS}ms)`
+    );
+  }
+
+  const drillLog = {
+    drill: "timed-backup-restore",
+    pack: "operator-recovery",
+    startedAt: drillStartedAt,
+    finishedAt: new Date().toISOString(),
+    backend: "json",
+    steps: [
+      { name: "backupTo", elapsedMs: backupMs, ok: true },
+      { name: "corruptLiveReadFails", elapsedMs: corruptMs, ok: true },
+      { name: "restoreFrom", elapsedMs: restoreMs, ok: true }
+    ],
+    totalElapsedMs: totalMs,
+    softBoundMs: MAX_TOTAL_MS,
+    outcome: "pass",
+    notes:
+      "Automated acceptance drill via npm run smoke:backup; times are for a tiny fixture, not a production SLA."
+  };
+  console.log(`timed backup/restore drill log: ${JSON.stringify(drillLog)}`);
+  console.log(
+    `timed backup/restore drill OK — backup ${backupMs}ms, corrupt ${corruptMs}ms, restore ${restoreMs}ms, total ${totalMs}ms`
+  );
+}
+
 try {
   await smokeJsonRoundTrip();
   await smokeCliRefusalsAndForce();
   await smokeSqliteForceOverwrite();
   await smokeCliDryRunInvalidWorkspace();
+  await smokeTimedBackupRestoreDrill();
   console.log(
-    "smoke:backup passed (JSON round-trip, CLI refusals, dry-run valid, SQLite force, dry-run invalid)"
+    "smoke:backup passed (JSON round-trip, CLI refusals, dry-run valid, SQLite force, dry-run invalid, timed drill)"
   );
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));

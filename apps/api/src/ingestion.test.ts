@@ -12,21 +12,26 @@ import {
   ocrImageWithModel,
   ocrModelConfigured,
   ocrScannedPdfFirstPage,
+  ocrScannedPdfPages,
   parseExtractionResponse,
+  resolveOcrPdfMaxPages,
   splitTextIntoChunks,
   transcribeAudioFile
 } from "./ingestion.js";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
+type StubPdfImage = {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+  channels: 1 | 3 | 4;
+  key: string;
+};
+
 const pdfStub = vi.hoisted(() => ({ text: "mira = river", totalPages: 1 }));
 const pdfOcrStub = vi.hoisted(() => ({
-  images: [] as Array<{
-    data: Uint8ClampedArray;
-    width: number;
-    height: number;
-    channels: 1 | 3 | 4;
-    key: string;
-  }>
+  images: [] as StubPdfImage[],
+  imagesByPage: undefined as Record<number, StubPdfImage[]> | undefined
 }));
 const docxStub = vi.hoisted(() => ({ value: "saku = child" }));
 const ocrStub = vi.hoisted(() => ({
@@ -50,7 +55,12 @@ const ocrStub = vi.hoisted(() => ({
 
 vi.mock("unpdf", () => ({
   extractText: vi.fn(async () => ({ totalPages: pdfStub.totalPages, text: pdfStub.text })),
-  extractImages: vi.fn(async () => pdfOcrStub.images)
+  extractImages: vi.fn(async (_data: unknown, pageNumber: number) => {
+    if (pdfOcrStub.imagesByPage) {
+      return pdfOcrStub.imagesByPage[pageNumber] ?? [];
+    }
+    return pdfOcrStub.images;
+  })
 }));
 
 vi.mock("tesseract.js", () => ({
@@ -863,6 +873,8 @@ describe("extractCandidatesForAsset document support", () => {
 
   it("reads scanned PDFs via OCR model when the text layer is empty", async () => {
     pdfStub.text = "   ";
+    pdfStub.totalPages = 1;
+    pdfOcrStub.imagesByPage = undefined;
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
     const fetchStub = (async () => new Response(JSON.stringify({
@@ -894,12 +906,68 @@ describe("extractCandidatesForAsset document support", () => {
 
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.payload.form).toBe("mira");
-    expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read scanned document (page 1)."))).toBe(true);
+    expect(result.warnings.some((warning) =>
+      warning.includes("Used configured OCR model to read scanned document (1 of 1 pages).")
+    )).toBe(true);
   });
 
-  it("warns when a multi-page scanned PDF is OCR'd on page 1 only", async () => {
+  it("OCRs multiple pages of a scanned PDF and concatenates with page markers", async () => {
+    pdfStub.text = "   ";
+    pdfStub.totalPages = 3;
+    const pageImage = (key: string): StubPdfImage => ({
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key
+    });
+    pdfOcrStub.imagesByPage = {
+      1: [pageImage("p1")],
+      2: [pageImage("p2")],
+      3: [pageImage("p3")]
+    };
+    const { asset, dataDir } = await makeDocumentAsset("scan-multi.pdf");
+
+    let call = 0;
+    const fetchStub = (async () => {
+      call += 1;
+      const content = call === 1 ? "mira = river" : call === 2 ? "saku = child" : "tora = forest";
+      return new Response(JSON.stringify({
+        choices: [{ message: { content } }]
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const result = await extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(call).toBe(3);
+    expect(result.warnings.some((warning) =>
+      warning.includes("Used configured OCR model to read scanned document (3 of 3 pages).")
+    )).toBe(true);
+    expect(result.warnings.some((warning) => /only the first \d+ pages were OCR'd/i.test(warning))).toBe(false);
+    expect(result.candidates.some((candidate) =>
+      candidate.kind === "lexeme" && candidate.payload.form === "mira"
+    )).toBe(true);
+    pdfStub.totalPages = 1;
+    pdfOcrStub.imagesByPage = undefined;
+  });
+
+  it("warns when a scanned PDF exceeds the OCR page cap", async () => {
     pdfStub.text = "   ";
     pdfStub.totalPages = 4;
+    pdfOcrStub.imagesByPage = undefined;
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
     const fetchStub = (async () => new Response(JSON.stringify({
@@ -924,17 +992,74 @@ describe("extractCandidatesForAsset document support", () => {
       dataDir,
       env: {
         ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1",
+        ASSINI_OCR_PDF_MAX_PAGES: "2"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.warnings.some((warning) =>
+      warning.includes("PDF has 4 pages; only the first 2 pages were OCR'd.")
+    )).toBe(true);
+    pdfStub.totalPages = 1;
+  });
+
+  it("soft-fails individual OCR pages and continues with the rest", async () => {
+    pdfStub.text = "   ";
+    pdfStub.totalPages = 3;
+    const pageImage = (key: string): StubPdfImage => ({
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key
+    });
+    pdfOcrStub.imagesByPage = {
+      1: [pageImage("p1")],
+      2: [pageImage("p2")],
+      3: [pageImage("p3")]
+    };
+    const { asset, dataDir } = await makeDocumentAsset("scan-soft-fail.pdf");
+
+    let call = 0;
+    const fetchStub = (async () => {
+      call += 1;
+      if (call === 2) return new Response("down", { status: 503 });
+      const content = call === 1 ? "mira = river" : "tora = forest";
+      return new Response(JSON.stringify({
+        choices: [{ message: { content } }]
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const result = await extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
         ASSINI_ALLOW_PRIVATE_URLS: "1"
       },
       fetchFn: fetchStub
     });
 
-    expect(result.warnings.some((warning) => warning.includes("PDF has 4 pages; only page 1 was OCR'd."))).toBe(true);
+    expect(result.warnings.some((warning) =>
+      warning.includes("OCR failed for page 2; continuing with remaining pages.")
+    )).toBe(true);
+    expect(result.warnings.some((warning) =>
+      warning.includes("Used configured OCR model to read scanned document (2 of 3 pages).")
+    )).toBe(true);
     pdfStub.totalPages = 1;
+    pdfOcrStub.imagesByPage = undefined;
   });
 
-  it("surfaces OCR failures for scanned PDFs when the model cannot read page 1", async () => {
+  it("surfaces OCR failures for scanned PDFs when every page fails", async () => {
     pdfStub.text = "   ";
+    pdfStub.totalPages = 1;
+    pdfOcrStub.imagesByPage = undefined;
     pdfOcrStub.images = [{
       data: new Uint8ClampedArray([255, 0, 0, 255]),
       width: 1,
@@ -959,8 +1084,10 @@ describe("extractCandidatesForAsset document support", () => {
     })).rejects.toThrow(/Configured OCR model could not read the scanned PDF:.*status 503/);
   });
 
-  it("preserves page-image guidance when a scanned PDF has no embeddable page 1 image", async () => {
+  it("preserves page-image guidance when a scanned PDF has no embeddable page images", async () => {
     pdfStub.text = "   ";
+    pdfStub.totalPages = 1;
+    pdfOcrStub.imagesByPage = undefined;
     pdfOcrStub.images = [];
     const { asset, dataDir } = await makeDocumentAsset("scan-no-image.pdf");
 
@@ -1004,8 +1131,100 @@ describe("extractCandidatesForAsset document support", () => {
   });
 });
 
+describe("resolveOcrPdfMaxPages", () => {
+  it("defaults to 10 and accepts positive integers", () => {
+    expect(resolveOcrPdfMaxPages({})).toBe(10);
+    expect(resolveOcrPdfMaxPages({ ASSINI_OCR_PDF_MAX_PAGES: "3" })).toBe(3);
+    expect(resolveOcrPdfMaxPages({ ASSINI_OCR_PDF_MAX_PAGES: "0" })).toBe(10);
+    expect(resolveOcrPdfMaxPages({ ASSINI_OCR_PDF_MAX_PAGES: "nope" })).toBe(10);
+  });
+});
+
+describe("ocrScannedPdfPages", () => {
+  it("OCRs multiple pages and concatenates with page markers", async () => {
+    const pageImage = (key: string): StubPdfImage => ({
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key
+    });
+    pdfOcrStub.imagesByPage = {
+      1: [pageImage("p1")],
+      2: [pageImage("p2")]
+    };
+
+    let call = 0;
+    const fetchStub = (async () => {
+      call += 1;
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: call === 1 ? "page one text" : "page two text" } }]
+      }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as typeof fetch;
+
+    const result = await ocrScannedPdfPages({
+      pdfBytes: new Uint8Array([1, 2, 3, 4]),
+      totalPages: 2,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.pagesSucceeded).toBe(2);
+    expect(result.text).toContain("--- Page 1 ---");
+    expect(result.text).toContain("page one text");
+    expect(result.text).toContain("--- Page 2 ---");
+    expect(result.text).toContain("page two text");
+    pdfOcrStub.imagesByPage = undefined;
+  });
+
+  it("soft-fails a page without an embedded image and continues", async () => {
+    const pageImage = (key: string): StubPdfImage => ({
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key
+    });
+    pdfOcrStub.imagesByPage = {
+      1: [],
+      2: [pageImage("p2")]
+    };
+
+    const fetchStub = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "page two text" } }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    const result = await ocrScannedPdfPages({
+      pdfBytes: new Uint8Array([1, 2, 3, 4]),
+      totalPages: 2,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.pagesSucceeded).toBe(1);
+    expect(result.warnings.some((warning) =>
+      warning.includes("OCR skipped page 1 (no embedded page image).")
+    )).toBe(true);
+    expect(result.text).toContain("page two text");
+    pdfOcrStub.imagesByPage = undefined;
+  });
+});
+
 describe("ocrScannedPdfFirstPage", () => {
   it("OCRs the largest embedded image from page 1", async () => {
+    pdfOcrStub.imagesByPage = undefined;
     pdfOcrStub.images = [
       {
         data: new Uint8ClampedArray([0, 0, 0, 255]),
@@ -1043,6 +1262,7 @@ describe("ocrScannedPdfFirstPage", () => {
   });
 
   it("fails clearly when page 1 has no embedded image to OCR", async () => {
+    pdfOcrStub.imagesByPage = undefined;
     pdfOcrStub.images = [];
 
     await expect(ocrScannedPdfFirstPage({

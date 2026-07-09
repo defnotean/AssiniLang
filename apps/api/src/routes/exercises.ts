@@ -194,7 +194,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (validationError) {
       reply.code(400);
-      return { error: validationError };
+      return {
+        error: validationError,
+        i18nKey: "errors.exerciseAuthoringValidationFailed"
+      };
     }
 
     if (!exercise) {
@@ -350,7 +353,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
         };
       }
       reply.code(422);
-      return { error: redactErrorSecrets(error instanceof Error ? error.message : "Exercise generation failed.") };
+      return {
+        error: redactErrorSecrets(error instanceof Error ? error.message : "Exercise generation failed."),
+        i18nKey: "errors.exerciseGenerationFailed"
+      };
     }
 
     return { exercise: generation.exercise, warnings: generation.warnings };

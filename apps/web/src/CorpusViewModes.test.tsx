@@ -7,13 +7,16 @@ import type { CorpusPassage } from "./lib/types";
 
 const fetchNeuralMapMock = vi.fn();
 const validateCorpusImportMock = vi.fn();
+const validateCorpusBulkMock = vi.fn();
+const onImportCorpusBulkMock = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
     fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args),
-    validateCorpusImport: (...args: unknown[]) => validateCorpusImportMock(...args)
+    validateCorpusImport: (...args: unknown[]) => validateCorpusImportMock(...args),
+    validateCorpusBulk: (...args: unknown[]) => validateCorpusBulkMock(...args)
   };
 });
 
@@ -79,6 +82,47 @@ function createCorpus(): CorpusPassage[] {
   ] as CorpusPassage[];
 }
 
+const BULK_HEADER = [
+  "target",
+  "translation",
+  "source",
+  "author",
+  "year",
+  "license",
+  "consentRecord",
+  "consentUse",
+  "tags",
+  "morphemes"
+].join("\t");
+
+function bulkTsvRow(overrides: Partial<Record<string, string>> = {}): string {
+  const values = {
+    target: "mira talo-mi-na",
+    translation: "I walk by the river.",
+    source: "field-import",
+    author: "Local Reviewer",
+    year: "2026",
+    license: "cc-by",
+    consentRecord: "local import consent",
+    consentUse: "community-approved",
+    tags: "motion",
+    morphemes: "mira | mira | river | noun; talo-mi-na | talo | walk.present.1sg | verb",
+    ...overrides
+  };
+  return [
+    values.target,
+    values.translation,
+    values.source,
+    values.author,
+    values.year,
+    values.license,
+    values.consentRecord,
+    values.consentUse,
+    values.tags,
+    values.morphemes
+  ].join("\t");
+}
+
 function renderCorpusView(corpus = createCorpus()) {
   return render(
     <CorpusView
@@ -86,6 +130,7 @@ function renderCorpusView(corpus = createCorpus()) {
       corpus={corpus}
       isWorkflowBusy={false}
       onImportCorpusPassage={vi.fn()}
+      onImportCorpusBulk={onImportCorpusBulkMock}
     />
   );
 }
@@ -93,6 +138,8 @@ function renderCorpusView(corpus = createCorpus()) {
 beforeEach(() => {
   fetchNeuralMapMock.mockReset();
   validateCorpusImportMock.mockReset();
+  validateCorpusBulkMock.mockReset();
+  onImportCorpusBulkMock.mockReset();
 });
 
 afterEach(() => {
@@ -433,5 +480,104 @@ describe("CorpusView import validation", () => {
       expect(screen.getByRole("button", { name: "Validate corpus passage import" })).not.toHaveAttribute("aria-busy", "true");
     });
     expect(screen.getByRole("button", { name: "Validate corpus passage import" })).toHaveTextContent("Validate");
+  });
+});
+
+describe("CorpusView bulk import", () => {
+  it("validates bulk paste with client dry-run and optional server grounding", async () => {
+    validateCorpusBulkMock.mockResolvedValue({
+      ok: true,
+      dryRun: true,
+      imported: 1,
+      failed: 0,
+      results: [{ index: 0, ok: true, warnings: [], preview: null }]
+    });
+
+    renderCorpusView();
+    fireEvent.click(screen.getByRole("button", { name: /Paste bulk passages/i }));
+    fireEvent.change(screen.getByLabelText("Bulk TSV or CSV paste"), {
+      target: { value: [BULK_HEADER, bulkTsvRow()].join("\n") }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate bulk corpus import" }));
+
+    await waitFor(() => {
+      expect(validateCorpusBulkMock).toHaveBeenCalledWith("avenik", [
+        expect.objectContaining({ textTarget: "mira talo-mi-na" })
+      ]);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Dry-run only — nothing saved yet.");
+    expect(screen.getByRole("status")).toHaveTextContent("1 ready, 0 failed of 1 rows.");
+    expect(screen.getByRole("status")).toHaveTextContent("Server grounding: 1 ready, 0 failed of 1 checked.");
+    expect(onImportCorpusBulkMock).not.toHaveBeenCalled();
+  });
+
+  it("imports valid bulk rows and shows imported count", async () => {
+    onImportCorpusBulkMock.mockResolvedValue({
+      ok: true,
+      dryRun: false,
+      imported: 1,
+      failed: 0,
+      results: [{ index: 0, ok: true, warnings: [], passage: createCorpus()[0] }]
+    });
+
+    renderCorpusView();
+    fireEvent.click(screen.getByRole("button", { name: /Paste bulk passages/i }));
+    fireEvent.change(screen.getByLabelText("Bulk TSV or CSV paste"), {
+      target: { value: [BULK_HEADER, bulkTsvRow()].join("\n") }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Import valid rows" }));
+
+    await waitFor(() => {
+      expect(onImportCorpusBulkMock).toHaveBeenCalledWith([
+        expect.objectContaining({ textTarget: "mira talo-mi-na" })
+      ]);
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Imported 1 passage(s).");
+    expect(screen.getByLabelText("Bulk TSV or CSV paste")).toHaveValue("");
+  });
+
+  it("shows partial failure counts after bulk import", async () => {
+    onImportCorpusBulkMock.mockResolvedValue({
+      ok: false,
+      dryRun: false,
+      imported: 1,
+      failed: 1,
+      results: [
+        { index: 0, ok: true, warnings: [], passage: createCorpus()[0] },
+        {
+          index: 1,
+          ok: false,
+          error: "Corpus morpheme is not grounded",
+          i18nKey: "errors.corpusImportValidationFailed",
+          warnings: []
+        }
+      ]
+    });
+
+    renderCorpusView();
+    fireEvent.click(screen.getByRole("button", { name: /Paste bulk passages/i }));
+    fireEvent.change(screen.getByLabelText("Bulk TSV or CSV paste"), {
+      target: {
+        value: [
+          BULK_HEADER,
+          bulkTsvRow(),
+          bulkTsvRow({
+            target: "selu mira-ka",
+            translation: "The river is cold.",
+            morphemes: "selu | selu | cold | adj; mira-ka | mira | river | noun"
+          })
+        ].join("\n")
+      }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Import valid rows" }));
+
+    await waitFor(() => {
+      expect(onImportCorpusBulkMock).toHaveBeenCalled();
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Imported 1 passage(s); 1 failed.");
+    expect(screen.getByRole("alert")).toHaveTextContent("Server row 2: Corpus morpheme is not grounded");
   });
 });

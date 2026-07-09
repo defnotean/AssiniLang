@@ -7,11 +7,13 @@ import { en } from "./i18n/en";
 
 const apiMock = vi.hoisted(() => ({
   acceptExtractionDraft: vi.fn(),
+  activateModelProfile: vi.fn(),
   applyElderCorrection: vi.fn(),
   checkLlmReachability: vi.fn(),
   createAiSession: vi.fn(),
   createLanguage: vi.fn(),
   deleteLanguage: vi.fn(),
+  deleteModelProfile: vi.fn(),
   fetchExtractionDrafts: vi.fn(),
   fetchSources: vi.fn(),
   processSource: vi.fn(),
@@ -39,10 +41,12 @@ const apiMock = vi.hoisted(() => ({
   generateModelDraftNotes: vi.fn(),
   generateModelExercise: vi.fn(),
   importCorpusPassage: vi.fn(),
+  importCorpusBulk: vi.fn(),
   resolveReviewDisposition: vi.fn(),
   reviewElderCorrection: vi.fn(),
   runEvaluation: vi.fn(),
   reviewNote: vi.fn(),
+  saveModelProfile: vi.fn(),
   submitElderCorrection: vi.fn(),
   fetchElderContext: vi.fn(),
   submitExerciseAnswer: vi.fn(),
@@ -396,7 +400,38 @@ function createRealLlmStatus() {
   };
 }
 
-function createRuntimeSettingsResponse(status = createDeterministicLlmStatus()) {
+function createModelProfile(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "irene-local",
+    name: "Irene local",
+    provider: "openai-compatible",
+    baseUrl: "http://127.0.0.1:11434/v1",
+    model: "irene-fusion",
+    apiKeyConfigured: false,
+    timeoutMs: 180000,
+    maxTokens: 4096,
+    jsonMode: false,
+    transcriptionBaseUrl: "",
+    transcriptionModel: "whisper-1",
+    transcriptionApiKeyConfigured: false,
+    ocrBaseUrl: "",
+    ocrModel: "llava",
+    ocrApiKeyConfigured: false,
+    ocrLang: "eng",
+    allowPrivateUrls: false,
+    createdAt: "2026-07-06T00:00:00.000Z",
+    updatedAt: "2026-07-06T00:00:00.000Z",
+    ...overrides
+  };
+}
+
+function createRuntimeSettingsResponse(
+  status = createDeterministicLlmStatus(),
+  extras: {
+    profiles?: ReturnType<typeof createModelProfile>[];
+    activeProfileId?: string;
+  } = {}
+) {
   return {
     settings: {
       provider: status.provider,
@@ -416,7 +451,9 @@ function createRuntimeSettingsResponse(status = createDeterministicLlmStatus()) 
       allowPrivateUrls: false
     },
     status,
-    persisted: true
+    persisted: true,
+    profiles: extras.profiles ?? [],
+    ...(extras.activeProfileId ? { activeProfileId: extras.activeProfileId } : {})
   };
 }
 
@@ -495,6 +532,9 @@ describe("App", () => {
     apiMock.fetchRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse());
     apiMock.fetchDiscoveredModels.mockResolvedValue(createModelDiscoveryResponse());
     apiMock.updateRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
+    apiMock.activateModelProfile.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
+    apiMock.saveModelProfile.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
+    apiMock.deleteModelProfile.mockResolvedValue(createRuntimeSettingsResponse());
     apiMock.checkLlmReachability.mockResolvedValue({
       reachable: false,
       checked: false,
@@ -1237,7 +1277,7 @@ describe("App", () => {
       { timeout: 4000 }
     );
     expect(failureMessages.length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: "Process Field notebook page" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Retry Field notebook page" })).toBeEnabled();
   }, 10000);
 
   it("surfaces the localized max-attempt error through the App ingest flow", async () => {
@@ -1245,7 +1285,7 @@ describe("App", () => {
     apiMock.fetchSources.mockResolvedValue([{
       ...createTextSource(),
       status: "failed",
-      processingAttempts: MAX_ATTEMPTS
+      processingAttempts: MAX_ATTEMPTS - 1
     }]);
     apiMock.fetchExtractionDrafts.mockResolvedValue([]);
     apiMock.processSource.mockRejectedValue(
@@ -1258,7 +1298,7 @@ describe("App", () => {
 
     await renderReady();
     fireEvent.click(screen.getByRole("button", { name: "Build" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Process Field notebook page" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Retry Field notebook page" }));
 
     expect(await screen.findByText(
       `Processing stopped after ${MAX_ATTEMPTS} attempts. Review the source error or contact an operator.`
@@ -1306,7 +1346,7 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Accept draft draft-1" }));
 
-    await waitFor(() => expect(apiMock.acceptExtractionDraft).toHaveBeenCalledWith("draft-1"));
+    await waitFor(() => expect(apiMock.acceptExtractionDraft).toHaveBeenCalledWith("draft-1", undefined));
     expect(await screen.findByText("Draft accepted: Lexeme committed.")).toBeInTheDocument();
     const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
     expect(await within(draftQueue).findByText("0 proposed drafts")).toBeInTheDocument();
@@ -1468,6 +1508,81 @@ describe("App", () => {
 
     expect(await screen.findByText("Genuine model practice prompt.")).toBeInTheDocument();
     expect(screen.queryByText(/Offline placeholder/)).not.toBeInTheDocument();
+  });
+
+  it("activates a saved model profile and updates runtime settings in the form", async () => {
+    const ireneLocal = createModelProfile({
+      id: "irene-local",
+      name: "Irene local",
+      provider: "openai-compatible",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "irene-fusion",
+      timeoutMs: 180000,
+      maxTokens: 8192
+    });
+    const studioSmall = createModelProfile({
+      id: "studio-small",
+      name: "Studio small",
+      provider: "lm-studio",
+      baseUrl: "http://127.0.0.1:1234/v1",
+      model: "irene-small",
+      timeoutMs: 90000,
+      maxTokens: 4096
+    });
+    const profiles = [ireneLocal, studioSmall];
+    const initialStatus = {
+      ...createRealLlmStatus(),
+      provider: "openai-compatible",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "irene-fusion",
+      timeoutMs: 180000
+    };
+    const activatedStatus = {
+      ...createRealLlmStatus(),
+      provider: "lm-studio",
+      mode: "local-openai-compatible",
+      activeProviderName: "lm-studio",
+      baseUrl: "http://127.0.0.1:1234/v1",
+      model: "irene-small",
+      timeoutMs: 90000
+    };
+
+    apiMock.fetchLlmStatus.mockResolvedValue(initialStatus);
+    apiMock.fetchRuntimeSettings.mockResolvedValue(
+      createRuntimeSettingsResponse(initialStatus, {
+        profiles,
+        activeProfileId: "irene-local"
+      })
+    );
+    apiMock.activateModelProfile.mockResolvedValue(
+      createRuntimeSettingsResponse(activatedStatus, {
+        profiles,
+        activeProfileId: "studio-small"
+      })
+    );
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    const profileSelect = await screen.findByLabelText("Saved profiles");
+    expect(profileSelect).toHaveValue("irene-local");
+    await waitFor(() => {
+      expect(screen.getByLabelText("Provider")).toHaveValue("openai-compatible");
+      expect(screen.getByLabelText("Base URL")).toHaveValue("http://127.0.0.1:11434/v1");
+      expect(screen.getByLabelText("Model")).toHaveValue("irene-fusion");
+    });
+
+    fireEvent.change(profileSelect, { target: { value: "studio-small" } });
+
+    await waitFor(() => expect(apiMock.activateModelProfile).toHaveBeenCalledWith("studio-small"));
+    await waitFor(() => {
+      expect(screen.getByLabelText("Saved profiles")).toHaveValue("studio-small");
+      expect(screen.getByLabelText("Provider")).toHaveValue("lm-studio");
+      expect(screen.getByLabelText("Base URL")).toHaveValue("http://127.0.0.1:1234/v1");
+      expect(screen.getByLabelText("Model")).toHaveValue("irene-small");
+      expect(screen.getByLabelText("Timeout")).toHaveValue(90000);
+    });
+    expect(screen.getByText("Model profile applied.")).toBeInTheDocument();
   });
 
   it("saves runtime model settings from the Settings screen", async () => {
@@ -2184,7 +2299,7 @@ describe("App", () => {
     });
   });
 
-  it("clears the discovered model selection when a loaded model is unloaded", async () => {
+  it("surfaces unloaded-model stale state when discovery no longer lists the saved model", async () => {
     const oldModelId = "lm-studio|http://127.0.0.1:1234/v1|old-loaded-model";
     apiMock.updateRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse({
       ...createDeterministicLlmStatus(),
@@ -2252,9 +2367,11 @@ describe("App", () => {
       expect(screen.getByLabelText("Model")).toHaveValue("");
     });
     expect(screen.getByText("Connected to http://127.0.0.1:1234/v1, but it did not return any models.")).toBeInTheDocument();
-    expect(screen.getByText(
+    const staleNotice = screen.getByText(
       "Saved model old-loaded-model is no longer loaded at http://127.0.0.1:1234/v1. Choose another discovered model or switch back to offline mode."
-    )).toBeInTheDocument();
+    );
+    expect(staleNotice).toBeInTheDocument();
+    expect(staleNotice.closest(".stale-model-notice")).toHaveAttribute("role", "status");
 
     fireEvent.click(screen.getByRole("button", { name: "Use offline mode" }));
 
@@ -2930,7 +3047,7 @@ describe("App", () => {
     expect(explanationInput).toHaveValue("Avenik verbs use transparent suffix chains.");
 
     fireEvent.change(explanationInput, { target: { value: revisedExplanation } });
-    fireEvent.click(screen.getByRole("button", { name: "Save note explanation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save note edits" }));
 
     await waitFor(() =>
       expect(apiMock.reviewNote).toHaveBeenCalledWith("avn-rule-verb-chain-note", {
@@ -2948,7 +3065,9 @@ describe("App", () => {
 
     const detail = await screen.findByRole("article", { name: "Selected note detail" });
     expect(within(detail).getByRole("heading", { name: "verb chains" })).toBeInTheDocument();
-    expect(within(detail).getByText("mira talo-mi-na")).toBeInTheDocument();
+    expect(within(detail).getByLabelText("Note examples editor").querySelector("code")?.textContent).toBe(
+      "mira talo-mi-na"
+    );
     expect(within(detail).getByText("I walk by the river.")).toBeInTheDocument();
     expect(within(detail).getByText("1 evidence link")).toBeInTheDocument();
     expect(within(detail).getByText("avn-c001")).toBeInTheDocument();
@@ -3086,6 +3205,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Allowed vocabulary"), {
       target: { value: "mira, talo, -mi, -na" }
     });
+    fireEvent.click(screen.getByText("Advanced: paste note IDs"));
     fireEvent.change(screen.getByLabelText("Allowed rule IDs"), {
       target: { value: "avn-rule-verb-chain" }
     });
@@ -3104,6 +3224,13 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Adversarial reason 2"), {
       target: { value: "Reverses tense and person suffix order." }
     });
+    fireEvent.click(screen.getByRole("button", { name: "Add probe" }));
+    fireEvent.change(screen.getByLabelText("Adversarial answer 3"), {
+      target: { value: "talo mira-mi-na" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 3"), {
+      target: { value: "Breaks the verb chain into separate words." }
+    });
     fireEvent.change(screen.getByLabelText("Grading explanation"), {
       target: { value: "Use mira for river, talo for walk, -mi for present, and -na for first person singular." }
     });
@@ -3117,7 +3244,8 @@ describe("App", () => {
       expectedAnswers: ["mira talo-mi-na"],
       adversarialAnswers: [
         { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
-        { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+        { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." },
+        { answer: "talo mira-mi-na", reason: "Breaks the verb chain into separate words." }
       ],
       gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
     }));
@@ -3145,6 +3273,7 @@ describe("App", () => {
     fireEvent.change(screen.getByLabelText("Allowed vocabulary"), {
       target: { value: "mira, talo, -mi, -na" }
     });
+    fireEvent.click(screen.getByText("Advanced: paste note IDs"));
     fireEvent.change(screen.getByLabelText("Allowed rule IDs"), {
       target: { value: "missing-rule" }
     });
@@ -3195,7 +3324,8 @@ describe("App", () => {
         expectedAnswers: ["nemi lo-ki"],
         adversarialAnswers: [
           { answer: "lo-ki nemi", reason: "Fronts the verb ahead of the subject noun." },
-          { answer: "nemi-ki lo", reason: "Attaches the tense suffix to the wrong stem." }
+          { answer: "nemi-ki lo", reason: "Attaches the tense suffix to the wrong stem." },
+          { answer: "nemi lo ki", reason: "Splits the tense suffix into a free particle." }
         ],
         gradingExplanation: "Use nemi for child and lo for sleep with the -ki present suffix."
       },
@@ -3216,6 +3346,9 @@ describe("App", () => {
     expect(screen.getByLabelText("Allowed vocabulary")).toHaveValue("nemi, lo, -ki");
     expect(screen.getByLabelText("Expected answers")).toHaveValue("nemi lo-ki");
     expect(screen.getByLabelText("Adversarial answer 1")).toHaveValue("lo-ki nemi");
+    expect(screen.getByLabelText("Adversarial answer 2")).toHaveValue("nemi-ki lo");
+    expect(screen.getByLabelText("Adversarial answer 3")).toHaveValue("nemi lo ki");
+    expect(screen.getByLabelText("Adversarial reason 3")).toHaveValue("Splits the tense suffix into a free particle.");
     expect(screen.getByLabelText("Grading explanation")).toHaveValue(
       "Use nemi for child and lo for sleep with the -ki present suffix."
     );
@@ -3241,7 +3374,7 @@ describe("App", () => {
       type: "translate_to_target"
     }));
     expect(
-      await screen.findByText("Model exercise generation failed (400): No model is configured.")
+      await screen.findByText("Model exercise generation failed. Retry, or author the exercise manually.")
     ).toBeInTheDocument();
     expect(apiMock.createExercise).not.toHaveBeenCalled();
   });

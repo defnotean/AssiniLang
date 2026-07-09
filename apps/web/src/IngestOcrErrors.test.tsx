@@ -43,7 +43,7 @@ describe("IngestView OCR processing errors", () => {
   it("shows a localized OCR setup hint on failed document sources", async () => {
     apiMock.fetchSources.mockResolvedValue([
       failedDocumentSource(
-        "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only)."
+        "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs."
       )
     ]);
 
@@ -87,8 +87,9 @@ describe("IngestView multi-page OCR warnings", () => {
         processedAt: "2026-06-11T00:05:00.000Z",
         processingAttempts: 1,
         warnings: [
-          "Used configured OCR model to read scanned document (page 1).",
-          "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+          "Used configured OCR model to read scanned document (2 of 2 pages).",
+          "PDF has 14 pages; only the first 10 pages were OCR'd. Raise ASSINI_OCR_PDF_MAX_PAGES or split remaining pages into separate sources if you need them.",
+          "OCR failed for page 2; continuing with remaining pages."
         ]
       }
     ]);
@@ -99,10 +100,13 @@ describe("IngestView multi-page OCR warnings", () => {
       name: "Processing warnings for Multi-page field notes"
     });
     expect(warnings).toHaveTextContent(
-      "Used configured OCR model to read scanned document (page 1)."
+      "Used configured OCR model to read scanned document (2 of 2 pages)."
     );
     expect(warnings).toHaveTextContent(
-      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+      "PDF has 14 pages; only the first 10 pages were OCR'd. Raise the OCR page cap or split remaining pages into separate sources if you need them."
+    );
+    expect(warnings).toHaveTextContent(
+      "OCR failed for page 2; continuing with remaining pages."
     );
   });
 });

@@ -19,7 +19,9 @@ import {
   createExercise,
   generateModelExercise,
   importCorpusPassage,
+  importCorpusBulk,
   validateCorpusImport,
+  validateCorpusBulk,
   validateExerciseAuthoring,
   createGovernanceRecord,
   updateReviewPolicy,
@@ -370,6 +372,94 @@ describe("fetchDashboardData", () => {
       method: "POST",
       ...jsonRequest,
       body: JSON.stringify(payload)
+    });
+  });
+
+  it("posts corpus bulk import requests with passages payload", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        dryRun: false,
+        imported: 1,
+        failed: 0,
+        results: []
+      })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      source: "field-lab",
+      sourceMetadata: {
+        author: "reviewer-1",
+        year: 2026,
+        license: "cc-by",
+        consentRecord: "local-review"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river near the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "river", gloss: "river", features: ["noun"] }
+      ],
+      topicTags: ["movement"],
+      consentStatus: {
+        use: "testing-only" as const,
+        restrictions: []
+      }
+    };
+
+    await importCorpusBulk("avenik/test language", [payload]);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/corpus/bulk", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ passages: [payload] })
+    });
+  });
+
+  it("posts corpus bulk dry-run validation with the dryRun query flag", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        dryRun: true,
+        imported: 1,
+        failed: 0,
+        results: []
+      })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      source: "field-notebook",
+      sourceMetadata: {
+        author: "Local Reviewer",
+        year: 2026,
+        license: "user-provided",
+        consentRecord: "local import consent"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river at the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }
+      ],
+      topicTags: ["movement"],
+      consentStatus: {
+        use: "testing-only" as const,
+        restrictions: []
+      }
+    };
+
+    await validateCorpusBulk("avenik/test language", [payload]);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/corpus/bulk?dryRun=1", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ passages: [payload] })
     });
   });
 
@@ -1035,8 +1125,25 @@ describe("fetchDashboardData", () => {
       ...actorRequest
     });
 
+    await acceptExtractionDraft("draft/3", { preferLexiconSegmentation: true });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/extraction-drafts/draft%2F3/accept", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ preferLexiconSegmentation: true })
+    });
+
+    const editedSegmentation = [
+      { surface: "mira", lemma: "mira", gloss: "stream", features: ["noun"] }
+    ];
+    await acceptExtractionDraft("draft/4", { morphologicalSegmentation: editedSegmentation });
+    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/extraction-drafts/draft%2F4/accept", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify({ morphologicalSegmentation: editedSegmentation })
+    });
+
     await rejectExtractionDraft("draft/2");
-    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/extraction-drafts/draft%2F2/reject", {
+    expect(fetchMock).toHaveBeenNthCalledWith(5, "/api/extraction-drafts/draft%2F2/reject", {
       method: "POST",
       ...actorRequest
     });

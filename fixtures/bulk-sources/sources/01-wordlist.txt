@@ -1,0 +1,6 @@
+# Velmari core wordlist (synthetic fixture)
+
+vel = water
+mir = river
+saku = child
+tora = speak

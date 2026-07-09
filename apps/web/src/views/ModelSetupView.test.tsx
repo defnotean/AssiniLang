@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { ModelWorkspace } from "../hooks/useModelWorkspace";
 import { ModelSetupView } from "./ModelSetupView";
@@ -151,6 +151,99 @@ describe("ModelSetupView settings save status", () => {
     expect(emptyHint).toHaveAttribute("role", "status");
     expect(emptyHint).toHaveAttribute("aria-live", "polite");
     expect(screen.getByRole("option", { name: "No saved profiles" })).toBeInTheDocument();
+  });
+
+  it("activates a named saved profile from the profile select", async () => {
+    const handleActivateModelProfile = vi.fn().mockResolvedValue(undefined);
+    const status = createLlmStatus();
+    const profiles = [
+      {
+        id: "irene-local",
+        name: "Irene local",
+        provider: "openai-compatible" as const,
+        baseUrl: "http://127.0.0.1:11434/v1",
+        model: "irene-fusion",
+        apiKeyConfigured: false,
+        timeoutMs: 180000,
+        maxTokens: 4096,
+        jsonMode: false,
+        transcriptionBaseUrl: "",
+        transcriptionModel: "whisper-1",
+        transcriptionApiKeyConfigured: false,
+        ocrBaseUrl: "",
+        ocrModel: "llava",
+        ocrApiKeyConfigured: false,
+        ocrLang: "eng",
+        allowPrivateUrls: false,
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:00:00.000Z"
+      },
+      {
+        id: "studio-small",
+        name: "Studio small",
+        provider: "lm-studio" as const,
+        baseUrl: "http://127.0.0.1:1234/v1",
+        model: "irene-small",
+        apiKeyConfigured: false,
+        timeoutMs: 90000,
+        maxTokens: 4096,
+        jsonMode: false,
+        transcriptionBaseUrl: "",
+        transcriptionModel: "whisper-1",
+        transcriptionApiKeyConfigured: false,
+        ocrBaseUrl: "",
+        ocrModel: "llava",
+        ocrApiKeyConfigured: false,
+        ocrLang: "eng",
+        allowPrivateUrls: false,
+        createdAt: "2026-07-06T00:00:00.000Z",
+        updatedAt: "2026-07-06T00:00:00.000Z"
+      }
+    ];
+
+    render(
+      <ModelSetupView
+        model={createModelWorkspace({
+          settingsSaveResult: null,
+          handleActivateModelProfile,
+          settingsState: {
+            status: "ready",
+            data: {
+              settings: {
+                provider: status.provider,
+                baseUrl: status.baseUrl ?? "",
+                model: status.model ?? "",
+                apiKeyConfigured: false,
+                timeoutMs: status.timeoutMs,
+                maxTokens: 4096,
+                jsonMode: false,
+                transcriptionBaseUrl: "",
+                transcriptionModel: "whisper-1",
+                transcriptionApiKeyConfigured: false,
+                ocrBaseUrl: "",
+                ocrModel: "llava",
+                ocrApiKeyConfigured: false,
+                ocrLang: "eng",
+                allowPrivateUrls: false
+              },
+              status,
+              persisted: true,
+              profiles,
+              activeProfileId: "irene-local"
+            }
+          }
+        })}
+      />
+    );
+
+    const profileSelect = screen.getByLabelText("Saved profiles");
+    expect(profileSelect).toHaveValue("irene-local");
+    expect(screen.getByRole("option", { name: "Irene local (irene-fusion)" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Studio small (irene-small)" })).toBeInTheDocument();
+
+    fireEvent.change(profileSelect, { target: { value: "studio-small" } });
+
+    await waitFor(() => expect(handleActivateModelProfile).toHaveBeenCalledWith("studio-small"));
   });
 
   it("renders localized provider option labels in the settings select", () => {

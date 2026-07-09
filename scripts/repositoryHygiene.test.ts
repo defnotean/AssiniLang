@@ -83,10 +83,14 @@ describe("repository production hygiene", () => {
     expect(script).toContain("--dry-run");
     expect(script).toContain("dryRun");
     expect(script).toContain("CLI --dry-run valid workspace: no write");
+    expect(script).toContain("timed backup/restore drill log");
+    expect(script).toContain("timed-backup-restore");
+    expect(script).toContain("softBoundMs");
     expect(ingestionSmoke).toContain('url: "/ready"');
     expect(ingestionSmoke).toContain("checks?.storage?.ok");
     expect(ingestionSmoke).toContain("checks?.jobQueue?.ok");
     expect(developmentDocs).toContain("npm.cmd run smoke:backup");
+    expect(developmentDocs).toContain("timed backup/restore drill log");
     expect(ciGreen).toContain("npm run smoke:backup");
   });
 
@@ -129,6 +133,7 @@ describe("repository production hygiene", () => {
       "ASSINI_OCR_BASE_URL",
       "ASSINI_OCR_MODEL",
       "ASSINI_OCR_API_KEY",
+      "ASSINI_OCR_PDF_MAX_PAGES",
       "ASSINI_OCR_LANG",
       "ASSINI_ALLOW_PRIVATE_URLS",
       "ASSINI_OBSIDIAN_VAULT_ROOTS",

@@ -18,7 +18,8 @@ import {
 } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
-type ReviewBody = Partial<Pick<Note, "status" | "explanation">> & {
+type NoteExample = Note["examples"][number];
+type ReviewBody = Partial<Pick<Note, "status" | "explanation" | "examples">> & {
   reviewerComment?: string;
   dispositionAssigneeId?: string;
   dispositionDueAt?: string;
@@ -33,6 +34,59 @@ function noteExplanationValidationError(explanation: string | undefined): string
   const wordCount = explanation.match(/[A-Za-z0-9][A-Za-z0-9'-]*/g)?.length ?? 0;
   if (explanation.length < 24 || wordCount < 4) {
     return "Note explanation edits require a substantive explanation.";
+  }
+
+  return undefined;
+}
+
+function parseReviewExamples(input: unknown): NoteExample[] | undefined {
+  if (!Array.isArray(input)) return undefined;
+
+  const examples: NoteExample[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
+    const record = item as Record<string, unknown>;
+    if (
+      typeof record.passageId !== "string"
+      || typeof record.target !== "string"
+      || typeof record.translation !== "string"
+    ) {
+      return undefined;
+    }
+
+    const passageId = record.passageId.trim();
+    const target = record.target.trim().replace(/\s+/g, " ");
+    const translation = record.translation.trim().replace(/\s+/g, " ");
+    if (passageId.length === 0 || target.length === 0 || translation.length === 0) {
+      return undefined;
+    }
+
+    examples.push({ passageId, target, translation });
+  }
+
+  return examples;
+}
+
+function noteExamplesValidationError(
+  state: AppState,
+  languageId: string,
+  examples: NoteExample[]
+): { error: string; i18nKey: string } | undefined {
+  for (const example of examples) {
+    const passage = state.corpus.find((item) => item.id === example.passageId);
+    if (!passage || passage.languageId !== languageId) {
+      return {
+        error: `Note example passage is not in language: ${example.passageId}`,
+        i18nKey: "errors.noteExamplePassageInvalid"
+      };
+    }
+
+    if (example.target !== passage.textTarget || example.translation !== passage.textTranslation) {
+      return {
+        error: `Note example text must match corpus passage: ${example.passageId}`,
+        i18nKey: "errors.noteExampleTextMismatch"
+      };
+    }
   }
 
   return undefined;
@@ -72,6 +126,13 @@ function parseReviewBody(input: unknown): ReviewBody | undefined {
     const explanation = body.explanation.trim().replace(/\s+/g, " ");
     if (explanation.length === 0) return undefined;
     review.explanation = explanation;
+  }
+
+  if ("examples" in body) {
+    hasReviewField = true;
+    const examples = parseReviewExamples(body.examples);
+    if (!examples) return undefined;
+    review.examples = examples;
   }
 
   if ("reviewerComment" in body) {
@@ -186,9 +247,23 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
       }
     }
 
+    const existingForExamples = current.notes.find((note) => note.id === noteId);
+    if (body.examples !== undefined && existingForExamples) {
+      const examplesValidationError = noteExamplesValidationError(
+        current,
+        existingForExamples.languageId,
+        body.examples
+      );
+      if (examplesValidationError) {
+        reply.code(400);
+        return examplesValidationError;
+      }
+    }
+
     let noteMissing = false;
     let nextNote: Note | undefined;
     let policyForbiddenMessage: string | undefined;
+    let examplesValidationFailure: { error: string; i18nKey: string } | undefined;
 
     await updateState((state) => {
       const existing = state.notes.find((note) => note.id === noteId);
@@ -196,6 +271,14 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
       if (!existing) {
         noteMissing = true;
         return state;
+      }
+
+      if (body.examples !== undefined) {
+        const examplesValidationError = noteExamplesValidationError(state, existing.languageId, body.examples);
+        if (examplesValidationError) {
+          examplesValidationFailure = examplesValidationError;
+          return state;
+        }
       }
 
       const reviewedAt = new Date().toISOString();
@@ -208,6 +291,8 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
       const disposition = isReviewDispositionStatus(requestedStatus) ? requestedStatus : undefined;
       let reviewDisposition: ReviewDisposition | undefined;
       let reviewDispositionCreated = false;
+      const nextExamples = body.examples ?? existing.examples;
+      const examplesChanged = body.examples !== undefined;
 
       if (requestedStatus === "approved" && policy) {
         if (policy.requiresAssignedReviewer && !policy.assignedReviewerIds.includes(actor.id)) {
@@ -277,10 +362,16 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         reviewDispositionCreated = !existingOpenDisposition;
       }
 
+      const editSummary = body.reviewerComment
+        ?? (examplesChanged && body.explanation === undefined && body.status === undefined
+          ? `Updated examples (${nextExamples.length})`
+          : `Status set to ${nextStatus}`);
+
       nextNote = {
         ...existing,
         status: nextStatus,
         explanation: body.explanation ?? existing.explanation,
+        examples: nextExamples.map((example) => ({ ...example })),
         reviewer: {
           lastReviewedBy: actor.id,
           lastReviewedAt: reviewedAt,
@@ -292,7 +383,7 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
             at: reviewedAt,
             by: actor.id,
             action: "reviewed",
-            summary: body.reviewerComment ?? `Status set to ${nextStatus}`
+            summary: editSummary
           }
         ]
       };
@@ -320,6 +411,7 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
           requestedStatus,
           status: nextStatus,
           explanationChanged: body.explanation !== undefined,
+          examplesChanged,
           ...(disposition ? { disposition } : {}),
           ...(reviewDisposition ? { reviewDispositionId: reviewDisposition.id } : {}),
           ...(approvalCount !== undefined && approvalThreshold !== undefined
@@ -354,6 +446,11 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         error: `Note not found: ${noteId}`,
         i18nKey: "errors.noteNotFound"
       };
+    }
+
+    if (examplesValidationFailure) {
+      reply.code(400);
+      return examplesValidationFailure;
     }
 
     if (policyForbiddenMessage) {

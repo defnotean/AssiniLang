@@ -2434,7 +2434,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise references unknown rule: missing-rule" });
+    expect(response.json()).toEqual({
+      error: "Exercise references unknown rule: missing-rule",
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
@@ -2462,7 +2465,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise authoring requires at least two adversarial probes." });
+    expect(response.json()).toEqual({
+      error: "Exercise authoring requires at least two adversarial probes.",
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
@@ -2507,7 +2513,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error });
+    expect(response.json()).toEqual({
+      error,
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
@@ -2536,7 +2545,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise expected answer is duplicated: saku talo-ki" });
+    expect(response.json()).toEqual({
+      error: "Exercise expected answer is duplicated: saku talo-ki",
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
@@ -2565,7 +2577,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Exercise adversarial answer is duplicated: talo saku-ki" });
+    expect(response.json()).toEqual({
+      error: "Exercise adversarial answer is duplicated: talo saku-ki",
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
     expect(after.json()).toEqual(before.json());
@@ -4958,6 +4973,113 @@ describe("api server", () => {
         const stored = await fetchStoredSource(app, sourceId);
         expect(stored.status).toBe("processed");
       });
+    });
+
+    it("cancels a pending queued process job and marks the asset failed", async () => {
+      let releaseActive: (value: string) => void = () => {};
+      const blocked = new Promise<string>((resolve) => {
+        releaseActive = resolve;
+      });
+      const llmProvider: LlmProvider = {
+        name: "blocking-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          return blocked;
+        }
+      };
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        llmProvider,
+        concurrency: 1
+      });
+      const activeId = await registerWordlistSource(app, "Active blocker");
+      const pendingId = await registerWordlistSource(app, "Queued for cancel");
+
+      const activeAccepted = await app.inject({
+        method: "POST",
+        url: `/sources/${activeId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(activeAccepted.statusCode).toBe(202);
+
+      const pendingAccepted = await app.inject({
+        method: "POST",
+        url: `/sources/${pendingId}/process`,
+        headers: authHeaders("reviewer-1"),
+        payload: { async: true }
+      });
+      expect(pendingAccepted.statusCode).toBe(202);
+      expect(pendingAccepted.json().asset).toMatchObject({
+        id: pendingId,
+        status: "processing",
+        processingAttempts: 1
+      });
+
+      const cancelled = await app.inject({
+        method: "POST",
+        url: `/sources/${pendingId}/cancel-processing`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(cancelled.statusCode).toBe(200);
+      expect(cancelled.json().asset).toMatchObject({
+        id: pendingId,
+        status: "failed",
+        error: "Queued source processing was cancelled. Re-run processing when ready.",
+        processingAttempts: 1
+      });
+      expect(cancelled.json().asset.processingStartedAt).toBeUndefined();
+      expect(cancelled.json().asset.processingHeartbeatAt).toBeUndefined();
+
+      const storedPending = await fetchStoredSource(app, pendingId);
+      expect(storedPending).toMatchObject({
+        status: "failed",
+        error: "Queued source processing was cancelled. Re-run processing when ready.",
+        processingAttempts: 1
+      });
+
+      const audit = await app.inject({
+        method: "GET",
+        url: "/audit/events",
+        headers: authHeaders("admin-1")
+      });
+      expect(audit.statusCode).toBe(200);
+      expect(audit.json().some((event: { action: string; entityId: string }) => (
+        event.action === "source_asset.process_cancelled" && event.entityId === pendingId
+      ))).toBe(true);
+
+      const activeCancel = await app.inject({
+        method: "POST",
+        url: `/sources/${activeId}/cancel-processing`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(activeCancel.statusCode).toBe(409);
+      expect(activeCancel.json()).toEqual({
+        error: "Source processing is already running and cannot be cancelled.",
+        i18nKey: "ingest.sourceProcessingCancelActive"
+      });
+
+      const notQueued = await app.inject({
+        method: "POST",
+        url: `/sources/${pendingId}/cancel-processing`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(notQueued.statusCode).toBe(409);
+      expect(notQueued.json()).toEqual({
+        error: "Source is not queued for processing.",
+        i18nKey: "ingest.sourceProcessingNotQueued"
+      });
+
+      releaseActive(JSON.stringify({ summary: "Done.", lexemes: [{ form: "mira", gloss: "river" }] }));
+      await vi.waitFor(async () => {
+        const stored = await fetchStoredSource(app, activeId);
+        expect(stored.status).toBe("processed");
+      });
+
+      const stillFailed = await fetchStoredSource(app, pendingId);
+      expect(stillFailed.status).toBe("failed");
     });
 
     it("keeps the synchronous response shape when async is not requested", async () => {

@@ -81,6 +81,8 @@ Each doc owns one topic; link instead of repeating:
 | `docs/development.md` | Setup, commands, quality gate, browser verification, the build-a-language walkthrough. |
 | `docs/maintenance.md` | This file: change recipes and doc conventions. |
 | `docs/troubleshooting.md` | Symptom-cause-fix tables. |
+| `docs/operator-recovery.md` | Local backup/restore, interrupted processing, corrupt DB, diagnostics, reset. |
+| `docs/audit-export-drill.md` | Operator audit/export drill using `fixtures/exports/` and export audit receipts. |
 | `docs/product-guide.md` / `docs/ui-design.md` | What the app does for users / how the design system maps to the React app. |
 | `docs/roadmap.md` | Honest gaps before real community data. |
 | `docs/specs/`, `docs/plans/` | Dated history. Do not edit. |

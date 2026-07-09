@@ -9,12 +9,14 @@ import type {
   ExtractionDraft,
   LanguagePhonology,
   Lexeme,
+  Morpheme,
   Note
 } from "@assini/db";
 import { summarizeEvaluationGate } from "@assini/eval";
 
 import { computeDraftGroundingFlags, type DraftGroundingFlag } from "./draftGrounding.js";
 import { detectParadigmGaps, type ParadigmGap } from "./paradigmGaps.js";
+import { proposeLexiconSegmentation } from "./segmentationProposals.js";
 
 export type { DraftGroundingFlag } from "./draftGrounding.js";
 export type { ParadigmGap } from "./paradigmGaps.js";
@@ -47,6 +49,13 @@ export type ExtractionDraftView = ExtractionDraft & {
    * blocks review; only present on proposed drafts with at least one flag.
    */
   grounding?: DraftGroundingFlag[];
+  /**
+   * Lexicon longest-match segmentation for corpus drafts that carry a
+   * `segmentation_conflict` grounding flag. Advisory only; used by Build
+   * reviewers to compare draft glosses against the accepted lexicon before
+   * accepting with `preferLexiconSegmentation` or a custom override.
+   */
+  lexiconSegmentationProposal?: Morpheme[];
 };
 
 export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer" | "learnerId">;
@@ -708,6 +717,20 @@ export function toExtractionDraftViews(state: AppState, drafts: ExtractionDraft[
     const grounding = computeDraftGroundingFlags(draft, state);
     if (grounding.length > 0) {
       view.grounding = grounding;
+    }
+
+    if (
+      draft.kind === "corpus_passage"
+      && grounding.some((flag) => flag.kind === "segmentation_conflict")
+    ) {
+      const textTarget = draft.payload.textTarget?.trim().replace(/\s+/g, " ") ?? "";
+      const languageLexemes = state.lexemes.filter((lexeme) => lexeme.languageId === draft.languageId);
+      if (textTarget && languageLexemes.length > 0) {
+        const proposal = proposeLexiconSegmentation(textTarget, languageLexemes);
+        if (proposal.length > 0) {
+          view.lexiconSegmentationProposal = proposal;
+        }
+      }
     }
 
     return view;

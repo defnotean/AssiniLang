@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { Note } from "@assini/db";
+import type { CorpusPassage, Note } from "@assini/db";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { DetailBlock } from "../components/DetailBlock";
 import { formatEvidenceLabel, formatNoteEditAction, localizeApiError } from "../lib/format";
 import { useI18n } from "../i18n";
+import type { NoteReviewEdits } from "../hooks/useReviewWorkspace";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
 const REVIEW_FILTERS: ReviewFilter[] = ["all", "pending", "contested", "rejected", "deferred", "escalated", "approved"];
+
+type NoteExample = Note["examples"][number];
 
 function matchesReviewFilter(note: Note, filter: ReviewFilter): boolean {
   if (filter === "all") return true;
@@ -14,8 +17,25 @@ function matchesReviewFilter(note: Note, filter: ReviewFilter): boolean {
   return note.status === filter;
 }
 
+function cloneExamples(examples: NoteExample[]): NoteExample[] {
+  return examples.map((example) => ({ ...example }));
+}
+
+function examplesEqual(left: NoteExample[], right: NoteExample[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function exampleFromPassage(passage: CorpusPassage): NoteExample {
+  return {
+    passageId: passage.id,
+    target: passage.textTarget,
+    translation: passage.textTranslation
+  };
+}
+
 export function ReviewView({
   notes,
+  corpus = [],
   selectedNote,
   isWorkflowBusy,
   reviewingNoteId,
@@ -25,17 +45,20 @@ export function ReviewView({
   onSaveExplanation
 }: {
   notes: Note[];
+  corpus?: CorpusPassage[];
   selectedNote: Note | null;
   isWorkflowBusy: boolean;
   reviewingNoteId: string | null;
   actionError?: string | null;
   onSelectNote: (noteId: string) => void;
   onReview: (status: ReviewStatus) => void;
-  onSaveExplanation: (explanation: string) => Promise<void>;
+  onSaveExplanation: (edits: NoteReviewEdits) => Promise<void>;
 }) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<ReviewFilter>("all");
   const [noteExplanationDraft, setNoteExplanationDraft] = useState(selectedNote?.explanation ?? "");
+  const [examplesDraft, setExamplesDraft] = useState<NoteExample[]>(() => cloneExamples(selectedNote?.examples ?? []));
+  const [passageToAdd, setPassageToAdd] = useState("");
   const [noteEditMessage, setNoteEditMessage] = useState<string | null>(null);
   const [noteEditError, setNoteEditError] = useState<string | null>(null);
   const counts = useMemo(() => (
@@ -59,25 +82,82 @@ export function ReviewView({
     if (!selectedNote) return null;
     return filteredNotes.some((note) => note.id === selectedNote.id) ? selectedNote : null;
   }, [filteredNotes, selectedNote]);
+  const languagePassages = useMemo(() => {
+    if (!detailNote) return [];
+    return corpus.filter((passage) => passage.languageId === detailNote.languageId);
+  }, [corpus, detailNote]);
+  const availablePassages = useMemo(() => {
+    const used = new Set(examplesDraft.map((example) => example.passageId));
+    return languagePassages.filter((passage) => !used.has(passage.id));
+  }, [examplesDraft, languagePassages]);
+  const detailExamplesKey = detailNote ? JSON.stringify(detailNote.examples) : "";
   useEffect(() => {
     setNoteExplanationDraft(detailNote?.explanation ?? "");
+    setExamplesDraft(cloneExamples(detailNote?.examples ?? []));
+    setPassageToAdd("");
     setNoteEditMessage(null);
     setNoteEditError(null);
-  }, [detailNote?.id, detailNote?.explanation]);
+  }, [detailNote?.id, detailNote?.explanation, detailExamplesKey]);
+  useEffect(() => {
+    if (passageToAdd && !availablePassages.some((passage) => passage.id === passageToAdd)) {
+      setPassageToAdd(availablePassages[0]?.id ?? "");
+    } else if (!passageToAdd && availablePassages[0]) {
+      setPassageToAdd(availablePassages[0].id);
+    }
+  }, [availablePassages, passageToAdd]);
   const trimmedDraft = noteExplanationDraft.trim();
   const reviewActionsDisabled = reviewingNoteId !== null || isWorkflowBusy;
-  const canSaveExplanation = detailNote !== null
+  const explanationChanged = detailNote !== null
     && trimmedDraft.length > 0
-    && trimmedDraft !== detailNote.explanation
+    && trimmedDraft !== detailNote.explanation;
+  const examplesChanged = detailNote !== null && !examplesEqual(examplesDraft, detailNote.examples);
+  const canSaveNoteEdits = detailNote !== null
+    && (explanationChanged || examplesChanged)
+    && trimmedDraft.length > 0
     && !reviewActionsDisabled;
+
+  function clearEditFeedback() {
+    setNoteEditMessage(null);
+    setNoteEditError(null);
+  }
+
+  function handleAddExample() {
+    const passage = availablePassages.find((item) => item.id === passageToAdd);
+    if (!passage) return;
+    setExamplesDraft((current) => [...current, exampleFromPassage(passage)]);
+    clearEditFeedback();
+  }
+
+  function handleRemoveExample(index: number) {
+    setExamplesDraft((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    clearEditFeedback();
+  }
+
+  function handleReplaceExample(index: number, passageId: string) {
+    const passage = languagePassages.find((item) => item.id === passageId);
+    if (!passage) return;
+    setExamplesDraft((current) => current.map((example, itemIndex) => (
+      itemIndex === index ? exampleFromPassage(passage) : example
+    )));
+    clearEditFeedback();
+  }
 
   async function handleSaveExplanation(event: FormEvent) {
     event.preventDefault();
-    if (!canSaveExplanation) return;
+    if (!canSaveNoteEdits || !detailNote) return;
     setNoteEditError(null);
     try {
-      await onSaveExplanation(trimmedDraft);
-      setNoteEditMessage(t("reviewView.noteExplanationUpdated"));
+      await onSaveExplanation({
+        explanation: trimmedDraft,
+        examples: cloneExamples(examplesDraft)
+      });
+      setNoteEditMessage(
+        explanationChanged && examplesChanged
+          ? t("reviewView.noteExplanationAndExamplesUpdated")
+          : examplesChanged
+            ? t("reviewView.noteExamplesUpdated")
+            : t("reviewView.noteExplanationUpdated")
+      );
     } catch (error) {
       setNoteEditMessage(null);
       setNoteEditError(localizeApiError(error, t, "errors.noteExplanationUpdateFailed"));
@@ -168,18 +248,98 @@ export function ReviewView({
                   disabled={reviewActionsDisabled}
                   onChange={(event) => {
                     setNoteExplanationDraft(event.target.value);
-                    setNoteEditMessage(null);
-                    setNoteEditError(null);
+                    clearEditFeedback();
                   }}
                 />
               </div>
+
+              <div className="form-group note-examples-editor" aria-label={t("reviewView.examplesEditor")}>
+                <span className="detail-label">{t("reviewView.examples")}</span>
+                {examplesDraft.length === 0 ? (
+                  <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noExamplesSupplied")}</p>
+                ) : (
+                  <div className="detail-list">
+                    {examplesDraft.map((example, index) => {
+                      const replaceOptions = languagePassages.filter((passage) => (
+                        passage.id === example.passageId
+                        || !examplesDraft.some((other, otherIndex) => (
+                          otherIndex !== index && other.passageId === passage.id
+                        ))
+                      ));
+                      return (
+                        <div key={`${index}:${example.passageId}`} className="detail-row example-row example-edit-row">
+                          <label className="visually-hidden" htmlFor={`note-example-passage-${index}`}>
+                            {t("reviewView.examplePassage")}
+                          </label>
+                          <select
+                            id={`note-example-passage-${index}`}
+                            value={example.passageId}
+                            disabled={reviewActionsDisabled || languagePassages.length === 0}
+                            onChange={(event) => handleReplaceExample(index, event.target.value)}
+                          >
+                            {replaceOptions.map((passage) => (
+                              <option key={passage.id} value={passage.id}>
+                                {passage.textTarget}
+                              </option>
+                            ))}
+                          </select>
+                          <code>{example.target}</code>
+                          <span>{example.translation}</span>
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={reviewActionsDisabled}
+                            onClick={() => handleRemoveExample(index)}
+                          >
+                            {t("reviewView.removeExample")}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="example-add-row">
+                  <label htmlFor="note-example-add-passage">{t("reviewView.addExampleFromPassage")}</label>
+                  <div>
+                    <select
+                      id="note-example-add-passage"
+                      value={passageToAdd}
+                      disabled={reviewActionsDisabled || availablePassages.length === 0}
+                      onChange={(event) => {
+                        setPassageToAdd(event.target.value);
+                        clearEditFeedback();
+                      }}
+                    >
+                      {availablePassages.length === 0 ? (
+                        <option value="">{t("reviewView.noPassagesAvailable")}</option>
+                      ) : (
+                        availablePassages.map((passage) => (
+                          <option key={passage.id} value={passage.id}>
+                            {passage.textTarget}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={reviewActionsDisabled || availablePassages.length === 0 || !passageToAdd}
+                      onClick={handleAddExample}
+                    >
+                      {t("reviewView.addExample")}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="submit"
                 className="secondary"
-                disabled={!canSaveExplanation}
+                disabled={!canSaveNoteEdits}
                 aria-busy={reviewingNoteId === detailNote.id}
               >
-                {reviewingNoteId === detailNote.id ? t("reviewView.saving") : t("reviewView.saveNoteExplanation")}
+                {reviewingNoteId === detailNote.id ? t("reviewView.saving") : t("reviewView.saveNoteEdits")}
               </button>
               {noteEditMessage && (
                 <p className="result-notice" role="status" aria-live="polite">
@@ -224,21 +384,6 @@ export function ReviewView({
                   </span>
                 ))}
               </div>
-            </DetailBlock>
-
-            <DetailBlock title={t("reviewView.examples")}>
-              {detailNote.examples.length === 0 ? (
-                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noExamplesSupplied")}</p>
-              ) : (
-                <div className="detail-list">
-                  {detailNote.examples.map((example, index) => (
-                    <div key={`${index}:${example.passageId}`} className="detail-row example-row">
-                      <code>{example.target}</code>
-                      <span>{example.translation}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </DetailBlock>
 
             <DetailBlock title={t("reviewView.reviewerComments")}>

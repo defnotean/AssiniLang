@@ -1,0 +1,112 @@
+{
+  "language": {
+    "id": "velmari-graph",
+    "name": "Velmari Graph",
+    "typology": "agglutinative",
+    "description": "Tiny synthetic language used only by corpus graph-rendering fixtures.",
+    "orthography": "Lowercase Latin roots with space-separated words.",
+    "status": "active",
+    "phonology": {
+      "consonants": ["v", "l", "m", "r", "s", "k", "t", "n"],
+      "vowels": ["a", "e", "i", "o", "u"],
+      "syllableTemplate": "CV",
+      "stress": "word-initial",
+      "notes": ["Fixture-only phonology."]
+    },
+    "createdBy": "system-seed",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  "sourceAsset": {
+    "id": "src-velmari-graph-1",
+    "languageId": "velmari-graph",
+    "kind": "text",
+    "title": "Velmari field notes",
+    "rawText": "saku vel mir\ntora vel",
+    "status": "processed",
+    "createdBy": "reviewer-1",
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "processedAt": "2026-01-01T00:05:00.000Z"
+  },
+  "corpus": [
+    {
+      "id": "velmari-graph-c001",
+      "languageId": "velmari-graph",
+      "source": "source-asset:Velmari field notes",
+      "sourceAssetId": "src-velmari-graph-1",
+      "sourceMetadata": {
+        "author": "Graph fixture builder",
+        "year": 2026,
+        "license": "Internal test data",
+        "consentRecord": "graph-fixture-consent"
+      },
+      "textTarget": "saku vel mir",
+      "textTranslation": "The child sees water.",
+      "morphologicalSegmentation": [
+        { "surface": "saku", "lemma": "saku", "gloss": "child", "features": ["noun"] },
+        { "surface": "vel", "lemma": "vel", "gloss": "see", "features": ["verb-root"] },
+        { "surface": "mir", "lemma": "mir", "gloss": "water", "features": ["noun"] }
+      ],
+      "topicTags": ["water", "nature"],
+      "consentStatus": {
+        "use": "testing-only",
+        "restrictions": ["test-fixture-only"]
+      }
+    },
+    {
+      "id": "velmari-graph-c002",
+      "languageId": "velmari-graph",
+      "source": "source-asset:Velmari field notes",
+      "sourceAssetId": "src-velmari-graph-1",
+      "sourceMetadata": {
+        "author": "Graph fixture builder",
+        "year": 2026,
+        "license": "Internal test data",
+        "consentRecord": "graph-fixture-consent"
+      },
+      "textTarget": "tora vel",
+      "textTranslation": "The bird sees.",
+      "morphologicalSegmentation": [
+        { "surface": "tora", "lemma": "tora", "gloss": "bird", "features": ["noun"] },
+        { "surface": "vel", "lemma": "vel", "gloss": "see", "features": ["verb-root"] }
+      ],
+      "topicTags": ["nature"],
+      "consentStatus": {
+        "use": "testing-only",
+        "restrictions": ["test-fixture-only"]
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "velmari-graph-note-1",
+      "languageId": "velmari-graph",
+      "topic": "lexicon/water",
+      "explanation": "mir is the common noun for water in field notes.",
+      "examples": [
+        {
+          "passageId": "velmari-graph-c001",
+          "target": "saku vel mir",
+          "translation": "The child sees water."
+        }
+      ],
+      "evidencePassageIds": ["velmari-graph-c001"],
+      "evidenceCount": 1,
+      "confidence": "high",
+      "status": "draft",
+      "reviewer": {
+        "lastReviewedBy": null,
+        "lastReviewedAt": null,
+        "comments": []
+      },
+      "dialectScope": "general",
+      "editHistory": [
+        {
+          "at": "2026-01-01T00:00:00.000Z",
+          "by": "reviewer-1",
+          "action": "created",
+          "summary": "Created graph-rendering fixture note."
+        }
+      ]
+    }
+  ]
+}

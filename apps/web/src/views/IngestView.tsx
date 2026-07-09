@@ -11,6 +11,7 @@ import {
   type RelativeAge
 } from "../lib/format";
 import { useI18n, type Translate } from "../i18n";
+import { hasSegmentationConflict, SegmentationConflictPanel } from "./SegmentationConflictPanel";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
 
@@ -78,6 +79,7 @@ export function IngestView({
     vaultNotice,
     vaultError,
     processingSourceId,
+    cancellingSourceId,
     processNotice,
     processError,
     processWarnings,
@@ -92,6 +94,7 @@ export function IngestView({
     handleUploadSource,
     handleImportVault,
     handleProcessSource,
+    handleCancelProcessing,
     handleDraftDecision,
     toggleDraftSelection,
     toggleSelectAllProposed,
@@ -314,21 +317,46 @@ export function IngestView({
                     </ul>
                   )}
                 </div>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={processingSourceId !== null || source.status === "processing"}
-                  aria-busy={
-                    processingSourceId === source.id || source.status === "processing" || undefined
-                  }
-                  onClick={() => handleProcessSource(source.id)}
-                >
-                  {processingSourceId === source.id || source.status === "processing"
-                    ? source.kind === "document"
-                      ? t("ingest.processingDocument")
-                      : t("ingest.processing")
-                    : t("ingest.processSource", { title: source.title })}
-                </button>
+                <div className="source-row-actions">
+                  {source.status === "processing" && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={cancellingSourceId !== null}
+                      aria-busy={cancellingSourceId === source.id || undefined}
+                      onClick={() => handleCancelProcessing(source.id)}
+                    >
+                      {cancellingSourceId === source.id
+                        ? t("ingest.cancelProcessingBusy")
+                        : t("ingest.cancelProcessing", { title: source.title })}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={
+                      processingSourceId !== null
+                      || cancellingSourceId !== null
+                      || source.status === "processing"
+                      || (
+                        source.status === "failed"
+                        && (source.processingAttempts ?? 0) >= 5
+                      )
+                    }
+                    aria-busy={
+                      processingSourceId === source.id || source.status === "processing" || undefined
+                    }
+                    onClick={() => handleProcessSource(source.id)}
+                  >
+                    {processingSourceId === source.id || source.status === "processing"
+                      ? source.kind === "document"
+                        ? t("ingest.processingDocument")
+                        : t("ingest.processing")
+                      : source.status === "failed"
+                        ? t("ingest.retrySource", { title: source.title })
+                        : t("ingest.processSource", { title: source.title })}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
@@ -433,18 +461,30 @@ export function IngestView({
                   </div>
                   <strong>{extractionDraftSummary(draft, t)}</strong>
                   {draft.rationale && <p>{draft.rationale}</p>}
+                  {hasSegmentationConflict(draft) && (
+                    <SegmentationConflictPanel
+                      draft={draft}
+                      disabled={reviewingDraftId !== null}
+                      busy={reviewingDraftId === draft.id}
+                      onAccept={(options) => {
+                        void handleDraftDecision(draft.id, "accept", options);
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="correction-actions draft-actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
-                    disabled={reviewingDraftId !== null}
-                    aria-busy={reviewingDraftId === draft.id || undefined}
-                    onClick={() => handleDraftDecision(draft.id, "accept")}
-                  >
-                    {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
-                  </button>
+                  {!hasSegmentationConflict(draft) && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
+                      disabled={reviewingDraftId !== null}
+                      aria-busy={reviewingDraftId === draft.id || undefined}
+                      onClick={() => handleDraftDecision(draft.id, "accept")}
+                    >
+                      {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="contest"

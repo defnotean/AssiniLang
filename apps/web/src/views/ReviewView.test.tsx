@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen } from "@testing-library/react";
-import type { Note } from "@assini/db";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { CorpusPassage, Note } from "@assini/db";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReviewView } from "./ReviewView";
 
@@ -30,6 +30,29 @@ function createReviewNote(overrides: Partial<Note> = {}): Note {
     },
     dialectScope: "baseline",
     editHistory: [],
+    ...overrides
+  };
+}
+
+function createCorpusPassage(overrides: Partial<CorpusPassage> = {}): CorpusPassage {
+  return {
+    id: "avn-c001",
+    languageId: "avenik",
+    source: "fixture",
+    sourceMetadata: {
+      author: "fixture-author",
+      year: 2026,
+      license: "cc-by",
+      consentRecord: "community-consent-001"
+    },
+    textTarget: "mira talo-mi-na",
+    textTranslation: "I walk by the river.",
+    morphologicalSegmentation: [],
+    topicTags: [],
+    consentStatus: {
+      use: "testing-only",
+      restrictions: []
+    },
     ...overrides
   };
 }
@@ -170,7 +193,7 @@ describe("ReviewView", () => {
     const examplesEmpty = screen.getByText(/No examples on this note yet/);
     expect(examplesEmpty).toHaveAttribute("role", "status");
     expect(examplesEmpty).toHaveAttribute("aria-live", "polite");
-    expect(examplesEmpty).toHaveTextContent(/Link a corpus passage as evidence in Build/);
+    expect(examplesEmpty).toHaveTextContent(/Add one from a language passage below/);
 
     const commentsEmpty = screen.getByText(/No reviewer comments yet/);
     expect(commentsEmpty).toHaveAttribute("aria-live", "polite");
@@ -178,7 +201,70 @@ describe("ReviewView", () => {
 
     const historyEmpty = screen.getByText(/No edit history yet/);
     expect(historyEmpty).toHaveAttribute("aria-live", "polite");
-    expect(historyEmpty).toHaveTextContent(/Saving a revised explanation below starts this trail/);
+    expect(historyEmpty).toHaveTextContent(/Saving a revised explanation or examples below starts this trail/);
+  });
+
+  it("lets reviewers add and remove examples, then save them with the explanation", async () => {
+    const note = createReviewNote({
+      examples: [],
+      explanation: "Avenik verbs use transparent suffix chains for person marking."
+    });
+    const corpus = [
+      createCorpusPassage(),
+      createCorpusPassage({
+        id: "avn-c002",
+        textTarget: "saku nemi-lo-ki",
+        textTranslation: "The child taught."
+      })
+    ];
+    const onSaveExplanation = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <ReviewView
+        notes={[note]}
+        corpus={corpus}
+        selectedNote={note}
+        isWorkflowBusy={false}
+        reviewingNoteId={null}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={onSaveExplanation}
+      />
+    );
+
+    const examplesEditor = screen.getByLabelText("Note examples editor");
+    fireEvent.change(screen.getByLabelText("Add example from passage"), {
+      target: { value: "avn-c002" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add example" }));
+    expect(within(examplesEditor).getByText("The child taught.")).toBeInTheDocument();
+    expect(examplesEditor.querySelector("code")?.textContent).toBe("saku nemi-lo-ki");
+    expect(within(examplesEditor).getByRole("button", { name: "Remove" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove" }));
+    expect(within(examplesEditor).queryByRole("button", { name: "Remove" })).not.toBeInTheDocument();
+    expect(within(examplesEditor).getByText(/No examples on this note yet/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Add example from passage"), {
+      target: { value: "avn-c001" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add example" }));
+
+    const saveButton = screen.getByRole("button", { name: "Save note edits" });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    expect(onSaveExplanation).toHaveBeenCalledWith({
+      explanation: "Avenik verbs use transparent suffix chains for person marking.",
+      examples: [
+        {
+          passageId: "avn-c001",
+          target: "mira talo-mi-na",
+          translation: "I walk by the river."
+        }
+      ]
+    });
+    expect(await screen.findByText("Note examples updated.")).toBeInTheDocument();
   });
 
   it("disables review actions while workflow is busy", () => {

@@ -1,0 +1,181 @@
+{
+  "languageId": "velmari-graph",
+  "nodes": [
+    {
+      "id": "language:velmari-graph",
+      "type": "language",
+      "label": "Velmari Graph",
+      "metadata": { "typology": "agglutinative" }
+    },
+    {
+      "id": "source_asset:src-velmari-graph-1",
+      "type": "source_asset",
+      "label": "Velmari field notes",
+      "metadata": { "kind": "text", "status": "processed" }
+    },
+    {
+      "id": "corpus:velmari-graph-c001",
+      "type": "corpus",
+      "label": "saku vel mir",
+      "metadata": { "source": "source-asset:Velmari field notes" }
+    },
+    {
+      "id": "topic_tag:velmari-graph:water",
+      "type": "topic_tag",
+      "label": "water",
+      "metadata": {}
+    },
+    {
+      "id": "topic_tag:velmari-graph:nature",
+      "type": "topic_tag",
+      "label": "nature",
+      "metadata": {}
+    },
+    {
+      "id": "morpheme:velmari-graph:saku",
+      "type": "morpheme",
+      "label": "saku",
+      "metadata": {}
+    },
+    {
+      "id": "morpheme:velmari-graph:vel",
+      "type": "morpheme",
+      "label": "vel",
+      "metadata": {}
+    },
+    {
+      "id": "morpheme:velmari-graph:mir",
+      "type": "morpheme",
+      "label": "mir",
+      "metadata": {}
+    },
+    {
+      "id": "corpus:velmari-graph-c002",
+      "type": "corpus",
+      "label": "tora vel",
+      "metadata": { "source": "source-asset:Velmari field notes" }
+    },
+    {
+      "id": "morpheme:velmari-graph:tora",
+      "type": "morpheme",
+      "label": "tora",
+      "metadata": {}
+    },
+    {
+      "id": "note:velmari-graph-note-1",
+      "type": "note",
+      "label": "lexicon/water",
+      "metadata": { "status": "draft", "confidence": "high" }
+    }
+  ],
+  "edges": [
+    {
+      "source": "language:velmari-graph",
+      "target": "corpus:velmari-graph-c001",
+      "relation": "has_corpus",
+      "weight": 1
+    },
+    {
+      "source": "source_asset:src-velmari-graph-1",
+      "target": "corpus:velmari-graph-c001",
+      "relation": "from_source",
+      "weight": 0.95
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "topic_tag:velmari-graph:water",
+      "relation": "tagged",
+      "weight": 0.65
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "topic_tag:velmari-graph:nature",
+      "relation": "tagged",
+      "weight": 0.65
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "morpheme:velmari-graph:saku",
+      "relation": "contains_morpheme",
+      "weight": 0.72
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "morpheme:velmari-graph:vel",
+      "relation": "contains_morpheme",
+      "weight": 0.72
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "morpheme:velmari-graph:mir",
+      "relation": "contains_morpheme",
+      "weight": 0.72
+    },
+    {
+      "source": "morpheme:velmari-graph:saku",
+      "target": "morpheme:velmari-graph:vel",
+      "relation": "co_occurs",
+      "weight": 0.35
+    },
+    {
+      "source": "morpheme:velmari-graph:mir",
+      "target": "morpheme:velmari-graph:saku",
+      "relation": "co_occurs",
+      "weight": 0.35
+    },
+    {
+      "source": "morpheme:velmari-graph:mir",
+      "target": "morpheme:velmari-graph:vel",
+      "relation": "co_occurs",
+      "weight": 0.35
+    },
+    {
+      "source": "language:velmari-graph",
+      "target": "corpus:velmari-graph-c002",
+      "relation": "has_corpus",
+      "weight": 1
+    },
+    {
+      "source": "source_asset:src-velmari-graph-1",
+      "target": "corpus:velmari-graph-c002",
+      "relation": "from_source",
+      "weight": 0.95
+    },
+    {
+      "source": "corpus:velmari-graph-c002",
+      "target": "topic_tag:velmari-graph:nature",
+      "relation": "tagged",
+      "weight": 0.65
+    },
+    {
+      "source": "corpus:velmari-graph-c002",
+      "target": "morpheme:velmari-graph:tora",
+      "relation": "contains_morpheme",
+      "weight": 0.72
+    },
+    {
+      "source": "corpus:velmari-graph-c002",
+      "target": "morpheme:velmari-graph:vel",
+      "relation": "contains_morpheme",
+      "weight": 0.72
+    },
+    {
+      "source": "morpheme:velmari-graph:tora",
+      "target": "morpheme:velmari-graph:vel",
+      "relation": "co_occurs",
+      "weight": 0.35
+    },
+    {
+      "source": "language:velmari-graph",
+      "target": "note:velmari-graph-note-1",
+      "relation": "has_note",
+      "weight": 1
+    },
+    {
+      "source": "corpus:velmari-graph-c001",
+      "target": "note:velmari-graph-note-1",
+      "relation": "uses_context",
+      "weight": 0.85
+    }
+  ]
+}

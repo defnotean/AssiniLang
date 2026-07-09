@@ -1,0 +1,4 @@
+# Velmari mixed notes (synthetic fixture)
+
+nala = stone
+saku tora-na = the child speaks

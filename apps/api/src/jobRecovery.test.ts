@@ -311,3 +311,92 @@ describe("recoverStaleProcessingSources", () => {
     });
   });
 });
+
+/**
+ * Operator recovery pack — interrupted-processing drill log.
+ * Mirrors the runbook checklist: stuck asset → startup sweep → failed + audit → reprocess-ready.
+ */
+describe("interrupted-processing drill log", () => {
+  it("records a pasteable drill log for the acceptance pack", async () => {
+    const recoveredAt = "2026-07-09T15:00:00.000Z";
+    let state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "drill-interrupted-1",
+      title: "Drill interrupted source",
+      processingStartedAt: "2026-07-09T14:59:00.000Z",
+      processingHeartbeatAt: "2026-07-09T14:59:30.000Z",
+      processingAttempts: 1
+    }));
+
+    const store = {
+      async update(updater: (current: AppState) => AppState): Promise<AppState> {
+        state = updater(state);
+        return state;
+      }
+    };
+
+    const steps: Array<{ name: string; ok: boolean; detail: string }> = [];
+
+    steps.push({
+      name: "seedStuckProcessing",
+      ok: state.sourceAssets.some((asset) => asset.id === "drill-interrupted-1" && asset.status === "processing"),
+      detail: "Source left in processing to simulate a crash mid-run."
+    });
+
+    const recoveredCount = await recoverInterruptedSources(store, recoveredAt);
+    const recovered = state.sourceAssets.find((asset) => asset.id === "drill-interrupted-1");
+    const auditEvent = state.auditEvents.find(
+      (item) => item.action === PROCESSING_RECOVERED_ACTION && item.entityId === "drill-interrupted-1"
+    );
+
+    steps.push({
+      name: "startupRecoverySweep",
+      ok: recoveredCount === 1,
+      detail: `recoverInterruptedSources recoveredCount=${recoveredCount}`
+    });
+    steps.push({
+      name: "assetFailedWithOperatorError",
+      ok: recovered?.status === "failed" && recovered.error === INTERRUPTED_PROCESSING_ERROR,
+      detail: recovered?.error ?? "missing error"
+    });
+    steps.push({
+      name: "markersClearedAttemptsKept",
+      ok: recovered?.processingStartedAt === undefined
+        && recovered?.processingHeartbeatAt === undefined
+        && recovered?.processingAttempts === 1,
+      detail: `processingAttempts=${recovered?.processingAttempts ?? "missing"}`
+    });
+    steps.push({
+      name: "auditProcessingRecovered",
+      ok: auditEvent?.metadata?.reason === "interrupted_restart",
+      detail: "source_asset.processing_recovered with reason interrupted_restart"
+    });
+    steps.push({
+      name: "reprocessReady",
+      ok: recovered?.status === "failed",
+      detail: "Failed status accepts a fresh Process call (see server ready-hook coverage)."
+    });
+
+    const drillLog = {
+      drill: "interrupted-processing",
+      pack: "operator-recovery",
+      startedAt: "2026-07-09T14:59:00.000Z",
+      finishedAt: recoveredAt,
+      sourceId: "drill-interrupted-1",
+      recoveredCount,
+      operatorVisibleError: INTERRUPTED_PROCESSING_ERROR,
+      auditAction: PROCESSING_RECOVERED_ACTION,
+      auditReason: "interrupted_restart",
+      steps,
+      outcome: steps.every((step) => step.ok) ? "pass" : "fail",
+      notes:
+        "Automated acceptance drill via apps/api/src/jobRecovery.test.ts; manual operators restart the API and confirm the same audit + failed status in Build."
+    };
+
+    expect(drillLog.outcome).toBe("pass");
+    expect(drillLog.steps).toHaveLength(6);
+    expect(drillLog.steps.every((step) => step.ok)).toBe(true);
+    expect(JSON.stringify(drillLog)).toContain("source_asset.processing_recovered");
+    expect(JSON.stringify(drillLog)).toContain(INTERRUPTED_PROCESSING_ERROR);
+  });
+});

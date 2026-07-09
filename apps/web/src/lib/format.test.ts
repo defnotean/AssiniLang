@@ -39,6 +39,7 @@ import {
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
   localizeVaultImportError,
+  localizeVaultImportSkipReason,
   trendVerb
 } from "./format";
 import { en } from "../i18n/en";
@@ -1075,6 +1076,49 @@ describe("localizeApiError", () => {
         "learner.errSubmissionFailed"
       )
     ).toBe("That exercise was not found. Select another exercise or author a new one.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Exercise references unknown rule: missing-rule", {
+          status: 400,
+          i18nKey: "errors.exerciseAuthoringValidationFailed"
+        }),
+        t,
+        "learner.exerciseAuthoringFailed"
+      )
+    ).toBe("The exercise failed validation. Check rules, vocabulary, answers, and adversarial probes.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages/avenik/exercises (400): Exercise references unknown rule: missing-rule", {
+          status: 400
+        }),
+        t,
+        "learner.exerciseAuthoringFailed"
+      )
+    ).toBe("The exercise failed validation. Check rules, vocabulary, answers, and adversarial probes.");
+
+    expect(
+      localizeApiError(
+        new ApiError("The model did not return valid JSON for exercise generation. Try again.", {
+          status: 422,
+          i18nKey: "errors.exerciseGenerationFailed"
+        }),
+        t,
+        "learner.modelExerciseGenerationFailed"
+      )
+    ).toBe("Model exercise generation failed. Retry, or author the exercise manually.");
+
+    expect(
+      localizeApiError(
+        new ApiError(
+          "Request failed: /languages/avenik/exercises/generate (422): The model did not return valid JSON for exercise generation. Try again.",
+          { status: 422 }
+        ),
+        t,
+        "learner.modelExerciseGenerationFailed"
+      )
+    ).toBe("Model exercise generation failed. Retry, or author the exercise manually.");
   });
 
   it("localizes already-processing conflicts from message text when metadata is absent", () => {
@@ -1088,6 +1132,33 @@ describe("localizeApiError", () => {
 
     expect(message).toBe(
       "This source is already processing. Wait for the current run to finish, or recover a stuck job after restart."
+    );
+  });
+
+  it("localizes oversized vault Markdown skip reasons and upload title failures", () => {
+    expect(
+      localizeVaultImportSkipReason("Markdown file is larger than the 1 MB import limit.", t)
+    ).toBe(
+      "That Markdown note is larger than the 1 MB vault import limit. Split or shorten the note, then import again."
+    );
+    expect(
+      localizeApiError(
+        new ApiError("Upload title field is too large", {
+          status: 400,
+          i18nKey: "errors.sourceUploadTitleTooLarge"
+        }),
+        t,
+        "ingest.sourceUploadFailed"
+      )
+    ).toBe("That upload title is too long. Shorten it to 200 characters or fewer, then retry.");
+    expect(
+      localizeSourceProcessingError(
+        "Source URL content is too large to process locally.",
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe(
+      "That source URL response is larger than the 2 MB local intake limit. Save the relevant text and paste or upload a smaller file."
     );
   });
 
@@ -1148,7 +1219,7 @@ describe("localizeApiError", () => {
 
   it("localizes OCR setup failures from persisted source errors", () => {
     const message = localizeSourceProcessingError(
-      "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only).",
+      "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs.",
       t,
       "ingest.sourceProcessingFailed"
     );
@@ -1169,14 +1240,25 @@ describe("localizeApiError", () => {
     expect(message).toBe("Processing River notes failed.");
   });
 
-  it("localizes multi-page PDF OCR warnings", () => {
+  it("localizes multi-page PDF OCR page-cap warnings", () => {
     const message = localizeSourceProcessingWarning(
-      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them.",
+      "PDF has 14 pages; only the first 10 pages were OCR'd. Raise ASSINI_OCR_PDF_MAX_PAGES or split remaining pages into separate sources if you need them.",
       t
     );
 
     expect(message).toBe(
-      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+      "PDF has 14 pages; only the first 10 pages were OCR'd. Raise the OCR page cap or split remaining pages into separate sources if you need them."
+    );
+  });
+
+  it("localizes scanned PDF OCR success notices", () => {
+    const message = localizeSourceProcessingWarning(
+      "Used configured OCR model to read scanned document (2 of 3 pages).",
+      t
+    );
+
+    expect(message).toBe(
+      "Used configured OCR model to read scanned document (2 of 3 pages)."
     );
   });
 
@@ -1202,6 +1284,16 @@ describe("localizeApiError", () => {
     expect(message).toBe(
       "Processing was interrupted by a server restart. Re-run processing on this source."
     );
+  });
+
+  it("localizes cancelled queued processing from persisted source errors", () => {
+    const message = localizeSourceProcessingError(
+      "Queued source processing was cancelled. Re-run processing when ready.",
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe("Queued processing was cancelled. Re-run processing when ready.");
   });
 
   it("localizes missing transcription endpoint guidance from persisted source errors", () => {

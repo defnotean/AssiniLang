@@ -10,22 +10,58 @@ import {
   formatSubmissionExplanation,
   formatSubmissionStatus,
   localizeApiError,
-  parseAuthoringList
+  parseAuthoringList,
+  safeDomId
 } from "../lib/format";
 import { useI18n } from "../i18n";
-import type { AsyncState, PublicExercise } from "../lib/types";
+import type { AsyncState, PublicExercise, PublicNote } from "../lib/types";
 import { LearnerPracticeNextPanel } from "./LearnerPracticeNextPanel";
 
 const EXERCISE_TYPES = ["translate_to_target", "translate_to_english", "segment", "choose_particle"] as const;
+const MIN_ADVERSARIAL_PROBES = 2;
+const NOTE_SUMMARY_MAX = 96;
+
+type AuthoringAdversarialProbe = { answer: string; reason: string };
+
+function emptyAdversarialProbe(): AuthoringAdversarialProbe {
+  return { answer: "", reason: "" };
+}
+
+function defaultAdversarialProbes(): AuthoringAdversarialProbe[] {
+  return [emptyAdversarialProbe(), emptyAdversarialProbe()];
+}
+
+function probesFromDraft(answers: { answer: string; reason: string }[]): AuthoringAdversarialProbe[] {
+  const probes = answers.map((probe) => ({
+    answer: probe.answer ?? "",
+    reason: probe.reason ?? ""
+  }));
+  while (probes.length < MIN_ADVERSARIAL_PROBES) {
+    probes.push(emptyAdversarialProbe());
+  }
+  return probes;
+}
+
+function noteSummary(explanation: string): string {
+  const trimmed = explanation.trim();
+  if (trimmed.length <= NOTE_SUMMARY_MAX) return trimmed;
+  return `${trimmed.slice(0, NOTE_SUMMARY_MAX - 1)}…`;
+}
+
+function mergeAllowedRuleIds(selectedRuleIds: string[], advancedRules: string): string[] {
+  return [...new Set([...selectedRuleIds, ...parseAuthoringList(advancedRules)])];
+}
 
 export function LearnerView({
   languageId,
   exercises,
+  notes = [],
   learner,
   isWorkflowBusy
 }: {
   languageId: string | null;
   exercises: PublicExercise[];
+  notes?: PublicNote[];
   learner: LearnerWorkspace;
   isWorkflowBusy: boolean;
 }) {
@@ -47,12 +83,12 @@ export function LearnerView({
   const [authoringType, setAuthoringType] = useState<PublicExercise["type"]>("translate_to_target");
   const [authoringPrompt, setAuthoringPrompt] = useState("");
   const [authoringVocabulary, setAuthoringVocabulary] = useState("");
-  const [authoringRules, setAuthoringRules] = useState("");
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+  const [authoringRulesAdvanced, setAuthoringRulesAdvanced] = useState("");
   const [authoringAnswers, setAuthoringAnswers] = useState("");
-  const [authoringAdversarialAnswerOne, setAuthoringAdversarialAnswerOne] = useState("");
-  const [authoringAdversarialReasonOne, setAuthoringAdversarialReasonOne] = useState("");
-  const [authoringAdversarialAnswerTwo, setAuthoringAdversarialAnswerTwo] = useState("");
-  const [authoringAdversarialReasonTwo, setAuthoringAdversarialReasonTwo] = useState("");
+  const [authoringAdversarialProbes, setAuthoringAdversarialProbes] = useState<AuthoringAdversarialProbe[]>(
+    defaultAdversarialProbes
+  );
   const [authoringExplanation, setAuthoringExplanation] = useState("");
   const [authoringMessage, setAuthoringMessage] = useState<string | null>(null);
   const [authoringError, setAuthoringError] = useState<string | null>(null);
@@ -86,15 +122,16 @@ export function LearnerView({
       cancelled = true;
     };
   }, [languageId, t]);
-  const hasTwoAdversarialProbes = authoringAdversarialAnswerOne.trim().length > 0
-    && authoringAdversarialReasonOne.trim().length > 0
-    && authoringAdversarialAnswerTwo.trim().length > 0
-    && authoringAdversarialReasonTwo.trim().length > 0;
+  const hasFilledAdversarialProbes = authoringAdversarialProbes.length >= MIN_ADVERSARIAL_PROBES
+    && authoringAdversarialProbes.every(
+      (probe) => probe.answer.trim().length > 0 && probe.reason.trim().length > 0
+    );
+  const allowedRuleIds = mergeAllowedRuleIds(selectedRuleIds, authoringRulesAdvanced);
   const canCreateExercise = authoringPrompt.trim().length > 0
     && authoringVocabulary.trim().length > 0
-    && authoringRules.trim().length > 0
+    && allowedRuleIds.length > 0
     && authoringAnswers.trim().length > 0
-    && hasTwoAdversarialProbes
+    && hasFilledAdversarialProbes
     && authoringExplanation.trim().length > 0
     && !isWorkflowBusy
     && !isCreatingExercise;
@@ -104,6 +141,36 @@ export function LearnerView({
     setAuthoringError(null);
   }
 
+  function toggleSelectedRuleId(noteId: string, checked: boolean) {
+    setSelectedRuleIds((current) => {
+      if (checked) {
+        return current.includes(noteId) ? current : [...current, noteId];
+      }
+      return current.filter((id) => id !== noteId);
+    });
+    clearAuthoringNotice();
+  }
+
+  function updateAdversarialProbe(index: number, patch: Partial<AuthoringAdversarialProbe>) {
+    setAuthoringAdversarialProbes((current) => current.map((probe, probeIndex) => (
+      probeIndex === index ? { ...probe, ...patch } : probe
+    )));
+    clearAuthoringNotice();
+  }
+
+  function addAdversarialProbe() {
+    setAuthoringAdversarialProbes((current) => [...current, emptyAdversarialProbe()]);
+    clearAuthoringNotice();
+  }
+
+  function removeAdversarialProbe(index: number) {
+    setAuthoringAdversarialProbes((current) => {
+      if (current.length <= MIN_ADVERSARIAL_PROBES) return current;
+      return current.filter((_, probeIndex) => probeIndex !== index);
+    });
+    clearAuthoringNotice();
+  }
+
   const canValidateExercise = canCreateExercise && !isValidatingExercise;
 
   function buildAuthoringPayload(): ExerciseAuthoringPayload {
@@ -111,12 +178,12 @@ export function LearnerView({
       type: authoringType,
       prompt: authoringPrompt.trim(),
       allowedVocabulary: parseAuthoringList(authoringVocabulary),
-      allowedRuleIds: parseAuthoringList(authoringRules),
+      allowedRuleIds: mergeAllowedRuleIds(selectedRuleIds, authoringRulesAdvanced),
       expectedAnswers: parseAuthoringList(authoringAnswers),
-      adversarialAnswers: [
-        { answer: authoringAdversarialAnswerOne.trim(), reason: authoringAdversarialReasonOne.trim() },
-        { answer: authoringAdversarialAnswerTwo.trim(), reason: authoringAdversarialReasonTwo.trim() }
-      ],
+      adversarialAnswers: authoringAdversarialProbes.map((probe) => ({
+        answer: probe.answer.trim(),
+        reason: probe.reason.trim()
+      })),
       gradingExplanation: authoringExplanation.trim()
     };
   }
@@ -184,12 +251,15 @@ export function LearnerView({
       }
       setAuthoringPrompt(exercise.prompt);
       setAuthoringVocabulary(exercise.allowedVocabulary.join(", "));
-      setAuthoringRules(exercise.allowedRuleIds.join(", "));
+      {
+        const noteIdSet = new Set(notes.map((note) => note.id));
+        const knownRuleIds = exercise.allowedRuleIds.filter((ruleId) => noteIdSet.has(ruleId));
+        const unknownRuleIds = exercise.allowedRuleIds.filter((ruleId) => !noteIdSet.has(ruleId));
+        setSelectedRuleIds(knownRuleIds);
+        setAuthoringRulesAdvanced(unknownRuleIds.join(", "));
+      }
       setAuthoringAnswers(exercise.expectedAnswers.join(", "));
-      setAuthoringAdversarialAnswerOne(exercise.adversarialAnswers[0]?.answer ?? "");
-      setAuthoringAdversarialReasonOne(exercise.adversarialAnswers[0]?.reason ?? "");
-      setAuthoringAdversarialAnswerTwo(exercise.adversarialAnswers[1]?.answer ?? "");
-      setAuthoringAdversarialReasonTwo(exercise.adversarialAnswers[1]?.reason ?? "");
+      setAuthoringAdversarialProbes(probesFromDraft(exercise.adversarialAnswers));
       setAuthoringExplanation(exercise.gradingExplanation);
 
       const base = t("learner.draftGenerated");
@@ -360,17 +430,48 @@ export function LearnerView({
               }}
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="exercise-author-rules">{t("learner.allowedRuleIds")}</label>
-            <input
-              id="exercise-author-rules"
-              value={authoringRules}
-              onChange={(event) => {
-                setAuthoringRules(event.target.value);
-                clearAuthoringNotice();
-              }}
-            />
-          </div>
+          <fieldset className="form-group rule-note-picker">
+            <legend>{t("learner.allowedRuleNotes")}</legend>
+            <p className="inline-empty muted">{t("learner.allowedRuleNotesHint")}</p>
+            {notes.length === 0 ? (
+              <p className="inline-empty muted">{t("learner.noRuleNotesAvailable")}</p>
+            ) : (
+              <div className="rule-note-picker-list">
+                {notes.map((note) => {
+                  const inputId = `exercise-author-rule-${safeDomId(note.id)}`;
+                  return (
+                    <label key={note.id} className="checkbox-row rule-note-option" htmlFor={inputId}>
+                      <input
+                        id={inputId}
+                        type="checkbox"
+                        checked={selectedRuleIds.includes(note.id)}
+                        onChange={(event) => toggleSelectedRuleId(note.id, event.target.checked)}
+                      />
+                      <span className="rule-note-option-copy">
+                        <strong>{note.topic}</strong>
+                        <code>{note.id}</code>
+                        <span className="muted">{noteSummary(note.explanation)}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <details className="rule-note-advanced" open={authoringRulesAdvanced.trim().length > 0 || undefined}>
+              <summary>{t("learner.allowedRuleIdsAdvanced")}</summary>
+              <label htmlFor="exercise-author-rules">{t("learner.allowedRuleIds")}</label>
+              <input
+                id="exercise-author-rules"
+                value={authoringRulesAdvanced}
+                onChange={(event) => {
+                  setAuthoringRulesAdvanced(event.target.value);
+                  clearAuthoringNotice();
+                }}
+                placeholder={t("learner.allowedRuleIdsPlaceholder")}
+              />
+              <p className="inline-empty muted">{t("learner.allowedRuleIdsAdvancedHint")}</p>
+            </details>
+          </fieldset>
           <div className="form-group">
             <label htmlFor="exercise-author-answers">{t("learner.expectedAnswers")}</label>
             <textarea
@@ -382,50 +483,46 @@ export function LearnerView({
               }}
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-answer-one">{t("learner.adversarialAnswer1")}</label>
-            <input
-              id="exercise-author-adversarial-answer-one"
-              value={authoringAdversarialAnswerOne}
-              onChange={(event) => {
-                setAuthoringAdversarialAnswerOne(event.target.value);
-                clearAuthoringNotice();
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-reason-one">{t("learner.adversarialReason1")}</label>
-            <input
-              id="exercise-author-adversarial-reason-one"
-              value={authoringAdversarialReasonOne}
-              onChange={(event) => {
-                setAuthoringAdversarialReasonOne(event.target.value);
-                clearAuthoringNotice();
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-answer-two">{t("learner.adversarialAnswer2")}</label>
-            <input
-              id="exercise-author-adversarial-answer-two"
-              value={authoringAdversarialAnswerTwo}
-              onChange={(event) => {
-                setAuthoringAdversarialAnswerTwo(event.target.value);
-                clearAuthoringNotice();
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="exercise-author-adversarial-reason-two">{t("learner.adversarialReason2")}</label>
-            <input
-              id="exercise-author-adversarial-reason-two"
-              value={authoringAdversarialReasonTwo}
-              onChange={(event) => {
-                setAuthoringAdversarialReasonTwo(event.target.value);
-                clearAuthoringNotice();
-              }}
-            />
-          </div>
+          <fieldset className="form-group adversarial-probes">
+            <legend>{t("learner.adversarialProbes")}</legend>
+            {authoringAdversarialProbes.map((probe, index) => {
+              const answerId = `exercise-author-adversarial-answer-${index + 1}`;
+              const reasonId = `exercise-author-adversarial-reason-${index + 1}`;
+              const canRemoveProbe = authoringAdversarialProbes.length > MIN_ADVERSARIAL_PROBES;
+              return (
+                <div className="adversarial-probe-row" key={`adversarial-probe-${index}`}>
+                  <div className="form-group">
+                    <label htmlFor={answerId}>{t("learner.adversarialAnswer", { index: index + 1 })}</label>
+                    <input
+                      id={answerId}
+                      value={probe.answer}
+                      onChange={(event) => updateAdversarialProbe(index, { answer: event.target.value })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor={reasonId}>{t("learner.adversarialReason", { index: index + 1 })}</label>
+                    <input
+                      id={reasonId}
+                      value={probe.reason}
+                      onChange={(event) => updateAdversarialProbe(index, { reason: event.target.value })}
+                    />
+                  </div>
+                  {canRemoveProbe && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => removeAdversarialProbe(index)}
+                    >
+                      {t("learner.removeAdversarialProbe")}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+            <button type="button" className="secondary" onClick={addAdversarialProbe}>
+              {t("learner.addAdversarialProbe")}
+            </button>
+          </fieldset>
           <div className="form-group">
             <label htmlFor="exercise-author-explanation">{t("learner.gradingExplanation")}</label>
             <textarea

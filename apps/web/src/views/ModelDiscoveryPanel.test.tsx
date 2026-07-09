@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { LlmModelDiscoveryResponse } from "../api";
+import type { DiscoveredLlmModel, LlmModelDiscoveryResponse } from "../api";
 import { ModelDiscoveryPanel } from "./ModelDiscoveryPanel";
 
 const emptyDiscovery: LlmModelDiscoveryResponse = {
@@ -110,5 +110,60 @@ describe("ModelDiscoveryPanel empty state", () => {
     expect(alert).toHaveTextContent("Model discovery failed");
     expect(alert).toHaveTextContent(/Confirm the provider is running/i);
     expect(alert).toHaveTextContent(/Refresh models/i);
+  });
+});
+
+describe("ModelDiscoveryPanel unloaded-model stale state", () => {
+  const replacement: DiscoveredLlmModel = {
+    id: "lm-studio|http://127.0.0.1:1234/v1|newly-loaded-model",
+    provider: "lm-studio",
+    providerLabel: "LM Studio",
+    source: "LM Studio local",
+    baseUrl: "http://127.0.0.1:1234/v1",
+    model: "newly-loaded-model",
+    requiresApiKey: false
+  };
+
+  it("announces when a saved model is no longer present in discovery", () => {
+    const onClearSavedModel = vi.fn();
+    renderPanel({
+      onClearSavedModel,
+      staleActiveModel: {
+        baseUrl: "http://127.0.0.1:1234/v1",
+        replacement: null,
+        savedModel: "unloaded-model",
+        savedModelDisplay: "unloaded-model"
+      }
+    });
+
+    const notice = screen.getByText(
+      "Saved model unloaded-model is no longer loaded at http://127.0.0.1:1234/v1. Choose another discovered model or switch back to offline mode."
+    );
+    expect(notice.closest(".stale-model-notice")).toHaveAttribute("role", "status");
+    expect(screen.queryByRole("button", { name: "Apply loaded model" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Use offline mode" }));
+    expect(onClearSavedModel).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers applying the single replacement when discovery lists one loaded model", () => {
+    const onApplyLoadedModel = vi.fn();
+    renderPanel({
+      discoveredModels: [replacement],
+      onApplyLoadedModel,
+      staleActiveModel: {
+        baseUrl: "http://127.0.0.1:1234/v1",
+        replacement,
+        savedModel: "unloaded-model",
+        savedModelDisplay: "unloaded-model"
+      }
+    });
+
+    expect(screen.getByText(
+      "Saved model unloaded-model is no longer loaded at http://127.0.0.1:1234/v1. The form now shows newly-loaded-model; apply it to switch immediately."
+    )).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply loaded model" }));
+    expect(onApplyLoadedModel).toHaveBeenCalledWith(replacement);
   });
 });

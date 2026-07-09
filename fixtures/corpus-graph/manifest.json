@@ -1,0 +1,43 @@
+{
+  "fixtureVersion": "corpus-graph-rendering-v1",
+  "languageId": "velmari-graph",
+  "description": "Synthetic language seed for deterministic corpus graph build and SVG render coverage.",
+  "files": {
+    "seed": "seed.json",
+    "expectedNeuralMap": "expected-neural-map.json"
+  },
+  "expected": {
+    "nodeCount": 11,
+    "edgeCount": 18,
+    "nodeTypes": {
+      "language": 1,
+      "source_asset": 1,
+      "corpus": 2,
+      "morpheme": 4,
+      "topic_tag": 2,
+      "note": 1
+    },
+    "requiredNodeIds": [
+      "language:velmari-graph",
+      "source_asset:src-velmari-graph-1",
+      "corpus:velmari-graph-c001",
+      "corpus:velmari-graph-c002",
+      "morpheme:velmari-graph:saku",
+      "morpheme:velmari-graph:vel",
+      "morpheme:velmari-graph:mir",
+      "morpheme:velmari-graph:tora",
+      "topic_tag:velmari-graph:water",
+      "topic_tag:velmari-graph:nature",
+      "note:velmari-graph-note-1"
+    ],
+    "requiredEdgeRelations": [
+      "has_corpus",
+      "from_source",
+      "contains_morpheme",
+      "tagged",
+      "co_occurs",
+      "has_note",
+      "uses_context"
+    ]
+  }
+}

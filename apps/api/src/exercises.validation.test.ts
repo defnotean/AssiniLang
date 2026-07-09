@@ -134,4 +134,60 @@ describe("exercise route validation i18nKeys", () => {
       i18nKey: "errors.languageNotFound"
     });
   });
+
+  it("returns exerciseAuthoringValidationFailed i18nKey for semantic authoring failures", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        type: "translate_to_target",
+        prompt: "Translate into Testlang: The child walks.",
+        allowedVocabulary: ["saku", "talo", "-ki"],
+        allowedRuleIds: ["missing-rule"],
+        expectedAnswers: ["saku talo-ki"],
+        adversarialAnswers: [
+          { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+          { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
+        ],
+        gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Exercise references unknown rule: missing-rule",
+      i18nKey: "errors.exerciseAuthoringValidationFailed"
+    });
+  });
+
+  it("returns exerciseGenerationFailed i18nKey when model generation fails", async () => {
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      llmProvider: {
+        name: "failing-exercise-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          throw new Error("The model did not return valid JSON for exercise generation. Try again.");
+        }
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises/generate`,
+      headers: authHeaders("reviewer-1"),
+      payload: { type: "translate_to_target" }
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toEqual({
+      error: "The model did not return valid JSON for exercise generation. Try again.",
+      i18nKey: "errors.exerciseGenerationFailed"
+    });
+  });
 });

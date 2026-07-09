@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { fetchNeuralMap, validateCorpusImport, type CorpusImportPayload, type NeuralMapResponse } from "../api";
+import {
+  fetchNeuralMap,
+  validateCorpusBulk,
+  validateCorpusImport,
+  type CorpusBulkImportResponse,
+  type CorpusImportPayload,
+  type NeuralMapResponse
+} from "../api";
 import {
   buildCorpusImportPayload,
   canSubmitCorpusImportDraft,
   CORPUS_CONSENT_USE_VALUES,
+  dryRunCorpusBulkImport,
   EMPTY_CORPUS_IMPORT_DRAFT,
+  formatCorpusBulkDryRunReport,
   formatCorpusImportError,
   type CorpusImportDraft
 } from "../corpusImport";
@@ -13,16 +22,36 @@ import { localizeApiError } from "../lib/format";
 import type { CorpusPassage } from "../lib/types";
 import { useI18n, type MessageKey, type Translate } from "../i18n";
 
+function formatServerBulkDryRunAppendix(response: CorpusBulkImportResponse, t: Translate): string {
+  const summary = t("corpus.bulkServerDryRunSummary", {
+    okCount: response.imported,
+    failedCount: response.failed,
+    total: response.results.length
+  });
+  const failures = response.results
+    .filter((row): row is Extract<CorpusBulkImportResponse["results"][number], { ok: false }> => !row.ok)
+    .map((row) => t("corpus.bulkServerDryRunRowError", {
+      index: row.index + 1,
+      detail: row.error
+    }));
+  if (failures.length === 0) {
+    return summary;
+  }
+  return `${summary} ${failures.join(" ")}`;
+}
+
 export function CorpusView({
   languageId,
   corpus,
   isWorkflowBusy,
-  onImportCorpusPassage
+  onImportCorpusPassage,
+  onImportCorpusBulk
 }: {
   languageId?: string;
   corpus: CorpusPassage[];
   isWorkflowBusy: boolean;
   onImportCorpusPassage: (payload: CorpusImportPayload) => Promise<void>;
+  onImportCorpusBulk: (passages: CorpusImportPayload[]) => Promise<CorpusBulkImportResponse>;
 }) {
   const { t } = useI18n();
   const graphLanguageId = languageId ?? corpus[0]?.languageId ?? "";
@@ -40,15 +69,27 @@ export function CorpusView({
   // Collapsed by default so the passage list gets the screen; the import form
   // is an occasional task while browsing is the everyday one.
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isBulkOpen, setIsBulkOpen] = useState(false);
+  const [bulkPaste, setBulkPaste] = useState("");
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [isValidatingBulk, setIsValidatingBulk] = useState(false);
+  const [isImportingBulk, setIsImportingBulk] = useState(false);
   const normalized = search.trim().toLowerCase();
+  const isCorpusBusy = isImportingCorpus || isValidatingCorpus || isValidatingBulk || isImportingBulk;
   const canImportPassage = canSubmitCorpusImportDraft(importDraft)
     && !isWorkflowBusy
-    && !isImportingCorpus
-    && !isValidatingCorpus;
+    && !isCorpusBusy;
   const canValidatePassage = canSubmitCorpusImportDraft(importDraft)
     && !isWorkflowBusy
-    && !isImportingCorpus
-    && !isValidatingCorpus
+    && !isCorpusBusy
+    && Boolean(languageId);
+  const canValidateBulk = bulkPaste.trim().length > 0
+    && !isWorkflowBusy
+    && !isCorpusBusy;
+  const canImportBulk = bulkPaste.trim().length > 0
+    && !isWorkflowBusy
+    && !isCorpusBusy
     && Boolean(languageId);
   const filtered = useMemo(() => {
     if (!normalized) return corpus;
@@ -106,9 +147,19 @@ export function CorpusView({
     setImportError(null);
   }
 
+  function clearBulkNotice() {
+    setBulkMessage(null);
+    setBulkError(null);
+  }
+
   function updateImportDraft(field: keyof CorpusImportDraft, value: string) {
     setImportDraft((current) => ({ ...current, [field]: value }));
     clearImportNotice();
+  }
+
+  function updateBulkPaste(value: string) {
+    setBulkPaste(value);
+    clearBulkNotice();
   }
 
   async function handleValidateCorpus() {
@@ -167,6 +218,110 @@ export function CorpusView({
       setImportError(localizeApiError(error, t, "corpus.importFailed"));
     } finally {
       setIsImportingCorpus(false);
+    }
+  }
+
+  async function handleValidateBulk() {
+    const report = dryRunCorpusBulkImport(bulkPaste);
+    const clientReport = formatCorpusBulkDryRunReport(report, t);
+    const validPayloads = report.parseError
+      ? []
+      : report.rows
+        .filter((row): row is Extract<typeof report.rows[number], { ok: true }> => row.ok)
+        .map((row) => row.payload);
+
+    if (report.parseError || validPayloads.length === 0) {
+      setBulkMessage(null);
+      setBulkError(clientReport);
+      return;
+    }
+
+    if (!languageId) {
+      setBulkMessage(clientReport);
+      setBulkError(t("corpus.bulkValidateNoLanguage"));
+      return;
+    }
+
+    setIsValidatingBulk(true);
+    setBulkMessage(null);
+    setBulkError(null);
+    try {
+      const serverValidation = await validateCorpusBulk(languageId, validPayloads);
+      const serverAppendix = formatServerBulkDryRunAppendix(serverValidation, t);
+      const combined = `${clientReport} ${serverAppendix}`;
+      if (serverValidation.failed > 0) {
+        setBulkMessage(null);
+        setBulkError(combined);
+      } else {
+        setBulkMessage(combined);
+      }
+    } catch (error) {
+      setBulkMessage(clientReport);
+      setBulkError(localizeApiError(error, t, "corpus.bulkValidateFailed"));
+    } finally {
+      setIsValidatingBulk(false);
+    }
+  }
+
+  async function handleImportBulk() {
+    if (!languageId) {
+      setBulkMessage(null);
+      setBulkError(t("corpus.bulkValidateNoLanguage"));
+      return;
+    }
+
+    const report = dryRunCorpusBulkImport(bulkPaste);
+    const validPayloads = report.parseError
+      ? []
+      : report.rows
+        .filter((row): row is Extract<typeof report.rows[number], { ok: true }> => row.ok)
+        .map((row) => row.payload);
+
+    if (validPayloads.length === 0) {
+      setBulkMessage(null);
+      setBulkError(t("corpus.bulkImportNoValidRows"));
+      return;
+    }
+
+    setIsImportingBulk(true);
+    setBulkMessage(null);
+    setBulkError(null);
+    try {
+      const result = await onImportCorpusBulk(validPayloads);
+      if (result.imported > 0 && result.failed === 0) {
+        setBulkPaste("");
+        setBulkMessage(t("corpus.bulkImportSuccess", { imported: result.imported }));
+      } else if (result.imported > 0) {
+        setBulkMessage(t("corpus.bulkImportPartial", {
+          imported: result.imported,
+          failed: result.failed
+        }));
+        const failureDetails = result.results
+          .filter((row): row is Extract<typeof result.results[number], { ok: false }> => !row.ok)
+          .map((row) => t("corpus.bulkServerDryRunRowError", {
+            index: row.index + 1,
+            detail: row.error
+          }));
+        if (failureDetails.length > 0) {
+          setBulkError(failureDetails.join(" "));
+        }
+      } else {
+        setBulkMessage(null);
+        const failureDetails = result.results
+          .filter((row): row is Extract<typeof result.results[number], { ok: false }> => !row.ok)
+          .map((row) => t("corpus.bulkServerDryRunRowError", {
+            index: row.index + 1,
+            detail: row.error
+          }));
+        setBulkError([
+          t("corpus.bulkImportNone", { failed: result.failed }),
+          ...failureDetails
+        ].join(" "));
+      }
+    } catch (error) {
+      setBulkError(localizeApiError(error, t, "corpus.bulkImportFailed"));
+    } finally {
+      setIsImportingBulk(false);
     }
   }
 
@@ -317,6 +472,66 @@ export function CorpusView({
         {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
         {importError && <p className="result-notice error" role="alert">{importError}</p>}
       </form>
+
+      <div className="record-card form-panel compact corpus-import-form" aria-label={t("corpus.bulkImportLabel")}>
+        <button
+          type="button"
+          className="secondary corpus-import-toggle"
+          aria-expanded={isBulkOpen}
+          aria-controls="corpus-bulk-import-fields"
+          onClick={() => setIsBulkOpen((current) => !current)}
+        >
+          <span>
+            <span className="detail-label">{t("corpus.bulkImportLabel")}</span>
+            <span className="corpus-import-toggle-title">{t("corpus.bulkImportTitle")}</span>
+          </span>
+          <span aria-hidden="true">{isBulkOpen ? t("corpus.hide") : t("corpus.open")}</span>
+        </button>
+        {isBulkOpen && (
+          <div className="corpus-import-grid" id="corpus-bulk-import-fields">
+            <div className="form-group wide">
+              <label htmlFor="corpus-bulk-paste">{t("corpus.bulkPasteLabel")}</label>
+              <textarea
+                id="corpus-bulk-paste"
+                value={bulkPaste}
+                onChange={(event) => updateBulkPaste(event.target.value)}
+                rows={8}
+              />
+            </div>
+          </div>
+        )}
+        {isBulkOpen && (
+          <div className="corpus-import-actions">
+            <button
+              type="button"
+              className="secondary"
+              aria-label={t("corpus.bulkValidateAria")}
+              aria-describedby="corpus-bulk-dry-run-hint"
+              disabled={!canValidateBulk}
+              aria-busy={isValidatingBulk}
+              onClick={() => void handleValidateBulk()}
+            >
+              {isValidatingBulk ? t("corpus.bulkValidating") : t("corpus.bulkValidate")}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={!canImportBulk}
+              aria-busy={isImportingBulk}
+              onClick={() => void handleImportBulk()}
+            >
+              {isImportingBulk ? t("corpus.bulkImporting") : t("corpus.bulkImport")}
+            </button>
+          </div>
+        )}
+        {isBulkOpen && (
+          <p id="corpus-bulk-dry-run-hint" className="inline-empty muted">
+            {t("corpus.bulkDryRunHint")}
+          </p>
+        )}
+        {bulkMessage && <p className="result-notice" role="status" aria-live="polite">{bulkMessage}</p>}
+        {bulkError && <p className="result-notice error" role="alert">{bulkError}</p>}
+      </div>
 
       <div className="toolbar-row">
         <label className="search-field" htmlFor="corpus-search">

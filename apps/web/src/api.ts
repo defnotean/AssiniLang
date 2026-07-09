@@ -59,6 +59,7 @@ export type { GovernancePayload, ReviewPolicyPayload } from "./api/governanceApi
 export {
   acceptExtractionDraft,
   bulkReviewExtractionDrafts,
+  cancelSourceProcessing,
   fetchExtractionDrafts,
   fetchSources,
   importObsidianVault,
@@ -68,6 +69,7 @@ export {
   uploadSourceFile
 } from "./api/ingestApi";
 export type {
+  AcceptExtractionDraftOptions,
   AcceptExtractionDraftResult,
   BulkReviewAction,
   BulkReviewExtractionDraftsResult,
@@ -119,11 +121,15 @@ export type { ProcessSourceResponse, RuntimeSettingsPatch } from "@assini/api-co
 export {
   generateDraftNotes,
   generateModelDraftNotes,
+  importCorpusBulk,
   importCorpusPassage,
   reviewNote,
+  validateCorpusBulk,
   validateCorpusImport
 } from "./api/studyApi";
 export type {
+  CorpusBulkImportResponse,
+  CorpusBulkImportRowResult,
   CorpusImportDryRunResult,
   CorpusImportPayload,
   ModelDraftGrounding,

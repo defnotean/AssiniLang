@@ -161,7 +161,7 @@ describe("IngestView bulk draft review", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Accept draft draft-1" }));
     await waitFor(() => {
-      expect(apiMock.acceptExtractionDraft).toHaveBeenCalledWith("draft-1");
+      expect(apiMock.acceptExtractionDraft).toHaveBeenCalledWith("draft-1", undefined);
     });
     await screen.findByText("Draft accepted: Lexeme committed.");
 

@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { sourceProcessingErrorI18n, sourceProcessingWarningI18n } from "./sourceProcessingErrors.js";
+import {
+  sourceProcessingErrorI18n,
+  sourceProcessingWarningI18n,
+  vaultImportSkipReasonI18n
+} from "./sourceProcessingErrors.js";
 
 describe("sourceProcessingErrorI18n", () => {
   it("classifies OCR-not-configured guidance", () => {
+    expect(sourceProcessingErrorI18n(
+      "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs."
+    )).toEqual({ i18nKey: "ingest.ocrNotConfigured" });
     expect(sourceProcessingErrorI18n(
       "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only)."
     )).toEqual({ i18nKey: "ingest.ocrNotConfigured" });
@@ -15,7 +22,7 @@ describe("sourceProcessingErrorI18n", () => {
 
   it("classifies scanned PDFs without an embeddable page image", () => {
     expect(sourceProcessingErrorI18n(
-      "The PDF has no embedded page image to OCR. Export page 1 as an image and upload it, or OCR the document externally."
+      "The PDF has no embedded page image to OCR. Export pages as images and upload them, or OCR the document externally."
     )).toEqual({ i18nKey: "ingest.ocrPdfNoImage" });
   });
 
@@ -79,6 +86,10 @@ describe("sourceProcessingErrorI18n", () => {
     expect(sourceProcessingErrorI18n(
       "Processing stalled without progress. Re-run processing."
     )).toEqual({ i18nKey: "ingest.processingStalledWithoutProgress" });
+
+    expect(sourceProcessingErrorI18n(
+      "Queued source processing was cancelled. Re-run processing when ready."
+    )).toEqual({ i18nKey: "ingest.sourceProcessingCancelled" });
   });
 
   it("classifies source URL fetch failures with status", () => {
@@ -136,18 +147,54 @@ describe("sourceProcessingErrorI18n", () => {
 });
 
 describe("sourceProcessingWarningI18n", () => {
-  it("classifies multi-page PDF OCR limits", () => {
+  it("classifies multi-page PDF OCR page-cap warnings", () => {
+    expect(sourceProcessingWarningI18n(
+      "PDF has 14 pages; only the first 10 pages were OCR'd. Raise ASSINI_OCR_PDF_MAX_PAGES or split remaining pages into separate sources if you need them."
+    )).toEqual({
+      i18nKey: "ingest.ocrPdfMultiPageWarning",
+      i18nParams: { pages: 14, maxPages: 10 }
+    });
+  });
+
+  it("classifies legacy page-1-only multi-page warnings", () => {
     expect(sourceProcessingWarningI18n(
       "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
     )).toEqual({
       i18nKey: "ingest.ocrPdfMultiPageWarning",
-      i18nParams: { pages: 4 }
+      i18nParams: { pages: 4, maxPages: 1 }
     });
   });
 
-  it("classifies page-1 scanned PDF OCR success notices", () => {
+  it("classifies scanned PDF OCR success notices", () => {
+    expect(sourceProcessingWarningI18n(
+      "Used configured OCR model to read scanned document (3 of 3 pages)."
+    )).toEqual({
+      i18nKey: "ingest.ocrPdfUsed",
+      i18nParams: { succeeded: 3, attempted: 3 }
+    });
+  });
+
+  it("classifies legacy page-1 scanned PDF OCR success notices", () => {
     expect(sourceProcessingWarningI18n("Used configured OCR model to read scanned document (page 1)."))
-      .toEqual({ i18nKey: "ingest.ocrPdfPage1Used" });
+      .toEqual({
+        i18nKey: "ingest.ocrPdfUsed",
+        i18nParams: { succeeded: 1, attempted: 1 }
+      });
+  });
+
+  it("classifies per-page OCR soft-fail warnings", () => {
+    expect(sourceProcessingWarningI18n(
+      "OCR failed for page 2; continuing with remaining pages."
+    )).toEqual({
+      i18nKey: "ingest.ocrPdfPageFailed",
+      i18nParams: { page: 2 }
+    });
+    expect(sourceProcessingWarningI18n(
+      "OCR skipped page 1 (no embedded page image)."
+    )).toEqual({
+      i18nKey: "ingest.ocrPdfPageSkipped",
+      i18nParams: { page: 1 }
+    });
   });
 
   it("classifies image OCR success notices", () => {
@@ -210,5 +257,15 @@ describe("sourceProcessingWarningI18n", () => {
 
   it("returns undefined for unrelated warnings", () => {
     expect(sourceProcessingWarningI18n("Custom operator note from a plugin")).toBeUndefined();
+  });
+});
+
+describe("vaultImportSkipReasonI18n", () => {
+  it("classifies oversized and empty vault Markdown skip reasons", () => {
+    expect(vaultImportSkipReasonI18n("Markdown file is larger than the 1 MB import limit."))
+      .toEqual({ i18nKey: "ingest.vaultMarkdownTooLarge" });
+    expect(vaultImportSkipReasonI18n("Markdown file had no importable text."))
+      .toEqual({ i18nKey: "ingest.vaultMarkdownEmpty" });
+    expect(vaultImportSkipReasonI18n("Directory could not be read.")).toBeUndefined();
   });
 });

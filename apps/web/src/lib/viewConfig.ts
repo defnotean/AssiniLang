@@ -25,3 +25,6 @@ export const REVIEWER_COMMENT_KEYS: Record<ReviewStatus, MessageKey> = {
 };
 
 export const REVIEWER_EDITED_EXPLANATION_COMMENT_KEY: MessageKey = "review.comment.editedExplanation";
+export const REVIEWER_EDITED_EXAMPLES_COMMENT_KEY: MessageKey = "review.comment.editedExamples";
+export const REVIEWER_EDITED_EXPLANATION_AND_EXAMPLES_COMMENT_KEY: MessageKey =
+  "review.comment.editedExplanationAndExamples";

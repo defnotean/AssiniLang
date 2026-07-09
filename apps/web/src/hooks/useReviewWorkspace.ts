@@ -1,10 +1,21 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import type { Note } from "@assini/db";
 import type { DashboardData } from "../api";
 import { generateDraftNotes, generateModelDraftNotes, reviewNote, runEvaluation } from "../api";
 import type { PublicNote, ReviewStatus, ViewMode } from "../lib/types";
 import { localizeApiError } from "../lib/format";
-import { REVIEWER_COMMENT_KEYS, REVIEWER_EDITED_EXPLANATION_COMMENT_KEY } from "../lib/viewConfig";
+import {
+  REVIEWER_COMMENT_KEYS,
+  REVIEWER_EDITED_EXAMPLES_COMMENT_KEY,
+  REVIEWER_EDITED_EXPLANATION_AND_EXAMPLES_COMMENT_KEY,
+  REVIEWER_EDITED_EXPLANATION_COMMENT_KEY
+} from "../lib/viewConfig";
 import { useI18n } from "../i18n";
+
+export type NoteReviewEdits = {
+  explanation: string;
+  examples: Note["examples"];
+};
 
 export interface ReviewWorkspace {
   selectedNote: PublicNote | null;
@@ -24,7 +35,7 @@ export interface ReviewWorkspace {
   handleGenerateDrafts: () => Promise<void>;
   handleGenerateModelDrafts: () => Promise<void>;
   handleReview: (status: ReviewStatus) => Promise<void>;
-  handleSaveNoteExplanation: (explanation: string) => Promise<void>;
+  handleSaveNoteExplanation: (edits: NoteReviewEdits) => Promise<void>;
 }
 
 /**
@@ -130,14 +141,22 @@ export function useReviewWorkspace(
     }
   }
 
-  async function handleSaveNoteExplanation(explanation: string) {
+  async function handleSaveNoteExplanation(edits: NoteReviewEdits) {
     if (!selectedNote) return;
     setReviewingNoteId(selectedNote.id);
     setReviewActionError(null);
+    const explanationChanged = edits.explanation !== selectedNote.explanation;
+    const examplesChanged = JSON.stringify(edits.examples) !== JSON.stringify(selectedNote.examples);
+    const reviewerComment = explanationChanged && examplesChanged
+      ? t(REVIEWER_EDITED_EXPLANATION_AND_EXAMPLES_COMMENT_KEY)
+      : examplesChanged
+        ? t(REVIEWER_EDITED_EXAMPLES_COMMENT_KEY)
+        : t(REVIEWER_EDITED_EXPLANATION_COMMENT_KEY);
     try {
       await reviewNote(selectedNote.id, {
-        explanation,
-        reviewerComment: t(REVIEWER_EDITED_EXPLANATION_COMMENT_KEY)
+        ...(explanationChanged ? { explanation: edits.explanation } : {}),
+        ...(examplesChanged ? { examples: edits.examples } : {}),
+        reviewerComment
       });
       await refreshDashboard();
     } catch (error) {

@@ -44,8 +44,18 @@ type SourceProcessCompletionOutput = {
 
 type VaultSkippedFile = ObsidianVaultImportResponse["skipped"][number];
 
-const MAX_OBSIDIAN_MARKDOWN_BYTES = 1_000_000;
+/** Per-note Markdown byte cap for Obsidian vault import (oversized notes are skipped). */
+export const MAX_OBSIDIAN_MARKDOWN_BYTES = 1_000_000;
+/** Operator-facing skip reason when a vault Markdown note exceeds {@link MAX_OBSIDIAN_MARKDOWN_BYTES}. */
+export const OBSIDIAN_MARKDOWN_TOO_LARGE_REASON =
+  "Markdown file is larger than the 1 MB import limit.";
 export const MAX_SOURCE_PROCESSING_ATTEMPTS = 5;
+/**
+ * Operator-visible error left when a queued (not yet active) processing job
+ * is cancelled via POST /sources/:sourceId/cancel-processing.
+ */
+export const CANCELLED_PROCESSING_ERROR =
+  "Queued source processing was cancelled. Re-run processing when ready.";
 /** Default multipart file cap for source uploads (also registered on the Fastify multipart plugin). */
 export const MAX_SOURCE_UPLOAD_BYTES = 25 * 1024 * 1024;
 /** Cap for the optional multipart `title` text field (and busboy `fieldSize`). */
@@ -451,7 +461,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       try {
         const fileStat = await stat(filePath);
         if (fileStat.size > MAX_OBSIDIAN_MARKDOWN_BYTES) {
-          skipped.push({ path: relativePath, reason: "Markdown file is larger than the 1 MB import limit." });
+          skipped.push({ path: relativePath, reason: OBSIDIAN_MARKDOWN_TOO_LARGE_REASON });
           continue;
         }
 
@@ -871,5 +881,97 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       drafts: output.drafts,
       warnings: extraction.warnings
     };
+  });
+
+  app.post("/sources/:sourceId/cancel-processing", async (request, reply) => {
+    const { sourceId } = request.params as { sourceId: string };
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
+
+    const asset = current.sourceAssets.find((item) => item.id === sourceId);
+    if (!asset) {
+      reply.code(404);
+      return {
+        error: `Source not found: ${sourceId}`,
+        i18nKey: "errors.sourceNotFound"
+      };
+    }
+
+    if (jobQueue.isActive(sourceId)) {
+      reply.code(409);
+      return {
+        error: "Source processing is already running and cannot be cancelled.",
+        i18nKey: "ingest.sourceProcessingCancelActive"
+      };
+    }
+
+    if (!jobQueue.isPending(sourceId)) {
+      reply.code(409);
+      return {
+        error: asset.status === "processing"
+          ? "Source processing is already running and cannot be cancelled."
+          : "Source is not queued for processing.",
+        i18nKey: asset.status === "processing"
+          ? "ingest.sourceProcessingCancelActive"
+          : "ingest.sourceProcessingNotQueued"
+      };
+    }
+
+    if (!jobQueue.cancel(sourceId)) {
+      reply.code(409);
+      return {
+        error: "Source processing is already running and cannot be cancelled.",
+        i18nKey: "ingest.sourceProcessingCancelActive"
+      };
+    }
+
+    const cancelledAt = new Date().toISOString();
+    let cancelledAsset: SourceAsset | undefined;
+
+    await updateState((state) => {
+      const stored = state.sourceAssets.find((item) => item.id === sourceId);
+      if (!stored || stored.status !== "processing") {
+        return state;
+      }
+      const failedAsset: SourceAsset = {
+        ...stored,
+        status: "failed",
+        error: CANCELLED_PROCESSING_ERROR,
+        processedAt: cancelledAt,
+        processingStartedAt: undefined,
+        processingHeartbeatAt: undefined
+      };
+      cancelledAsset = failedAsset;
+      return appendAuditEvent({
+        ...state,
+        sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? failedAsset : item))
+      }, {
+        actor,
+        at: cancelledAt,
+        action: "source_asset.process_cancelled",
+        entityType: "source_asset",
+        entityId: sourceId,
+        languageId: stored.languageId,
+        summary: `Cancelled queued processing for source "${stored.title}".`,
+        metadata: {
+          reason: "operator_cancel",
+          ...(stored.processingAttempts !== undefined ? { processingAttempts: stored.processingAttempts } : {})
+        }
+      });
+    });
+
+    if (!cancelledAsset) {
+      reply.code(409);
+      return {
+        error: "Source is not queued for processing.",
+        i18nKey: "ingest.sourceProcessingNotQueued"
+      };
+    }
+
+    return { asset: cancelledAsset };
   });
 }

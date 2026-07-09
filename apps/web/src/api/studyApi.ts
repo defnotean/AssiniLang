@@ -8,7 +8,7 @@ export type CorpusImportDryRunResult = {
   warnings: string[];
   preview: CorpusImportPayload | null;
 };
-export type ReviewNotePayload = Partial<Pick<Note, "status" | "explanation">> & {
+export type ReviewNotePayload = Partial<Pick<Note, "status" | "explanation" | "examples">> & {
   reviewerComment?: string;
   dispositionAssigneeId?: string;
   dispositionDueAt?: string;
@@ -93,4 +93,58 @@ export async function validateCorpusImport(
   await assertOk(response, "Corpus validation failed");
 
   return response.json() as Promise<CorpusImportDryRunResult>;
+}
+
+export type CorpusBulkImportRowResult =
+  | {
+      index: number;
+      ok: true;
+      warnings: string[];
+      passage?: CorpusPassage;
+      preview?: CorpusImportPayload;
+    }
+  | {
+      index: number;
+      ok: false;
+      error: string;
+      i18nKey: string;
+      warnings: string[];
+    };
+
+export type CorpusBulkImportResponse = {
+  ok: boolean;
+  dryRun: boolean;
+  imported: number;
+  failed: number;
+  results: CorpusBulkImportRowResult[];
+};
+
+export async function importCorpusBulk(
+  languageId: string,
+  passages: CorpusImportPayload[]
+): Promise<CorpusBulkImportResponse> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/corpus/bulk`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify({ passages })
+  });
+
+  await assertOk(response, "Corpus bulk import failed");
+
+  return response.json() as Promise<CorpusBulkImportResponse>;
+}
+
+export async function validateCorpusBulk(
+  languageId: string,
+  passages: CorpusImportPayload[]
+): Promise<CorpusBulkImportResponse> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/corpus/bulk?dryRun=1`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify({ passages })
+  });
+
+  await assertOk(response, "Corpus bulk validation failed");
+
+  return response.json() as Promise<CorpusBulkImportResponse>;
 }

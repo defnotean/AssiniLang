@@ -9,6 +9,7 @@ import {
   deleteLanguage,
   fetchCurrentUser,
   fetchDashboardData,
+  importCorpusBulk,
   importCorpusPassage
 } from "./api";
 import { CommandPalette } from "./components/CommandPalette";
@@ -242,6 +243,15 @@ export function App() {
     await refreshDashboard();
   }
 
+  async function handleImportCorpusBulk(passages: CorpusImportPayload[]) {
+    if (!selectedLanguageId) {
+      throw new Error(t("errors.selectOrCreateLanguage"));
+    }
+    const result = await importCorpusBulk(selectedLanguageId, passages);
+    await refreshDashboard();
+    return result;
+  }
+
   if (loadState.status === "loading") {
     return <StatusScreen kind="loading" message={t("app.loadingWorkspace")} />;
   }
@@ -447,6 +457,7 @@ export function App() {
                         corpus={data.corpus}
                         isWorkflowBusy={isWorkflowBusy}
                         onImportCorpusPassage={handleImportCorpusPassage}
+                        onImportCorpusBulk={handleImportCorpusBulk}
                       />
                     </section>
                   </div>
@@ -471,6 +482,7 @@ export function App() {
                       </div>
                       <ReviewView
                         notes={data.notes}
+                        corpus={data.corpus}
                         selectedNote={review.selectedNote}
                         isWorkflowBusy={isWorkflowBusy}
                         reviewingNoteId={review.reviewingNoteId}
@@ -506,6 +518,7 @@ export function App() {
                       <LearnerView
                         languageId={selectedLanguageId}
                         exercises={data.exercises}
+                        notes={data.notes}
                         learner={learner}
                         isWorkflowBusy={isWorkflowBusy}
                       />

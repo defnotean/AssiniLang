@@ -221,7 +221,9 @@ describe("LearnerView practice next panel", () => {
       preview: {
         expectedAnswers: ["mira talo-mi-na"],
         adversarialAnswers: [
-          { answer: "talo-mi-na mira", reason: "Verb-first order." }
+          { answer: "talo-mi-na mira", reason: "Verb-first order." },
+          { answer: "mira talo-na-mi", reason: "Suffix order drift." },
+          { answer: "talo mira-mi-na", reason: "Splits the verb chain." }
         ]
       }
     });
@@ -234,6 +236,7 @@ describe("LearnerView practice next panel", () => {
     fireEvent.change(screen.getByLabelText("Allowed vocabulary"), {
       target: { value: "mira, talo, -mi, -na" }
     });
+    fireEvent.click(screen.getByText("Advanced: paste note IDs"));
     fireEvent.change(screen.getByLabelText("Allowed rule IDs"), {
       target: { value: "avn-rule-verb-chain" }
     });
@@ -252,6 +255,13 @@ describe("LearnerView practice next panel", () => {
     fireEvent.change(screen.getByLabelText("Adversarial reason 2"), {
       target: { value: "Suffix order drift." }
     });
+    fireEvent.click(screen.getByRole("button", { name: "Add probe" }));
+    fireEvent.change(screen.getByLabelText("Adversarial answer 3"), {
+      target: { value: "talo mira-mi-na" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 3"), {
+      target: { value: "Splits the verb chain." }
+    });
     fireEvent.change(screen.getByLabelText("Grading explanation"), {
       target: { value: "Use mira for river and talo for walk." }
     });
@@ -259,11 +269,37 @@ describe("LearnerView practice next panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Validate exercise authoring" }));
 
     await waitFor(() => expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledTimes(1));
+    expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledWith("avenik", expect.objectContaining({
+      adversarialAnswers: [
+        { answer: "talo-mi-na mira", reason: "Verb-first order." },
+        { answer: "mira talo-na-mi", reason: "Suffix order drift." },
+        { answer: "talo mira-mi-na", reason: "Splits the verb chain." }
+      ]
+    }));
     const authoringForm = screen.getByRole("form", { name: "Exercise authoring" });
     const dryRunStatus = await within(authoringForm).findByRole("status");
     expect(dryRunStatus).toHaveTextContent("Dry-run only — nothing saved yet.");
     expect(dryRunStatus).toHaveTextContent(
-      "Validation passed: 1 expected answers and 1 adversarial probes ready to save."
+      "Validation passed: 1 expected answers and 3 adversarial probes ready to save."
     );
+  });
+
+  it("keeps at least two adversarial probe rows and can remove extras", () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
+    renderLearnerView({ exercises: [], selectedExercise: null });
+
+    const authoringForm = screen.getByRole("form", { name: "Exercise authoring" });
+    expect(within(authoringForm).getByLabelText("Adversarial answer 1")).toBeInTheDocument();
+    expect(within(authoringForm).getByLabelText("Adversarial answer 2")).toBeInTheDocument();
+    expect(within(authoringForm).queryByRole("button", { name: "Remove probe" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(authoringForm).getByRole("button", { name: "Add probe" }));
+    expect(within(authoringForm).getByLabelText("Adversarial answer 3")).toBeInTheDocument();
+    const removeButtons = within(authoringForm).getAllByRole("button", { name: "Remove probe" });
+    expect(removeButtons).toHaveLength(3);
+
+    fireEvent.click(removeButtons[2]!);
+    expect(within(authoringForm).queryByLabelText("Adversarial answer 3")).not.toBeInTheDocument();
+    expect(within(authoringForm).queryByRole("button", { name: "Remove probe" })).not.toBeInTheDocument();
   });
 });

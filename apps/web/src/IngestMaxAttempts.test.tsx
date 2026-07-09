@@ -54,7 +54,23 @@ describe("IngestView max processing attempts", () => {
   it("surfaces the localized max-attempt 409 message in the UI", async () => {
     render(<IngestView languageId={LANGUAGE_ID} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Process Over-processed source" }));
+    const retryButton = await screen.findByRole("button", { name: "Retry Over-processed source" });
+    expect(retryButton).toBeDisabled();
+  });
+
+  it("keeps Retry enabled under the attempt cap and surfaces a 409 from process", async () => {
+    apiMock.fetchSources.mockResolvedValue([
+      {
+        ...MAXED_SOURCE,
+        id: "src-retryable",
+        title: "Retryable source",
+        processingAttempts: MAX_ATTEMPTS - 1
+      }
+    ]);
+
+    render(<IngestView languageId={LANGUAGE_ID} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry Retryable source" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       `Processing stopped after ${MAX_ATTEMPTS} attempts. Review the source error or contact an operator.`

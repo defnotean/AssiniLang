@@ -57,6 +57,31 @@ describe("IngestView Obsidian vault import", () => {
     await screen.findByText("Vault import finished: 2 imported, 1 skipped.");
   });
 
+  it("surfaces oversized vault Markdown skip reasons in the import notice", async () => {
+    apiMock.importObsidianVault.mockResolvedValue({
+      imported: [],
+      skipped: [
+        {
+          path: "Language Notes/huge.md",
+          reason: "Markdown file is larger than the 1 MB import limit."
+        }
+      ],
+      warnings: [],
+      summary: { scanned: 1, imported: 0, skipped: 1 }
+    });
+
+    await renderIngestView();
+
+    fireEvent.change(screen.getByLabelText("Vault folder path"), {
+      target: { value: VAULT_PATH }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import vault sources" }));
+
+    await screen.findByText(
+      "Vault import finished: 0 imported, 1 skipped. That Markdown note is larger than the 1 MB vault import limit. Split or shorten the note, then import again."
+    );
+  });
+
   it("surfaces allowlist errors in the vault error UI", async () => {
     apiMock.importObsidianVault.mockRejectedValue(
       new Error(

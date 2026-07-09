@@ -1,5 +1,9 @@
 import type { AiSession } from "@assini/db";
-import { sourceProcessingErrorI18n, sourceProcessingWarningI18n } from "@assini/api-contract";
+import {
+  sourceProcessingErrorI18n,
+  sourceProcessingWarningI18n,
+  vaultImportSkipReasonI18n
+} from "@assini/api-contract";
 import type {
   EvaluationArtifact,
   ExtractionDraft,
@@ -232,6 +236,7 @@ const AUDIT_ACTION_MESSAGE_KEYS: Record<string, MessageKey> = {
   "source_asset.process_started": "audit.action.sourceAssetProcessStarted",
   "source_asset.processed": "audit.action.sourceAssetProcessed",
   "source_asset.process_failed": "audit.action.sourceAssetProcessFailed",
+  "source_asset.process_cancelled": "audit.action.sourceAssetProcessCancelled",
   "source_asset.processing_recovered": "audit.action.sourceAssetProcessingRecovered",
   "source_asset.obsidian_vault_imported": "audit.action.sourceAssetObsidianVaultImported",
   "extraction_draft.accepted": "audit.action.extractionDraftAccepted",
@@ -429,6 +434,10 @@ function matchAuditSummary(summary: string): AuditSummaryMatch | undefined {
   match = normalized.match(/^Processing failed for source "(.+)"\.$/);
   if (match) {
     return { i18nKey: "audit.summary.sourceProcessFailed", i18nParams: { title: match[1]! } };
+  }
+  match = normalized.match(/^Cancelled queued processing for source "(.+)"\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.sourceProcessCancelled", i18nParams: { title: match[1]! } };
   }
   match = normalized.match(
     /^Recovered source "(.+)" from an interrupted processing run; marked failed for re-processing\.$/
@@ -1080,6 +1089,12 @@ function operatorApiErrorI18n(
   if (/Note explanation edits require a substantive explanation/i.test(normalized)) {
     return { i18nKey: "errors.noteExplanationTooShort" };
   }
+  if (/Note example passage is not in language:/i.test(normalized)) {
+    return { i18nKey: "errors.noteExamplePassageInvalid" };
+  }
+  if (/Note example text must match corpus passage:/i.test(normalized)) {
+    return { i18nKey: "errors.noteExampleTextMismatch" };
+  }
   if (/^Note not found:/i.test(normalized)) {
     return { i18nKey: "errors.noteNotFound" };
   }
@@ -1110,8 +1125,27 @@ function operatorApiErrorI18n(
   if (/Invalid exercise authoring body/i.test(normalized)) {
     return { i18nKey: "errors.invalidExerciseAuthoringBody" };
   }
+  if (
+    /Exercise references unknown (?:rule|vocabulary form):/i.test(normalized)
+    || /Exercise (?:allowed rule|allowed vocabulary|expected answer|adversarial answer|prompt|grading explanation)/i.test(normalized)
+    || /Exercise authoring (?:language not found|requires at least two adversarial probes)/i.test(normalized)
+    || /Exercise adversarial answer duplicates an expected answer:/i.test(normalized)
+    || /Translate-to-target expected answer is not present in corpus:/i.test(normalized)
+    || /Choose-particle expected answer is not allowed vocabulary:/i.test(normalized)
+  ) {
+    return { i18nKey: "errors.exerciseAuthoringValidationFailed" };
+  }
   if (/Invalid exercise submission body/i.test(normalized)) {
     return { i18nKey: "errors.invalidExerciseSubmissionBody" };
+  }
+  if (
+    /Exercise generation failed/i.test(normalized)
+    || /did not return valid JSON for exercise generation/i.test(normalized)
+    || /did not match the expected exercise shape/i.test(normalized)
+    || /only reasoning_content for exercise generation/i.test(normalized)
+    || /no draft exercise was created/i.test(normalized)
+  ) {
+    return { i18nKey: "errors.exerciseGenerationFailed" };
   }
   if (/Invalid corpus import body/i.test(normalized)) {
     return { i18nKey: "errors.invalidCorpusImportBody" };
@@ -1136,6 +1170,12 @@ function operatorApiErrorI18n(
   }
   if (/Uploaded file is empty/i.test(normalized)) {
     return { i18nKey: "errors.sourceUploadEmpty" };
+  }
+  if (/Upload title field is too large/i.test(normalized)) {
+    return { i18nKey: "errors.sourceUploadTitleTooLarge" };
+  }
+  if (/Upload title field is invalid/i.test(normalized)) {
+    return { i18nKey: "errors.sourceUploadTitleInvalid" };
   }
   if (/Source could not be stored/i.test(normalized)) {
     return { i18nKey: "errors.sourceStoreFailed" };
@@ -1355,6 +1395,15 @@ export function localizeSourceProcessingWarning(warning: string, t: Translate): 
     return t(mapped.i18nKey as MessageKey, mapped.i18nParams);
   }
   return warning;
+}
+
+/** Localizes Obsidian vault import skip reasons for operator-facing UI. */
+export function localizeVaultImportSkipReason(reason: string, t: Translate): string {
+  const mapped = vaultImportSkipReasonI18n(reason);
+  if (mapped) {
+    return t(mapped.i18nKey as MessageKey, mapped.i18nParams);
+  }
+  return reason;
 }
 
 const LLM_PROVIDER_OPTION_KEYS = new Set<MessageKey>([

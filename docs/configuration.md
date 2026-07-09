@@ -82,6 +82,7 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `ASSINI_OCR_BASE_URL` | unset | http(s) URL | OpenAI-compatible server whose `/chat/completions` endpoint reads image sources. When set, image processing tries this dedicated OCR model before the main LLM or local tesseract fallback. |
 | `ASSINI_OCR_MODEL` | `llava` | model name string | Model sent with the OCR request. Can differ from `ASSINI_LLM_MODEL` so you can keep a small text model for extraction and a vision model only for images. |
 | `ASSINI_OCR_API_KEY` | unset | secret string | Optional bearer token for the OCR server. |
+| `ASSINI_OCR_PDF_MAX_PAGES` | `10` | positive integer | Max pages OCR'd for scanned PDFs with an empty text layer. Pages beyond the cap are skipped with a warning. |
 
 ## Ingestion safety and OCR
 

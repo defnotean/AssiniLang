@@ -33,11 +33,21 @@ export type DraftGroundingFlag = {
 export type ExtractionDraftView = ExtractionDraft & {
   duplicate?: ExtractionDraftDuplicate;
   grounding?: DraftGroundingFlag[];
+  /**
+   * Present on proposed corpus drafts with a `segmentation_conflict`
+   * grounding flag: lexicon longest-match proposal for Build resolution.
+   */
+  lexiconSegmentationProposal?: CorpusPassage["morphologicalSegmentation"];
 };
 
 export type AcceptExtractionDraftResult = {
   draft: ExtractionDraft;
   entity: Lexeme | CorpusPassage | Note;
+};
+
+export type AcceptExtractionDraftOptions = {
+  preferLexiconSegmentation?: boolean;
+  morphologicalSegmentation?: CorpusPassage["morphologicalSegmentation"];
 };
 
 export type BulkReviewAction = "accept" | "reject";
@@ -123,6 +133,17 @@ export async function processSource(
   return response.json() as Promise<ProcessSourceResult>;
 }
 
+export async function cancelSourceProcessing(sourceId: string): Promise<{ asset: SourceAsset }> {
+  const response = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/cancel-processing`, {
+    method: "POST",
+    ...(await actorRequest("reviewer"))
+  });
+
+  await assertOk(response, "Source processing cancel failed");
+
+  return response.json() as Promise<{ asset: SourceAsset }>;
+}
+
 export async function fetchExtractionDrafts(
   languageId: string,
   status?: ExtractionDraft["status"]
@@ -134,10 +155,26 @@ export async function fetchExtractionDrafts(
   );
 }
 
-export async function acceptExtractionDraft(draftId: string): Promise<AcceptExtractionDraftResult> {
+export async function acceptExtractionDraft(
+  draftId: string,
+  options?: AcceptExtractionDraftOptions
+): Promise<AcceptExtractionDraftResult> {
+  const hasOverride = options?.preferLexiconSegmentation === true
+    || (options?.morphologicalSegmentation !== undefined
+      && options.morphologicalSegmentation.length > 0);
   const response = await fetch(`/api/extraction-drafts/${encodeURIComponent(draftId)}/accept`, {
     method: "POST",
-    ...(await actorRequest("reviewer"))
+    ...(await actorRequest("reviewer", hasOverride)),
+    ...(hasOverride
+      ? {
+          body: JSON.stringify({
+            ...(options?.preferLexiconSegmentation ? { preferLexiconSegmentation: true } : {}),
+            ...(options?.morphologicalSegmentation
+              ? { morphologicalSegmentation: options.morphologicalSegmentation }
+              : {})
+          })
+        }
+      : {})
   });
 
   await assertOk(response, "Extraction draft accept failed");

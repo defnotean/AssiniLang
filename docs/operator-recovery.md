@@ -1,6 +1,6 @@
 # Operator recovery runbook
 
-Short procedures for local operators running AssiniLang as a research console or local beta. For symptom tables and model-specific fixes, see [Troubleshooting](troubleshooting.md). For backup API details, see [Maintenance Guide — backing up and restoring](maintenance.md#backing-up-and-restoring-the-local-database).
+Short procedures for local operators running AssiniLang as a research console or local beta. For symptom tables and model-specific fixes, see [Troubleshooting](troubleshooting.md). For backup API details, see [Maintenance Guide — backing up and restoring](maintenance.md#backing-up-and-restoring-the-local-database). For sanitized snapshot/artifact exports and audit receipts, see [Audit / Export Drill](audit-export-drill.md).
 
 ## Local data paths
 
@@ -11,7 +11,7 @@ AssiniLang keeps all workspace data under the configured data directory (repo ch
 | `data/local-db.json` | Default JSON workspace (languages, sources, drafts, audit events, users). A path that does not end in `.json` selects the SQLite backend instead. |
 | `data/backups/` | Timestamped backups from `npm.cmd run db:backup` (CLI) or the desktop app's backup tools. |
 | `data/assets/<languageId>/` | Uploaded source files (images, audio, PDF, DOCX) referenced by `sourceAssets.filePath`. |
-| `data/ocr-cache/` | Cached tesseract.js trained data for the local OCR image fallback (`ASSINI_OCR_LANG`); scanned PDFs use the configured vision OCR model (`ASSINI_OCR_BASE_URL`) on page 1 only. |
+| `data/ocr-cache/` | Cached tesseract.js trained data for the local OCR image fallback (`ASSINI_OCR_LANG`); scanned PDFs use the configured vision OCR model (`ASSINI_OCR_BASE_URL`) on pages 1..N (cap via `ASSINI_OCR_PDF_MAX_PAGES`). |
 | `data/ingestion-uploads/` | Temporary multipart upload staging (ignored by Git). |
 
 **Desktop packaged app:** Settings → Desktop app tools shows the install folder, local data directory, backups folder, and latest backup path. Backups and data live under the per-user app data root (for example `%APPDATA%\AssiniLang\`), not necessarily the repo `data/` tree.
@@ -62,6 +62,46 @@ If a source stays **`processing` while the API is still running** (background ta
 
 See [Ingestion Deep Dive — sync vs async processing](ingestion.md#sync-vs-async-processing) for the full flow.
 
+## Acceptance drills (operator recovery pack)
+
+These drills produce checkable artifacts for the local-beta acceptance pack. Automated coverage lives in `npm.cmd run smoke:backup` (timed backup/restore) and `apps/api/src/jobRecovery.test.ts` (interrupted-processing drill log). The corrupted-database loud-failure screenshot remains a manual capture.
+
+### Timed backup/restore exercise
+
+Goal: prove backup → loud corrupt failure → restore returns the pre-backup workspace, and record elapsed times.
+
+**Automated (preferred for CI):**
+
+```powershell
+npm.cmd run smoke:backup
+```
+
+The smoke prints a pasteable JSON line starting with `timed backup/restore drill log:` that includes per-step `elapsedMs`, `totalElapsedMs`, and a soft CI bound (`softBoundMs`). Times are for a tiny fixture workspace, not a production SLA.
+
+**Manual (dev checkout):**
+
+1. Note the live database path (`data/local-db.json` or `ASSINI_DB_PATH`).
+2. Run `npm.cmd run db:backup` and keep the printed restore recipe.
+3. Optionally corrupt the live file (or restore into a throwaway copy) and confirm reads fail loudly.
+4. Run the printed `JsonStore.restoreFrom(...)` recipe.
+5. Confirm `/ready`, then open Build and verify languages/sources match the pre-backup workspace.
+6. Record wall-clock start/finish (or paste the automated drill log) into the acceptance pack.
+
+### Interrupted-processing drill log
+
+Goal: prove a crash mid-process leaves a reprocessable `failed` asset with a recovery audit event.
+
+**Automated (preferred for CI):** `apps/api/src/jobRecovery.test.ts` → `interrupted-processing drill log` asserts the checklist below and builds a pasteable drill object (`drill: "interrupted-processing"`, `auditAction: "source_asset.processing_recovered"`, `outcome: "pass"`).
+
+**Manual checklist (API already running with a source in `processing`):**
+
+1. Stop the API process while a source shows `processing` in Build (or seed a stuck asset in a throwaway workspace).
+2. Restart the API; wait until `GET /ready` succeeds (startup recovery runs on ready).
+3. Confirm the source is `failed` with `Processing interrupted by a server restart. Re-run processing.`
+4. Confirm an audit event `source_asset.processing_recovered` with `metadata.reason: "interrupted_restart"`.
+5. Re-run **Process**; a successful run clears `processingAttempts` and in-flight markers.
+6. Paste the automated drill assertion output or a short note of steps 1–5 into the acceptance pack.
+
 ## Corrupted database — loud failure and reseed
 
 AssiniLang **fails loudly** on read when `data/local-db.json` (or the SQLite file) does not validate against `appStateSchema`. Startup or the first mutation returns an error that names the database path and usually the offending collection or field.
@@ -87,7 +127,7 @@ Reseed writes an empty workspace (prototype users, no languages) and **discards*
 | `GET /health`, `GET /ready` | Liveness and readiness (recovery runs on ready). |
 | Settings → Model Setup | Provider mode, readiness warnings, **Test connection** (`POST /llm/health-check`) for reachability (not just config shape). |
 | Settings → Desktop app tools → **Copy diagnostics** / **Save diagnostics** | Redacted bundle: paths, backup summary, model discovery, observability counts — no API keys or answer keys. |
-| Audit events (Review / export) | `source_asset.process_started`, `source_asset.processing_recovered`, draft accept/reject, language mutations. |
+| Audit events (Review / export) | `source_asset.process_started`, `source_asset.processing_recovered`, draft accept/reject, language mutations, plus export receipts (`language_snapshot.exported`, `evaluation_artifact.exported`) from the [audit/export drill](audit-export-drill.md). |
 
 When filing an issue, include the sanitized diagnostics text, the source kind and title, and whether processing was sync or async.
 

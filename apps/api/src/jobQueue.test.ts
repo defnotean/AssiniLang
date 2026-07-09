@@ -189,4 +189,56 @@ describe("JobQueue", () => {
       active: []
     });
   });
+
+  it("cancels pending jobs before they start", async () => {
+    const queue = new JobQueue(1);
+    let resolveActive!: () => void;
+    const activeGate = new Promise<void>((resolve) => {
+      resolveActive = resolve;
+    });
+    let pendingRan = false;
+
+    queue.add("active-job", async () => {
+      await activeGate;
+    });
+    queue.add("pending-job", async () => {
+      pendingRan = true;
+    });
+
+    await sleep(10);
+
+    expect(queue.isPending("pending-job")).toBe(true);
+    expect(queue.isActive("active-job")).toBe(true);
+    expect(queue.cancel("pending-job")).toBe(true);
+    expect(queue.isPending("pending-job")).toBe(false);
+    expect(queue.isQueuedOrActive("pending-job")).toBe(false);
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 1 });
+
+    resolveActive();
+    await sleep(20);
+
+    expect(pendingRan).toBe(false);
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
+  });
+
+  it("refuses to cancel an active job", async () => {
+    const queue = new JobQueue(1);
+    let resolveActive!: () => void;
+    const activeGate = new Promise<void>((resolve) => {
+      resolveActive = resolve;
+    });
+
+    queue.add("active-job", async () => {
+      await activeGate;
+    });
+    await sleep(10);
+
+    expect(queue.isActive("active-job")).toBe(true);
+    expect(queue.cancel("active-job")).toBe(false);
+    expect(queue.isActive("active-job")).toBe(true);
+
+    resolveActive();
+    await sleep(20);
+    expect(queue.cancel("missing-job")).toBe(false);
+  });
 });

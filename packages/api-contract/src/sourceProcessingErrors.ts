@@ -65,6 +65,10 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.processingStalledWithoutProgress" };
   }
 
+  if (/Queued source processing was cancelled/i.test(normalized)) {
+    return { i18nKey: "ingest.sourceProcessingCancelled" };
+  }
+
   const urlFetchFailed = normalized.match(/Fetching source URL failed with status (\d+)/i);
   if (urlFetchFailed) {
     return {
@@ -117,16 +121,62 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
   const normalized = warning.trim();
   if (!normalized) return undefined;
 
-  const multiPage = normalized.match(/PDF has (\d+) pages;\s*only page 1 was OCR'?d/i);
-  if (multiPage) {
+  const multiPageCap = normalized.match(
+    /PDF has (\d+) pages;\s*only the first (\d+) pages were OCR'?d/i
+  );
+  if (multiPageCap) {
     return {
       i18nKey: "ingest.ocrPdfMultiPageWarning",
-      i18nParams: { pages: Number(multiPage[1]) }
+      i18nParams: { pages: Number(multiPageCap[1]), maxPages: Number(multiPageCap[2]) }
     };
   }
 
+  // Legacy page-1-only warning (persisted before multi-page OCR).
+  const multiPageLegacy = normalized.match(/PDF has (\d+) pages;\s*only page 1 was OCR'?d/i);
+  if (multiPageLegacy) {
+    return {
+      i18nKey: "ingest.ocrPdfMultiPageWarning",
+      i18nParams: { pages: Number(multiPageLegacy[1]), maxPages: 1 }
+    };
+  }
+
+  const pdfOcrUsed = normalized.match(
+    /Used configured OCR model to read scanned document \((\d+) of (\d+) pages\)/i
+  );
+  if (pdfOcrUsed) {
+    return {
+      i18nKey: "ingest.ocrPdfUsed",
+      i18nParams: {
+        succeeded: Number(pdfOcrUsed[1]),
+        attempted: Number(pdfOcrUsed[2])
+      }
+    };
+  }
+
+  // Legacy page-1 success notice.
   if (/Used configured OCR model to read scanned document \(page 1\)/i.test(normalized)) {
-    return { i18nKey: "ingest.ocrPdfPage1Used" };
+    return {
+      i18nKey: "ingest.ocrPdfUsed",
+      i18nParams: { succeeded: 1, attempted: 1 }
+    };
+  }
+
+  const pageFailed = normalized.match(
+    /OCR failed for page (\d+);\s*continuing with remaining pages/i
+  );
+  if (pageFailed) {
+    return {
+      i18nKey: "ingest.ocrPdfPageFailed",
+      i18nParams: { page: Number(pageFailed[1]) }
+    };
+  }
+
+  const pageSkipped = normalized.match(/OCR skipped page (\d+)/i);
+  if (pageSkipped) {
+    return {
+      i18nKey: "ingest.ocrPdfPageSkipped",
+      i18nParams: { page: Number(pageSkipped[1]) }
+    };
   }
 
   if (/Used configured OCR model to read the image/i.test(normalized)) {
@@ -183,6 +233,25 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
       i18nKey: "ingest.warningVaultFileLimit",
       i18nParams: { maxFiles: Number(vaultFileLimit[1]) }
     };
+  }
+
+  return undefined;
+}
+
+/**
+ * Maps Obsidian vault import skip reasons (and related intake size messages)
+ * to stable i18n keys for operator-facing UI.
+ */
+export function vaultImportSkipReasonI18n(reason: string): SourceProcessingErrorI18n | undefined {
+  const normalized = reason.trim();
+  if (!normalized) return undefined;
+
+  if (/Markdown file is larger than the 1 MB import limit/i.test(normalized)) {
+    return { i18nKey: "ingest.vaultMarkdownTooLarge" };
+  }
+
+  if (/Markdown file had no importable text/i.test(normalized)) {
+    return { i18nKey: "ingest.vaultMarkdownEmpty" };
   }
 
   return undefined;

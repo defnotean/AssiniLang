@@ -1,0 +1,40 @@
+{
+  "fixtureVersion": "bulk-source-processing-v1",
+  "languageId": "testlang",
+  "description": "Synthetic multi-source pack for deterministic bulk source-processing coverage (offline heuristics).",
+  "sources": [
+    {
+      "key": "wordlist-core",
+      "kind": "wordlist",
+      "title": "Bulk fixture wordlist",
+      "file": "sources/01-wordlist.txt",
+      "expected": {
+        "minDrafts": 4,
+        "lexemeForms": ["vel", "mir", "saku", "tora"],
+        "passageTargets": []
+      }
+    },
+    {
+      "key": "passages",
+      "kind": "text",
+      "title": "Bulk fixture passages",
+      "file": "sources/02-passages.txt",
+      "expected": {
+        "minDrafts": 2,
+        "lexemeForms": [],
+        "passageTargets": ["saku vel mir", "tora vel"]
+      }
+    },
+    {
+      "key": "mixed",
+      "kind": "text",
+      "title": "Bulk fixture mixed",
+      "file": "sources/03-mixed.txt",
+      "expected": {
+        "minDrafts": 2,
+        "lexemeForms": ["nala"],
+        "passageTargets": ["saku tora-na"]
+      }
+    }
+  ]
+}

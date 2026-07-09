@@ -15,6 +15,7 @@ const DOC_FILES = [
   "docs/ingestion.md",
   "docs/maintenance.md",
   "docs/operator-recovery.md",
+  "docs/audit-export-drill.md",
   "docs/product-guide.md",
   "docs/roadmap.md",
   "docs/troubleshooting.md",
@@ -126,7 +127,12 @@ describe("project documentation", () => {
         "npm.cmd run verify:beta",
         "npm.cmd run ci:green"
       ],
-      "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
+      "docs/README.md": [
+        "[UI Design Guide](ui-design.md)",
+        "[Audit / Export Drill](audit-export-drill.md)",
+        "## Reading paths",
+        "## Doc index"
+      ],
       "docs/api.md": [
         "verifyExportIntegrity",
         "missing or null `integrity`",
@@ -174,8 +180,10 @@ describe("project documentation", () => {
         "errors.bulkReviewInvalidDraftIds",
         "errors.bulkReviewTooManyDraftIds",
         "errors.invalidExerciseAuthoringBody",
+        "errors.exerciseAuthoringValidationFailed",
         "errors.invalidExerciseSubmissionBody",
         "errors.exerciseNotFound",
+        "errors.exerciseGenerationFailed",
         "errors.invalidCorpusImportBody",
         "errors.corpusImportValidationFailed",
         "errors.extractionDraftNotFound",
@@ -189,6 +197,7 @@ describe("project documentation", () => {
         "whitespace-only, or repeated `languageId`",
         "elder-correction nodes with redacted labels",
         "errors.payloadTooLarge",
+        "1 MB import limit",
         "app.rateLimitExceeded",
         "elderWs.errInvalidCorrectionBody",
         "elderWs.errNoteNotFoundForLanguage",
@@ -254,6 +263,7 @@ describe("project documentation", () => {
         "--omit=dev",
         "CLI refusal checks",
         "SQLite force-overwrite",
+        "timed backup/restore drill log",
         "select-or-create empty state",
         "Building a language from raw sources",
         "ASSINI_EVAL_REQUIRE_LANGUAGES",
@@ -275,7 +285,10 @@ describe("project documentation", () => {
         "OCR model endpoint returned no text",
         "leaving the model unset",
         "successful run clears the counter",
-        "stay blocked"
+        "stay blocked",
+        "ingest.urlContentTooLarge",
+        "ingest.vaultMarkdownTooLarge",
+        "errors.payloadTooLarge"
       ],
       "docs/maintenance.md": [
         "## Adding an API route",
@@ -301,7 +314,9 @@ describe("project documentation", () => {
         "database file only",
         "not `data/assets/`",
         "refuses to replace live data if that safety backup fails",
-        "dry-run still succeeds and prints a warning"
+        "dry-run still succeeds and prints a warning",
+        "docs/audit-export-drill.md",
+        "docs/operator-recovery.md"
       ],
       "docs/operator-recovery.md": [
         "## Local data paths",
@@ -333,7 +348,37 @@ describe("project documentation", () => {
         "data/assets/",
         "backup-safety-before-restore-",
         "refuses to wipe live data if that safety backup fails",
-        "dry-run still succeeds and warns"
+        "dry-run still succeeds and warns",
+        "audit-export-drill.md",
+        "language_snapshot.exported",
+        "evaluation_artifact.exported",
+        "## Acceptance drills (operator recovery pack)",
+        "Timed backup/restore exercise",
+        "timed backup/restore drill log:",
+        "Interrupted-processing drill log",
+        "interrupted-processing drill log",
+        "metadata.reason: \"interrupted_restart\""
+      ],
+      "docs/audit-export-drill.md": [
+        "## What you prove",
+        "## Fixtures and automated guard",
+        "## Step-by-step local drill",
+        "fixtures/exports/language-snapshot.sample.json",
+        "fixtures/exports/evaluation-artifact.sample.json",
+        "scripts/reviewAccountability.test.ts",
+        "language-snapshot-v2",
+        "evaluation-artifact-v2",
+        "language_snapshot.exported",
+        "evaluation_artifact.exported",
+        "verifyExportIntegrity",
+        "/exports/languages/testlang/snapshot",
+        "/exports/evaluations/artifact",
+        "/audit/events",
+        "x-assini-user-id",
+        "x-assini-dev-token",
+        "Cache-Control: no-store",
+        "errors.languageNotFound",
+        "operator-recovery.md"
       ],
       "docs/roadmap.md": [
         "Non-negotiable gate",
@@ -353,7 +398,15 @@ describe("project documentation", () => {
         "smoke:backup",
         "success clears the counter",
         "source_asset.processing_recovered",
-        "in-process only"
+        "in-process only",
+        "audit-export-drill.md",
+        "acceptance-pack screenshots",
+        "Operator recovery drills",
+        "timed backup/restore drill log",
+        "interrupted-processing drill log",
+        "corrupted-database loud-failure screenshot",
+        "oversizedImportFailures.test.ts",
+        "ingest.vaultMarkdownTooLarge"
       ],
       "docs/product-guide.md": [
         "leadless",

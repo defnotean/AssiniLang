@@ -11,11 +11,11 @@ This document explains how a raw source becomes reviewable extraction drafts. Th
 | `url` | Same route with a `url` | Public http(s) pages, capped at 2 MB | Server-side fetch, HTML converted to plain text, SSRF guard applied | Offline heuristic parsing of the fetched text |
 | `image` | `POST /languages/:languageId/sources/upload` (image MIME/extension) | Photos or scans of printed/handwritten material | OCR model (`ASSINI_OCR_BASE_URL`) when configured; else vision-capable main LLM; else local tesseract.js | OCR/tesseract text then offline heuristic parsing |
 | `audio` | Upload (audio MIME/extension) | Recordings | Transcribed via the `ASSINI_TRANSCRIBE_BASE_URL` endpoint; the transcript is stored on the asset and reused on reprocess | None - transcription endpoint is required |
-| `document` | Upload (everything else) | `txt`, `md`, `markdown`, `csv`, `tsv`, `json`, `text`, plus PDF (`unpdf`) and DOCX (`mammoth`) | File parsed to plain text; scanned PDFs with no text layer use OCR model on page 1 when `ASSINI_OCR_BASE_URL` is set | Offline heuristic parsing of the parsed text |
+| `document` | Upload (everything else) | `txt`, `md`, `markdown`, `csv`, `tsv`, `json`, `text`, plus PDF (`unpdf`) and DOCX (`mammoth`) | File parsed to plain text; scanned PDFs with no text layer use OCR model on pages 1..N (cap via `ASSINI_OCR_PDF_MAX_PAGES`, default 10) when `ASSINI_OCR_BASE_URL` is set | Offline heuristic parsing of the parsed text |
 
 Uploads are multipart, one file, 25 MB cap, stored under `data/assets/<languageId>/`. The upload route detects the kind from MIME type and extension.
 
-Obsidian vault import is a bulk intake helper, not a separate persisted source kind. `POST /languages/:languageId/sources/obsidian-vault` reads local Markdown files from a vault folder, skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, and registers each readable note as a pending `text` source. Those sources then use the same processing, warnings, draft review, and audit paths as pasted text. Vault folders must sit under `ASSINI_OBSIDIAN_VAULT_ROOTS` (fail-closed when unset); see [configuration](configuration.md#ingestion-safety-and-ocr).
+Obsidian vault import is a bulk intake helper, not a separate persisted source kind. `POST /languages/:languageId/sources/obsidian-vault` reads local Markdown files from a vault folder, skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, and registers each readable note as a pending `text` source. Notes larger than 1 MB are skipped (not imported) with an operator-facing reason localized as `ingest.vaultMarkdownTooLarge`. Those sources then use the same processing, warnings, draft review, and audit paths as pasted text. Vault folders must sit under `ASSINI_OBSIDIAN_VAULT_ROOTS` (fail-closed when unset); see [configuration](configuration.md#ingestion-safety-and-ocr).
 
 ## Processing flow
 
@@ -26,7 +26,7 @@ flowchart TD
     B -->|audio| D[Transcribe via<br>ASSINI_TRANSCRIBE_BASE_URL]
     B -->|document| E[Parse PDF / DOCX /<br>plain-text formats]
     E --> E2{PDF text layer<br>empty?}
-    E2 -->|yes + OCR configured| E3[OCR model reads page 1<br>embedded image]
+    E2 -->|yes + OCR configured| E3[OCR model reads pages 1..N<br>embedded images]
     E2 -->|no or has text| J[Normalized text]
     E3 --> J
     B -->|text / wordlist| F[Raw text]
@@ -78,6 +78,8 @@ Because chunked extraction through a slow local model can take minutes, the rout
 
 A source that is already `processing` returns `409` in both modes. There is no in-process resume, but a startup recovery sweep (`apps/api/src/jobRecovery.ts`, run from the server's ready hook) resets every asset left in `processing` by a crash to `failed` with the operator-visible error `Processing interrupted by a server restart. Re-run processing.` and a `source_asset.processing_recovered` audit event; the source can then be reprocessed normally (see [troubleshooting](troubleshooting.md)). Recovery and process completion both clear `processingStartedAt` / `processingHeartbeatAt`. Failures and recovery keep `processingAttempts`; a successful run clears the counter so only failed/abandoned claims count toward the max-attempt cap.
 
+Operators can cancel a **pending** (not yet active) background job with `POST /sources/:sourceId/cancel-processing`. That removes the queue entry, marks the asset `failed` with `Queued source processing was cancelled. Re-run processing when ready.`, and appends `source_asset.process_cancelled`. Active jobs cannot be cancelled mid-run (`409` / `ingest.sourceProcessingCancelActive`).
+
 ## SSRF guard
 
 URL sources are fetched server-side, so the fetcher refuses to be a proxy into the local network. Unless `ASSINI_ALLOW_PRIVATE_URLS=1` (or `true`):
@@ -102,19 +104,19 @@ Image sources resolve text in priority order:
 - The first run for a given language downloads its trained data from the tesseract.js CDN (a few MB, internet required once) and caches it under `data/ocr-cache/`; later runs are offline.
 - OCR output feeds the same downstream extraction as pasted text, and the result carries the warning `No vision model configured; used local OCR (tesseract.js) to read the image.`
 
-OCR applies to `image` sources and to scanned PDF `document` sources when the text layer is empty and `ASSINI_OCR_BASE_URL` is configured. For scanned PDFs, only page 1 is processed: `unpdf` extracts the largest embedded page image (typical for image-only scans), encodes it as PNG, and sends it to the OCR model. DOCX files with no text layer still fail closed.
+OCR applies to `image` sources and to scanned PDF `document` sources when the text layer is empty and `ASSINI_OCR_BASE_URL` is configured. For scanned PDFs, pages 1..N are processed up to `ASSINI_OCR_PDF_MAX_PAGES` (default 10): `unpdf` extracts the largest embedded image per page (typical for image-only scans), encodes each as PNG, and sends it to the OCR model. Soft-fail per page (warn + continue). DOCX files with no text layer still fail closed.
 
 ## Scanned PDF OCR (documents)
 
 When a PDF upload has no extractable text layer:
 
-1. If `ASSINI_OCR_BASE_URL` is set, page 1 is OCR'd via the same vision model path as images (`ocrScannedPdfFirstPage` in `apps/api/src/ingestion.ts`).
-2. The largest embedded image on page 1 is extracted with `unpdf` `extractImages`, written to a temporary PNG, and passed to `ocrImageWithModel`.
-3. OCR output continues through the normal text extraction pipeline and adds the warning `Used configured OCR model to read scanned document (page 1).`
-4. Multi-page scanned PDFs also add `PDF has N pages; only page 1 was OCR'd...`; the Build UI localizes both warnings for operators.
-5. If the OCR model is not configured, processing fails with guidance to set `ASSINI_OCR_BASE_URL`.
+1. If `ASSINI_OCR_BASE_URL` is set, pages 1..N are OCR'd via the same vision model path as images (`ocrScannedPdfPages` in `apps/api/src/ingestion.ts`).
+2. For each page up to the cap, the largest embedded image is extracted with `unpdf` `extractImages`, written to a temporary PNG, and passed to `ocrImageWithModel`.
+3. Successful page texts are concatenated with `--- Page N ---` markers when more than one page is attempted; output continues through the normal text extraction pipeline with `Used configured OCR model to read scanned document (S of A pages).`
+4. Per-page failures soft-fail (`OCR failed for page N...` / `OCR skipped page N...`) and processing continues. A page-cap warning is added only when the PDF has more pages than `ASSINI_OCR_PDF_MAX_PAGES`.
+5. If the OCR model is not configured, or every attempted page fails with no readable text, processing fails with guidance to set `ASSINI_OCR_BASE_URL` or export pages as images.
 
-Limitations: only page 1 is read; PDFs that rasterize pages without embedded images cannot be OCR'd in-process (export page 1 as an image and upload it instead). DOCX OCR is not implemented yet; empty DOCX text layers fail with a localized `ingest.ocrDocxUnsupported` hint in Build.
+Limitations: pages beyond the configured cap are not read; PDFs that rasterize pages without embedded images cannot be OCR'd in-process (export those pages as images and upload them instead). DOCX OCR is not implemented yet; empty DOCX text layers fail with a localized `ingest.ocrDocxUnsupported` hint in Build.
 
 ## Transcription (audio)
 
@@ -141,6 +143,8 @@ The same listing also computes a read-time `grounding` array (`{ kind, message }
 | `decomposable_form` | "Form decomposes into accepted lexemes" | A lexeme draft's form is fully covered by a concatenation of 2-3 accepted lexeme forms (e.g. `talune` = `talu` "water" + `ne` "locative case marker"), so the model may have glossed a multi-morpheme word as one new lexeme. |
 | `segmentation_conflict` | "Segment gloss conflicts with lexicon" | A corpus-passage draft's segmentation glosses a surface differently from the accepted lexeme with the same form. |
 
+When a proposed corpus draft carries `segmentation_conflict`, the listing also includes a read-time `lexiconSegmentationProposal` (lexicon longest-match morphemes for the draft target text) so Build can show draft glosses vs the lexicon side by side. Reviewers resolve via accept: keep the draft (no body), prefer lexicon (`preferLexiconSegmentation: true`), or accept an edited gloss list (`morphologicalSegmentation`).
+
 ## Error catalogue
 
 Errors from processing mark the source `failed` with a sanitized message and return `422` (sync) or land on the asset's `error` field (async). Route-level errors return their listed status.
@@ -158,7 +162,9 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Obsidian vault import is disabled until ASSINI_OBSIDIAN_VAULT_ROOTS is set ...` / `Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.` | 400 | Vault roots unset, or path outside allowlist (`..` / symlink escapes included) | Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to semicolon-separated absolute roots and import a path under one of them. |
 | `Source URL hostname ... resolves to a private or local network address and was blocked.` | 422 | DNS resolved to a private range | Same as above. |
 | `Fetching source URL failed with status N.` | 422 | The remote server returned an error | Check the URL is reachable and public. |
-| `Source URL content is too large to process locally.` | 422 | Response over 2 MB | Save the relevant part as text and paste or upload it. |
+| `Source URL content is too large to process locally.` (`i18nKey: ingest.urlContentTooLarge`) | 422 | Response over 2 MB | Save the relevant part as text and paste or upload it. |
+| `Markdown file is larger than the 1 MB import limit.` (`i18nKey: ingest.vaultMarkdownTooLarge`) | vault skip | Obsidian note over 1 MB | Split or shorten the note, then import again. |
+| `Payload too large` (`i18nKey: errors.payloadTooLarge`) | 413 | JSON body over `ASSINI_BODY_LIMIT_BYTES` (default 64 KB) or multipart upload over the 25 MB file cap | Shrink the JSON payload or upload a smaller file. |
 | `Source URL returned no readable text content.` | 422 | Page had no extractable text | Paste the text manually. |
 | `Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL ...` (`i18nKey: ingest.transcribeNotConfigured`) | 422 | No transcription server configured | Configure a whisper-style server; see [configuration](configuration.md#transcription-audio-sources). |
 | `Transcription request failed with status N.` / `Transcription request failed: ...` / `Transcription endpoint returned no text.` / `... invalid JSON.` (`i18nKey: ingest.transcribeFailed`) | 422 | Transcription server error, network failure, empty result, or malformed JSON | Check the server, model name, and audio file. |
@@ -166,8 +172,8 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Local OCR could not read the image: ...` (`i18nKey: ingest.ocrNoReadableText`) | 422 | Tesseract fallback failed (often `OCR found no readable text in the image.`) | Provide a clearer image, set `ASSINI_OCR_LANG` to match the script, or configure `ASSINI_OCR_BASE_URL` / a vision-capable main LLM. |
 | `The configured model returned no usable result for this image. It may not be vision-capable. ... leaving the model unset.` (`i18nKey: ingest.visionModelRequired`) | 422 | An image source was sent to a configured but non-vision main LLM with no OCR model | Configure `ASSINI_OCR_BASE_URL` with a vision model, set a vision-capable `ASSINI_LLM_MODEL`, or leave the main model unset so the image falls back to local tesseract. |
 | `The model response could not be parsed as extraction JSON. Try again or use a larger model.` | 422 | A vision model replied with non-JSON output | Retry, or use a model that follows JSON instructions. |
-| `Configured OCR model could not read the scanned PDF: ...` (`i18nKey: ingest.ocrModelFailed`) / `The PDF has no embedded page image to OCR. ...` (`i18nKey: ingest.ocrPdfNoImage`) | 422 | Scanned PDF OCR model call failed, or page 1 had no embedded image | Check `ASSINI_OCR_BASE_URL` / `ASSINI_OCR_MODEL`, confirm the vision model is loaded, or export page 1 as an image and upload it. |
-| `The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only).` | 422 | Scanned/image-only PDF and no OCR model configured | Set `ASSINI_OCR_BASE_URL` (for example a local llava server) or export pages as images and upload those. |
+| `Configured OCR model could not read the scanned PDF: ...` (`i18nKey: ingest.ocrModelFailed`) / `The PDF has no embedded page image to OCR. ...` (`i18nKey: ingest.ocrPdfNoImage`) | 422 | Every attempted page failed OCR, or no page had an embedded image | Check `ASSINI_OCR_BASE_URL` / `ASSINI_OCR_MODEL`, confirm the vision model is loaded, or export pages as images and upload them. |
+| `The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs.` | 422 | Scanned/image-only PDF and no OCR model configured | Set `ASSINI_OCR_BASE_URL` (for example a local llava server) or export pages as images and upload those. |
 | `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
 | `Document type .X is not supported yet. Upload a PDF, DOCX, plain-text, Markdown, or CSV file, or convert it first.` | 422 | Unsupported document extension | Convert to a supported format. |
 | `Text source asset has no content.` / `... has no stored file.` / `URL source asset has no URL.` | 422 | The asset record is incomplete (usually hand-edited state) | Re-register or re-upload the source. |
@@ -184,8 +190,9 @@ Warnings (extraction still succeeds, result is flagged). Processing warnings are
 | `Source text is very long; only the first 8 parts were processed and N characters were skipped.` (`i18nKey: ingest.warningChunkCapSkipped`) | The source exceeded the chunk cap. |
 | `No vision model configured; used local OCR (tesseract.js) to read the image.` (`i18nKey: ingest.warningLocalOcrUsed`) | The tesseract fallback path ran for an image source (no OCR model or vision LLM succeeded). |
 | `Used configured OCR model to read the image.` (`i18nKey: ingest.ocrImageUsed`) | The `ASSINI_OCR_BASE_URL` endpoint read the image successfully. |
-| `Used configured OCR model to read scanned document (page 1).` (`i18nKey: ingest.ocrPdfPage1Used`) | A scanned PDF with no text layer was OCR'd via page 1's embedded image. |
-| `PDF has N pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them.` (`i18nKey: ingest.ocrPdfMultiPageWarning`) | Multi-page scanned PDF; only page 1 was OCR'd. |
+| `Used configured OCR model to read scanned document (S of A pages).` (`i18nKey: ingest.ocrPdfUsed`) | A scanned PDF with no text layer was OCR'd via embedded page images (S succeeded of A attempted). |
+| `PDF has N pages; only the first M pages were OCR'd. Raise ASSINI_OCR_PDF_MAX_PAGES...` (`i18nKey: ingest.ocrPdfMultiPageWarning`) | Scanned PDF exceeded the OCR page cap (`ASSINI_OCR_PDF_MAX_PAGES`, default 10). |
+| `OCR failed for page N; continuing with remaining pages.` (`i18nKey: ingest.ocrPdfPageFailed`) / `OCR skipped page N...` (`i18nKey: ingest.ocrPdfPageSkipped`) | Soft-fail for one page; other pages may still succeed. |
 
 ## After extraction
 

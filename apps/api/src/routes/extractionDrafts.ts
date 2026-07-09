@@ -15,12 +15,118 @@ import {
   appendAuditEvent,
   corpusPhonologyValidationError,
   corpusTargetContainsSurface,
+  parseStringArray,
   requireActor
 } from "../routeHelpers.js";
-import { enrichSegmentationFromLexicon } from "../segmentationProposals.js";
+import {
+  enrichSegmentationFromLexicon,
+  proposeLexiconSegmentation
+} from "../segmentationProposals.js";
 import type { RouteContext } from "./context.js";
 
 const BULK_REVIEW_MAX_IDS = 50;
+
+export type AcceptDraftOptions = {
+  /**
+   * When true, commit lexicon longest-match segmentation instead of the
+   * draft's proposed morphemes (Build "Prefer lexicon" resolution).
+   */
+  preferLexiconSegmentation?: boolean;
+  /**
+   * Optional reviewer-edited segmentation applied before accept. Mutually
+   * exclusive with {@link preferLexiconSegmentation}.
+   */
+  morphologicalSegmentation?: CorpusPassage["morphologicalSegmentation"];
+};
+
+function parseAcceptDraftMorphemes(
+  value: unknown
+): CorpusPassage["morphologicalSegmentation"] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const morphemes: CorpusPassage["morphologicalSegmentation"] = [];
+
+  for (const item of value) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
+    const record = item as Record<string, unknown>;
+    const surface = typeof record.surface === "string" ? record.surface.trim() : "";
+    const lemma = typeof record.lemma === "string" ? record.lemma.trim() : "";
+    const gloss = typeof record.gloss === "string" ? record.gloss.trim() : "";
+    const features = parseStringArray(record.features);
+    if (!surface || !lemma || !gloss || !features) return undefined;
+    morphemes.push({ surface, lemma, gloss, features });
+  }
+
+  return morphemes.length > 0 ? morphemes : undefined;
+}
+
+/**
+ * Parses the optional accept-body override used by Build segmentation
+ * conflict resolution. Empty / missing body is fine (keep draft).
+ */
+export function parseAcceptDraftBody(input: unknown):
+  | { ok: true; options: AcceptDraftOptions }
+  | { ok: false; error: string; i18nKey: string } {
+  if (input === undefined || input === null || input === "") {
+    return { ok: true, options: {} };
+  }
+  if (typeof input !== "object" || Array.isArray(input)) {
+    return {
+      ok: false,
+      error: "Accept body must be an object when provided.",
+      i18nKey: "errors.invalidExtractionDraftAcceptBody"
+    };
+  }
+
+  const body = input as Record<string, unknown>;
+  const knownKeys = new Set(["preferLexiconSegmentation", "morphologicalSegmentation"]);
+  for (const key of Object.keys(body)) {
+    if (!knownKeys.has(key)) {
+      return {
+        ok: false,
+        error: `Unknown accept body field: ${key}`,
+        i18nKey: "errors.invalidExtractionDraftAcceptBody"
+      };
+    }
+  }
+
+  const preferRaw = body.preferLexiconSegmentation;
+  if (preferRaw !== undefined && typeof preferRaw !== "boolean") {
+    return {
+      ok: false,
+      error: "preferLexiconSegmentation must be a boolean when provided.",
+      i18nKey: "errors.invalidExtractionDraftAcceptBody"
+    };
+  }
+  const preferLexiconSegmentation = preferRaw === true;
+
+  let morphologicalSegmentation: CorpusPassage["morphologicalSegmentation"] | undefined;
+  if (body.morphologicalSegmentation !== undefined) {
+    morphologicalSegmentation = parseAcceptDraftMorphemes(body.morphologicalSegmentation);
+    if (!morphologicalSegmentation) {
+      return {
+        ok: false,
+        error: "morphologicalSegmentation must be a non-empty array of morphemes with surface, lemma, gloss, and features.",
+        i18nKey: "errors.invalidExtractionDraftAcceptBody"
+      };
+    }
+  }
+
+  if (preferLexiconSegmentation && morphologicalSegmentation) {
+    return {
+      ok: false,
+      error: "Provide either preferLexiconSegmentation or morphologicalSegmentation, not both.",
+      i18nKey: "errors.invalidExtractionDraftAcceptBody"
+    };
+  }
+
+  return {
+    ok: true,
+    options: {
+      ...(preferLexiconSegmentation ? { preferLexiconSegmentation: true } : {}),
+      ...(morphologicalSegmentation ? { morphologicalSegmentation } : {})
+    }
+  };
+}
 
 /**
  * Ensures a corpus passage accepted from an extraction draft always has
@@ -97,8 +203,17 @@ function alreadyReviewedI18n(status: string): DraftReviewI18n {
  * validates the payload, commits the entity (lexeme / corpus passage /
  * grammar note), marks the draft accepted, and appends one audit event.
  * Shared by the single-draft accept route and the bulk-review route.
+ *
+ * Optional {@link AcceptDraftOptions} let Build reviewers resolve
+ * segmentation conflicts without a separate PATCH: prefer lexicon
+ * longest-match, or supply an edited morpheme list.
  */
-function applyAcceptDraft(state: AppState, draftId: string, actor: User): AcceptDraftOutcome {
+function applyAcceptDraft(
+  state: AppState,
+  draftId: string,
+  actor: User,
+  options: AcceptDraftOptions = {}
+): AcceptDraftOutcome {
   const draft = state.extractionDrafts.find((item) => item.id === draftId);
   if (!draft) {
     return { state, draftMissing: true };
@@ -109,6 +224,17 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
       state,
       validationError: `Extraction draft is already ${draft.status}.`,
       ...alreadyReviewedI18n(draft.status)
+    };
+  }
+
+  if (
+    (options.preferLexiconSegmentation || options.morphologicalSegmentation)
+    && draft.kind !== "corpus_passage"
+  ) {
+    return {
+      state,
+      validationError: "Segmentation accept overrides are only valid for corpus_passage drafts.",
+      i18nKey: "errors.invalidExtractionDraftAcceptBody"
     };
   }
 
@@ -205,9 +331,12 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
 
     const sourceAsset = state.sourceAssets.find((item) => item.id === draft.sourceAssetId);
     const languageLexemes = state.lexemes.filter((lexeme) => lexeme.languageId === draft.languageId);
+    const proposedSegmentation = options.preferLexiconSegmentation
+      ? proposeLexiconSegmentation(textTarget, languageLexemes)
+      : (options.morphologicalSegmentation ?? draft.payload.morphologicalSegmentation);
     const segmentation = ensureCorpusDraftSegmentation(
       textTarget,
-      draft.payload.morphologicalSegmentation,
+      proposedSegmentation,
       languageLexemes
     );
     const passage: CorpusPassage = {
@@ -263,7 +392,13 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
         entityId: passage.id,
         languageId: draft.languageId,
         summary: `Accepted corpus draft into passage ${passage.id}.`,
-        metadata: { draftId, kind: draft.kind, morphemeCount: passage.morphologicalSegmentation.length }
+        metadata: {
+          draftId,
+          kind: draft.kind,
+          morphemeCount: passage.morphologicalSegmentation.length,
+          ...(options.preferLexiconSegmentation ? { preferLexiconSegmentation: true } : {}),
+          ...(options.morphologicalSegmentation ? { segmentationOverride: true } : {})
+        }
       })
     };
   }
@@ -424,6 +559,11 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
   app.post("/extraction-drafts/:draftId/accept", async (request, reply) => {
     const { draftId } = request.params as { draftId: string };
+    const parsedBody = parseAcceptDraftBody(request.body);
+    if (!parsedBody.ok) {
+      reply.code(400);
+      return { error: parsedBody.error, i18nKey: parsedBody.i18nKey };
+    }
 
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
@@ -434,7 +574,7 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
     let outcome: AcceptDraftOutcome | undefined;
 
     await updateState((state) => {
-      outcome = applyAcceptDraft(state, draftId, actor);
+      outcome = applyAcceptDraft(state, draftId, actor, parsedBody.options);
       return outcome.state;
     });
 

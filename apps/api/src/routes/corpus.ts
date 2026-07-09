@@ -164,6 +164,55 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
   return validateCorpusImport(state, languageId, body).errors[0];
 }
 
+export const CORPUS_BULK_MAX_PASSAGES = 50;
+
+export type CorpusBulkImportRowResult =
+  | {
+      index: number;
+      ok: true;
+      warnings: string[];
+      passage?: CorpusPassage;
+      preview?: CorpusImportBody;
+    }
+  | {
+      index: number;
+      ok: false;
+      error: string;
+      i18nKey: "errors.invalidCorpusImportBody" | "errors.corpusImportValidationFailed";
+      warnings: string[];
+    };
+
+export type CorpusBulkImportResponse = {
+  ok: boolean;
+  dryRun: boolean;
+  imported: number;
+  failed: number;
+  results: CorpusBulkImportRowResult[];
+};
+
+function parseCorpusBulkPassages(rawBody: unknown): { passages: unknown[] } | undefined {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return undefined;
+  }
+  const { dryRun: _dryRun, ...rest } = rawBody as Record<string, unknown>;
+  if (!Array.isArray(rest.passages)) {
+    return undefined;
+  }
+  return { passages: rest.passages };
+}
+
+function buildImportedCorpusPassage(
+  languageId: string,
+  body: CorpusImportBody,
+  languageCorpusCount: number
+): CorpusPassage {
+  return {
+    id: `imported-corpus-${languageId}-${languageCorpusCount + 1}-${randomUUID()}`,
+    languageId,
+    ...body
+  };
+}
+
 export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, updateState, checkRateLimit, authToken, prototypeSessions } = ctx;
 
@@ -178,6 +227,197 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
     return state.corpus.filter((passage) => passage.languageId === languageId);
+  });
+
+  app.post("/languages/:languageId/corpus/bulk", async (request, reply) => {
+    const { languageId } = request.params as { languageId: string };
+    const dryRun = isCorpusDryRunRequest(request, request.body ?? {});
+    const parsedBulk = parseCorpusBulkPassages(request.body ?? {});
+    if (!parsedBulk) {
+      reply.code(400);
+      return {
+        error: "Invalid corpus bulk import body",
+        i18nKey: "errors.invalidCorpusBulkBody"
+      };
+    }
+    if (parsedBulk.passages.length === 0) {
+      reply.code(400);
+      return {
+        error: "Corpus bulk import requires at least one passage",
+        i18nKey: "errors.invalidCorpusBulkBody"
+      };
+    }
+    if (parsedBulk.passages.length > CORPUS_BULK_MAX_PASSAGES) {
+      reply.code(400);
+      return {
+        error: `Too many passages: at most ${CORPUS_BULK_MAX_PASSAGES} per request.`,
+        i18nKey: "errors.corpusBulkTooManyPassages",
+        i18nParams: { max: CORPUS_BULK_MAX_PASSAGES }
+      };
+    }
+
+    const current = await readState();
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
+    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
+
+    if (!current.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
+    }
+
+    if (dryRun) {
+      const results: CorpusBulkImportRowResult[] = [];
+      let workingState = current;
+      for (let index = 0; index < parsedBulk.passages.length; index += 1) {
+        const body = parseCorpusImportBody(parsedBulk.passages[index]);
+        if (!body) {
+          results.push({
+            index,
+            ok: false,
+            error: "Invalid corpus import body",
+            i18nKey: "errors.invalidCorpusImportBody",
+            warnings: []
+          });
+          continue;
+        }
+        const validation = validateCorpusImport(workingState, languageId, body);
+        if (validation.errors.length > 0) {
+          results.push({
+            index,
+            ok: false,
+            error: validation.errors[0]!,
+            i18nKey: "errors.corpusImportValidationFailed",
+            warnings: validation.warnings
+          });
+          continue;
+        }
+        results.push({
+          index,
+          ok: true,
+          warnings: validation.warnings,
+          preview: body
+        });
+        // Simulate acceptance so later rows see in-batch duplicates.
+        const passage = buildImportedCorpusPassage(
+          languageId,
+          body,
+          workingState.corpus.filter((item) => item.languageId === languageId).length
+        );
+        workingState = {
+          ...workingState,
+          corpus: [...workingState.corpus, passage]
+        };
+      }
+      const imported = results.filter((row) => row.ok).length;
+      const failed = results.length - imported;
+      return {
+        ok: failed === 0,
+        dryRun: true,
+        imported,
+        failed,
+        results
+      } satisfies CorpusBulkImportResponse;
+    }
+
+    let languageMissing = false;
+    let results: CorpusBulkImportRowResult[] = [];
+
+    await updateState((state) => {
+      if (!state.languages.some((language) => language.id === languageId)) {
+        languageMissing = true;
+        return state;
+      }
+
+      const nextResults: CorpusBulkImportRowResult[] = [];
+      let nextState = state;
+      const importedAt = new Date().toISOString();
+
+      for (let index = 0; index < parsedBulk.passages.length; index += 1) {
+        const body = parseCorpusImportBody(parsedBulk.passages[index]);
+        if (!body) {
+          nextResults.push({
+            index,
+            ok: false,
+            error: "Invalid corpus import body",
+            i18nKey: "errors.invalidCorpusImportBody",
+            warnings: []
+          });
+          continue;
+        }
+
+        const validation = validateCorpusImport(nextState, languageId, body);
+        if (validation.errors.length > 0) {
+          nextResults.push({
+            index,
+            ok: false,
+            error: validation.errors[0]!,
+            i18nKey: "errors.corpusImportValidationFailed",
+            warnings: validation.warnings
+          });
+          continue;
+        }
+
+        const passage = buildImportedCorpusPassage(
+          languageId,
+          body,
+          nextState.corpus.filter((item) => item.languageId === languageId).length
+        );
+        nextState = appendAuditEvent({
+          ...nextState,
+          corpus: [...nextState.corpus, passage],
+          corpusAnswerKeys: [...(nextState.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
+        }, {
+          actor,
+          at: importedAt,
+          action: "corpus.imported",
+          entityType: "corpus",
+          entityId: passage.id,
+          languageId,
+          summary: `Imported corpus passage ${passage.id}.`,
+          metadata: {
+            source: passage.source,
+            morphemeCount: passage.morphologicalSegmentation.length,
+            tagCount: passage.topicTags.length,
+            consentUse: passage.consentStatus.use,
+            restrictionCount: passage.consentStatus.restrictions.length,
+            bulk: true
+          }
+        });
+        nextResults.push({
+          index,
+          ok: true,
+          warnings: validation.warnings,
+          passage
+        });
+      }
+
+      results = nextResults;
+      return nextState;
+    });
+
+    if (languageMissing) {
+      reply.code(404);
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
+    }
+
+    const imported = results.filter((row) => row.ok).length;
+    const failed = results.length - imported;
+    reply.code(imported > 0 ? 201 : 200);
+    return {
+      ok: failed === 0,
+      dryRun: false,
+      imported,
+      failed,
+      results
+    } satisfies CorpusBulkImportResponse;
   });
 
   app.post("/languages/:languageId/corpus", async (request, reply) => {

@@ -192,11 +192,14 @@ export function recoverStaleProcessingSourcesState(
  * through the store's serialized update seam and reports how many source
  * assets were recovered.
  */
-export async function recoverInterruptedSources(store: UpdatableStore): Promise<number> {
+export async function recoverInterruptedSources(
+  store: UpdatableStore,
+  recoveredAt = new Date().toISOString()
+): Promise<number> {
   let recoveredCount = 0;
   await store.update((state) => {
     recoveredCount = state.sourceAssets.filter((asset) => asset.status === "processing").length;
-    return recoverInterruptedSourcesState(state);
+    return recoverInterruptedSourcesState(state, recoveredAt);
   });
   return recoveredCount;
 }

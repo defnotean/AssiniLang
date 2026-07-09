@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   acceptExtractionDraft,
   bulkReviewExtractionDrafts,
+  cancelSourceProcessing,
   fetchExtractionDrafts,
   fetchSources,
   importObsidianVault,
@@ -10,12 +11,20 @@ import {
   rejectExtractionDraft,
   uploadSourceFile
 } from "../api";
-import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
+import type {
+  AcceptExtractionDraftOptions,
+  BulkReviewAction,
+  ExtractionDraftView,
+  SourceAsset,
+  SourceRegistrationPayload
+} from "../api";
 import {
   localizeApiError,
   localizeExtractionDraftFailure,
   localizeSourceProcessingError,
-  localizeVaultImportError
+  localizeSourceProcessingWarning,
+  localizeVaultImportError,
+  localizeVaultImportSkipReason
 } from "../lib/format";
 import type { Translate } from "../i18n";
 
@@ -51,6 +60,7 @@ export function useIngestExtraction(
   const [vaultError, setVaultError] = useState<string | null>(null);
 
   const [processingSourceId, setProcessingSourceId] = useState<string | null>(null);
+  const [cancellingSourceId, setCancellingSourceId] = useState<string | null>(null);
   const [pollingSource, setPollingSource] = useState<{ id: string; title: string } | null>(null);
   const [processNotice, setProcessNotice] = useState<string | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
@@ -74,6 +84,7 @@ export function useIngestExtraction(
     setVaultNotice(null);
     setVaultError(null);
     setProcessingSourceId(null);
+    setCancellingSourceId(null);
     setPollingSource(null);
     setProcessNotice(null);
     setProcessError(null);
@@ -211,11 +222,14 @@ export function useIngestExtraction(
         imported: result.summary.imported,
         skipped: result.summary.skipped
       });
-      setVaultNotice(
-        result.warnings.length > 0
-          ? `${summary} ${result.warnings.join(" ")}`
-          : summary
+      const skipDetails = result.skipped
+        .map((item) => localizeVaultImportSkipReason(item.reason, t))
+        .filter((reason, index, all) => all.indexOf(reason) === index);
+      const warningDetails = result.warnings.map((warning) =>
+        localizeSourceProcessingWarning(warning, t)
       );
+      const details = [...skipDetails, ...warningDetails];
+      setVaultNotice(details.length > 0 ? `${summary} ${details.join(" ")}` : summary);
       await refreshIntake();
     } catch (error) {
       const message = localizeVaultImportError(error, t, "ingest.vaultImportFailed");
@@ -321,13 +335,42 @@ export function useIngestExtraction(
     }
   }
 
-  async function handleDraftDecision(draftId: string, decision: "accept" | "reject") {
+  async function handleCancelProcessing(sourceId: string) {
+    const source = sources.find((item) => item.id === sourceId);
+    setCancellingSourceId(sourceId);
+    setProcessNotice(null);
+    setProcessError(null);
+    setProcessWarnings([]);
+    try {
+      const result = await cancelSourceProcessing(sourceId);
+      setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
+      if (pollingSource?.id === sourceId) {
+        setPollingSource(null);
+      }
+      if (processingSourceId === sourceId) {
+        setProcessingSourceId(null);
+      }
+      setProcessNotice(
+        t("ingest.processingCancelledNotice", { title: result.asset.title || source?.title || sourceId })
+      );
+    } catch (error) {
+      setProcessError(localizeApiError(error, t, "ingest.sourceProcessingFailed"));
+    } finally {
+      setCancellingSourceId(null);
+    }
+  }
+
+  async function handleDraftDecision(
+    draftId: string,
+    decision: "accept" | "reject",
+    acceptOptions?: AcceptExtractionDraftOptions
+  ) {
     setReviewingDraftId(draftId);
     setDraftNotice(null);
     setDraftError(null);
     try {
       if (decision === "accept") {
-        const result = await acceptExtractionDraft(draftId);
+        const result = await acceptExtractionDraft(draftId, acceptOptions);
         setDraftNotice(t("ingest.draftAccepted", { label: t(`draftKind.${result.draft.kind}`) }));
       } else {
         const rejected = await rejectExtractionDraft(draftId);
@@ -426,6 +469,7 @@ export function useIngestExtraction(
     vaultNotice,
     vaultError,
     processingSourceId,
+    cancellingSourceId,
     processNotice,
     processError,
     processWarnings,
@@ -440,6 +484,7 @@ export function useIngestExtraction(
     handleUploadSource,
     handleImportVault,
     handleProcessSource,
+    handleCancelProcessing,
     handleDraftDecision,
     toggleDraftSelection,
     toggleSelectAllProposed,

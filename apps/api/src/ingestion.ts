@@ -31,7 +31,8 @@ export type SourceExtractionResult = {
 const CHUNK_TARGET_CHARS = 12_000;
 const MAX_CHUNKS_PER_SOURCE = 8;
 const MAX_CANDIDATES_PER_KIND = 100;
-const MAX_URL_CONTENT_BYTES = 2_000_000;
+/** Cap for fetched URL source bodies before HTML-to-text conversion. */
+export const MAX_URL_CONTENT_BYTES = 2_000_000;
 const MAX_MERGED_SUMMARY_CHARS = 300;
 
 const TEXT_DOCUMENT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "text"]);
@@ -311,11 +312,138 @@ function largestPdfPageImage(images: ExtractedPdfImage[]): ExtractedPdfImage | u
   return best;
 }
 
+/** Default cap for scanned-PDF OCR pages; override with ASSINI_OCR_PDF_MAX_PAGES. */
+export const DEFAULT_OCR_PDF_MAX_PAGES = 10;
+
+export function resolveOcrPdfMaxPages(env: Env = process.env): number {
+  const raw = env.ASSINI_OCR_PDF_MAX_PAGES?.trim();
+  if (!raw) return DEFAULT_OCR_PDF_MAX_PAGES;
+  const parsed = Number(raw);
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  return DEFAULT_OCR_PDF_MAX_PAGES;
+}
+
+export type ScannedPdfOcrResult = {
+  text: string;
+  totalPages: number;
+  pagesAttempted: number;
+  pagesSucceeded: number;
+  maxPages: number;
+  warnings: string[];
+};
+
 /**
- * Reads page 1 of a scanned PDF by extracting the largest embedded page image
- * (typical for image-only PDFs) and sending it to the configured OCR model.
- * Only page 1 is processed; multi-page scans are not merged.
+ * Reads pages 1..N of a scanned PDF by extracting the largest embedded image
+ * per page (typical for image-only PDFs) and sending each to the configured
+ * OCR model. Soft-fails per page (warn + continue). Caps at
+ * ASSINI_OCR_PDF_MAX_PAGES (default 10). Concatenates successful pages with
+ * markers when more than one page is attempted.
  */
+export async function ocrScannedPdfPages(
+  params: {
+    pdfBytes: Uint8Array;
+    totalPages: number;
+    env?: Env;
+    fetchFn?: FetchFn;
+    tempDir?: string;
+  }
+): Promise<ScannedPdfOcrResult> {
+  const env = params.env ?? process.env;
+  const totalPages = Math.max(1, Math.floor(params.totalPages) || 1);
+  const maxPages = resolveOcrPdfMaxPages(env);
+  const pagesAttempted = Math.min(totalPages, maxPages);
+  const { extractImages } = await import("unpdf");
+  const workDir = params.tempDir ?? await mkdtemp(join(tmpdir(), "assini-pdf-ocr-"));
+  const shouldCleanup = params.tempDir === undefined;
+  const pageTexts: Array<{ page: number; text: string }> = [];
+  const warnings: string[] = [];
+  let sawEmbeddedImage = false;
+  let lastHardOcrFailure: string | undefined;
+
+  try {
+    for (let page = 1; page <= pagesAttempted; page += 1) {
+      let images: ExtractedPdfImage[];
+      try {
+        images = await extractImages(params.pdfBytes, page);
+      } catch (error) {
+        const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
+        warnings.push(`OCR skipped page ${page} (could not extract page image: ${reason}).`);
+        continue;
+      }
+
+      const pageImage = largestPdfPageImage(images);
+      if (!pageImage) {
+        warnings.push(`OCR skipped page ${page} (no embedded page image).`);
+        continue;
+      }
+      sawEmbeddedImage = true;
+
+      const pngBytes = encodeRawImageAsPng(
+        pageImage.width,
+        pageImage.height,
+        pageImage.channels,
+        pageImage.data
+      );
+      const imagePath = join(workDir, `page-${page}.png`);
+      try {
+        await writeFile(imagePath, pngBytes);
+        const text = await ocrImageWithModel({
+          filePath: imagePath,
+          mimeType: "image/png",
+          env,
+          fetchFn: params.fetchFn
+        });
+        if (text.trim().length === 0) {
+          warnings.push(`OCR skipped page ${page} (model returned no text).`);
+          continue;
+        }
+        pageTexts.push({ page, text: text.trim() });
+      } catch (error) {
+        const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
+        lastHardOcrFailure = reason;
+        warnings.push(`OCR failed for page ${page}; continuing with remaining pages.`);
+      }
+    }
+  } finally {
+    if (shouldCleanup) {
+      await rm(workDir, { recursive: true, force: true });
+    }
+  }
+
+  if (pageTexts.length === 0) {
+    if (!sawEmbeddedImage) {
+      throw new Error(
+        "The PDF has no embedded page image to OCR. Export pages as images and upload them, or OCR the document externally."
+      );
+    }
+    throw new Error(
+      lastHardOcrFailure
+        ?? "OCR model returned no readable text from any page."
+    );
+  }
+
+  if (totalPages > maxPages) {
+    warnings.push(
+      `PDF has ${totalPages} pages; only the first ${maxPages} pages were OCR'd. Raise ASSINI_OCR_PDF_MAX_PAGES or split remaining pages into separate sources if you need them.`
+    );
+  }
+
+  const useMarkers = pagesAttempted > 1;
+  const text = useMarkers
+    ? pageTexts.map(({ page, text: pageText }) => `--- Page ${page} ---\n${pageText}`).join("\n\n")
+    : pageTexts[0]!.text;
+
+  return {
+    text,
+    totalPages,
+    pagesAttempted,
+    pagesSucceeded: pageTexts.length,
+    maxPages,
+    warnings
+  };
+}
+
+/** @deprecated Prefer ocrScannedPdfPages; kept for callers that only need page 1. */
 export async function ocrScannedPdfFirstPage(
   params: {
     pdfBytes: Uint8Array;
@@ -324,38 +452,15 @@ export async function ocrScannedPdfFirstPage(
     tempDir?: string;
   }
 ): Promise<string> {
-  const { extractImages } = await import("unpdf");
-  const images = await extractImages(params.pdfBytes, 1);
-  const pageImage = largestPdfPageImage(images);
-  if (!pageImage) {
-    throw new Error(
-      "The PDF has no embedded page image to OCR. Export page 1 as an image and upload it, or OCR the document externally."
-    );
-  }
-
-  const pngBytes = encodeRawImageAsPng(
-    pageImage.width,
-    pageImage.height,
-    pageImage.channels,
-    pageImage.data
-  );
-  const workDir = params.tempDir ?? await mkdtemp(join(tmpdir(), "assini-pdf-ocr-"));
-  const imagePath = join(workDir, "page-1.png");
-  const shouldCleanup = params.tempDir === undefined;
-
-  try {
-    await writeFile(imagePath, pngBytes);
-    return await ocrImageWithModel({
-      filePath: imagePath,
-      mimeType: "image/png",
-      env: params.env,
-      fetchFn: params.fetchFn
-    });
-  } finally {
-    if (shouldCleanup) {
-      await rm(workDir, { recursive: true, force: true });
+  const result = await ocrScannedPdfPages({
+    ...params,
+    totalPages: 1,
+    env: {
+      ...(params.env ?? process.env),
+      ASSINI_OCR_PDF_MAX_PAGES: "1"
     }
-  }
+  });
+  return result.text;
 }
 
 function parseOcrModelContent(content: unknown): string | undefined {
@@ -793,13 +898,14 @@ async function resolveAssetText(
       if (text.trim().length === 0) {
         if (!ocrModelConfigured(env)) {
           throw new Error(
-            "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only)."
+            "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs."
           );
         }
-        let ocrText: string;
+        let ocrResult: ScannedPdfOcrResult;
         try {
-          ocrText = await ocrScannedPdfFirstPage({
+          ocrResult = await ocrScannedPdfPages({
             pdfBytes,
+            totalPages,
             env,
             fetchFn
           });
@@ -812,13 +918,11 @@ async function resolveAssetText(
           }
           throw new Error(`Configured OCR model could not read the scanned PDF: ${reason}`);
         }
-        warnings.push("Used configured OCR model to read scanned document (page 1).");
-        if (totalPages > 1) {
-          warnings.push(
-            `PDF has ${totalPages} pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them.`
-          );
-        }
-        return { text: ocrText, warnings };
+        warnings.push(
+          `Used configured OCR model to read scanned document (${ocrResult.pagesSucceeded} of ${ocrResult.pagesAttempted} pages).`
+        );
+        warnings.push(...ocrResult.warnings);
+        return { text: ocrResult.text, warnings };
       }
       return { text, warnings };
     }

@@ -201,6 +201,15 @@ describe("locale catalogs", () => {
     expect(ar["ingest.bulkFailureRow"]).toContain("{draftId}");
   });
 
+  it("localizes corpus bulk dry-run validation copy", () => {
+    expect(en["corpus.bulkDryRunHint"]).toContain("TSV or CSV");
+    expect(ar["corpus.bulkDryRunHint"]).toContain("TSV");
+    expect(ar["corpus.bulkDryRunHint"]).not.toBe(en["corpus.bulkDryRunHint"]);
+    expect(en["corpus.bulkDryRunSummary"]).toContain("{validCount}");
+    expect(ar["corpus.bulkDryRunSummary"]).toContain("{validCount}");
+    expect(ar["corpus.bulkDryRunDuplicateTarget"]).not.toBe(en["corpus.bulkDryRunDuplicateTarget"]);
+  });
+
   it("localizes governance empty-policy next-step guidance", () => {
     expect(en["governance.noGovernancePolicyHint"]).toContain("consent, access, or generation");
     expect(ar["governance.noGovernancePolicyHint"]).toContain("موافقة");
@@ -297,6 +306,10 @@ describe("locale catalogs", () => {
     expect(ar["errors.missingLanguageId"]).not.toBe(en["errors.missingLanguageId"]);
     expect(ar["errors.prototypeAuthDisabled"]).not.toBe(en["errors.prototypeAuthDisabled"]);
     expect(ar["errors.payloadTooLarge"]).not.toBe(en["errors.payloadTooLarge"]);
+    expect(ar["errors.sourceUploadTitleTooLarge"]).not.toBe(en["errors.sourceUploadTitleTooLarge"]);
+    expect(ar["ingest.urlContentTooLarge"]).not.toBe(en["ingest.urlContentTooLarge"]);
+    expect(ar["ingest.vaultMarkdownTooLarge"]).not.toBe(en["ingest.vaultMarkdownTooLarge"]);
+    expect(ar["ingest.warningVaultFileLimit"]).toContain("{maxFiles}");
     expect(ar["app.rateLimitExceeded"]).toContain("{seconds}");
     expect(ar["elderWs.errInvalidCorrectionBody"]).not.toBe(en["elderWs.errInvalidCorrectionBody"]);
     expect(ar["elderWs.errCorrectionMustBeAccepted"]).not.toBe(en["elderWs.errCorrectionMustBeAccepted"]);

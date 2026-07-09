@@ -1,0 +1,4 @@
+# Velmari sample passages (synthetic fixture)
+
+saku vel mir = the child's river
+tora vel = speak water
