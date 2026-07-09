@@ -406,8 +406,8 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
               <button type="submit" disabled={isSavingSettings} aria-busy={isSavingSettings}>
                 {isSavingSettings ? t("model.savingSettings") : t("model.saveSettings")}
               </button>
-              {formError && <p className="inline-error" role="alert">{formError}</p>}
-              {settingsSaveError && <p className="inline-error" role="alert">{settingsSaveError}</p>}
+              {formError && <p className="inline-error" role="alert" aria-live="assertive">{formError}</p>}
+              {settingsSaveError && <p className="inline-error" role="alert" aria-live="assertive">{settingsSaveError}</p>}
               {settingsSaveResult && <p className="result-notice" role="status" aria-live="polite">{settingsSaveResult}</p>}
             </div>
           </form>

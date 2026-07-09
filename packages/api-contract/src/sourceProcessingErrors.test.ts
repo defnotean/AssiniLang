@@ -25,6 +25,12 @@ describe("sourceProcessingErrorI18n", () => {
     )).toEqual({ i18nKey: "ingest.ocrModelFailed" });
   });
 
+  it("classifies empty DOCX text layers where OCR is unsupported", () => {
+    expect(sourceProcessingErrorI18n(
+      "The document contains no extractable text — it may be a scanned image; OCR is not supported yet."
+    )).toEqual({ i18nKey: "ingest.ocrDocxUnsupported" });
+  });
+
   it("returns undefined for unrelated processing errors", () => {
     expect(sourceProcessingErrorI18n("Remote failure [redacted-secret]")).toBeUndefined();
   });

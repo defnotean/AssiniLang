@@ -128,4 +128,19 @@ describe("ModelSetupView settings save status", () => {
     expect(saveButton).toBeDisabled();
     expect(saveButton).toHaveAttribute("aria-busy", "true");
   });
+
+  it("announces settings save failures with assertive aria-live", () => {
+    render(
+      <ModelSetupView
+        model={createModelWorkspace({
+          settingsSaveResult: null,
+          settingsSaveError: "Could not save settings."
+        })}
+      />
+    );
+
+    const saveError = screen.getByText("Could not save settings.");
+    expect(saveError).toHaveAttribute("role", "alert");
+    expect(saveError).toHaveAttribute("aria-live", "assertive");
+  });
 });

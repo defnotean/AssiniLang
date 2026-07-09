@@ -55,4 +55,54 @@ describe("IngestView OCR processing errors", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("shows a localized DOCX OCR-unsupported hint on failed document sources", async () => {
+    apiMock.fetchSources.mockResolvedValue([
+      failedDocumentSource(
+        "The document contains no extractable text — it may be a scanned image; OCR is not supported yet."
+      )
+    ]);
+
+    render(<IngestView languageId="avenik" />);
+
+    expect(
+      await screen.findByText(
+        "This document has no extractable text, and DOCX OCR is not supported yet. Export pages as images or paste the text, then process again."
+      )
+    ).toBeInTheDocument();
+  });
+});
+
+describe("IngestView multi-page OCR warnings", () => {
+  it("shows localized multi-page PDF OCR warnings on processed sources", async () => {
+    apiMock.fetchSources.mockResolvedValue([
+      {
+        id: "asset-scan-multi",
+        languageId: "avenik",
+        kind: "document",
+        title: "Multi-page field notes",
+        status: "processed",
+        createdBy: "reviewer-1",
+        createdAt: "2026-06-11T00:00:00.000Z",
+        processedAt: "2026-06-11T00:05:00.000Z",
+        processingAttempts: 1,
+        warnings: [
+          "Used configured OCR model to read scanned document (page 1).",
+          "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+        ]
+      }
+    ]);
+
+    render(<IngestView languageId="avenik" />);
+
+    const warnings = await screen.findByRole("list", {
+      name: "Processing warnings for Multi-page field notes"
+    });
+    expect(warnings).toHaveTextContent(
+      "Used configured OCR model to read scanned document (page 1)."
+    );
+    expect(warnings).toHaveTextContent(
+      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+    );
+  });
 });

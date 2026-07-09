@@ -234,4 +234,16 @@ describe("localizeApiError", () => {
       "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
     );
   });
+
+  it("localizes empty DOCX OCR-unsupported failures from persisted source errors", () => {
+    const message = localizeSourceProcessingError(
+      "The document contains no extractable text — it may be a scanned image; OCR is not supported yet.",
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "This document has no extractable text, and DOCX OCR is not supported yet. Export pages as images or paste the text, then process again."
+    );
+  });
 });

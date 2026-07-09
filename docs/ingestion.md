@@ -111,9 +111,10 @@ When a PDF upload has no extractable text layer:
 1. If `ASSINI_OCR_BASE_URL` is set, page 1 is OCR'd via the same vision model path as images (`ocrScannedPdfFirstPage` in `apps/api/src/ingestion.ts`).
 2. The largest embedded image on page 1 is extracted with `unpdf` `extractImages`, written to a temporary PNG, and passed to `ocrImageWithModel`.
 3. OCR output continues through the normal text extraction pipeline and adds the warning `Used configured OCR model to read scanned document (page 1).`
-4. If the OCR model is not configured, processing fails with guidance to set `ASSINI_OCR_BASE_URL`.
+4. Multi-page scanned PDFs also add `PDF has N pages; only page 1 was OCR'd...`; the Build UI localizes both warnings for operators.
+5. If the OCR model is not configured, processing fails with guidance to set `ASSINI_OCR_BASE_URL`.
 
-Limitations: only page 1 is read; PDFs that rasterize pages without embedded images cannot be OCR'd in-process (export page 1 as an image and upload it instead). DOCX OCR is not implemented yet.
+Limitations: only page 1 is read; PDFs that rasterize pages without embedded images cannot be OCR'd in-process (export page 1 as an image and upload it instead). DOCX OCR is not implemented yet; empty DOCX text layers fail with a localized `ingest.ocrDocxUnsupported` hint in Build.
 
 ## Transcription (audio)
 

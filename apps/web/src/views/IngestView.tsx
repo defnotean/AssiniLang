@@ -3,7 +3,6 @@ import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import {
   extractionDraftSummary,
-  formatCount,
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
   relativeAge,
@@ -236,7 +235,7 @@ export function IngestView({
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("ingest.registeredSources")}</span>
-            <h2>{formatCount(sources.length, "source")}</h2>
+            <h2>{t(sources.length === 1 ? "ingest.sourceCountOne" : "ingest.sourceCountMany", { count: sources.length })}</h2>
           </div>
         </div>
         {processNotice && <p className="result-notice" role="status" aria-live="polite">{processNotice}</p>}
@@ -325,7 +324,7 @@ export function IngestView({
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("ingest.extractionDrafts")}</span>
-            <h2>{formatCount(drafts.length, "proposed draft")}</h2>
+            <h2>{t(drafts.length === 1 ? "ingest.draftCountOne" : "ingest.draftCountMany", { count: drafts.length })}</h2>
           </div>
         </div>
         {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}

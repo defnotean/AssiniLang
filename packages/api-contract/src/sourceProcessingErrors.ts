@@ -30,6 +30,10 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.ocrModelFailed" };
   }
 
+  if (/OCR is not supported yet/i.test(normalized) && /no extractable text/i.test(normalized)) {
+    return { i18nKey: "ingest.ocrDocxUnsupported" };
+  }
+
   return undefined;
 }
 
