@@ -104,15 +104,25 @@ function isReviewDispositionStatus(status: Note["status"] | undefined): status i
   return status !== undefined && REVIEW_DISPOSITION_STATUSES.includes(status as ReviewDispositionStatus);
 }
 
-function reviewDispositionValidationError(state: AppState, body: ReviewBody, actor: User): string | undefined {
+function reviewDispositionValidationError(
+  state: AppState,
+  body: ReviewBody,
+  actor: User
+): { error: string; i18nKey: string } | undefined {
   const assignedTo = body.dispositionAssigneeId ?? actor.id;
   const assignee = usersForState(state).find((user) => user.id === assignedTo);
   if (!assignee || !isReviewPolicyAssignableRole(assignee.role)) {
-    return `Review disposition assignee is not assignable: ${assignedTo}`;
+    return {
+      error: `Review disposition assignee is not assignable: ${assignedTo}`,
+      i18nKey: "errors.reviewDispositionAssigneeInvalid"
+    };
   }
 
   if (body.dispositionDueAt && Number.isNaN(Date.parse(body.dispositionDueAt))) {
-    return "Review disposition due date must be parseable";
+    return {
+      error: "Review disposition due date must be parseable",
+      i18nKey: "errors.reviewDispositionDueAtInvalid"
+    };
   }
 
   return undefined;
@@ -126,7 +136,10 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const state = await readState();
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return toPublicNotes(state.notes.filter((note) => note.languageId === languageId));
   });
@@ -153,7 +166,10 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const explanationValidationError = noteExplanationValidationError(body.explanation);
     if (explanationValidationError) {
       reply.code(400);
-      return { error: explanationValidationError };
+      return {
+        error: explanationValidationError,
+        i18nKey: "errors.noteExplanationTooShort"
+      };
     }
 
     const current = await readState();
@@ -166,7 +182,7 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
       const validationError = reviewDispositionValidationError(current, body, actor);
       if (validationError) {
         reply.code(400);
-        return { error: validationError };
+        return validationError;
       }
     }
 
@@ -334,12 +350,18 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
 
     if (noteMissing) {
       reply.code(404);
-      return { error: `Note not found: ${noteId}` };
+      return {
+        error: `Note not found: ${noteId}`,
+        i18nKey: "errors.noteNotFound"
+      };
     }
 
     if (policyForbiddenMessage) {
       reply.code(403);
-      return { error: policyForbiddenMessage };
+      return {
+        error: policyForbiddenMessage,
+        i18nKey: "errors.reviewerNotAssigned"
+      };
     }
 
     return toPublicNote(nextNote as Note);

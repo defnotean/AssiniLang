@@ -1120,14 +1120,10 @@ describe("api server", () => {
     const response = await app.inject({ method: "GET", url: `/languages/not-a-language/${resource}` });
 
     expect(response.statusCode).toBe(404);
-    if (resource === "notes") {
-      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
-    } else {
-      expect(response.json()).toEqual({
-        error: "Language not found: not-a-language",
-        i18nKey: "errors.languageNotFound"
-      });
-    }
+    expect(response.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("runs evaluations and appends them to state", async () => {
@@ -1440,7 +1436,8 @@ describe("api server", () => {
     });
     expect(unassignedApproval.statusCode).toBe(403);
     expect(unassignedApproval.json()).toEqual({
-      error: `Reviewer is not assigned to approve notes for language: ${TEST_LANGUAGE_ID}`
+      error: `Reviewer is not assigned to approve notes for language: ${TEST_LANGUAGE_ID}`,
+      i18nKey: "errors.reviewerNotAssigned"
     });
 
     const finalApproval = await app.inject({
@@ -2795,7 +2792,10 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json().error).toContain("A configured model is required");
+      expect(response.json()).toEqual({
+        error: expect.stringContaining("A configured model is required"),
+        i18nKey: "errors.modelRequired"
+      });
 
       const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
       expect(after.json()).toEqual(before.json());
@@ -2904,7 +2904,10 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(400);
-      expect(response.json().error).toContain("A configured model is required");
+      expect(response.json()).toEqual({
+        error: expect.stringContaining("A configured model is required"),
+        i18nKey: "errors.modelRequired"
+      });
     });
 
     it("returns 404 for an unknown language", async () => {
@@ -2985,7 +2988,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Note explanation edits require a substantive explanation." });
+    expect(response.json()).toEqual({
+      error: "Note explanation edits require a substantive explanation.",
+      i18nKey: "errors.noteExplanationTooShort"
+    });
 
     const after = await fetchReviewedNote(app);
     expect(after.status).toBe(before.status);
@@ -3341,7 +3347,35 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Note not found: missing-note" });
+    expect(response.json()).toEqual({
+      error: "Note not found: missing-note",
+      i18nKey: "errors.noteNotFound"
+    });
+  });
+
+  it("returns 404 with i18nKey for unknown language notes and sources list", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const notes = await app.inject({
+      method: "GET",
+      url: "/languages/not-a-language/notes"
+    });
+    expect(notes.statusCode).toBe(404);
+    expect(notes.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
+
+    const sources = await app.inject({
+      method: "GET",
+      url: "/languages/not-a-language/sources",
+      headers: authHeaders("reviewer-1")
+    });
+    expect(sources.statusCode).toBe(404);
+    expect(sources.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("resolves authenticated users and uses them for note review audit fields", async () => {

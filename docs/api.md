@@ -27,10 +27,10 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | DELETE | `/languages/:languageId` | reviewer, lead, admin | Permanently delete one language and its scoped workspace records. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/profile` | Public | State-derived public profile. |
 | GET | `/languages/:languageId/lexicon` | Public | The language's lexemes. |
-| GET | `/languages/:languageId/sources` | reviewer, lead, admin, programmer | List source assets (the async-processing polling target). |
-| POST | `/languages/:languageId/sources` | reviewer, lead, admin | Register a `text`, `wordlist`, or `url` source. |
-| POST | `/languages/:languageId/sources/obsidian-vault` | reviewer, lead, admin | Import Markdown files from a local Obsidian vault path as pending text sources. |
-| POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). |
+| GET | `/languages/:languageId/sources` | reviewer, lead, admin, programmer | List source assets (the async-processing polling target). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/sources` | reviewer, lead, admin | Register a `text`, `wordlist`, or `url` source. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/sources/obsidian-vault` | reviewer, lead, admin | Import Markdown files from a local Obsidian vault path as pending text sources. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/sources/:sourceId/process` | reviewer, lead, admin | Run extraction; `{ "async": true }` for background mode. |
 | GET | `/languages/:languageId/extraction-drafts` | reviewer, lead, admin | List drafts with read-time duplicate flags; `?status=` filters. |
 | POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
@@ -38,14 +38,14 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. Invalid `action` returns `400` with `i18nKey: "errors.bulkReviewInvalidAction"`; missing/empty `draftIds` returns `400` with `i18nKey: "errors.bulkReviewInvalidDraftIds"`; more than 50 ids returns `400` with `i18nKey: "errors.bulkReviewTooManyDraftIds"` and `i18nParams.max`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. Invalid bodies return `400` with `i18nKey: "errors.invalidCorpusImportBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
-| GET | `/languages/:languageId/notes` | Public | Public review notes. |
-| PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
+| GET | `/languages/:languageId/notes` | Public | Public review notes. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. Invalid bodies return `400` with `i18nKey: "errors.invalidReviewBody"`; dispositions without `reviewerComment` return `400` with `i18nKey: "errors.reviewDispositionRequiresComment"`; underspecified explanations return `400` with `i18nKey: "errors.noteExplanationTooShort"`; invalid disposition assignee/due date return `400` with `i18nKey: "errors.reviewDispositionAssigneeInvalid"` / `errors.reviewDispositionDueAtInvalid`; unknown notes return `404` with `i18nKey: "errors.noteNotFound"`; unassigned approvers under a restricted policy return `403` with `i18nKey: "errors.reviewerNotAssigned"`. |
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. Invalid bodies return `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
-| POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
+| POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` with `i18nKey: "errors.modelRequired"` without a model). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. Invalid bodies return `400` with `i18nKey: "errors.invalidExerciseAuthoringBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
-| POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` with `i18nKey: "errors.modelRequired"` without a model). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. Unknown exercise ids return `404` with `i18nKey: "errors.exerciseNotFound"`. |
 | POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. Invalid bodies return `400` with `i18nKey: "errors.invalidExerciseSubmissionBody"`; unknown exercise ids return `404` with `i18nKey: "errors.exerciseNotFound"`. |
 | GET | `/evaluations` | lead, admin, programmer, reviewer (not elder/learner) | Previous evaluation runs. |
@@ -228,7 +228,7 @@ Dry-run validation previews the same checks without persisting. Add `?dryRun=1` 
 
 ## Model-backed generation
 
-Both generation routes are model-only: they reuse the same configured LLM provider as ingestion (the OpenAI-compatible chat/completions endpoint), so the same `ASSINI_LLM_*` configuration that enables ingestion enables them. Unlike ingestion, there is no offline heuristic fallback - in deterministic / no-model mode each route returns `400` with setup guidance instead of degrading. Both are grounded against the language's approved data so the model cannot introduce hallucinated forms, evidence, or rule references.
+Both generation routes are model-only: they reuse the same configured LLM provider as ingestion (the OpenAI-compatible chat/completions endpoint), so the same `ASSINI_LLM_*` configuration that enables ingestion enables them. Unlike ingestion, there is no offline heuristic fallback - in deterministic / no-model mode each route returns `400` with `{ "error": "A configured model is required…", "i18nKey": "errors.modelRequired" }` instead of degrading. Both are grounded against the language's approved data so the model cannot introduce hallucinated forms, evidence, or rule references.
 
 `POST /languages/:languageId/study-loop/model-draft` (roles: reviewer, lead, admin, elder)
 
@@ -266,7 +266,7 @@ Audit events are written by mutation routes, including language creation, source
 
 `PATCH /notes/:noteId/review`
 
-Reviewers can update note status and explanations. Contested, rejected, deferred, and escalated notes require a reviewer comment. Those dispositions create work records that can later be resolved by the assignee, leads, or admins. Resolving an unknown disposition id returns `404` with `i18nKey: governance.errDispositionNotFound`; resolving an already-resolved record returns `400` with `i18nKey: governance.errDispositionAlreadyResolved` (English `error` text remains for logs and older clients).
+Reviewers can update note status and explanations. Contested, rejected, deferred, and escalated notes require a reviewer comment (`400` with `i18nKey: "errors.reviewDispositionRequiresComment"` when missing). Invalid review bodies return `400` with `i18nKey: "errors.invalidReviewBody"`; underspecified explanation edits return `400` with `i18nKey: "errors.noteExplanationTooShort"`; invalid disposition assignee or due date return `400` with `i18nKey: "errors.reviewDispositionAssigneeInvalid"` / `errors.reviewDispositionDueAtInvalid`; unknown notes return `404` with `i18nKey: "errors.noteNotFound"`; approving under a restricted policy without assignment returns `403` with `i18nKey: "errors.reviewerNotAssigned"`. Those dispositions create work records that can later be resolved by the assignee, leads, or admins. Resolving an unknown disposition id returns `404` with `i18nKey: governance.errDispositionNotFound`; resolving an already-resolved record returns `400` with `i18nKey: governance.errDispositionAlreadyResolved` (English `error` text remains for logs and older clients).
 
 If the same note already has an open work record for the requested disposition, the route updates that record's reason, assignee, and due date instead of creating a duplicate open disposition. The original opened attribution stays on the record, and a separate audit event records the update.
 

@@ -220,7 +220,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return state.sourceAssets.filter((asset) => asset.languageId === languageId);
   });
@@ -282,7 +285,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (languageMissing) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (!asset) {
@@ -310,7 +316,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     let rootPath: string;
@@ -428,7 +437,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const file = await request.file();
@@ -520,7 +532,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const language = current.languages.find((item) => item.id === asset.languageId);
     if (!language) {
       reply.code(404);
-      return { error: `Language not found: ${asset.languageId}` };
+      return {
+        error: `Language not found: ${asset.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (asset.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {

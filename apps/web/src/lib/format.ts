@@ -519,6 +519,24 @@ function operatorApiErrorI18n(
   if (/Review dispositions require reviewerComment/i.test(normalized)) {
     return { i18nKey: "errors.reviewDispositionRequiresComment" };
   }
+  if (/Note explanation edits require a substantive explanation/i.test(normalized)) {
+    return { i18nKey: "errors.noteExplanationTooShort" };
+  }
+  if (/^Note not found:/i.test(normalized)) {
+    return { i18nKey: "errors.noteNotFound" };
+  }
+  if (/Reviewer is not assigned to approve notes for language:/i.test(normalized)) {
+    return { i18nKey: "errors.reviewerNotAssigned" };
+  }
+  if (/Review disposition assignee is not assignable:/i.test(normalized)) {
+    return { i18nKey: "errors.reviewDispositionAssigneeInvalid" };
+  }
+  if (/Review disposition due date must be parseable/i.test(normalized)) {
+    return { i18nKey: "errors.reviewDispositionDueAtInvalid" };
+  }
+  if (/A configured model is required to generate drafts/i.test(normalized)) {
+    return { i18nKey: "errors.modelRequired" };
+  }
   if (/Invalid language body/i.test(normalized)) {
     return { i18nKey: "errors.invalidLanguageBody" };
   }
@@ -631,11 +649,15 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     if (error.status === 401) {
       return t("app.sessionExpired");
     }
-    if (error.status === 403) {
-      return t("app.forbidden");
-    }
     if (error.i18nKey) {
       return t(error.i18nKey as MessageKey, error.i18nParams);
+    }
+    if (error.status === 403) {
+      const forbiddenI18n = operatorApiErrorI18n(error.message);
+      if (forbiddenI18n) {
+        return t(forbiddenI18n.i18nKey, forbiddenI18n.i18nParams);
+      }
+      return t("app.forbidden");
     }
     if (error.status === 429) {
       const seconds = retryAfterSecondsFromMessage(error.message);

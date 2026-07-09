@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Note } from "@assini/db";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { DetailBlock } from "../components/DetailBlock";
-import { formatEvidenceLabel } from "../lib/format";
+import { formatEvidenceLabel, localizeApiError } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
@@ -79,9 +79,8 @@ export function ReviewView({
       await onSaveExplanation(trimmedDraft);
       setNoteEditMessage(t("reviewView.noteExplanationUpdated"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.noteExplanationUpdateFailed");
       setNoteEditMessage(null);
-      setNoteEditError(message);
+      setNoteEditError(localizeApiError(error, t, "errors.noteExplanationUpdateFailed"));
     }
   }
 

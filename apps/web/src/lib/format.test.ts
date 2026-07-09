@@ -361,6 +361,73 @@ describe("localizeApiError", () => {
         "errors.noteReviewFailed"
       )
     ).toBe("Add a reviewer comment before recording this disposition.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Note explanation edits require a substantive explanation.", {
+          status: 400,
+          i18nKey: "errors.noteExplanationTooShort"
+        }),
+        t,
+        "errors.noteExplanationUpdateFailed"
+      )
+    ).toBe("Write a longer note explanation (at least a short paragraph) before saving.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Note explanation edits require a substantive explanation.", { status: 400 }),
+        t,
+        "errors.noteExplanationUpdateFailed"
+      )
+    ).toBe("Write a longer note explanation (at least a short paragraph) before saving.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Note not found: missing-note", {
+          status: 404,
+          i18nKey: "errors.noteNotFound"
+        }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("That note was not found. Select another note from the review queue.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Reviewer is not assigned to approve notes for language: testlang", { status: 403 }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("You are not assigned to approve notes for this language. Ask a lead to update the review policy.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Review disposition assignee is not assignable: learner-1", { status: 400 }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("Choose an assignable reviewer, lead, admin, or elder for this disposition.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Review disposition due date must be parseable", { status: 400 }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("Enter a valid due date for this disposition.");
+
+    expect(
+      localizeApiError(
+        new ApiError(
+          "A configured model is required to generate drafts. Set ASSINI_LLM_* (see the configuration reference) and retry.",
+          { status: 400, i18nKey: "errors.modelRequired" }
+        ),
+        t,
+        "errors.modelDraftGenerationFailed"
+      )
+    ).toBe(
+      "A configured model is required to generate drafts. Set ASSINI_LLM_* (see the configuration reference) and retry."
+    );
   });
 
   it("localizes language create/patch and bulk-review validation errors", () => {
@@ -461,6 +528,19 @@ describe("localizeApiError", () => {
     );
 
     expect(message).toBe("You do not have permission for this action.");
+  });
+
+  it("prefers specific 403 i18nKey over the generic forbidden message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Reviewer is not assigned to approve notes for language: testlang", {
+          status: 403,
+          i18nKey: "errors.reviewerNotAssigned"
+        }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("You are not assigned to approve notes for this language. Ask a lead to update the review policy.");
   });
 
   it("localizes already-processing conflicts from i18n metadata", () => {

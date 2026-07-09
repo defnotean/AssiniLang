@@ -344,7 +344,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     } catch (error) {
       if (error instanceof ModelRequiredError) {
         reply.code(400);
-        return { error: MODEL_REQUIRED_MESSAGE };
+        return {
+          error: MODEL_REQUIRED_MESSAGE,
+          i18nKey: "errors.modelRequired"
+        };
       }
       reply.code(422);
       return { error: redactErrorSecrets(error instanceof Error ? error.message : "Exercise generation failed.") };
