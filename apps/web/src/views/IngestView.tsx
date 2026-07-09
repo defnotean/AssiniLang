@@ -3,6 +3,8 @@ import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import {
   extractionDraftSummary,
+  formatSourceKind,
+  localizeDraftGroundingMessage,
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
   relativeAge,
@@ -269,7 +271,7 @@ export function IngestView({
                 <div>
                   <strong>{source.title}</strong>
                   <div className="pill-row">
-                    <span className="pill">{source.kind}</span>
+                    <span className="pill">{formatSourceKind(source.kind, t)}</span>
                     <StatusBadge status={source.status} />
                     {(source.status === "processing" || source.status === "failed") &&
                       source.processingAttempts !== undefined &&
@@ -423,7 +425,7 @@ export function IngestView({
                       <span
                         key={`${flag.kind}:${flag.message}`}
                         className="status-badge contested"
-                        title={flag.message}
+                        title={localizeDraftGroundingMessage(flag, t)}
                       >
                         {t(`draftGrounding.${flag.kind}`)}
                       </span>

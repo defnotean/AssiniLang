@@ -1,7 +1,9 @@
+/** @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationRun } from "../evaluationTrends";
+import { I18nProvider } from "../i18n";
 import type { Language } from "../lib/types";
 import { EvaluationView } from "./EvaluationView";
 
@@ -30,20 +32,25 @@ function createRun(overrides: Partial<EvaluationRun> = {}): EvaluationRun {
   };
 }
 
-function renderEvaluationView(overrides: Partial<Parameters<typeof EvaluationView>[0]> = {}) {
+function renderEvaluationView(
+  overrides: Partial<Parameters<typeof EvaluationView>[0]> = {},
+  locale: "en" | "ar" = "en"
+) {
   return render(
-    <EvaluationView
-      evaluations={[]}
-      languages={languages}
-      selectedLanguageId="avenik"
-      isWorkflowBusy={false}
-      isEvaluating={false}
-      artifactDownload={null}
-      artifactError={null}
-      isExportingArtifact={false}
-      onExportArtifact={vi.fn()}
-      {...overrides}
-    />
+    <I18nProvider initialLocale={locale}>
+      <EvaluationView
+        evaluations={[]}
+        languages={languages}
+        selectedLanguageId="avenik"
+        isWorkflowBusy={false}
+        isEvaluating={false}
+        artifactDownload={null}
+        artifactError={null}
+        isExportingArtifact={false}
+        onExportArtifact={vi.fn()}
+        {...overrides}
+      />
+    </I18nProvider>
   );
 }
 
@@ -159,5 +166,31 @@ describe("EvaluationView", () => {
 
     expect(screen.getByText("Note accuracy note-1: Missing note content for verb chains")).toBeInTheDocument();
     expect(screen.queryByText(/noteAccuracy/)).not.toBeInTheDocument();
+  });
+
+  it("localizes run summaries and failure messages in Arabic", () => {
+    renderEvaluationView(
+      {
+        evaluations: [
+          createRun({
+            summary: "Avenik: 90.0% average score across 2 categories.",
+            failures: [
+              {
+                category: "noteAccuracy",
+                languageId: "avenik",
+                itemId: "note-1",
+                message: "Missing note content for verb chains"
+              }
+            ]
+          })
+        ]
+      },
+      "ar"
+    );
+
+    expect(screen.getByText("Avenik: متوسط درجة 90.0% عبر 2 فئات.")).toBeInTheDocument();
+    expect(screen.getByText("دقة الملاحظات note-1: محتوى الملاحظة مفقود لـ verb chains")).toBeInTheDocument();
+    expect(screen.queryByText(/average score across/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Missing note content/i)).not.toBeInTheDocument();
   });
 });

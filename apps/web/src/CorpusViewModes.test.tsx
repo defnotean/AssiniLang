@@ -103,7 +103,10 @@ describe("CorpusView display modes", () => {
   it("shows a Build-oriented empty state when the corpus is empty", () => {
     renderCorpusView([]);
 
-    expect(screen.getByRole("status")).toHaveTextContent(
+    const emptyState = screen.getByRole("status");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(
       "No saved examples yet. Process a source in Build and accept corpus drafts, or open Add source passage above to import one here."
     );
   });

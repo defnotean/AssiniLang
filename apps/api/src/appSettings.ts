@@ -13,6 +13,7 @@ import {
   type RuntimeSettingsResponse
 } from "@assini/api-contract";
 import { describeLlmProviderFromEnv } from "./llmProvider.js";
+import { redactErrorSecrets } from "./secretRedaction.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 import {
   DEFAULT_LLM_MAX_TOKENS,
@@ -100,7 +101,7 @@ async function assertRuntimeSettingsUrlFieldAllowed(
     await assertOutboundHttpUrlAllowed(url, { env });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new RuntimeSettingsUrlValidationError(`Invalid ${label}: ${message}`);
+    throw new RuntimeSettingsUrlValidationError(`Invalid ${label}: ${redactErrorSecrets(message)}`);
   }
 }
 
@@ -129,6 +130,29 @@ export async function assertRuntimeSettingsPatchUrlsAllowed(
     if (ocrBaseUrl) {
       await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
     }
+  }
+}
+
+/** Validates the URLs a stored profile would actually persist (including inherited fields). */
+async function assertStoredProfileUrlsAllowed(profile: StoredModelProfile, env: Env): Promise<void> {
+  const validationEnv: Env = {
+    ...env,
+    ASSINI_ALLOW_PRIVATE_URLS: profile.allowPrivateUrls ? "1" : ""
+  };
+
+  const baseUrl = trimValue(profile.baseUrl);
+  if (baseUrl) {
+    await assertRuntimeSettingsUrlFieldAllowed("LLM base URL", baseUrl, validationEnv);
+  }
+
+  const transcriptionBaseUrl = trimValue(profile.transcriptionBaseUrl);
+  if (transcriptionBaseUrl) {
+    await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
+  }
+
+  const ocrBaseUrl = trimValue(profile.ocrBaseUrl);
+  if (ocrBaseUrl) {
+    await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
   }
 }
 
@@ -529,6 +553,7 @@ async function saveRuntimeModelProfileUnlocked(
     : profiles.findIndex((profile) => profile.name.toLowerCase() === params.payload.name.toLowerCase());
   const existing = existingIndex >= 0 ? profiles[existingIndex] : undefined;
   const profile = storedProfileFromPayload(params.payload, existing, env, new Date().toISOString());
+  await assertStoredProfileUrlsAllowed(profile, env);
   const nextProfiles = existingIndex >= 0
     ? profiles.map((item, index) => (index === existingIndex ? profile : item))
     : [...profiles, profile];

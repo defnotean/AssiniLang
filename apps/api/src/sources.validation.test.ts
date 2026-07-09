@@ -1,9 +1,38 @@
+import { access, mkdtemp, readFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { createServer } from "./server.js";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
+import { createServer } from "./server.js";
+import { MAX_SOURCE_UPLOAD_TITLE_CHARS } from "./routes/sources.js";
 
 function authHeaders(userId: string) {
   return { "x-assini-user-id": userId, "x-assini-dev-token": "test" };
+}
+
+function multipartPayload(parts: Array<{
+  name: string;
+  filename?: string;
+  contentType?: string;
+  body: string;
+}>, boundary: string): string {
+  const chunks: string[] = [];
+  for (const part of parts) {
+    chunks.push(`--${boundary}`);
+    if (part.filename !== undefined) {
+      chunks.push(
+        `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"`
+      );
+      chunks.push(`Content-Type: ${part.contentType ?? "application/octet-stream"}`);
+    } else {
+      chunks.push(`Content-Disposition: form-data; name="${part.name}"`);
+    }
+    chunks.push("");
+    chunks.push(part.body);
+  }
+  chunks.push(`--${boundary}--`);
+  chunks.push("");
+  return chunks.join("\r\n");
 }
 
 describe("source route validation i18nKeys", () => {
@@ -64,15 +93,9 @@ describe("source route validation i18nKeys", () => {
   it("rejects empty uploaded files with i18nKey", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const boundary = "----assini-empty";
-    const payload = [
-      `--${boundary}`,
-      'Content-Disposition: form-data; name="file"; filename="empty.txt"',
-      "Content-Type: text/plain",
-      "",
-      "",
-      `--${boundary}--`,
-      ""
-    ].join("\r\n");
+    const payload = multipartPayload([
+      { name: "file", filename: "empty.txt", contentType: "text/plain", body: "" }
+    ], boundary);
 
     const response = await app.inject({
       method: "POST",
@@ -88,6 +111,161 @@ describe("source route validation i18nKeys", () => {
     expect(response.json()).toEqual({
       error: "Uploaded file is empty",
       i18nKey: "errors.sourceUploadEmpty"
+    });
+  });
+
+  it("rejects oversized multipart uploads with payloadTooLarge i18nKey", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-upload-oversize-"));
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      dataDir,
+      multipartFileSizeBytes: 32
+    });
+    const boundary = "----assini-oversize";
+    const payload = multipartPayload([
+      {
+        name: "file",
+        filename: "big.txt",
+        contentType: "text/plain",
+        body: "x".repeat(64)
+      }
+    ], boundary);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/sources/upload`,
+      headers: {
+        ...authHeaders("reviewer-1"),
+        "content-type": `multipart/form-data; boundary=${boundary}`
+      },
+      payload
+    });
+
+    expect(response.statusCode).toBe(413);
+    expect(response.json()).toMatchObject({
+      error: "Payload too large",
+      i18nKey: "errors.payloadTooLarge"
+    });
+
+    const listed = await app.inject({
+      method: "GET",
+      url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+      headers: authHeaders("reviewer-1")
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual([]);
+  });
+
+  it("sanitizes traversal filenames and stores under assets/<languageId>/", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-upload-path-"));
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      dataDir
+    });
+    const boundary = "----assini-path";
+    const payload = multipartPayload([
+      {
+        name: "title",
+        body: "Safe notes"
+      },
+      {
+        name: "file",
+        filename: "../../etc/passwd.txt",
+        contentType: "text/plain",
+        body: "talu water"
+      }
+    ], boundary);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/sources/upload`,
+      headers: {
+        ...authHeaders("reviewer-1"),
+        "content-type": `multipart/form-data; boundary=${boundary}`
+      },
+      payload
+    });
+
+    expect(response.statusCode).toBe(201);
+    const asset = response.json();
+    expect(asset).toMatchObject({
+      languageId: TEST_LANGUAGE_ID,
+      kind: "document",
+      title: "Safe notes",
+      // busboy keeps only the basename; sanitizeStoredFileName then strips junk.
+      originalName: "passwd.txt",
+      status: "pending"
+    });
+    expect(asset.filePath).toMatch(new RegExp(`^assets/${TEST_LANGUAGE_ID}/source-[^/]+__passwd\\.txt$`));
+    expect(asset.filePath).not.toContain("..");
+    expect(asset.filePath).not.toContain("\\");
+
+    const absolutePath = join(dataDir, ...asset.filePath.split("/"));
+    await access(absolutePath);
+    expect(await readFile(absolutePath, "utf8")).toBe("talu water");
+  });
+
+  it("rejects oversized upload titles with i18nKey", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const boundary = "----assini-title";
+    const payload = multipartPayload([
+      {
+        name: "title",
+        body: "t".repeat(MAX_SOURCE_UPLOAD_TITLE_CHARS + 1)
+      },
+      {
+        name: "file",
+        filename: "notes.txt",
+        contentType: "text/plain",
+        body: "ok"
+      }
+    ], boundary);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/sources/upload`,
+      headers: {
+        ...authHeaders("reviewer-1"),
+        "content-type": `multipart/form-data; boundary=${boundary}`
+      },
+      payload
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Upload title field is too large",
+      i18nKey: "errors.sourceUploadTitleTooLarge"
+    });
+  });
+
+  it("rejects duplicate upload title fields with i18nKey", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const boundary = "----assini-title-dup";
+    const payload = multipartPayload([
+      { name: "title", body: "First" },
+      { name: "title", body: "Second" },
+      {
+        name: "file",
+        filename: "notes.txt",
+        contentType: "text/plain",
+        body: "ok"
+      }
+    ], boundary);
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/sources/upload`,
+      headers: {
+        ...authHeaders("reviewer-1"),
+        "content-type": `multipart/form-data; boundary=${boundary}`
+      },
+      payload
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Upload title field is invalid",
+      i18nKey: "errors.sourceUploadTitleInvalid"
     });
   });
 

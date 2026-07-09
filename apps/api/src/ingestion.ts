@@ -33,7 +33,6 @@ const MAX_CHUNKS_PER_SOURCE = 8;
 const MAX_CANDIDATES_PER_KIND = 100;
 const MAX_URL_CONTENT_BYTES = 2_000_000;
 const MAX_MERGED_SUMMARY_CHARS = 300;
-const SECRET_PATTERN = /\bsk-[A-Za-z0-9._-]+/g;
 
 const TEXT_DOCUMENT_EXTENSIONS = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "text"]);
 
@@ -620,8 +619,7 @@ function extractionErrorWarning(error: unknown, partLabel: string): string {
   const message = error instanceof Error && error.message.trim().length > 0
     ? error.message
     : "model extraction failed";
-  const sanitized = message
-    .replace(SECRET_PATTERN, "[redacted-secret]")
+  const sanitized = redactErrorSecrets(message)
     .replace(/\s+/g, " ")
     .trim();
   return `Model extraction failed for ${partLabel}: ${sanitized.slice(0, 300)}; fell back to offline heuristics when no usable model output remained.`;

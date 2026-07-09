@@ -83,11 +83,11 @@ describe("ModelDiscoveryPanel empty state", () => {
     renderPanel();
 
     expect(screen.getByText("No models found yet")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Start Ollama, LM Studio, or llama.cpp, then press Refresh models. Or enter a base URL above and scan again."
-      )
-    ).toBeInTheDocument();
+    const emptyHint = screen.getByText(
+      "Start Ollama, LM Studio, or llama.cpp, then press Refresh models. Or enter a base URL above and scan again."
+    );
+    expect(emptyHint).toHaveAttribute("role", "status");
+    expect(emptyHint).toHaveAttribute("aria-live", "polite");
   });
 
   it("hides the empty-state hint while a scan is in flight", () => {
@@ -98,5 +98,17 @@ describe("ModelDiscoveryPanel empty state", () => {
         "Start Ollama, LM Studio, or llama.cpp, then press Refresh models. Or enter a base URL above and scan again."
       )
     ).not.toBeInTheDocument();
+  });
+
+  it("shows a next-step hint when discovery itself fails", () => {
+    renderPanel({
+      modelDiscoveryState: { status: "error", message: "Model discovery failed" }
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("aria-live", "assertive");
+    expect(alert).toHaveTextContent("Model discovery failed");
+    expect(alert).toHaveTextContent(/Confirm the provider is running/i);
+    expect(alert).toHaveTextContent(/Refresh models/i);
   });
 });

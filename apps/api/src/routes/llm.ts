@@ -43,16 +43,35 @@ function profileIdFromParams(params: unknown): string {
   }
 }
 
-function mapModelProfileMutationError(error: unknown, reply: { code: (statusCode: number) => unknown }): { error: string } | undefined {
+function mapModelProfileMutationError(
+  error: unknown,
+  reply: { code: (statusCode: number) => unknown }
+): { error: string; i18nKey: string } | undefined {
   if (error instanceof RuntimeModelProfileNotFoundError) {
     reply.code(404);
-    return { error: error.message };
+    return { error: error.message, i18nKey: "errors.modelProfileNotFound" };
   }
   if (error instanceof RuntimeModelProfilesCorruptError) {
     reply.code(409);
-    return { error: error.message };
+    return { error: error.message, i18nKey: "errors.modelProfilesCorrupt" };
+  }
+  if (error instanceof RuntimeSettingsUrlValidationError) {
+    reply.code(400);
+    return { error: error.message, i18nKey: "errors.invalidRuntimeSettingsUrl" };
   }
   return undefined;
+}
+
+function requireProfileId(
+  params: unknown,
+  reply: { code: (statusCode: number) => unknown }
+): string | undefined {
+  const profileId = profileIdFromParams(params).trim();
+  if (!profileId) {
+    reply.code(400);
+    return undefined;
+  }
+  return profileId;
 }
 
 export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void {
@@ -106,7 +125,7 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const patch = parseSchemaBody(runtimeSettingsPatchSchema, request.body ?? {});
     if (!patch) {
       reply.code(400);
-      return { error: "Invalid runtime settings body" };
+      return { error: "Invalid runtime settings body", i18nKey: "errors.invalidRuntimeSettingsBody" };
     }
 
     try {
@@ -118,7 +137,7 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     } catch (error) {
       if (error instanceof RuntimeSettingsUrlValidationError) {
         reply.code(400);
-        return { error: error.message };
+        return { error: error.message, i18nKey: "errors.invalidRuntimeSettingsUrl" };
       }
       throw error;
     }
@@ -134,7 +153,7 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const payload = parseSchemaBody(modelProfileSavePayloadSchema, request.body ?? {});
     if (!payload) {
       reply.code(400);
-      return { error: "Invalid model profile body" };
+      return { error: "Invalid model profile body", i18nKey: "errors.invalidModelProfileBody" };
     }
 
     try {
@@ -157,7 +176,10 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
 
-    const profileId = profileIdFromParams(request.params);
+    const profileId = requireProfileId(request.params, reply);
+    if (!profileId) {
+      return { error: "Invalid model profile id", i18nKey: "errors.invalidModelProfileId" };
+    }
     try {
       return await activateRuntimeModelProfile({
         settingsPath,
@@ -178,7 +200,10 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
 
-    const profileId = profileIdFromParams(request.params);
+    const profileId = requireProfileId(request.params, reply);
+    if (!profileId) {
+      return { error: "Invalid model profile id", i18nKey: "errors.invalidModelProfileId" };
+    }
     try {
       return await deleteRuntimeModelProfile({
         settingsPath,

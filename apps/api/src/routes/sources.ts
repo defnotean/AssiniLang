@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve as resolvePath } from "node:path";
+import { basename, dirname, extname, join, relative } from "node:path";
 import type { FastifyInstance } from "fastify";
 import {
   obsidianVaultImportPayloadSchema,
@@ -10,7 +10,14 @@ import {
   type ObsidianVaultImportResponse,
   type SourceRegistrationPayload
 } from "@assini/api-contract";
-import type { AppState, ExtractionDraft, SourceAsset, SourceAssetKind, User } from "@assini/db";
+import {
+  resolveSourceAssetFilePath,
+  type AppState,
+  type ExtractionDraft,
+  type SourceAsset,
+  type SourceAssetKind,
+  type User
+} from "@assini/db";
 import { extractCandidatesForAsset, type ExtractionCandidate, type SourceExtractionResult } from "../ingestion.js";
 import { appendAuditEvent, redactErrorSecrets, requireActor } from "../routeHelpers.js";
 import {
@@ -39,7 +46,45 @@ type VaultSkippedFile = ObsidianVaultImportResponse["skipped"][number];
 
 const MAX_OBSIDIAN_MARKDOWN_BYTES = 1_000_000;
 export const MAX_SOURCE_PROCESSING_ATTEMPTS = 5;
+/** Default multipart file cap for source uploads (also registered on the Fastify multipart plugin). */
+export const MAX_SOURCE_UPLOAD_BYTES = 25 * 1024 * 1024;
+/** Cap for the optional multipart `title` text field (and busboy `fieldSize`). */
+export const MAX_SOURCE_UPLOAD_TITLE_BYTES = 1024;
+export const MAX_SOURCE_UPLOAD_TITLE_CHARS = 200;
 const OBSIDIAN_SKIPPED_DIRECTORIES = new Set([".obsidian", ".git", "node_modules"]);
+
+/** Tight per-request multipart limits for the source upload route. */
+export const SOURCE_UPLOAD_MULTIPART_LIMITS = {
+  fileSize: MAX_SOURCE_UPLOAD_BYTES,
+  files: 1,
+  fields: 4,
+  fieldSize: MAX_SOURCE_UPLOAD_TITLE_BYTES,
+  parts: 6,
+  headerPairs: 32
+} as const;
+
+type UploadTitleField = {
+  type?: string;
+  value?: unknown;
+  valueTruncated?: boolean;
+};
+
+function readOptionalUploadTitle(
+  fields: Record<string, unknown> | undefined
+): { title: string } | { error: "truncated" | "invalid" } {
+  const raw = fields?.title;
+  if (raw === undefined) return { title: "" };
+  if (Array.isArray(raw)) return { error: "invalid" };
+  if (!raw || typeof raw !== "object") return { error: "invalid" };
+
+  const field = raw as UploadTitleField;
+  if (field.type === "file" || !("value" in field)) return { error: "invalid" };
+  if (field.valueTruncated) return { error: "truncated" };
+
+  const title = String(field.value ?? "").trim();
+  if (title.length > MAX_SOURCE_UPLOAD_TITLE_CHARS) return { error: "truncated" };
+  return { title };
+}
 
 function vaultAuditLabel(rootPath: string): string {
   return basename(rootPath) || "selected vault";
@@ -225,7 +270,18 @@ async function collectObsidianMarkdownFiles(
 }
 
 export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, updateState, checkRateLimit, authToken, prototypeSessions, llmProvider, dataDir, ingestionFetch, jobQueue } = ctx;
+  const {
+    readState,
+    updateState,
+    checkRateLimit,
+    authToken,
+    prototypeSessions,
+    llmProvider,
+    dataDir,
+    multipartFileSizeBytes,
+    ingestionFetch,
+    jobQueue
+  } = ctx;
 
   app.get("/languages/:languageId/sources", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
@@ -477,7 +533,11 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
 
-    const file = await request.file();
+    const uploadLimits = {
+      ...SOURCE_UPLOAD_MULTIPART_LIMITS,
+      fileSize: Math.min(SOURCE_UPLOAD_MULTIPART_LIMITS.fileSize, multipartFileSizeBytes)
+    };
+    const file = await request.file({ limits: uploadLimits });
     if (!file) {
       reply.code(400);
       return {
@@ -486,7 +546,29 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
 
-    const buffer = await file.toBuffer();
+    let buffer: Buffer;
+    try {
+      buffer = await file.toBuffer();
+    } catch (error) {
+      const statusCode = (error as { statusCode?: number }).statusCode;
+      if (statusCode === 413 || file.file.truncated) {
+        reply.code(413);
+        return {
+          error: "Payload too large",
+          i18nKey: "errors.payloadTooLarge"
+        };
+      }
+      throw error;
+    }
+    // Defense in depth if throwFileSizeLimit is disabled: never persist a
+    // silently truncated multipart body.
+    if (file.file.truncated) {
+      reply.code(413);
+      return {
+        error: "Payload too large",
+        i18nKey: "errors.payloadTooLarge"
+      };
+    }
     if (buffer.length === 0) {
       reply.code(400);
       return {
@@ -495,19 +577,40 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
 
+    const titleResult = readOptionalUploadTitle(file.fields as Record<string, unknown> | undefined);
+    if ("error" in titleResult) {
+      reply.code(400);
+      return titleResult.error === "truncated"
+        ? {
+            error: "Upload title field is too large",
+            i18nKey: "errors.sourceUploadTitleTooLarge"
+          }
+        : {
+            error: "Upload title field is invalid",
+            i18nKey: "errors.sourceUploadTitleInvalid"
+          };
+    }
+
     const originalName = sanitizeStoredFileName(file.filename ?? "upload");
     const assetId = `source-${randomUUID()}`;
-    const relativePath = join("assets", languageId, `${assetId}__${originalName}`);
-    const absolutePath = resolvePath(dataDir, relativePath);
+    // Keep forward slashes so persisted paths pass sourceAssetFilePathIssue.
+    const relativePath = `assets/${languageId}/${assetId}__${originalName}`;
+    let absolutePath: string;
+    try {
+      absolutePath = resolveSourceAssetFilePath(dataDir, relativePath, languageId);
+    } catch {
+      reply.code(500);
+      return {
+        error: "Source could not be stored",
+        i18nKey: "errors.sourceStoreFailed"
+      };
+    }
     await mkdir(dirname(absolutePath), { recursive: true });
     await writeFile(absolutePath, buffer);
 
     const mimeType = file.mimetype || "application/octet-stream";
     const kind = sourceKindForUpload(mimeType, originalName);
-    const titleField = file.fields?.title;
-    const titleValue = titleField && "value" in (titleField as object)
-      ? String((titleField as { value: unknown }).value ?? "").trim()
-      : "";
+    const titleValue = titleResult.title;
 
     let asset: SourceAsset | undefined;
 
@@ -520,7 +623,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         title: titleValue || originalName,
         originalName,
         mimeType,
-        filePath: relativePath.split("\\").join("/"),
+        filePath: relativePath,
         status: "pending",
         createdBy: actor.id,
         createdAt

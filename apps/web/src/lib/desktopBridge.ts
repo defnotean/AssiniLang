@@ -18,10 +18,12 @@ export type DesktopAction =
 
 export type DesktopActionResult = {
   backupSummary?: DesktopBackupSummary;
+  /** Stable machine-readable failure code from desktop IPC. */
+  code?: string;
   diagnosticsDir?: string;
   diagnosticsPath?: string;
   ok: boolean;
-  /** Stable i18n key for bridge-unavailable / action-missing failures. */
+  /** Stable i18n key for bridge-unavailable / action-missing / IPC failures. */
   i18nKey?: MessageKey;
   message?: string;
   shortcutSummary?: DesktopShortcutSummary;
@@ -86,6 +88,23 @@ export function getDesktopBridgeInfo(): DesktopBridgeInfo | null {
   };
 }
 
+function coerceDesktopActionResult(result: {
+  ok: boolean;
+  code?: string;
+  i18nKey?: string;
+  message?: string;
+  backupSummary?: DesktopBackupSummary;
+  diagnosticsDir?: string;
+  diagnosticsPath?: string;
+  shortcutSummary?: DesktopShortcutSummary;
+  preferences?: DesktopPreferences;
+}): DesktopActionResult & { preferences?: DesktopPreferences } {
+  return {
+    ...result,
+    i18nKey: result.i18nKey as MessageKey | undefined
+  };
+}
+
 export async function runDesktopAction(action: DesktopAction): Promise<DesktopActionResult> {
   if (typeof window === "undefined" || !window.assiniDesktop) {
     return {
@@ -104,7 +123,7 @@ export async function runDesktopAction(action: DesktopAction): Promise<DesktopAc
     };
   }
 
-  return runner();
+  return coerceDesktopActionResult(await runner());
 }
 
 export async function setDesktopPreferences(
@@ -118,7 +137,7 @@ export async function setDesktopPreferences(
     };
   }
 
-  return window.assiniDesktop.setDesktopPreferences(patch);
+  return coerceDesktopActionResult(await window.assiniDesktop.setDesktopPreferences(patch));
 }
 
 export async function refreshDesktopBackupSummary(): Promise<DesktopActionResult> {
@@ -130,7 +149,7 @@ export async function refreshDesktopBackupSummary(): Promise<DesktopActionResult
     };
   }
 
-  return window.assiniDesktop.refreshBackupSummary();
+  return coerceDesktopActionResult(await window.assiniDesktop.refreshBackupSummary());
 }
 
 export async function refreshDesktopShortcutSummary(): Promise<DesktopActionResult> {
@@ -142,7 +161,7 @@ export async function refreshDesktopShortcutSummary(): Promise<DesktopActionResu
     };
   }
 
-  return window.assiniDesktop.refreshShortcutSummary();
+  return coerceDesktopActionResult(await window.assiniDesktop.refreshShortcutSummary());
 }
 
 export async function saveDesktopDiagnosticsReport(text: string): Promise<DesktopActionResult> {
@@ -154,7 +173,7 @@ export async function saveDesktopDiagnosticsReport(text: string): Promise<Deskto
     };
   }
 
-  return window.assiniDesktop.saveDiagnosticsReport(text);
+  return coerceDesktopActionResult(await window.assiniDesktop.saveDiagnosticsReport(text));
 }
 
 export type { DesktopBackupSummary, DesktopPreferences, DesktopShortcutSummary };

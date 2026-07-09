@@ -24,6 +24,8 @@ export type DesktopShortcutSummary = {
 
 type DesktopActionBridgeResult = Promise<{
   ok: boolean;
+  code?: string;
+  i18nKey?: string;
   message?: string;
   backupSummary?: DesktopBackupSummary;
   diagnosticsDir?: string;
@@ -62,6 +64,8 @@ type AssiniDesktopBridge = {
   saveDiagnosticsReport?: (text: string) => DesktopActionBridgeResult;
   setDesktopPreferences?: (patch: Partial<Pick<DesktopPreferences, "hideToTray" | "launchAtLogin">>) => Promise<{
     ok: boolean;
+    code?: string;
+    i18nKey?: string;
     message?: string;
     preferences?: DesktopPreferences;
   }>;

@@ -12,6 +12,7 @@ import {
   trimValue,
   type Env
 } from "./llmEnvShared.js";
+import { redactErrorSecrets } from "./secretRedaction.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 export type {
@@ -24,7 +25,6 @@ export type {
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_DISCOVERY_TIMEOUT_MS = 1_800;
 const MAX_DISCOVERY_BASE_URLS = 12;
-const SECRET_PATTERN = /\bsk-[A-Za-z0-9._-]+/g;
 
 type DiscoveryProvider = DiscoveredLlmModel["provider"];
 type DiscoveryKind = "openai-models" | "ollama-tags" | "lm-studio-native-v1" | "lm-studio-native-v0";
@@ -364,7 +364,7 @@ function errorDetail(error: unknown, apiKey?: string): string {
   if (message === "fetch failed") {
     return "Could not connect to the endpoint. Check that the model server is running and the host/port are reachable from this app.";
   }
-  let sanitized = message.replace(SECRET_PATTERN, "[redacted-secret]");
+  let sanitized = redactErrorSecrets(message);
   if (apiKey) sanitized = sanitized.split(apiKey).join("[redacted-secret]");
   return sanitized.length > 500 ? `${sanitized.slice(0, 499)}...` : sanitized;
 }
@@ -616,8 +616,8 @@ export async function discoverLlmModels(options: {
       const detail = error instanceof Error ? error.message : "Requested endpoint was blocked.";
       errors.push({
         source: "Requested endpoint",
-        baseUrl,
-        detail
+        baseUrl: redactErrorSecrets(baseUrl),
+        detail: redactErrorSecrets(detail)
       });
     }
   }
@@ -645,8 +645,8 @@ export async function discoverLlmModels(options: {
         const detail = error instanceof Error ? error.message : "Discovery endpoint was blocked.";
         errors.push({
           source: target.source,
-          baseUrl: target.baseUrl,
-          detail
+          baseUrl: redactErrorSecrets(target.baseUrl),
+          detail: redactErrorSecrets(detail)
         });
       }
       return;
@@ -669,9 +669,10 @@ export async function discoverLlmModels(options: {
     } catch (error) {
       if (target.reportErrors) {
         const detail = errorDetail(error, target.apiKey);
+        const safeBaseUrl = redactErrorSecrets(target.baseUrl);
         const endpoint: LlmModelDiscoveryEndpoint = {
           source: target.source,
-          baseUrl: target.baseUrl,
+          baseUrl: safeBaseUrl,
           provider: target.provider,
           providerLabel: target.providerLabel,
           connected: false,
@@ -683,7 +684,7 @@ export async function discoverLlmModels(options: {
           endpoint,
           error: {
             source: target.source,
-            baseUrl: target.baseUrl,
+            baseUrl: safeBaseUrl,
             detail
           }
         });

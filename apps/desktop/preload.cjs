@@ -1,4 +1,5 @@
 const { ipcRenderer } = require("electron");
+const { normalizeDesktopIpcResult } = require("./desktopIpc.cjs");
 
 function readDesktopInfo() {
   try {
@@ -38,8 +39,17 @@ function rewriteApiUrl(input) {
   return `${apiBaseUrl}${apiPath}`;
 }
 
+async function invokeDesktopChannel(channel, ...args) {
+  try {
+    const result = await ipcRenderer.invoke(channel, ...args);
+    return normalizeDesktopIpcResult(result);
+  } catch (error) {
+    return normalizeDesktopIpcResult(undefined, error);
+  }
+}
+
 async function invokeDesktopAction(action) {
-  const result = await ipcRenderer.invoke("assini:desktop-action", action);
+  const result = await invokeDesktopChannel("assini:desktop-action", action);
   if (result?.backupSummary) {
     backupSummary = result.backupSummary;
   }
@@ -78,14 +88,14 @@ window.assiniDesktop = Object.freeze({
   pruneOldDataBackups: () => invokeDesktopAction("pruneOldDataBackups"),
   prototypeAuth: true,
   refreshShortcutSummary: async () => {
-    const result = await ipcRenderer.invoke("assini:desktop-shortcut-summary");
+    const result = await invokeDesktopChannel("assini:desktop-shortcut-summary");
     if (result?.shortcutSummary) {
       shortcutSummary = result.shortcutSummary;
     }
     return result;
   },
   refreshBackupSummary: async () => {
-    const result = await ipcRenderer.invoke("assini:desktop-backup-summary");
+    const result = await invokeDesktopChannel("assini:desktop-backup-summary");
     if (result?.backupSummary) {
       backupSummary = result.backupSummary;
     }
@@ -93,9 +103,9 @@ window.assiniDesktop = Object.freeze({
   },
   restoreLatestDataBackup: () => invokeDesktopAction("restoreLatestDataBackup"),
   resetWindowLayout: () => invokeDesktopAction("resetWindowLayout"),
-  saveDiagnosticsReport: (text) => ipcRenderer.invoke("assini:desktop-diagnostics", text),
+  saveDiagnosticsReport: (text) => invokeDesktopChannel("assini:desktop-diagnostics", text),
   setDesktopPreferences: async (patch) => {
-    const result = await ipcRenderer.invoke("assini:desktop-preferences", patch);
+    const result = await invokeDesktopChannel("assini:desktop-preferences", patch);
     if (result?.preferences) {
       desktopPreferences = result.preferences;
     }

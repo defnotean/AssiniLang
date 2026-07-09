@@ -38,4 +38,17 @@ describe("outbound URL safety", () => {
     await expect(assertOutboundHttpUrlAllowed("http://100.64.0.1/v1", { env: {} }))
       .rejects.toThrow(/private or local network/);
   });
+
+  it("redacts URL userinfo from invalid-URL validation errors", async () => {
+    await expect(
+      assertOutboundHttpUrlAllowed("https://user:url-pass-secret@%zz", { env: {} })
+    ).rejects.toThrow(/\[redacted-secret\]/);
+
+    try {
+      await assertOutboundHttpUrlAllowed("https://user:url-pass-secret@%zz", { env: {} });
+      throw new Error("expected URL validation to fail");
+    } catch (error) {
+      expect((error as Error).message).not.toContain("url-pass-secret");
+    }
+  });
 });

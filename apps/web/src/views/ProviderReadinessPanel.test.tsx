@@ -109,6 +109,14 @@ describe("ProviderReadinessPanel", () => {
     expect(screen.queryByText(/Choose a discovered model below/i)).not.toBeInTheDocument();
   });
 
+  it("announces reachability failures with assertive aria-live", () => {
+    renderPanel({ reachabilityError: "LLM reachability check failed" });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("aria-live", "assertive");
+    expect(alert).toHaveTextContent("LLM reachability check failed");
+  });
+
   it("marks smoke-test and connection-test actions busy while in flight", () => {
     const { rerender } = renderPanel({ isTestingModel: true });
     const smokeButton = screen.getByRole("button", { name: "Testing provider..." });

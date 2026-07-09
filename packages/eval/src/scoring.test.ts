@@ -302,4 +302,181 @@ describe("evaluation scoring", () => {
       ])
     );
   });
+
+  it("fails closed on generationPolicy when exercises exist but none are generation-checked", () => {
+    const state = buildTestWorkspaceState();
+    for (const exercise of state.exercises.filter((item) => item.languageId === TEST_LANGUAGE_ID)) {
+      exercise.type = "translate_to_english";
+    }
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.exerciseGrading).toBe(1);
+    expect(result.scores.generationPolicy).toBe(0);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "generationPolicy",
+          itemId: "generationPolicy:empty",
+          message: "No generation-policy exercises to score; empty generationPolicy fails closed."
+        })
+      ])
+    );
+  });
+
+  it("records missing corpus passages for orphaned answer keys", () => {
+    const state = buildTestWorkspaceState();
+    state.corpus = state.corpus.filter((passage) => passage.id !== "testlang-c001");
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.translationAccuracy).toBeLessThan(1);
+    expect(result.scores.segmentationAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "translationAccuracy",
+          itemId: "testlang-c001",
+          message: "Missing corpus passage for answer key testlang-c001."
+        }),
+        expect.objectContaining({
+          category: "segmentationAccuracy",
+          itemId: "testlang-c001",
+          message: "Missing corpus passage for answer key testlang-c001."
+        })
+      ])
+    );
+  });
+
+  it("records missing corpus answer keys for unkeyed passages", () => {
+    const state = buildTestWorkspaceState();
+    state.corpusAnswerKeys = (state.corpusAnswerKeys ?? []).filter((key) => key.passageId !== "testlang-c002");
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.translationAccuracy).toBeLessThan(1);
+    expect(result.scores.segmentationAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "translationAccuracy",
+          itemId: "testlang-c002",
+          message: "Missing corpus answer key for passage testlang-c002."
+        }),
+        expect.objectContaining({
+          category: "segmentationAccuracy",
+          itemId: "testlang-c002",
+          message: "Missing corpus answer key for passage testlang-c002."
+        })
+      ])
+    );
+  });
+
+  it("scores evidence mismatches against immutable answer-key passage ids", () => {
+    const state = buildTestWorkspaceState();
+    const drafted = draftNotesForLanguage(TEST_LANGUAGE_ID, state);
+    const draftedNote = drafted.find((note) => note.topic === "syntax/basic-order");
+    if (!draftedNote) throw new Error("Missing drafted basic-order note");
+
+    draftedNote.evidencePassageIds = ["testlang-c002"];
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, drafted);
+
+    expect(result.scores.noteCoverage).toBe(1);
+    expect(result.scores.evidenceAccuracy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "evidenceAccuracy",
+          itemId: "testlang-note-basic-order",
+          message: expect.stringContaining("Evidence mismatch for syntax/basic-order")
+        })
+      ])
+    );
+  });
+
+  it("rejects choose_particle answers outside the allowed vocabulary", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-001");
+    if (!exercise) throw new Error("Missing testlang-ex-001");
+
+    exercise.expectedAnswers = ["-xx"];
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.generationPolicy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "generationPolicy",
+          itemId: "testlang-ex-001"
+        })
+      ])
+    );
+  });
+
+  it("rejects blank expected answers instead of letting empty normalize auto-pass", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
+
+    expect(gradeExerciseAnswer(exercise, "   ").accepted).toBe(false);
+
+    exercise.expectedAnswers = ["   "];
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.exerciseGrading).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "exerciseGrading",
+          itemId: "testlang-ex-002",
+          message: "Expected answer was rejected by the grader."
+        })
+      ])
+    );
+  });
+
+  it("fails exercise grading when expectedAnswers is empty", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-002");
+    if (!exercise) throw new Error("Missing testlang-ex-002");
+
+    exercise.expectedAnswers = [];
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.exerciseGrading).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "exerciseGrading",
+          itemId: "testlang-ex-002",
+          message: "Expected answer was rejected by the grader."
+        })
+      ])
+    );
+  });
+
+  it("fails generation policy when a checked exercise has no expected answers", () => {
+    const state = buildTestWorkspaceState();
+    const exercise = state.exercises.find((item) => item.id === "testlang-ex-001");
+    if (!exercise) throw new Error("Missing testlang-ex-001");
+
+    exercise.expectedAnswers = [];
+
+    const result = scoreLanguageEvaluation(TEST_LANGUAGE_ID, state, draftNotesForLanguage(TEST_LANGUAGE_ID, state));
+
+    expect(result.scores.generationPolicy).toBeLessThan(1);
+    expect(result.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          category: "generationPolicy",
+          itemId: "testlang-ex-001",
+          message: "Generation-policy exercise has no expected answers to validate."
+        })
+      ])
+    );
+  });
 });

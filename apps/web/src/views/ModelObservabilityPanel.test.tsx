@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ModelObservabilityPanel } from "./ModelObservabilityPanel";
 
 describe("ModelObservabilityPanel", () => {
@@ -66,8 +66,24 @@ describe("ModelObservabilityPanel", () => {
 
     const empty = screen.getByRole("status");
     expect(empty).toHaveAttribute("aria-live", "polite");
+    expect(empty).toHaveClass("empty-state");
     expect(empty).toHaveTextContent(
       "No AI sessions recorded yet. Open Chat to start a practice or review session, then return here to inspect it."
     );
+  });
+
+  it("announces observability load failures with assertive live messaging and retry", () => {
+    const onRetry = vi.fn();
+    render(
+      <ModelObservabilityPanel
+        observabilityState={{ status: "error", message: "Model observability failed" }}
+        onRetry={onRetry}
+      />
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveAttribute("aria-live", "assertive");
+    expect(alert).toHaveTextContent("Model observability failed");
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 });

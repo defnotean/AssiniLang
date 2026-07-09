@@ -214,6 +214,148 @@ describe("runtime app settings", () => {
     expect(env.ASSINI_OCR_BASE_URL).toBeUndefined();
   });
 
+  it("redacts URL userinfo from runtime settings URL validation errors", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+
+    await expect(applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: { baseUrl: "https://user:url-pass-secret@%zz" },
+      env
+    })).rejects.toMatchObject({
+      message: expect.stringMatching(/Invalid LLM base URL:.*\[redacted-secret\]/)
+    });
+
+    try {
+      await applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { baseUrl: "https://user:url-pass-secret@%zz" },
+        env
+      });
+    } catch (error) {
+      expect((error as Error).message).not.toContain("url-pass-secret");
+    }
+  });
+
+  it("validates private URLs against allowPrivateUrls in the same settings patch", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+
+    const accepted = await applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: {
+        allowPrivateUrls: true,
+        baseUrl: "http://127.0.0.1:11434/v1"
+      },
+      env
+    });
+    expect(accepted.settings).toMatchObject({
+      allowPrivateUrls: true,
+      baseUrl: "http://127.0.0.1:11434/v1"
+    });
+
+    await expect(applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: {
+        allowPrivateUrls: false,
+        ocrBaseUrl: "http://127.0.0.1:8080/v1"
+      },
+      env
+    })).rejects.toMatchObject({
+      message: expect.stringMatching(/Invalid OCR base URL:/)
+    });
+  });
+
+  it("rejects private URLs when saving a model profile without allow-private", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+
+    await expect(saveRuntimeModelProfile({
+      settingsPath,
+      env,
+      payload: {
+        name: "Blocked private",
+        provider: "openai-compatible",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        timeoutMs: 30_000,
+        maxTokens: 1024,
+        jsonMode: false,
+        transcriptionModel: "whisper-1",
+        ocrModel: "llava",
+        ocrLang: "eng",
+        allowPrivateUrls: false
+      }
+    })).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
+
+    expect(env.ASSINI_LLM_MODEL_PROFILES).toBeUndefined();
+    expect(await readFile(settingsPath, "utf8")).not.toContain("ASSINI_LLM_MODEL_PROFILES=");
+  });
+
+  it("rejects inherited private profile URLs when allowPrivateUrls is false", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_PROVIDER: "deterministic",
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
+    };
+
+    await expect(saveRuntimeModelProfile({
+      settingsPath,
+      env,
+      payload: {
+        name: "Inherit blocked",
+        provider: "openai-compatible",
+        timeoutMs: 30_000,
+        maxTokens: 1024,
+        jsonMode: false,
+        transcriptionModel: "whisper-1",
+        ocrModel: "llava",
+        ocrLang: "eng",
+        allowPrivateUrls: false
+      }
+    })).rejects.toMatchObject({
+      message: expect.stringMatching(/Invalid LLM base URL:/)
+    });
+  });
+
+  it("accepts private profile URLs when the payload enables allowPrivateUrls", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+
+    const saved = await saveRuntimeModelProfile({
+      settingsPath,
+      env,
+      payload: {
+        name: "Local private",
+        provider: "openai-compatible",
+        baseUrl: "http://127.0.0.1:11434/v1",
+        timeoutMs: 30_000,
+        maxTokens: 1024,
+        jsonMode: false,
+        transcriptionModel: "whisper-1",
+        ocrModel: "llava",
+        ocrLang: "eng",
+        allowPrivateUrls: true
+      }
+    });
+
+    expect(saved.profiles[0]).toMatchObject({
+      name: "Local private",
+      baseUrl: "http://127.0.0.1:11434/v1",
+      allowPrivateUrls: true
+    });
+  });
+
   it("accepts private runtime URLs when ASSINI_ALLOW_PRIVATE_URLS=1", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
     const settingsPath = join(dir, ".env");
@@ -312,7 +454,7 @@ describe("runtime app settings", () => {
         transcriptionModel: "whisper-1",
         ocrModel: "llava",
         ocrLang: "eng",
-        allowPrivateUrls: false,
+        allowPrivateUrls: true,
         activate: true
       }
     });
@@ -344,7 +486,7 @@ describe("runtime app settings", () => {
         transcriptionModel: "whisper-1",
         ocrModel: "llava",
         ocrLang: "eng",
-        allowPrivateUrls: false
+        allowPrivateUrls: true
       }
     });
 
@@ -426,7 +568,7 @@ describe("runtime app settings", () => {
         transcriptionModel: "whisper-1",
         ocrModel: "llava",
         ocrLang: "eng",
-        allowPrivateUrls: false,
+        allowPrivateUrls: true,
         activate: true
       }
     });
@@ -447,7 +589,7 @@ describe("runtime app settings", () => {
         transcriptionModel: "whisper-1",
         ocrModel: "llava",
         ocrLang: "eng",
-        allowPrivateUrls: false
+        allowPrivateUrls: true
       }
     });
 

@@ -61,6 +61,36 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.processingInterruptedByRestart" };
   }
 
+  if (/Processing stalled without progress/i.test(normalized)) {
+    return { i18nKey: "ingest.processingStalledWithoutProgress" };
+  }
+
+  const urlFetchFailed = normalized.match(/Fetching source URL failed with status (\d+)/i);
+  if (urlFetchFailed) {
+    return {
+      i18nKey: "ingest.urlFetchFailed",
+      i18nParams: { status: Number(urlFetchFailed[1]) }
+    };
+  }
+
+  if (/Source URL content is too large to process locally/i.test(normalized)) {
+    return { i18nKey: "ingest.urlContentTooLarge" };
+  }
+
+  if (/Source URL returned no readable text content/i.test(normalized)) {
+    return { i18nKey: "ingest.urlNoReadableText" };
+  }
+
+  const unsupportedDocument = normalized.match(
+    /Document type \.([^\s]+) is not supported yet/i
+  );
+  if (unsupportedDocument) {
+    return {
+      i18nKey: "ingest.documentTypeUnsupported",
+      i18nParams: { ext: unsupportedDocument[1] }
+    };
+  }
+
   if (
     /ASSINI_TRANSCRIBE_BASE_URL/i.test(normalized)
     && /Audio sources need a transcription endpoint|Set ASSINI_TRANSCRIBE/i.test(normalized)
@@ -142,6 +172,16 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
     return {
       i18nKey: "ingest.warningModelExtractionFailed",
       i18nParams: { part: Number(extractionFailed[1]), total: Number(extractionFailed[2]) }
+    };
+  }
+
+  const vaultFileLimit = normalized.match(
+    /Import stopped at the configured (\d+) file limit/i
+  );
+  if (vaultFileLimit) {
+    return {
+      i18nKey: "ingest.warningVaultFileLimit",
+      i18nParams: { maxFiles: Number(vaultFileLimit[1]) }
     };
   }
 

@@ -4,6 +4,7 @@ import {
   formatActorRole,
   formatAuditAction,
   formatAuditEntityPill,
+  formatAuditSummary,
   formatStatus,
   safeDomId
 } from "../lib/format";
@@ -349,7 +350,7 @@ export function GovernanceView({
                   </div>
                   <span className="status-badge under_review">{formatActorRole(event.actorRole, t)}</span>
                 </div>
-                <p>{event.summary}</p>
+                <p>{formatAuditSummary(event.summary, t)}</p>
                 <div className="pill-row">
                   <span className="pill">{event.actorId}</span>
                   <span className="pill">{formatAuditEntityPill(event.entityType, event.entityId, t)}</span>

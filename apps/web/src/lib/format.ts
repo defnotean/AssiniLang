@@ -215,6 +215,8 @@ const AUDIT_ACTION_MESSAGE_KEYS: Record<string, MessageKey> = {
   "governance_record.created": "audit.action.governanceRecordCreated",
   "review_policy.upserted": "audit.action.reviewPolicyUpserted",
   "review_disposition.resolved": "audit.action.reviewDispositionResolved",
+  "review_disposition.created": "audit.action.reviewDispositionCreated",
+  "review_disposition.updated": "audit.action.reviewDispositionUpdated",
   "note.reviewed": "audit.action.noteReviewed",
   "note.draft_generated": "audit.action.noteDraftGenerated",
   "note.elder_correction_applied": "audit.action.noteElderCorrectionApplied",
@@ -230,6 +232,7 @@ const AUDIT_ACTION_MESSAGE_KEYS: Record<string, MessageKey> = {
   "source_asset.process_started": "audit.action.sourceAssetProcessStarted",
   "source_asset.processed": "audit.action.sourceAssetProcessed",
   "source_asset.process_failed": "audit.action.sourceAssetProcessFailed",
+  "source_asset.processing_recovered": "audit.action.sourceAssetProcessingRecovered",
   "source_asset.obsidian_vault_imported": "audit.action.sourceAssetObsidianVaultImported",
   "extraction_draft.accepted": "audit.action.extractionDraftAccepted",
   "extraction_draft.rejected": "audit.action.extractionDraftRejected",
@@ -252,6 +255,339 @@ export function formatAuditEntityPill(entityType: string, entityId: string, t?: 
   return t
     ? t("audit.entityPill", { entityType: typeLabel, entityId })
     : `${typeLabel} / ${entityId}`;
+}
+
+const PART_OF_SPEECH_MESSAGE_KEYS: Record<string, MessageKey> = {
+  noun: "pos.noun",
+  verb: "pos.verb",
+  adjective: "pos.adjective",
+  adverb: "pos.adverb",
+  pronoun: "pos.pronoun",
+  particle: "pos.particle",
+  suffix: "pos.suffix",
+  prefix: "pos.prefix",
+  infix: "pos.infix",
+  clitic: "pos.clitic",
+  conjunction: "pos.conjunction",
+  interjection: "pos.interjection",
+  numeral: "pos.numeral",
+  determiner: "pos.determiner",
+  unknown: "pos.unknown"
+};
+
+/** Localizes common part-of-speech labels on the language profile. */
+export function formatPartOfSpeech(value: string, t?: Translate): string {
+  const key = PART_OF_SPEECH_MESSAGE_KEYS[value.trim().toLowerCase()];
+  if (t && key) return t(key);
+  return value;
+}
+
+const PARADIGM_DIMENSION_MESSAGE_KEYS: Record<string, MessageKey> = {
+  person: "profile.dimension.person",
+  tense: "profile.dimension.tense",
+  number: "profile.dimension.number",
+  aspect: "profile.dimension.aspect",
+  mood: "profile.dimension.mood",
+  case: "profile.dimension.case",
+  gender: "profile.dimension.gender",
+  voice: "profile.dimension.voice",
+  polarity: "profile.dimension.polarity"
+};
+
+/** Localizes known paradigm-gap dimension labels on the language profile. */
+export function formatParadigmDimension(value: string, t?: Translate): string {
+  const key = PARADIGM_DIMENSION_MESSAGE_KEYS[value.trim().toLowerCase()];
+  if (t && key) return t(key);
+  return value;
+}
+
+const LOCAL_USER_NAME_MESSAGE_KEYS: Record<string, MessageKey> = {
+  "Local Learner": "user.localLearner",
+  "Local Elder": "user.localElder",
+  "Local Programmer": "user.localProgrammer",
+  "Local Reviewer": "user.localReviewer",
+  "Local Lead": "user.localLead",
+  "Local Admin": "user.localAdmin"
+};
+
+/** Localizes canned local-prototype user display names in the sidebar user card. */
+export function formatLocalUserName(name: string | undefined, t?: Translate): string | undefined {
+  if (!name) return undefined;
+  const key = LOCAL_USER_NAME_MESSAGE_KEYS[name];
+  if (t && key) return t(key);
+  return name;
+}
+
+type AuditSummaryMatch = {
+  i18nKey: MessageKey;
+  i18nParams?: Record<string, string | number>;
+};
+
+function matchAuditSummary(summary: string): AuditSummaryMatch | undefined {
+  const normalized = summary.trim();
+  if (!normalized) return undefined;
+
+  let match = normalized.match(/^Created language (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.languageCreated", i18nParams: { name: match[1]! } };
+  match = normalized.match(/^Updated language metadata for (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.languageUpdated", i18nParams: { name: match[1]! } };
+  match = normalized.match(/^Deleted language (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.languageDeleted", i18nParams: { name: match[1]! } };
+
+  match = normalized.match(/^Created (consent|access|generation) governance policy record\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.governanceRecordCreated",
+      i18nParams: { policyType: match[1]! }
+    };
+  }
+  match = normalized.match(/^Updated review policy for (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.reviewPolicyUpdated", i18nParams: { languageId: match[1]! } };
+  match = normalized.match(/^Resolved (\w+) review disposition for (.+)\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.reviewDispositionResolved",
+      i18nParams: { disposition: match[1]!, noteId: match[2]! }
+    };
+  }
+  match = normalized.match(/^Opened (\w+) review disposition for (.+)\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.reviewDispositionOpened",
+      i18nParams: { disposition: match[1]!, noteId: match[2]! }
+    };
+  }
+  match = normalized.match(/^Updated (\w+) review disposition for (.+)\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.reviewDispositionUpdated",
+      i18nParams: { disposition: match[1]!, noteId: match[2]! }
+    };
+  }
+
+  match = normalized.match(/^Reviewed note (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.noteReviewed", i18nParams: { noteId: match[1]! } };
+  match = normalized.match(/^Generated deterministic draft note for (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.noteDraftDeterministic", i18nParams: { topic: match[1]! } };
+  match = normalized.match(/^Generated model-backed draft note for (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.noteDraftModel", i18nParams: { topic: match[1]! } };
+
+  if (normalized === "Submitted elder correction for review.") {
+    return { i18nKey: "audit.summary.elderCorrectionSubmitted" };
+  }
+  match = normalized.match(/^Marked elder correction (accepted|rejected)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.elderCorrectionMarked", i18nParams: { status: match[1]! } };
+  }
+  match = normalized.match(/^Applied elder correction (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.elderCorrectionApplied", i18nParams: { correctionId: match[1]! } };
+  }
+
+  match = normalized.match(/^Created exercise (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.exerciseCreated", i18nParams: { exerciseId: match[1]! } };
+  match = normalized.match(/^Graded exercise submission for (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.exerciseSubmissionGraded", i18nParams: { exerciseId: match[1]! } };
+  }
+  match = normalized.match(/^Imported corpus passage (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.corpusImported", i18nParams: { passageId: match[1]! } };
+  match = normalized.match(/^Recorded evaluation run for (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.evaluationRunRecorded", i18nParams: { languageId: match[1]! } };
+  }
+
+  match = normalized.match(/^Registered (\S+) source "(.+)"\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.sourceRegistered",
+      i18nParams: { kind: match[1]!, title: match[2]! }
+    };
+  }
+  match = normalized.match(/^Uploaded (\S+) source "(.+)"\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.sourceUploaded",
+      i18nParams: { kind: match[1]!, title: match[2]! }
+    };
+  }
+  match = normalized.match(/^Started background processing for source "(.+)"\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.sourceProcessStartedAsync", i18nParams: { title: match[1]! } };
+  }
+  match = normalized.match(/^Started processing for source "(.+)"\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.sourceProcessStarted", i18nParams: { title: match[1]! } };
+  }
+  match = normalized.match(/^Processed source "(.+)" into (\d+) extraction drafts\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.sourceProcessed",
+      i18nParams: { title: match[1]!, count: Number(match[2]) }
+    };
+  }
+  match = normalized.match(/^Processing failed for source "(.+)"\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.sourceProcessFailed", i18nParams: { title: match[1]! } };
+  }
+  match = normalized.match(
+    /^Recovered source "(.+)" from an interrupted processing run; marked failed for re-processing\.$/
+  );
+  if (match) {
+    return { i18nKey: "audit.summary.sourceProcessingRecovered", i18nParams: { title: match[1]! } };
+  }
+  match = normalized.match(/^Imported (\d+) Markdown sources from Obsidian vault "(.+)"\.$/);
+  if (match) {
+    return {
+      i18nKey: "audit.summary.obsidianVaultImported",
+      i18nParams: { count: Number(match[1]), vault: match[2]! }
+    };
+  }
+
+  match = normalized.match(/^Accepted lexeme draft (.+)\.$/);
+  if (match) return { i18nKey: "audit.summary.lexemeDraftAccepted", i18nParams: { form: match[1]! } };
+  match = normalized.match(/^Accepted corpus draft into passage (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.corpusDraftAccepted", i18nParams: { passageId: match[1]! } };
+  }
+  match = normalized.match(/^Accepted grammar-note extraction draft (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.grammarNoteDraftAccepted", i18nParams: { draftId: match[1]! } };
+  }
+  match = normalized.match(/^Accepted grammar-note draft into note (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.grammarNoteDraftIntoNote", i18nParams: { noteId: match[1]! } };
+  }
+  match = normalized.match(/^Rejected extraction draft (.+)\.$/);
+  if (match) {
+    return { i18nKey: "audit.summary.extractionDraftRejected", i18nParams: { draftId: match[1]! } };
+  }
+
+  if (normalized === "Stored failed AI session attempt with sanitized diagnostics.") {
+    return { i18nKey: "audit.summary.aiSessionFailedStored" };
+  }
+  match = normalized.match(/^Created (.+) AI session\.$/);
+  if (match) return { i18nKey: "audit.summary.aiSessionCreated", i18nParams: { mode: match[1]! } };
+  if (normalized === "Stored failed AI follow-up attempt with sanitized diagnostics.") {
+    return { i18nKey: "audit.summary.aiMessageFailedStored" };
+  }
+  if (normalized === "Appended a new user input and safe model output.") {
+    return { i18nKey: "audit.summary.aiMessageAppendedSafe" };
+  }
+  if (normalized === "Appended AI session follow-up message and response.") {
+    return { i18nKey: "audit.summary.aiMessageAppended" };
+  }
+
+  return undefined;
+}
+
+const POLICY_TYPE_MESSAGE_KEYS: Record<string, MessageKey> = {
+  consent: "policyType.consent",
+  access: "policyType.access",
+  generation: "policyType.generation"
+};
+
+const DISPOSITION_MESSAGE_KEYS: Record<string, MessageKey> = {
+  contested: "reviewDisposition.contested",
+  rejected: "reviewDisposition.rejected",
+  deferred: "reviewDisposition.deferred",
+  escalated: "reviewDisposition.escalated"
+};
+
+const SOURCE_KIND_MESSAGE_KEYS: Record<string, MessageKey> = {
+  text: "ingest.sourceKindText",
+  wordlist: "ingest.sourceKindWordlist",
+  url: "ingest.sourceKindUrl",
+  image: "ingest.sourceKindImage",
+  audio: "ingest.sourceKindAudio",
+  document: "ingest.sourceKindDocument"
+};
+
+/** Localizes Build source-kind pills. */
+export function formatSourceKind(value: string, t?: Translate): string {
+  const key = SOURCE_KIND_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
+  return value;
+}
+
+type DraftGroundingFlagLike = {
+  kind: string;
+  message: string;
+};
+
+/**
+ * Localizes known draft-grounding tooltip detail messages for Build review.
+ * Unrecognized / custom operator notes pass through unchanged.
+ */
+export function localizeDraftGroundingMessage(
+  flag: DraftGroundingFlagLike,
+  t: Translate
+): string {
+  const message = flag.message.trim();
+  if (flag.kind === "gloss_conflict") {
+    const match = message.match(
+      /^Accepted lexeme "(.+)" is glossed "(.+)", but this draft glosses it "(.+)"\.$/
+    );
+    if (match) {
+      return t("draftGrounding.gloss_conflict.detail", {
+        form: match[1]!,
+        acceptedGloss: match[2]!,
+        draftGloss: match[3]!
+      });
+    }
+  }
+  if (flag.kind === "decomposable_form") {
+    const match = message.match(
+      /^Form decomposes into accepted lexemes (.+); the draft gloss may belong to a different word\.$/
+    );
+    if (match) {
+      return t("draftGrounding.decomposable_form.detail", { parts: match[1]! });
+    }
+  }
+  if (flag.kind === "segmentation_conflict") {
+    const match = message.match(
+      /^Segment "(.+)" is glossed "(.+)" in this draft, but the accepted lexeme "(.+)" is glossed "(.+)"\.$/
+    );
+    if (match) {
+      return t("draftGrounding.segmentation_conflict.detail", {
+        surface: match[1]!,
+        draftGloss: match[2]!,
+        form: match[3]!,
+        acceptedGloss: match[4]!
+      });
+    }
+  }
+  return flag.message;
+}
+
+/**
+ * Localizes known audit-event summary lines shown in the Checks ledger.
+ * Unrecognized / custom summaries pass through unchanged.
+ */
+export function formatAuditSummary(summary: string, t?: Translate): string {
+  if (!t) return summary;
+  const matched = matchAuditSummary(summary);
+  if (!matched) return summary;
+
+  const params: Record<string, string | number> = { ...(matched.i18nParams ?? {}) };
+  if (typeof params.policyType === "string") {
+    const key = POLICY_TYPE_MESSAGE_KEYS[params.policyType];
+    if (key) params.policyType = t(key);
+  }
+  if (typeof params.disposition === "string") {
+    const key = DISPOSITION_MESSAGE_KEYS[params.disposition];
+    if (key) params.disposition = t(key);
+  }
+  if (typeof params.status === "string") {
+    params.status = formatStatus(params.status, t);
+  }
+  if (typeof params.mode === "string") {
+    params.mode = formatStatus(params.mode.replace(/ /g, "_"), t);
+  }
+  if (typeof params.kind === "string") {
+    params.kind = formatSourceKind(params.kind, t);
+  }
+  return t(matched.i18nKey, params);
 }
 
 const TYPOLOGY_MESSAGE_KEYS: Record<string, MessageKey> = {
@@ -526,6 +862,105 @@ export function scoreTone(score: number): "success" | "warning" | "danger" {
   if (score >= 0.96) return "success";
   if (score >= 0.84) return "warning";
   return "danger";
+}
+
+/**
+ * Localizes canned evaluation-run summary lines from packages/eval
+ * (`"{name}: {percent}% average score across {count} categories."`).
+ * Unrecognized summaries (custom fixtures) pass through unchanged.
+ */
+export function localizeEvaluationRunSummary(summary: string, t: Translate): string {
+  const match = summary.trim().match(
+    /^(.+):\s*([\d.]+)%\s+average score across\s+(\d+)\s+categories\.?$/i
+  );
+  if (!match) return summary;
+  return t("eval.runSummary", {
+    name: match[1]!.trim(),
+    percent: match[2]!,
+    count: Number(match[3])
+  });
+}
+
+/**
+ * Localizes known evaluation failure messages from packages/eval scoring.
+ * Unrecognized messages (future codes / fixtures) pass through unchanged.
+ */
+function stripTrailingPeriod(value: string): string {
+  return value.replace(/\.$/, "");
+}
+
+export function localizeEvaluationFailureMessage(message: string, t: Translate): string {
+  const normalized = message.trim();
+  if (!normalized) return message;
+
+  let match = normalized.match(/^Missing corpus passage for answer key (.+)$/i);
+  if (match) return t("eval.failure.missingCorpusPassage", { id: stripTrailingPeriod(match[1]!) });
+
+  match = normalized.match(/^Translation mismatch for corpus passage (.+)$/i);
+  if (match) return t("eval.failure.translationMismatch", { id: stripTrailingPeriod(match[1]!) });
+
+  match = normalized.match(/^Segmentation mismatch for corpus passage (.+)$/i);
+  if (match) return t("eval.failure.segmentationMismatch", { id: stripTrailingPeriod(match[1]!) });
+
+  match = normalized.match(/^Missing corpus answer key for passage (.+)$/i);
+  if (match) return t("eval.failure.missingCorpusAnswerKey", { id: stripTrailingPeriod(match[1]!) });
+
+  match = normalized.match(/^Missing note topic (.+)$/i);
+  if (match) return t("eval.failure.missingNoteTopic", { topic: match[1]! });
+
+  match = normalized.match(/^Missing note content for (.+)$/i);
+  if (match) return t("eval.failure.missingNoteContent", { topic: match[1]! });
+
+  match = normalized.match(/^Missing note evidence for (.+)$/i);
+  if (match) return t("eval.failure.missingNoteEvidence", { topic: match[1]! });
+
+  match = normalized.match(/^Explanation mismatch for (.+) \(draft confidence: (.+)\)\.?$/i);
+  if (match) {
+    return t("eval.failure.explanationMismatch", {
+      topic: match[1]!,
+      confidence: stripTrailingPeriod(match[2]!)
+    });
+  }
+
+  match = normalized.match(/^Evidence mismatch for (.+) \(draft confidence: (.+)\)\.?$/i);
+  if (match) {
+    return t("eval.failure.evidenceMismatch", {
+      topic: match[1]!,
+      confidence: stripTrailingPeriod(match[2]!)
+    });
+  }
+
+  if (normalized === "Expected answer was rejected by the grader.") {
+    return t("eval.failure.expectedAnswerRejected");
+  }
+  if (normalized === "Deterministic invalid answer was accepted by the grader.") {
+    return t("eval.failure.invalidAnswerAccepted");
+  }
+  if (normalized === "Curated adversarial answer was accepted by the grader.") {
+    return t("eval.failure.adversarialAnswerAccepted");
+  }
+  if (normalized === "Expected answer uses forms outside the exercise allowed vocabulary.") {
+    return t("eval.failure.outsideAllowedVocabulary");
+  }
+
+  match = normalized.match(/^No note answer keys to score; empty (\w+) fails closed\.?$/i);
+  if (match) {
+    return t("eval.failure.emptyNoteKeys", { category: formatMetric(match[1]!, t) });
+  }
+  match = normalized.match(/^No corpus answer keys to score; empty (\w+) fails closed\.?$/i);
+  if (match) {
+    return t("eval.failure.emptyCorpusKeys", { category: formatMetric(match[1]!, t) });
+  }
+  match = normalized.match(/^No exercises to score; empty (\w+) fails closed\.?$/i);
+  if (match) {
+    return t("eval.failure.emptyExercises", { category: formatMetric(match[1]!, t) });
+  }
+  match = normalized.match(/^No generation-policy exercises to score; empty (\w+) fails closed\.?$/i);
+  if (match) {
+    return t("eval.failure.emptyGenerationPolicy", { category: formatMetric(match[1]!, t) });
+  }
+
+  return message;
 }
 
 export function formatTrendPoints(delta: number | null, t?: Translate): string {

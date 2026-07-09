@@ -101,6 +101,39 @@ describe("GovernanceView consent empty states", () => {
     expect(screen.getByText("No audit events for this language yet.")).toBeInTheDocument();
     expect(screen.getByText(/Audit events appear after policy changes/i)).toBeInTheDocument();
   });
+
+  it("renders localized audit action titles and summary lines in the ledger", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.auditEventState = {
+      status: "ready",
+      data: [
+        {
+          id: "audit-1",
+          at: "2026-07-01T12:00:00.000Z",
+          actorId: "reviewer-1",
+          actorRole: "reviewer",
+          action: "language.created",
+          entityType: "language",
+          entityId: "avenik",
+          languageId: "avenik",
+          summary: "Created language Avenik.",
+          metadata: {}
+        }
+      ]
+    };
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    expect(screen.getByRole("heading", { name: "Language created" })).toBeInTheDocument();
+    expect(screen.getByText("Created language Avenik.")).toBeInTheDocument();
+    expect(screen.getByText("Reviewer")).toBeInTheDocument();
+    expect(screen.getByText("Language / avenik")).toBeInTheDocument();
+  });
 });
 
 describe("GovernanceView form notices", () => {

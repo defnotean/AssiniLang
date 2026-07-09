@@ -1,10 +1,21 @@
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JsonStore } from "@assini/db";
+import { JsonStore, type AppState, type EvaluationRun } from "@assini/db";
+import {
+  EMPTY_WORKSPACE_EVAL_GUIDANCE,
+  EMPTY_WORKSPACE_EVAL_REQUIRE_LANGUAGES_GUIDANCE,
+  NO_EVAL_RUNS_CLI_GUIDANCE
+} from "./cliGuidance.js";
 import { runEvaluationForState, summarizeEvaluationGate } from "./runEvaluation.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 export const defaultEvalDbPath = resolve(dirname(currentFilePath), "..", "..", "..", "data", "local-db.json");
+
+export {
+  EMPTY_WORKSPACE_EVAL_GUIDANCE,
+  EMPTY_WORKSPACE_EVAL_REQUIRE_LANGUAGES_GUIDANCE,
+  NO_EVAL_RUNS_CLI_GUIDANCE
+} from "./cliGuidance.js";
 
 export function resolveEvalDbPath(env: NodeJS.ProcessEnv = process.env): string {
   const override = env.ASSINI_DB_PATH?.trim();
@@ -19,11 +30,13 @@ function requireLanguages(env: NodeJS.ProcessEnv = process.env): boolean {
 export async function runEvaluationCli({
   dbPath = resolveEvalDbPath(),
   env = process.env,
+  evaluate = runEvaluationForState,
   stderr = console.error,
   stdout = console.log
 }: {
   dbPath?: string;
   env?: NodeJS.ProcessEnv;
+  evaluate?: (state: AppState) => EvaluationRun[];
   stderr?: (message?: unknown, ...optionalParams: unknown[]) => void;
   stdout?: (message?: unknown, ...optionalParams: unknown[]) => void;
 } = {}) {
@@ -32,16 +45,25 @@ export async function runEvaluationCli({
 
   if (state.languages.length === 0) {
     if (requireLanguages(env)) {
-      stderr("Evaluation gate failed: workspace has no languages (ASSINI_EVAL_REQUIRE_LANGUAGES is set).");
-      stderr("Seed a fixture language before running verify, or unset ASSINI_EVAL_REQUIRE_LANGUAGES for an empty local workspace.");
+      for (const line of EMPTY_WORKSPACE_EVAL_REQUIRE_LANGUAGES_GUIDANCE) {
+        stderr(line);
+      }
       return 1;
     }
-    stdout("No languages in the workspace yet; nothing to evaluate.");
-    stdout("Create a language from the sidebar (or API), ingest sources, then run System Eval from Checks or re-run `npm run eval`.");
+    for (const line of EMPTY_WORKSPACE_EVAL_GUIDANCE) {
+      stdout(line);
+    }
     return 0;
   }
 
-  const runs = runEvaluationForState(state);
+  const runs = evaluate(state);
+  if (runs.length === 0) {
+    for (const line of NO_EVAL_RUNS_CLI_GUIDANCE) {
+      stderr(line);
+    }
+    return 1;
+  }
+
   await store.write({
     ...state,
     evaluationRuns: [...state.evaluationRuns, ...runs]

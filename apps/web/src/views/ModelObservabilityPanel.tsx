@@ -31,7 +31,7 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
         <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingObservability")}</p>
       )}
       {observabilityState.status === "error" && (
-        <div className="inline-error" role="alert">
+        <div className="inline-error" role="alert" aria-live="assertive">
           <p>{observabilityState.message}</p>
           {onRetry && (
             <button type="button" className="secondary" onClick={onRetry}>
@@ -61,7 +61,7 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
             </div>
           </dl>
           {recentSessions.length === 0 ? (
-            <p className="inline-empty" role="status" aria-live="polite">{t("model.noSessions")}</p>
+            <p className="muted empty-state" role="status" aria-live="polite">{t("model.noSessions")}</p>
           ) : (
             <div className="detail-list session-list">
               {recentSessions.map((session) => (

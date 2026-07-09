@@ -67,4 +67,43 @@ describe("extraction draft route validation i18nKeys", () => {
     expect(response.statusCode).toBe(200);
     expect(Array.isArray(response.json())).toBe(true);
   });
+
+  it("returns already-status i18nKey when accepting a non-proposed draft", async () => {
+    const base = buildTestWorkspaceState();
+    const app = createServer({
+      initialState: {
+        ...base,
+        extractionDrafts: [
+          {
+            id: "accepted-draft",
+            languageId: TEST_LANGUAGE_ID,
+            sourceAssetId: "source-1",
+            kind: "lexeme",
+            status: "accepted",
+            confidence: "medium",
+            createdAt: "2026-06-10T00:00:00.000Z",
+            payload: {
+              form: "mira",
+              gloss: "river",
+              tags: [],
+              morphologicalSegmentation: [],
+              topicTags: []
+            }
+          }
+        ]
+      }
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: "/extraction-drafts/accepted-draft/accept",
+      headers: authHeaders("reviewer-1")
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Extraction draft is already accepted.",
+      i18nKey: "errors.extractionDraftAlreadyAccepted"
+    });
+  });
 });

@@ -8,7 +8,15 @@ import {
 } from "../evaluationTrends";
 import { ScoreBar } from "../components/ScoreBar";
 import { ScoreRing } from "../components/ScoreRing";
-import { formatMetric, formatSignedTrendPoints, formatTrendPoints, formatTypology, scoreTone } from "../lib/format";
+import {
+  formatMetric,
+  formatSignedTrendPoints,
+  formatTrendPoints,
+  formatTypology,
+  localizeEvaluationFailureMessage,
+  localizeEvaluationRunSummary,
+  scoreTone
+} from "../lib/format";
 import { useI18n, type MessageKey } from "../i18n";
 import type { Language, SnapshotDownload } from "../lib/types";
 
@@ -40,7 +48,7 @@ export function EvaluationView({
   isExportingArtifact: boolean;
   onExportArtifact: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [activeLanguageId, setActiveLanguageId] = useState<string | null>(selectedLanguageId);
   useEffect(() => {
     setActiveLanguageId(selectedLanguageId);
@@ -179,9 +187,11 @@ export function EvaluationView({
               <span className="detail-label">{t("eval.latestRun")}</span>
               <h2>{t("eval.scoreBreakdown", { name: activeLanguage?.name ?? activeRun.languageId })}</h2>
             </div>
-            <span className="id-badge">{new Date(activeRun.createdAt).toLocaleString()}</span>
+            <span className="id-badge">
+              {new Date(activeRun.createdAt).toLocaleString(locale)}
+            </span>
           </div>
-          <p className="eval-summary">{activeRun.summary}</p>
+          <p className="eval-summary">{localizeEvaluationRunSummary(activeRun.summary, t)}</p>
           <div className="score-bars">
             {Object.entries(activeRun.scores).map(([metric, score]) => (
               <ScoreBar key={metric} metric={metric} score={score} />
@@ -194,7 +204,7 @@ export function EvaluationView({
                   {t("eval.failureRow", {
                     category: formatMetric(failure.category, t),
                     itemId: failure.itemId,
-                    message: failure.message
+                    message: localizeEvaluationFailureMessage(failure.message, t)
                   })}
                 </p>
               ))}

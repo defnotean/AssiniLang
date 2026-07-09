@@ -7,6 +7,10 @@ import {
   formatAuditAction,
   formatAuditEntityPill,
   formatAuditEntityType,
+  formatAuditSummary,
+  formatLocalUserName,
+  formatParadigmDimension,
+  formatPartOfSpeech,
   buildEvaluationArtifactDownload,
   buildSnapshotDownload,
   extractionDraftSummary,
@@ -18,6 +22,7 @@ import {
   formatReachability,
   formatSignedTrendPoints,
   formatSnapshotReviewAccountability,
+  formatSourceKind,
   formatStatus,
   formatSubmissionStatus,
   formatSubmissionExplanation,
@@ -26,6 +31,9 @@ import {
   latestAssistantMessage,
   formatLlmProvider,
   localizeApiError,
+  localizeDraftGroundingMessage,
+  localizeEvaluationFailureMessage,
+  localizeEvaluationRunSummary,
   localizeExtractionDraftFailure,
   localizeLlmStatusWarning,
   localizeSourceProcessingError,
@@ -1432,6 +1440,109 @@ describe("formatTrendPoints", () => {
   });
 });
 
+describe("localizeEvaluationRunSummary", () => {
+  it("localizes canned eval run summaries and leaves unknown text unchanged", () => {
+    expect(
+      localizeEvaluationRunSummary("Avenik: 87.5% average score across 7 categories.", t)
+    ).toBe("Avenik: 87.5% average score across 7 categories.");
+    expect(
+      localizeEvaluationRunSummary("Avenik: 87.5% average score across 7 categories.", createTranslator("ar"))
+    ).toBe("Avenik: متوسط درجة 87.5% عبر 7 فئات.");
+    expect(localizeEvaluationRunSummary("Custom fixture summary.", t)).toBe("Custom fixture summary.");
+  });
+});
+
+describe("localizeEvaluationFailureMessage", () => {
+  it("localizes known scoring failure messages and leaves unknown text unchanged", () => {
+    const ar = createTranslator("ar");
+    expect(localizeEvaluationFailureMessage("Missing note content for verb chains", t)).toBe(
+      "Missing note content for verb chains"
+    );
+    expect(localizeEvaluationFailureMessage("Missing note content for verb chains", ar)).toBe(
+      "محتوى الملاحظة مفقود لـ verb chains"
+    );
+    expect(
+      localizeEvaluationFailureMessage("Missing corpus passage for answer key passage-1.", ar)
+    ).toBe("مقطع المدوّنة مفقود لمفتاح الإجابة passage-1.");
+    expect(
+      localizeEvaluationFailureMessage(
+        "Explanation mismatch for verb chains (draft confidence: medium).",
+        ar
+      )
+    ).toBe("عدم تطابق الشرح لـ verb chains (ثقة المسودة: medium).");
+    expect(
+      localizeEvaluationFailureMessage(
+        "No note answer keys to score; empty noteCoverage fails closed.",
+        ar
+      )
+    ).toContain("تغطية الملاحظات");
+    expect(localizeEvaluationFailureMessage("Expected answer was rejected by the grader.", ar)).toBe(
+      "رفض المصحح الإجابة المتوقعة."
+    );
+    expect(localizeEvaluationFailureMessage("Some future scoring message", t)).toBe(
+      "Some future scoring message"
+    );
+  });
+});
+
+describe("formatSourceKind and localizeDraftGroundingMessage", () => {
+  it("localizes known source kinds and leaves unknown values unchanged", () => {
+    expect(formatSourceKind("text", t)).toBe("Text");
+    expect(formatSourceKind("wordlist", t)).toBe("Word list");
+    expect(formatSourceKind("url", t)).toBe("URL");
+    expect(formatSourceKind("image", t)).toBe("Image");
+    expect(formatSourceKind("audio", createTranslator("ar"))).toBe("صوت");
+    expect(formatSourceKind("document", createTranslator("ar"))).toBe("مستند");
+    expect(formatSourceKind("custom-kind", t)).toBe("custom-kind");
+    expect(formatSourceKind("audio")).toBe("audio");
+  });
+
+  it("localizes known grounding tooltip messages and leaves unrecognized shapes unchanged", () => {
+    expect(
+      localizeDraftGroundingMessage(
+        {
+          kind: "gloss_conflict",
+          message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
+        },
+        t
+      )
+    ).toBe('Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".');
+
+    expect(
+      localizeDraftGroundingMessage(
+        {
+          kind: "decomposable_form",
+          message:
+            'Form decomposes into accepted lexemes talu ("water") + ne ("locative case marker"); the draft gloss may belong to a different word.'
+        },
+        createTranslator("ar")
+      )
+    ).toBe(
+      'الصيغة تتحلّل إلى المفردات المعتمدة talu ("water") + ne ("locative case marker")؛ قد ينتمي شرح المسودة إلى كلمة أخرى.'
+    );
+
+    expect(
+      localizeDraftGroundingMessage(
+        {
+          kind: "segmentation_conflict",
+          message:
+            'Segment "ne" is glossed "plural" in this draft, but the accepted lexeme "ne" is glossed "locative case marker".'
+        },
+        createTranslator("ar")
+      )
+    ).toBe(
+      'المقطع "ne" مشروح بـ "plural" في هذه المسودة، لكن المفردة المعتمدة "ne" مشروحة بـ "locative case marker".'
+    );
+
+    expect(
+      localizeDraftGroundingMessage(
+        { kind: "gloss_conflict", message: "Custom operator grounding note" },
+        t
+      )
+    ).toBe("Custom operator grounding note");
+  });
+});
+
 describe("formatStatus and trendVerb", () => {
   it("localizes note, source, session, and disposition statuses", () => {
     expect(formatStatus("open", t)).toBe("open");
@@ -1483,5 +1594,44 @@ describe("audit ledger formatters", () => {
     expect(formatAuditEntityPill("governance_record", "governance-1", ar)).toBe(
       "سجل حوكمة / governance-1"
     );
+  });
+
+  it("localizes known audit summary lines and leaves custom text unchanged", () => {
+    expect(formatAuditSummary('Created language Avenik.', t)).toBe("Created language Avenik.");
+    expect(formatAuditSummary('Created consent governance policy record.', t)).toBe(
+      "Created Consent governance policy record."
+    );
+    expect(formatAuditSummary('Registered text source "Word list".', t)).toBe(
+      'Registered Text source "Word list".'
+    );
+    expect(formatAuditSummary("Custom operator note.", t)).toBe("Custom operator note.");
+    expect(formatAuditSummary('Created language Avenik.')).toBe("Created language Avenik.");
+
+    const ar = createTranslator("ar");
+    expect(formatAuditSummary('Created language Avenik.', ar)).toBe("تم إنشاء اللغة Avenik.");
+    expect(formatAuditSummary('Created consent governance policy record.', ar)).toBe(
+      "تم إنشاء سجل سياسة حوكمة من نوع الموافقة."
+    );
+    expect(formatAuditSummary('Resolved deferred review disposition for note-1.', ar)).toBe(
+      "حُسم قرار المراجعة مؤجّل للملاحظة note-1."
+    );
+    expect(formatAuditSummary("Created learner practice AI session.", ar)).toBe(
+      "أُنشئت جلسة ذكاء اصطناعي بنمط تمرين المتعلّم."
+    );
+  });
+
+  it("localizes profile POS, paradigm dimensions, and local user names", () => {
+    expect(formatPartOfSpeech("noun", t)).toBe("noun");
+    expect(formatPartOfSpeech("suffix", t)).toBe("suffix");
+    expect(formatPartOfSpeech("custom-pos", t)).toBe("custom-pos");
+    expect(formatParadigmDimension("person", t)).toBe("person");
+    expect(formatParadigmDimension("tense", t)).toBe("tense");
+    expect(formatLocalUserName("Local Reviewer", t)).toBe("Local Reviewer");
+    expect(formatLocalUserName(undefined, t)).toBeUndefined();
+
+    const ar = createTranslator("ar");
+    expect(formatPartOfSpeech("verb", ar)).toBe("فعل");
+    expect(formatParadigmDimension("person", ar)).toBe("الشخص");
+    expect(formatLocalUserName("Local Learner", ar)).toBe("متعلّم محلي");
   });
 });

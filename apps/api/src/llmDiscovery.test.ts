@@ -280,6 +280,27 @@ describe("LLM model discovery", () => {
     expect(result.errors[0].detail).not.toBe("fetch failed");
   });
 
+  it("redacts bearer tokens and URL credentials from discovery failure details", async () => {
+    const result = await discoverLlmModels({
+      env: {
+        ASSINI_LLM_API_KEY: "plain-discovery-secret"
+      },
+      fetchFn: async () => {
+        throw new Error("upstream rejected Bearer plain-discovery-secret api_key=query-leak");
+      },
+      extraBaseUrls: ["https://user:url-pass-secret@models.example/v1"],
+      includeCommonTargets: false,
+      timeoutMs: 500,
+      lookupFn: async () => ({ address: "93.184.216.34", family: 4 })
+    });
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("plain-discovery-secret");
+    expect(serialized).not.toContain("url-pass-secret");
+    expect(serialized).not.toContain("query-leak");
+    expect(result.errors.some((entry) => entry.detail.includes("[redacted-secret]"))).toBe(true);
+  });
+
   it("deduplicates localhost and 127.0.0.1 aliases for the same local model", async () => {
     const result = await discoverLlmModels({
       env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },

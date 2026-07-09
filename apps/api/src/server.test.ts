@@ -146,12 +146,29 @@ describe("api server", () => {
     });
   });
 
+  it("keeps unhandled 500 responses free of secret-bearing exception text", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    app.get("/__test/secret-throw", async () => {
+      throw new Error("Unhandled failure with Bearer sk-handler-secret");
+    });
+
+    const response = await app.inject({ method: "GET", url: "/__test/secret-throw" });
+    expect(response.statusCode).toBe(500);
+    expect(response.json()).toMatchObject({
+      error: "Internal Server Error"
+    });
+    expect(JSON.stringify(response.json())).not.toContain("sk-handler-secret");
+  });
+
   it("reports readiness when persisted state can be read", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const ready = await app.inject({ method: "GET", url: "/ready" });
 
     expect(ready.statusCode).toBe(200);
+    expect(ready.headers["cache-control"]).toBe("no-store, max-age=0");
+    expect(ready.headers.pragma).toBe("no-cache");
     expect(ready.json()).toEqual({
       ok: true,
       checks: {
@@ -166,6 +183,42 @@ describe("api server", () => {
         }
       }
     });
+  });
+
+  it("keeps /health live and uncached even when /ready storage fails", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ready-"));
+    const dbPath = join(dir, "local-db.json");
+    await writeFile(dbPath, "{ not valid json with C:/secret/local-db.json", "utf8");
+    const app = createServer({ store: new JsonStore(dbPath) });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(health.statusCode).toBe(200);
+    expect(health.headers["cache-control"]).toBe("no-store, max-age=0");
+    expect(health.headers.pragma).toBe("no-cache");
+    expect(health.json()).toEqual({ ok: true });
+
+    expect(ready.statusCode).toBe(503);
+    expect(ready.headers["cache-control"]).toBe("no-store, max-age=0");
+    expect(ready.headers.pragma).toBe("no-cache");
+    expect(ready.json()).toEqual({
+      ok: false,
+      checks: {
+        storage: {
+          ok: false,
+          error: "Storage read failed"
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
+        }
+      }
+    });
+    expect(JSON.stringify(ready.json())).not.toContain(dbPath);
+    expect(JSON.stringify(ready.json())).not.toContain("C:/secret/local-db.json");
+    expect(JSON.stringify(ready.json())).not.toContain("not valid json");
   });
 
   it("reports sanitized readiness failure when persisted state cannot be read", async () => {
@@ -192,6 +245,42 @@ describe("api server", () => {
       }
     });
     expect(JSON.stringify(ready.json())).not.toContain(dbPath);
+  });
+
+  it("reports sanitized readiness failure when job queue status cannot be inspected", async () => {
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      jobQueue: {
+        getStatus: () => {
+          throw new Error("Cannot inspect source-secret-123 at C:/secret/queue.json");
+        },
+        getPendingAndActiveIds: () => ({ pending: ["source-secret-123"], active: [] }),
+        add() {},
+        isQueuedOrActive: () => false
+      } as never
+    });
+
+    const health = await app.inject({ method: "GET", url: "/health" });
+    const ready = await app.inject({ method: "GET", url: "/ready" });
+
+    expect(health.statusCode).toBe(200);
+    expect(health.json()).toEqual({ ok: true });
+    expect(ready.statusCode).toBe(503);
+    expect(ready.json()).toEqual({
+      ok: false,
+      checks: {
+        storage: {
+          ok: true,
+          schemaVersion: 8
+        },
+        jobQueue: {
+          ok: false,
+          error: "Job queue status unavailable"
+        }
+      }
+    });
+    expect(JSON.stringify(ready.json())).not.toContain("source-secret-123");
+    expect(JSON.stringify(ready.json())).not.toContain("C:/secret/queue.json");
   });
 
   describe("POST /llm/health-check", () => {
@@ -476,7 +565,10 @@ describe("api server", () => {
         });
 
         expect(rejected.statusCode).toBe(400);
-        expect(rejected.json().error).toMatch(/Invalid OCR base URL:/);
+        expect(rejected.json()).toEqual({
+          error: expect.stringMatching(/Invalid OCR base URL:/),
+          i18nKey: "errors.invalidRuntimeSettingsUrl"
+        });
         expect(await readFile(settingsPath, "utf8")).not.toContain("ASSINI_OCR_BASE_URL=");
       } finally {
         restoreEnv("ASSINI_ALLOW_PRIVATE_URLS", previousAllowPrivate);
@@ -555,7 +647,10 @@ describe("api server", () => {
 
     const missing = await app.inject({ method: "GET", url: "/languages/not-a-language/profile" });
     expect(missing.statusCode).toBe(404);
-    expect(missing.json()).toEqual({ error: "Language not found: not-a-language" });
+    expect(missing.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("deletes a language and purges scoped workspace records", async () => {
@@ -612,6 +707,7 @@ describe("api server", () => {
       headers: { origin: "http://localhost:5173" }
     });
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(allowed.headers["access-control-allow-credentials"]).toBe("true");
 
     const blocked = await app.inject({
       method: "GET",
@@ -619,6 +715,62 @@ describe("api server", () => {
       headers: { origin: "https://example.invalid" }
     });
     expect(blocked.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(blocked.headers["access-control-allow-credentials"]).toBeUndefined();
+
+    const noOrigin = await app.inject({ method: "GET", url: "/health" });
+    expect(noOrigin.statusCode).toBe(200);
+    expect(noOrigin.headers["access-control-allow-origin"]).toBeUndefined();
+
+    const nullOrigin = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "null" }
+    });
+    expect(nullOrigin.headers["access-control-allow-origin"]).toBeUndefined();
+
+    const wildcardOrigin = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "*" }
+    });
+    expect(wildcardOrigin.headers["access-control-allow-origin"]).toBeUndefined();
+
+    const preflightAllowed = await app.inject({
+      method: "OPTIONS",
+      url: "/health",
+      headers: {
+        origin: "http://localhost:5173",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type,x-assini-user-id"
+      }
+    });
+    expect(preflightAllowed.statusCode).toBe(204);
+    expect(preflightAllowed.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(preflightAllowed.headers["access-control-allow-credentials"]).toBe("true");
+    expect(String(preflightAllowed.headers["access-control-allow-methods"] ?? "")).toMatch(/POST/);
+
+    const preflightBlocked = await app.inject({
+      method: "OPTIONS",
+      url: "/health",
+      headers: {
+        origin: "https://example.invalid",
+        "access-control-request-method": "POST"
+      }
+    });
+    expect(preflightBlocked.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(preflightBlocked.headers["access-control-allow-credentials"]).toBeUndefined();
+  });
+
+  it("rejects wildcard, null, and empty createServer CORS allow-lists", () => {
+    expect(() => createServer({ initialState: buildTestWorkspaceState(), allowedOrigins: ["*"] })).toThrow(
+      /wildcard|null/
+    );
+    expect(() => createServer({ initialState: buildTestWorkspaceState(), allowedOrigins: ["null"] })).toThrow(
+      /wildcard|null/
+    );
+    expect(() => createServer({ initialState: buildTestWorkspaceState(), allowedOrigins: [] })).toThrow(
+      "allowedOrigins must include at least one origin"
+    );
   });
 
   it("keeps prototype session auth explicit, cookie scoped, and non-admin", async () => {

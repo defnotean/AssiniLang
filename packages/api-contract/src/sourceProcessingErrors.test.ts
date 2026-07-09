@@ -75,6 +75,44 @@ describe("sourceProcessingErrorI18n", () => {
     )).toEqual({ i18nKey: "ingest.processingInterruptedByRestart" });
   });
 
+  it("classifies stale-heartbeat recovery interruptions", () => {
+    expect(sourceProcessingErrorI18n(
+      "Processing stalled without progress. Re-run processing."
+    )).toEqual({ i18nKey: "ingest.processingStalledWithoutProgress" });
+  });
+
+  it("classifies source URL fetch failures with status", () => {
+    expect(sourceProcessingErrorI18n("Fetching source URL failed with status 404."))
+      .toEqual({ i18nKey: "ingest.urlFetchFailed", i18nParams: { status: 404 } });
+  });
+
+  it("classifies oversized or empty source URL content", () => {
+    expect(sourceProcessingErrorI18n("Source URL content is too large to process locally."))
+      .toEqual({ i18nKey: "ingest.urlContentTooLarge" });
+    expect(sourceProcessingErrorI18n("Source URL returned no readable text content."))
+      .toEqual({ i18nKey: "ingest.urlNoReadableText" });
+  });
+
+  it("classifies unsupported document extensions", () => {
+    expect(sourceProcessingErrorI18n(
+      "Document type .xlsx is not supported yet. Upload a PDF, DOCX, plain-text, Markdown, or CSV file, or convert it first."
+    )).toEqual({
+      i18nKey: "ingest.documentTypeUnsupported",
+      i18nParams: { ext: "xlsx" }
+    });
+  });
+
+  it("classifies OCR-not-configured when the OCR endpoint helper throws", () => {
+    expect(sourceProcessingErrorI18n(
+      "OCR model endpoint is not configured. Set ASSINI_OCR_BASE_URL to an OpenAI-compatible /chat/completions server (for example a local llava server)."
+    )).toEqual({ i18nKey: "ingest.ocrNotConfigured" });
+  });
+
+  it("returns undefined for blank processing errors", () => {
+    expect(sourceProcessingErrorI18n("")).toBeUndefined();
+    expect(sourceProcessingErrorI18n("   ")).toBeUndefined();
+  });
+
   it("classifies missing transcription endpoint guidance", () => {
     expect(sourceProcessingErrorI18n(
       "Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL to an OpenAI-compatible /audio/transcriptions server (for example a local whisper server)."
@@ -160,6 +198,14 @@ describe("sourceProcessingWarningI18n", () => {
       i18nKey: "ingest.warningModelExtractionFailed",
       i18nParams: { part: 1, total: 1 }
     });
+  });
+
+  it("classifies Obsidian vault import file-limit notices", () => {
+    expect(sourceProcessingWarningI18n("Import stopped at the configured 100 file limit."))
+      .toEqual({
+        i18nKey: "ingest.warningVaultFileLimit",
+        i18nParams: { maxFiles: 100 }
+      });
   });
 
   it("returns undefined for unrelated warnings", () => {

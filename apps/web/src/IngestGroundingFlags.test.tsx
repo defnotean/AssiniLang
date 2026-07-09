@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { I18nProvider } from "./i18n";
 import { IngestView } from "./views/IngestView";
 import type { ExtractionDraftView } from "./api";
 
@@ -69,7 +70,11 @@ describe("IngestView grounding flag badges", () => {
       createLexemeDraft({ id: "draft-clean", payload: { form: "miro", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] } })
     ]);
 
-    render(<IngestView languageId="avenik" />);
+    render(
+      <I18nProvider>
+        <IngestView languageId="avenik" />
+      </I18nProvider>
+    );
 
     const flaggedRow = await screen.findByRole("article", { name: "Extraction draft draft-talune" });
     const decomposableBadge = within(flaggedRow).getByText("Form decomposes into accepted lexemes");
@@ -81,10 +86,40 @@ describe("IngestView grounding flag badges", () => {
 
     const conflictRow = screen.getByRole("article", { name: "Extraction draft draft-talu" });
     expect(within(conflictRow).getByText("Conflicts with accepted gloss")).toBeInTheDocument();
+    expect(within(conflictRow).getByText("Conflicts with accepted gloss")).toHaveAttribute(
+      "title",
+      'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
+    );
 
     const cleanRow = screen.getByRole("article", { name: "Extraction draft draft-clean" });
     expect(within(cleanRow).queryByText("Form decomposes into accepted lexemes")).not.toBeInTheDocument();
     expect(within(cleanRow).queryByText("Conflicts with accepted gloss")).not.toBeInTheDocument();
+  });
+
+  it("localizes grounding badge labels and tooltip detail in Arabic", async () => {
+    apiMock.fetchExtractionDrafts.mockResolvedValue([
+      createLexemeDraft({
+        grounding: [
+          {
+            kind: "gloss_conflict",
+            message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
+          }
+        ]
+      })
+    ]);
+
+    render(
+      <I18nProvider initialLocale="ar">
+        <IngestView languageId="avenik" />
+      </I18nProvider>
+    );
+
+    const row = await screen.findByRole("article", { name: "مسودة استخلاص draft-talune" });
+    const badge = within(row).getByText("يتعارض مع شرح مُعتمد");
+    expect(badge).toHaveAttribute(
+      "title",
+      'المفردة المعتمدة "talu" مشروحة بـ "water"، لكن هذه المسودة تشرحها بـ "swims".'
+    );
   });
 
   it("renders grounding badges alongside an existing duplicate badge", async () => {
@@ -97,7 +132,11 @@ describe("IngestView grounding flag badges", () => {
       })
     ]);
 
-    render(<IngestView languageId="avenik" />);
+    render(
+      <I18nProvider>
+        <IngestView languageId="avenik" />
+      </I18nProvider>
+    );
 
     const row = await screen.findByRole("article", { name: "Extraction draft draft-talune" });
     await waitFor(() => {

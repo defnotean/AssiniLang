@@ -731,25 +731,45 @@ describe("App", () => {
     expect(getInitialTheme()).toBe("dark");
   });
 
-  it("exposes theme toggle pressed state and flips the document theme", async () => {
+  it("exposes theme toggle switch state and flips the document theme", async () => {
     await renderReady();
 
-    const toggle = screen.getByRole("button", { name: "Switch to light theme" });
-    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    const toggle = screen.getByRole("switch", { name: "Dark theme" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(toggle).toHaveTextContent("Dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
 
     fireEvent.click(toggle);
 
-    const lightToggle = screen.getByRole("button", { name: "Switch to dark theme" });
-    expect(lightToggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(toggle).toHaveTextContent("Light");
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(lightToggle).toHaveTextContent("Dark");
 
-    fireEvent.click(lightToggle);
+    fireEvent.click(toggle);
 
-    const darkToggle = screen.getByRole("button", { name: "Switch to light theme" });
-    expect(darkToggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(toggle).toHaveTextContent("Dark");
     expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
+  it("moves focus to main content when the skip link is activated", async () => {
+    await renderReady();
+
+    const skip = screen.getByRole("link", { name: "Skip to main content" });
+    const main = document.getElementById("main-content");
+    expect(main).not.toBeNull();
+
+    fireEvent.click(skip);
+
+    expect(document.activeElement).toBe(main);
+  });
+
+  it("exposes section navigation as a labeled group without nested nav landmarks", async () => {
+    await renderReady();
+
+    expect(screen.getByRole("navigation", { name: "Languages" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Avenik sections" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Avenik sections" })).not.toBeInTheDocument();
   });
 
   it("filters corpus passages and renders morpheme chips from API data", async () => {
@@ -1008,6 +1028,30 @@ describe("App", () => {
     expect(screen.getByText("Read and search what you have")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Corpus passages" })).toBeInTheDocument();
     expect(screen.getByText("mira talo-mi-na")).toBeInTheDocument();
+    expect(screen.queryByText("This language has no saved material yet.")).not.toBeInTheDocument();
+  });
+
+  it("shows Start next-step guidance when the selected language has no saved material", async () => {
+    const emptyLanguageData = {
+      ...createDashboardData(),
+      corpus: [],
+      notes: [],
+      exercises: []
+    };
+    apiMock.fetchDashboardData.mockResolvedValue(emptyLanguageData);
+    render(<App />);
+    await selectAvenik();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "Start" })).toBeInTheDocument();
+    const overview = screen.getByRole("region", { name: "Language overview" });
+    const emptyState = within(overview).getByRole("status");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent("This language has no saved material yet.");
+    expect(emptyState).toHaveTextContent(/Open Build to add a source/);
+    expect(emptyState).toHaveTextContent(/Saved examples/);
   });
 
   it("does not require language profile data to render Start", async () => {
@@ -1038,8 +1082,8 @@ describe("App", () => {
     expect(within(sourcesRegion).getByText("2 sources")).toBeInTheDocument();
     expect(within(sourcesRegion).getByText("Field notebook page")).toBeInTheDocument();
     expect(within(sourcesRegion).getByText("Elder recording")).toBeInTheDocument();
-    expect(within(sourcesRegion).getByText("text")).toBeInTheDocument();
-    expect(within(sourcesRegion).getByText("audio")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("Text")).toBeInTheDocument();
+    expect(within(sourcesRegion).getByText("Audio")).toBeInTheDocument();
     expect(within(sourcesRegion).getByText("transcript ready")).toBeInTheDocument();
 
     const draftQueue = screen.getByRole("region", { name: "Extraction draft queue" });
@@ -2505,7 +2549,7 @@ describe("App", () => {
     expect(within(auditLedger).getByText("Lead")).toBeInTheDocument();
     expect(within(auditLedger).getByText("lead-1")).toBeInTheDocument();
     expect(within(auditLedger).getByText("Governance record / governance-1")).toBeInTheDocument();
-    expect(within(auditLedger).getByText("Created generation governance policy record.")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Created Generation governance policy record.")).toBeInTheDocument();
     expect(within(auditLedger).getByText("Note reviewed")).toBeInTheDocument();
     expect(within(auditLedger).getByText("Reviewer")).toBeInTheDocument();
     expect(within(auditLedger).getByText("reviewer-1")).toBeInTheDocument();

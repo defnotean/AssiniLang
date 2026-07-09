@@ -5,16 +5,21 @@ import { describe, expect, it } from "vitest";
 import {
   assertObsidianVaultPathAllowed,
   i18nKeyForVaultPathError,
+  isFilesystemRootPath,
   isPathInsideRoot,
   parseObsidianVaultRoots,
   stripWindowsExtendedPrefix,
   VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE,
+  VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE,
   VAULT_ROOTS_UNSET_MESSAGE
 } from "./vaultPathSafety.js";
 
 describe("Obsidian vault path safety", () => {
   it("maps allowlist English errors to ingest i18n keys", () => {
     expect(i18nKeyForVaultPathError(VAULT_ROOTS_UNSET_MESSAGE)).toBe("ingest.errorVaultRootsUnset");
+    expect(i18nKeyForVaultPathError(VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE)).toBe(
+      "ingest.errorVaultRootsMustNotBeFilesystemRoot"
+    );
     expect(i18nKeyForVaultPathError(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE)).toBe(
       "ingest.errorVaultOutsideAllowlist"
     );
@@ -37,6 +42,21 @@ describe("Obsidian vault path safety", () => {
       ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;./relative;D:\\Notes"
     })).toEqual(
       parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;D:\\Notes" })
+    );
+  });
+
+  it("drops filesystem / drive roots so whole-volume allowlists cannot widen imports", () => {
+    expect(isFilesystemRootPath("C:\\")).toBe(true);
+    expect(isFilesystemRootPath("C:/")).toBe(true);
+    expect(isFilesystemRootPath("/")).toBe(true);
+    expect(isFilesystemRootPath("C:\\Vaults")).toBe(false);
+    expect(isFilesystemRootPath("\\\\server\\share")).toBe(false);
+
+    expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;/;C:/" })).toEqual([]);
+    expect(parseObsidianVaultRoots({
+      ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;C:\\Vaults;/"
+    })).toEqual(
+      parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults" })
     );
   });
 
@@ -84,6 +104,23 @@ describe("Obsidian vault path safety", () => {
         env: { ASSINI_OBSIDIAN_VAULT_ROOTS: "./vaults;relative-root" }
       })
     ).rejects.toThrow(/must be absolute directory paths/);
+  });
+
+  it("fails closed when only filesystem / drive roots are configured", async () => {
+    await expect(
+      assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), {
+        env: { ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;/;C:/" }
+      })
+    ).rejects.toThrow(/below a drive or volume root/);
+  });
+
+  it("rejects vaultPath values that contain NUL or other control characters", async () => {
+    const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
+    await expect(
+      assertObsidianVaultPathAllowed(`${allowedRoot}\\vault\0nested`, {
+        env: { ASSINI_OBSIDIAN_VAULT_ROOTS: allowedRoot }
+      })
+    ).rejects.toThrow(/outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/);
   });
 
   it("rejects paths outside the allowlist after resolve", async () => {

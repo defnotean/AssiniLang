@@ -1,6 +1,6 @@
 import type { LanguageProfile } from "../api";
 import { ConfidenceBadge } from "../components/badges";
-import { formatTypology } from "../lib/format";
+import { formatParadigmDimension, formatPartOfSpeech, formatTypology } from "../lib/format";
 import type { AsyncState } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -161,7 +161,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
             <article className="vocabulary-entry" key={item.id}>
               <code>{item.form}</code>
               <strong>{item.gloss}</strong>
-              <span>{item.partOfSpeech}</span>
+              <span>{formatPartOfSpeech(item.partOfSpeech, t)}</span>
               <div className="pill-row">
                 {item.tags.map((tag, index) => (
                   <span className="pill" key={`${item.id}:${index}:${tag}`}>{tag}</span>
@@ -199,7 +199,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
               <strong>{item.lemma}</strong>
               <span>{item.glosses.join(" / ")}</span>
               {item.vocabulary && (
-                <small>{item.vocabulary.partOfSpeech}: {item.vocabulary.gloss}</small>
+                <small>{formatPartOfSpeech(item.vocabulary.partOfSpeech, t)}: {item.vocabulary.gloss}</small>
               )}
               <div className="pill-row">
                 {item.features.map((feature, index) => (
@@ -237,7 +237,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
               <article className="detail-row paradigm-gap-row" key={`${index}:${gap.lemma}:${gap.dimension}`}>
                 <div className="paradigm-gap-topline">
                   <code>{gap.lemma}</code>
-                  <span className="paradigm-gap-dimension">{gap.dimension}</span>
+                  <span className="paradigm-gap-dimension">{formatParadigmDimension(gap.dimension, t)}</span>
                   <span className="id-badge">
                     {gap.evidencePassageIds.length === 1
                       ? t("profile.linkedPassageCountOne", { count: gap.evidencePassageIds.length })

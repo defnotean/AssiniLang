@@ -28,7 +28,10 @@ export function SidebarLanguageNav({
   return (
     <nav className="language-nav" aria-label={t("sidebar.languagesNav")}>
       {languages.length === 0 && (
-        <p className="empty-state">{t("sidebar.noLanguages")}</p>
+        <div className="empty-state" role="status" aria-live="polite">
+          <p>{t("sidebar.noLanguages")}</p>
+          <p className="muted">{t("sidebar.noLanguagesHint")}</p>
+        </div>
       )}
       {languages.map((language) => {
         const isActive = language.id === selectedLanguageId;
@@ -51,7 +54,11 @@ export function SidebarLanguageNav({
             </button>
 
             {isActive && (
-              <nav className="section-nav" aria-label={t("sidebar.sectionsAria", { name: language.name })}>
+              <div
+                className="section-nav"
+                role="group"
+                aria-label={t("sidebar.sectionsAria", { name: language.name })}
+              >
                 {VIEW_ORDER.map((mode) => (
                   <button
                     type="button"
@@ -66,7 +73,7 @@ export function SidebarLanguageNav({
                     {sectionCounts[mode] != null && <span className="section-count" aria-hidden="true">{sectionCounts[mode]}</span>}
                   </button>
                 ))}
-              </nav>
+              </div>
             )}
           </div>
         );

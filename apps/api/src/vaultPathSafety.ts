@@ -15,6 +15,9 @@ export const VAULT_ROOTS_UNSET_MESSAGE =
 export const VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE =
   "ASSINI_OBSIDIAN_VAULT_ROOTS entries must be absolute directory paths; relative roots are ignored.";
 
+export const VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE =
+  "ASSINI_OBSIDIAN_VAULT_ROOTS entries must be directories below a drive or volume root; filesystem roots like C:\\ or / are ignored.";
+
 export const VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE =
   "Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.";
 
@@ -29,6 +32,8 @@ export function i18nKeyForVaultPathError(message: string): string | undefined {
       return "ingest.errorVaultRootsUnset";
     case VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE:
       return "ingest.errorVaultRootsMustBeAbsolute";
+    case VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE:
+      return "ingest.errorVaultRootsMustNotBeFilesystemRoot";
     case VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE:
       return "ingest.errorVaultOutsideAllowlist";
     case VAULT_PATH_NOT_DIRECTORY_MESSAGE:
@@ -98,9 +103,35 @@ function isAbsoluteVaultRoot(pathValue: string): boolean {
 }
 
 /**
+ * True for drive/volume roots that would allowlist the entire filesystem
+ * (e.g. `C:\`, `C:/`, `/`). UNC share roots like `\\server\share` are kept.
+ * Always evaluates Windows-shaped paths so Linux CI can validate them.
+ */
+export function isFilesystemRootPath(pathValue: string): boolean {
+  const stripped = stripWindowsExtendedPrefix(pathValue.trim());
+  if (!stripped) return false;
+
+  if (looksLikeWindowsAbsolutePath(stripped)) {
+    const normalized = stripped.replace(/\//g, "\\").replace(/\\+$/g, "");
+    // `C:` / `C:\` (no further segments)
+    if (/^[A-Za-z]:$/i.test(normalized)) return true;
+    return false;
+  }
+
+  if (stripped === "/" || stripped === "\\") return true;
+
+  // On POSIX hosts, resolve("/") stays "/"; on Windows resolve("/") becomes a drive root.
+  const resolved = resolvePath(stripped);
+  if (looksLikeWindowsAbsolutePath(resolved)) {
+    return isFilesystemRootPath(resolved);
+  }
+  return resolved === "/" || resolved === sep;
+}
+
+/**
  * Parses semicolon-separated absolute roots from ASSINI_OBSIDIAN_VAULT_ROOTS.
- * Empty/unset => []. Relative segments are dropped so CWD cannot silently widen
- * the allowlist (e.g. `./vaults` or `vaults` alone).
+ * Empty/unset => []. Relative segments and filesystem roots (`C:\`, `/`) are
+ * dropped so CWD / whole-drive allowlists cannot silently widen imports.
  */
 export function parseObsidianVaultRoots(env: Env = process.env): string[] {
   const raw = env.ASSINI_OBSIDIAN_VAULT_ROOTS?.trim();
@@ -110,13 +141,33 @@ export function parseObsidianVaultRoots(env: Env = process.env): string[] {
     .map((part) => part.trim())
     .filter(Boolean)
     .filter(isAbsoluteVaultRoot)
-    .map((part) => resolvePath(part));
+    .map((part) => resolvePath(part))
+    .filter((part) => !isFilesystemRootPath(part));
 }
 
-function hasConfiguredVaultRootSegments(env: Env): boolean {
+function configuredVaultRootSegments(env: Env): string[] {
   const raw = env.ASSINI_OBSIDIAN_VAULT_ROOTS?.trim();
-  if (!raw) return false;
-  return raw.split(";").map((part) => part.trim()).some(Boolean);
+  if (!raw) return [];
+  return raw.split(";").map((part) => part.trim()).filter(Boolean);
+}
+
+function vaultRootsConfigError(env: Env): Error {
+  const segments = configuredVaultRootSegments(env);
+  if (segments.length === 0) {
+    return new Error(VAULT_ROOTS_UNSET_MESSAGE);
+  }
+
+  const absoluteSegments = segments.filter(isAbsoluteVaultRoot);
+  if (absoluteSegments.length === 0) {
+    return new Error(VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE);
+  }
+
+  // Absolute segments were present but all were drive/volume roots (or resolved to them).
+  return new Error(VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE);
+}
+
+function pathHasUnsafeControlChars(pathValue: string): boolean {
+  return /[\u0000-\u001f\u007f]/.test(pathValue);
 }
 
 async function resolveExistingPath(pathValue: string, realpathFn: RealpathFn): Promise<string> {
@@ -159,16 +210,25 @@ export async function assertObsidianVaultPathAllowed(
   const env = options.env ?? process.env;
   const roots = parseObsidianVaultRoots(env);
   if (roots.length === 0) {
-    throw new Error(
-      hasConfiguredVaultRootSegments(env) ? VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE : VAULT_ROOTS_UNSET_MESSAGE
-    );
+    throw vaultRootsConfigError(env);
+  }
+
+  if (pathHasUnsafeControlChars(vaultPath)) {
+    throw new Error(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE);
   }
 
   const realpathFn = options.realpathFn ?? fsRealpath;
   const resolvedVault = await resolveExistingPath(vaultPath, realpathFn);
   const resolvedRoots = await Promise.all(roots.map((root) => resolveExistingPath(root, realpathFn)));
 
-  if (!resolvedRoots.some((root) => isPathInsideRoot(resolvedVault, root))) {
+  // Defense in depth: a root that canonicalizes to a drive/volume root must not
+  // widen the allowlist even if it slipped past parse-time filtering.
+  const usableRoots = resolvedRoots.filter((root) => !isFilesystemRootPath(root));
+  if (usableRoots.length === 0) {
+    throw new Error(VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE);
+  }
+
+  if (!usableRoots.some((root) => isPathInsideRoot(resolvedVault, root))) {
     throw new Error(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE);
   }
 

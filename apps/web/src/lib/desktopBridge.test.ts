@@ -56,4 +56,47 @@ describe("desktopBridge unavailable paths", () => {
       i18nKey: "model.desktopActionUnavailable"
     });
   });
+
+  it("surfaces stable IPC failure codes and i18n keys from the desktop bridge", async () => {
+    window.assiniDesktop = {
+      apiBaseUrl: "http://127.0.0.1:8787",
+      authToken: "test-token",
+      prototypeAuth: true,
+      dataDir: "C:\\AssiniLang\\data",
+      createDesktopShortcut: async () => ({
+        ok: false,
+        code: "DESKTOP_SHORTCUT_PACKAGED_ONLY",
+        i18nKey: "model.desktopShortcutPackagedOnly",
+        message: "Shortcut setup is available in the packaged app."
+      }),
+      setDesktopPreferences: async () => ({
+        ok: false,
+        code: "DESKTOP_INVALID_PREFERENCES_PATCH",
+        i18nKey: "model.desktopInvalidPreferencesPatch",
+        message: "Desktop preferences patch must be an object with boolean hideToTray and/or launchAtLogin."
+      }),
+      saveDiagnosticsReport: async () => ({
+        ok: false,
+        code: "DESKTOP_INVALID_DIAGNOSTICS_TEXT",
+        i18nKey: "model.desktopInvalidDiagnosticsText",
+        message: "Diagnostics report text must be a string."
+      })
+    };
+
+    await expect(runDesktopAction("createDesktopShortcut")).resolves.toMatchObject({
+      ok: false,
+      code: "DESKTOP_SHORTCUT_PACKAGED_ONLY",
+      i18nKey: "model.desktopShortcutPackagedOnly"
+    });
+    await expect(setDesktopPreferences({ hideToTray: true })).resolves.toMatchObject({
+      ok: false,
+      code: "DESKTOP_INVALID_PREFERENCES_PATCH",
+      i18nKey: "model.desktopInvalidPreferencesPatch"
+    });
+    await expect(saveDesktopDiagnosticsReport("report")).resolves.toMatchObject({
+      ok: false,
+      code: "DESKTOP_INVALID_DIAGNOSTICS_TEXT",
+      i18nKey: "model.desktopInvalidDiagnosticsText"
+    });
+  });
 });

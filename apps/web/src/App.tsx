@@ -20,7 +20,7 @@ import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { CompassMark, DiamondBand } from "./components/marks";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
 import { ApiError } from "./lib/apiClient";
-import { localizeApiError } from "./lib/format";
+import { formatLocalUserName, localizeApiError } from "./lib/format";
 import { getDesktopBridgeInfo } from "./lib/desktopBridge";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
@@ -291,7 +291,16 @@ export function App() {
       )}
       {showTour && <GuidedTour steps={TOUR_STEPS} onClose={dismissTour} />}
       <div className="app-shell">
-      <a className="skip-link" href="#main-content">
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          const main = document.getElementById("main-content");
+          if (!main) return;
+          event.preventDefault();
+          main.focus({ preventScroll: false });
+        }}
+      >
         {t("app.skipToMain")}
       </a>
       <aside className="sidebar" aria-label={t("sidebar.aria")}>
@@ -309,11 +318,12 @@ export function App() {
             <button
               type="button"
               className="theme-toggle"
-              aria-label={theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark")}
-              aria-pressed={theme === "dark"}
+              role="switch"
+              aria-checked={theme === "dark"}
+              aria-label={t("theme.darkMode")}
               onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
             >
-              {theme === "dark" ? t("theme.light") : t("theme.dark")}
+              {theme === "dark" ? t("theme.dark") : t("theme.light")}
             </button>
           </div>
         </div>
@@ -344,7 +354,7 @@ export function App() {
           </button>
           <div className="user-card">
             <span>{t("sidebar.signedIn")}</span>
-            <strong>{currentUser?.name ?? t("sidebar.localUser")}</strong>
+            <strong>{formatLocalUserName(currentUser?.name, t) ?? t("sidebar.localUser")}</strong>
             <SignOutButton />
           </div>
         </div>
@@ -419,6 +429,12 @@ export function App() {
                           <dd>{data.exercises.length}</dd>
                         </div>
                       </dl>
+                      {data.corpus.length === 0 && data.notes.length === 0 && data.exercises.length === 0 && (
+                        <div className="empty-state" role="status" aria-live="polite">
+                          <p>{t("simple.emptyLanguage")}</p>
+                          <p className="muted">{t("simple.emptyLanguageHint")}</p>
+                        </div>
+                      )}
                     </section>
                     <section className="simple-section surface-section" aria-label={t("simple.savedExamplesAria")}>
                       <div className="simple-section-heading">

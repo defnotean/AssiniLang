@@ -67,12 +67,14 @@ export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteCont
   });
 
   app.get("/observability/neural-map", async (request, reply) => {
-    const query = request.query as { languageId?: string };
+    const query = request.query as { languageId?: string | string[] };
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, PRIVILEGED_OBSERVABILITY_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
-    if (!query.languageId) {
+    const rawLanguageId = query.languageId;
+    const languageId = typeof rawLanguageId === "string" ? rawLanguageId.trim() : "";
+    if (!languageId) {
       reply.code(400);
       return {
         error: "Missing languageId",
@@ -80,14 +82,14 @@ export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteCont
       };
     }
 
-    if (!state.languages.some((language) => language.id === query.languageId)) {
+    if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
       return {
-        error: `Language not found: ${query.languageId}`,
+        error: `Language not found: ${languageId}`,
         i18nKey: "errors.languageNotFound"
       };
     }
 
-    return sanitizeNeuralMapForActor(buildNeuralMap(state, query.languageId), actor);
+    return sanitizeNeuralMapForActor(buildNeuralMap(state, languageId), actor);
   });
 }

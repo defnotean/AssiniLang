@@ -1,6 +1,9 @@
 import type { AppState } from "@assini/db";
 import type { JobQueueStatus } from "./jobQueue.js";
 
+const STORAGE_READ_FAILED = "Storage read failed" as const;
+const JOB_QUEUE_UNAVAILABLE = "Job queue status unavailable" as const;
+
 type StorageReadinessCheck =
   | {
       ok: true;
@@ -8,7 +11,7 @@ type StorageReadinessCheck =
     }
   | {
       ok: false;
-      error: "Storage read failed";
+      error: typeof STORAGE_READ_FAILED;
     };
 
 type JobQueueReadinessCheck =
@@ -19,7 +22,7 @@ type JobQueueReadinessCheck =
     }
   | {
       ok: false;
-      error: "Job queue status unavailable";
+      error: typeof JOB_QUEUE_UNAVAILABLE;
     };
 
 export type ReadinessReport =
@@ -38,19 +41,24 @@ export type ReadinessReport =
       };
     };
 
-function isSafeCount(value: number): boolean {
-  return Number.isSafeInteger(value) && value >= 0;
+function isSafeCount(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 }
 
 function isSafeSchemaVersion(value: unknown): value is AppState["schemaVersion"] {
-  return Number.isSafeInteger(value) && (value as number) >= 1;
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 1;
 }
 
 function readJobQueueCheck(readJobQueueStatus: () => JobQueueStatus): JobQueueReadinessCheck {
   try {
     const status = readJobQueueStatus();
-    if (!isSafeCount(status.pending) || !isSafeCount(status.active)) {
-      return { ok: false, error: "Job queue status unavailable" };
+    if (
+      status == null
+      || typeof status !== "object"
+      || !isSafeCount(status.pending)
+      || !isSafeCount(status.active)
+    ) {
+      return { ok: false, error: JOB_QUEUE_UNAVAILABLE };
     }
 
     return {
@@ -59,13 +67,13 @@ function readJobQueueCheck(readJobQueueStatus: () => JobQueueStatus): JobQueueRe
       active: status.active
     };
   } catch {
-    return { ok: false, error: "Job queue status unavailable" };
+    return { ok: false, error: JOB_QUEUE_UNAVAILABLE };
   }
 }
 
 function readStorageCheck(state: AppState): StorageReadinessCheck {
-  if (!isSafeSchemaVersion(state.schemaVersion)) {
-    return { ok: false, error: "Storage read failed" };
+  if (!state || !isSafeSchemaVersion(state.schemaVersion)) {
+    return { ok: false, error: STORAGE_READ_FAILED };
   }
 
   return {
@@ -100,14 +108,13 @@ export async function createReadinessReport(
       }
     };
   } catch {
-    const storage: StorageReadinessCheck = {
-      ok: false,
-      error: "Storage read failed"
-    };
     return {
       ok: false,
       checks: {
-        storage,
+        storage: {
+          ok: false,
+          error: STORAGE_READ_FAILED
+        },
         jobQueue
       }
     };

@@ -28,6 +28,9 @@ describe("repository production hygiene", () => {
     expect(script).toContain(".github/workflows/ci.yml");
     expect(script).toContain("npm audit");
     expect(script).toContain("--omit=dev");
+    expect(script).toContain("failed to start");
+    expect(script).toContain("terminated by signal");
+    expect(script).toContain("production dependency audit passed");
     expect(developmentDocs).toContain("npm.cmd run ci:green");
     expect(developmentDocs).toContain("--omit=dev");
   });
@@ -51,9 +54,13 @@ describe("repository production hygiene", () => {
 
     expect(pkg.scripts["model:verify"]).toBe("node scripts/verifyLocalModelLanguage.mjs");
     expect(verifyBetaCli).toContain("runVerifyBeta");
+    expect(verifyBetaCli).toContain("pathToFileURL");
+    expect(verifyBetaCli).toContain("isMain");
     expect(verifyBeta).toContain("modelVerifyRequested");
     expect(verifyBeta).toContain("ASSINI_VERIFY_MODEL");
     expect(verifyBeta).toContain("skipping model:verify");
+    expect(verifyBeta).toContain("preferred model:");
+    expect(verifyBeta).toContain("terminated by signal");
     expect(developmentDocs).toContain("npm.cmd run verify:beta");
     expect(developmentDocs).toContain('ASSINI_VERIFY_MODEL="1"');
     expect(readme).toContain("npm.cmd run verify:beta");

@@ -30,7 +30,12 @@ describe("DesktopAppDetails backup summary", () => {
     );
 
     expect(screen.getByText("No backups yet")).toBeInTheDocument();
-    expect(screen.getByText("Create a data backup before risky experiments. Restore stays disabled until one exists.")).toBeInTheDocument();
+    const emptyHint = screen.getByText(
+      "Create a data backup before risky experiments. Restore stays disabled until one exists."
+    );
+    expect(emptyHint).toHaveAttribute("role", "status");
+    expect(emptyHint).toHaveAttribute("aria-live", "polite");
+    expect(emptyHint).toHaveClass("empty-state");
     expect(document.querySelector("[data-desktop-backup-summary='empty']")).toBeInTheDocument();
     expect(screen.queryByText("0 backups")).not.toBeInTheDocument();
   });

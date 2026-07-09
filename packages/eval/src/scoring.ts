@@ -287,7 +287,12 @@ function deterministicNegativeProbeAnswers(exercise: Exercise): string[] {
 
 export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accepted: boolean; explanation: string } {
   const normalizedAnswer = normalize(answer);
-  const accepted = exercise.expectedAnswers.some((expected) => normalize(expected) === normalizedAnswer);
+  // Blank answers (and blank expected entries after normalize) must not auto-pass.
+  const accepted = Boolean(normalizedAnswer)
+    && exercise.expectedAnswers.some((expected) => {
+      const normalizedExpected = normalize(expected);
+      return Boolean(normalizedExpected) && normalizedExpected === normalizedAnswer;
+    });
 
   return {
     accepted,
@@ -362,7 +367,8 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
   let exercisePass = 0;
   for (const exercise of languageExercises) {
-    const acceptsExpectedAnswers = exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted);
+    const acceptsExpectedAnswers = exercise.expectedAnswers.length > 0
+      && exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted);
     const rejectsNegativeProbes = deterministicNegativeProbeAnswers(exercise).every(
       (answer) => !gradeExerciseAnswer(exercise, answer).accepted
     );
@@ -392,9 +398,11 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   );
   let generationPolicyPass = 0;
   for (const exercise of generationCheckedExercises) {
-    const passesPolicy = exercise.expectedAnswers.every((answer) =>
-      answerPassesGenerationPolicy(languageId, state, exercise, answer)
-    );
+    // Empty expectedAnswers must not vacuous-pass generation policy.
+    const passesPolicy = exercise.expectedAnswers.length > 0
+      && exercise.expectedAnswers.every((answer) =>
+        answerPassesGenerationPolicy(languageId, state, exercise, answer)
+      );
     if (passesPolicy) {
       generationPolicyPass += 1;
     } else {
@@ -402,7 +410,9 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
         category: "generationPolicy",
         languageId,
         itemId: exercise.id,
-        message: "Expected answer uses forms outside the exercise allowed vocabulary."
+        message: exercise.expectedAnswers.length === 0
+          ? "Generation-policy exercise has no expected answers to validate."
+          : "Expected answer uses forms outside the exercise allowed vocabulary."
       });
     }
   }

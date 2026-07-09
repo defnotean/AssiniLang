@@ -28,13 +28,51 @@ describe("readRuntimeConfig", () => {
     });
   });
 
+  it("treats blank HOST and empty origin lists as defaults", () => {
+    expect(readRuntimeConfig({
+      HOST: "   ",
+      ASSINI_ALLOWED_ORIGINS: " , , ",
+      ASSINI_API_LOGGER: "yes"
+    })).toMatchObject({
+      host: "127.0.0.1",
+      allowedOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
+      logger: false
+    });
+  });
+
+  it("enables the logger for 1 as well as true", () => {
+    expect(readRuntimeConfig({ ASSINI_API_LOGGER: "1" }).logger).toBe(true);
+  });
+
   it.each([
     ["PORT", "0"],
     ["PORT", "70000"],
     ["PORT", "not-a-port"],
     ["ASSINI_BODY_LIMIT_BYTES", "0"],
-    ["ASSINI_BODY_LIMIT_BYTES", "not-a-size"]
+    ["ASSINI_BODY_LIMIT_BYTES", "not-a-size"],
+    ["ASSINI_BODY_LIMIT_BYTES", String(25 * 1024 * 1024 + 1)]
   ])("rejects invalid numeric env %s=%s", (name, value) => {
     expect(() => readRuntimeConfig({ [name]: value })).toThrow(name);
+  });
+
+  it.each([
+    "*",
+    "null",
+    "http://evil.example/path",
+    "http://evil.example/",
+    "ftp://evil.example",
+    "not-a-url",
+    "https://evil.example?x=1",
+    "https://user:pass@evil.example"
+  ])("rejects invalid CORS origin %s", (origin) => {
+    expect(() => readRuntimeConfig({ ASSINI_ALLOWED_ORIGINS: origin })).toThrow("ASSINI_ALLOWED_ORIGINS");
+  });
+
+  it.each([
+    "http://bad host",
+    "http://127.0.0.1:4321",
+    "0.0.0.0/24"
+  ])("rejects invalid HOST %s", (host) => {
+    expect(() => readRuntimeConfig({ HOST: host })).toThrow("HOST");
   });
 });

@@ -16,6 +16,7 @@ import {
   parseOpenAiChatCompletionContent,
   type OpenAiChatCompletionResponse
 } from "./llmResponseParsing.js";
+import { redactErrorSecrets } from "./secretRedaction.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 export type { LlmProviderReadiness, LlmReachability } from "@assini/api-contract";
@@ -513,11 +514,11 @@ function errorMessageFromBody(body: unknown): string | undefined {
 }
 
 function sanitizeProviderErrorDetail(detail: string, apiKey?: string): string {
-  let sanitized = redactText(detail, 500);
+  let sanitized = redactErrorSecrets(redactText(detail, 500));
   if (apiKey) {
     sanitized = sanitized.split(apiKey).join("[redacted-secret]");
   }
-  return sanitized.replace(/\bsk-[A-Za-z0-9._-]+/g, "[redacted-secret]");
+  return sanitized;
 }
 
 async function readProviderErrorDetail(response: Response, apiKey?: string): Promise<string | undefined> {

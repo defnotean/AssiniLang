@@ -89,7 +89,36 @@ describe("createReadinessReport", () => {
     expect(JSON.stringify(report)).not.toContain("source-secret-123");
   });
 
-  it("treats non-finite or negative job-queue counts as unavailable", async () => {
+  it("reports both checks failed when storage and job queue fail together", async () => {
+    const report = await createReadinessReport(
+      async () => {
+        throw new Error("Failed to read C:/secret/local-db.json with sk-live-secret");
+      },
+      () => {
+        throw new Error("Cannot inspect source-secret-123 at C:/secret/queue.json");
+      }
+    );
+
+    expect(report).toEqual({
+      ok: false,
+      checks: {
+        storage: {
+          ok: false,
+          error: "Storage read failed"
+        },
+        jobQueue: {
+          ok: false,
+          error: "Job queue status unavailable"
+        }
+      }
+    });
+    const serialized = JSON.stringify(report);
+    expect(serialized).not.toContain("C:/secret");
+    expect(serialized).not.toContain("source-secret-123");
+    expect(serialized).not.toContain("sk-live-secret");
+  });
+
+  it("treats non-finite, negative, or non-integer job-queue counts as unavailable", async () => {
     await expect(
       createReadinessReport(async () => createEmptyState(), () => ({ pending: -1, active: 0 }))
     ).resolves.toMatchObject({
@@ -119,31 +148,87 @@ describe("createReadinessReport", () => {
         jobQueue: { ok: false, error: "Job queue status unavailable" }
       }
     });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => ({
+        pending: 1.5,
+        active: 0
+      }))
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => ({
+        pending: Number.MAX_SAFE_INTEGER + 1,
+        active: 0
+      }))
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+  });
+
+  it("treats nullish or non-object job-queue status as unavailable", async () => {
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => null as never)
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => undefined as never)
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => "pending" as never)
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
   });
 
   it("treats unsafe schema versions as sanitized storage failures", async () => {
-    const invalidSchema = {
-      ...createEmptyState(),
-      schemaVersion: Number.NaN
-    } as ReturnType<typeof createEmptyState>;
+    for (const schemaVersion of [Number.NaN, 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1, "8" as never]) {
+      const invalidSchema = {
+        ...createEmptyState(),
+        schemaVersion
+      } as ReturnType<typeof createEmptyState>;
 
-    const report = await createReadinessReport(async () => invalidSchema);
+      const report = await createReadinessReport(async () => invalidSchema);
 
-    expect(report).toEqual({
-      ok: false,
-      checks: {
-        storage: {
-          ok: false,
-          error: "Storage read failed"
-        },
-        jobQueue: {
-          ok: true,
-          pending: 0,
-          active: 0
+      expect(report).toEqual({
+        ok: false,
+        checks: {
+          storage: {
+            ok: false,
+            error: "Storage read failed"
+          },
+          jobQueue: {
+            ok: true,
+            pending: 0,
+            active: 0
+          }
         }
-      }
-    });
-    expect(JSON.stringify(report)).not.toContain("NaN");
+      });
+      expect(JSON.stringify(report)).not.toContain("NaN");
+      expect(JSON.stringify(report)).not.toContain("Infinity");
+    }
   });
 
   it("does not expose job identifiers when queue status is healthy", async () => {

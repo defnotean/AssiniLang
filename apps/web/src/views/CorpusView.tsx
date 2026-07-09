@@ -398,7 +398,7 @@ export function CorpusView({
             }}
           />
         ) : visible.length === 0 ? (
-          <p className="empty-state" role="status">
+          <p className="empty-state" role="status" aria-live="polite">
             {morphFilter
               ? t("corpus.emptyMorpheme")
               : corpus.length === 0

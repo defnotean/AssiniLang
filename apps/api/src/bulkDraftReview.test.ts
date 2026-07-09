@@ -17,7 +17,7 @@ const draftBase = {
 };
 const emptyPayload = { tags: [], morphologicalSegmentation: [], topicTags: [] };
 
-function buildBulkReviewState(): AppState {
+function buildBulkReviewState(extraDrafts: AppState["extractionDrafts"] = []): AppState {
   const baseState = buildTestWorkspaceState();
   const baseLanguage = baseState.languages[0]!;
   return {
@@ -64,12 +64,58 @@ function buildBulkReviewState(): AppState {
       },
       {
         ...draftBase,
+        id: "bulk-draft-already-accepted",
+        kind: "lexeme" as const,
+        status: "accepted" as const,
+        payload: { ...emptyPayload, form: "nira", gloss: "river" },
+        createdAt: "2026-06-10T00:00:03.500Z"
+      },
+      {
+        ...draftBase,
         id: "bulk-draft-other-language",
         languageId: OTHER_LANGUAGE_ID,
         kind: "lexeme" as const,
         payload: { ...emptyPayload, form: "tovi", gloss: "moon" },
         createdAt: "2026-06-10T00:00:04.000Z"
-      }
+      },
+      {
+        ...draftBase,
+        id: "bulk-draft-corpus",
+        kind: "corpus_passage" as const,
+        payload: {
+          ...emptyPayload,
+          textTarget: "mira talo",
+          textTranslation: "river walk",
+          morphologicalSegmentation: [
+            { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
+            { surface: "talo", lemma: "talo", gloss: "walk", features: ["verb"] }
+          ],
+          topicTags: ["imported"]
+        },
+        createdAt: "2026-06-10T00:00:05.000Z"
+      },
+      {
+        ...draftBase,
+        id: "bulk-draft-lexeme-dup-a",
+        kind: "lexeme" as const,
+        payload: { ...emptyPayload, form: "kela", gloss: "leaf" },
+        createdAt: "2026-06-10T00:00:06.000Z"
+      },
+      {
+        ...draftBase,
+        id: "bulk-draft-lexeme-dup-b",
+        kind: "lexeme" as const,
+        payload: { ...emptyPayload, form: "kela", gloss: "leaf" },
+        createdAt: "2026-06-10T00:00:07.000Z"
+      },
+      {
+        ...draftBase,
+        id: "bulk-draft-incomplete-lexeme",
+        kind: "lexeme" as const,
+        payload: { ...emptyPayload, form: "  ", gloss: "empty" },
+        createdAt: "2026-06-10T00:00:08.000Z"
+      },
+      ...extraDrafts
     ]
   };
 }
@@ -121,6 +167,30 @@ describe("bulk extraction draft review", () => {
     expect(serialized).not.toContain("learnerId");
   });
 
+  it("accepts a corpus passage draft and trims padded draft ids", async () => {
+    const app = createServer({ initialState: buildBulkReviewState() });
+
+    const response = await bulkReview(app, {
+      action: "accept",
+      draftIds: ["  bulk-draft-corpus  "]
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body).toMatchObject({
+      accepted: 1,
+      rejected: 0,
+      failed: 0
+    });
+    expect(body.results).toEqual([
+      {
+        draftId: "bulk-draft-corpus",
+        ok: true,
+        committedEntityId: expect.stringMatching(/^ingested-corpus-/)
+      }
+    ]);
+  });
+
   it("rejects drafts in bulk and deduplicates repeated ids", async () => {
     const app = createServer({ initialState: buildBulkReviewState() });
 
@@ -137,7 +207,7 @@ describe("bulk extraction draft review", () => {
     expect(body.results).toHaveLength(2);
   });
 
-  it("reports per-item failures without failing the whole request", async () => {
+  it("reports per-item failures with i18nKeys without failing the whole request", async () => {
     const app = createServer({ initialState: buildBulkReviewState() });
 
     const response = await bulkReview(app, {
@@ -146,23 +216,69 @@ describe("bulk extraction draft review", () => {
         "bulk-draft-lexeme",
         "missing-draft",
         "bulk-draft-already-rejected",
-        "bulk-draft-other-language"
+        "bulk-draft-already-accepted",
+        "bulk-draft-other-language",
+        "bulk-draft-incomplete-lexeme"
       ]
     });
 
     expect(response.statusCode).toBe(200);
     const body = response.json();
     expect(body.accepted).toBe(1);
-    expect(body.failed).toBe(3);
+    expect(body.failed).toBe(5);
 
-    const byId = new Map<string, { ok: boolean; error?: string }>(
+    const byId = new Map<string, { ok: boolean; error?: string; i18nKey?: string; i18nParams?: Record<string, string | number> }>(
       body.results.map((result: { draftId: string }) => [result.draftId, result])
     );
     expect(byId.get("bulk-draft-lexeme")?.ok).toBe(true);
-    expect(byId.get("missing-draft")).toMatchObject({ ok: false, error: "Extraction draft not found: missing-draft" });
-    expect(byId.get("bulk-draft-already-rejected")).toMatchObject({ ok: false, error: "Extraction draft is already rejected." });
-    expect(byId.get("bulk-draft-other-language")?.ok).toBe(false);
-    expect(byId.get("bulk-draft-other-language")?.error).toContain("does not belong to language");
+    expect(byId.get("missing-draft")).toMatchObject({
+      ok: false,
+      error: "Extraction draft not found: missing-draft",
+      i18nKey: "errors.extractionDraftNotFound"
+    });
+    expect(byId.get("bulk-draft-already-rejected")).toMatchObject({
+      ok: false,
+      error: "Extraction draft is already rejected.",
+      i18nKey: "errors.extractionDraftAlreadyRejected"
+    });
+    expect(byId.get("bulk-draft-already-accepted")).toMatchObject({
+      ok: false,
+      error: "Extraction draft is already accepted.",
+      i18nKey: "errors.extractionDraftAlreadyAccepted"
+    });
+    expect(byId.get("bulk-draft-other-language")).toMatchObject({
+      ok: false,
+      error: `Extraction draft does not belong to language ${TEST_LANGUAGE_ID}.`,
+      i18nKey: "errors.extractionDraftWrongLanguage",
+      i18nParams: { languageId: TEST_LANGUAGE_ID }
+    });
+    expect(byId.get("bulk-draft-incomplete-lexeme")).toMatchObject({
+      ok: false,
+      error: "Lexeme draft is missing form or gloss.",
+      i18nKey: "errors.lexemeDraftMissingFormOrGloss"
+    });
+  });
+
+  it("fails the second identical lexeme in one accept batch as already existing", async () => {
+    const app = createServer({ initialState: buildBulkReviewState() });
+
+    const response = await bulkReview(app, {
+      action: "accept",
+      draftIds: ["bulk-draft-lexeme-dup-a", "bulk-draft-lexeme-dup-b"]
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.accepted).toBe(1);
+    expect(body.failed).toBe(1);
+    expect(body.results[0]).toMatchObject({ draftId: "bulk-draft-lexeme-dup-a", ok: true });
+    expect(body.results[1]).toMatchObject({
+      draftId: "bulk-draft-lexeme-dup-b",
+      ok: false,
+      error: "Lexeme already exists: kela (leaf)",
+      i18nKey: "errors.lexemeAlreadyExists",
+      i18nParams: { form: "kela", gloss: "leaf" }
+    });
   });
 
   it("requires authentication and a reviewing role", async () => {
@@ -193,6 +309,22 @@ describe("bulk extraction draft review", () => {
       i18nKey: "errors.bulkReviewInvalidDraftIds"
     });
 
+    const missingIds = await bulkReview(app, { action: "accept" });
+    expect(missingIds.statusCode).toBe(400);
+    expect(missingIds.json().i18nKey).toBe("errors.bulkReviewInvalidDraftIds");
+
+    const nonArrayIds = await bulkReview(app, { action: "accept", draftIds: "bulk-draft-lexeme" });
+    expect(nonArrayIds.statusCode).toBe(400);
+    expect(nonArrayIds.json().i18nKey).toBe("errors.bulkReviewInvalidDraftIds");
+
+    const nonStringIds = await bulkReview(app, { action: "accept", draftIds: [123] });
+    expect(nonStringIds.statusCode).toBe(400);
+    expect(nonStringIds.json().i18nKey).toBe("errors.bulkReviewInvalidDraftIds");
+
+    const whitespaceIds = await bulkReview(app, { action: "accept", draftIds: ["  "] });
+    expect(whitespaceIds.statusCode).toBe(400);
+    expect(whitespaceIds.json().i18nKey).toBe("errors.bulkReviewInvalidDraftIds");
+
     const tooMany = await bulkReview(app, {
       action: "accept",
       draftIds: Array.from({ length: 51 }, (_, index) => `draft-${index}`)
@@ -203,6 +335,28 @@ describe("bulk extraction draft review", () => {
       i18nKey: "errors.bulkReviewTooManyDraftIds",
       i18nParams: { max: 50 }
     });
+  });
+
+  it("accepts exactly 50 draft ids at the bulk limit", async () => {
+    const fiftyDrafts = Array.from({ length: 50 }, (_, index) => ({
+      ...draftBase,
+      id: `bulk-limit-${index}`,
+      kind: "lexeme" as const,
+      payload: { ...emptyPayload, form: `form${index}`, gloss: `gloss${index}` },
+      createdAt: `2026-06-10T01:${String(index).padStart(2, "0")}:00.000Z`
+    }));
+    const app = createServer({ initialState: buildBulkReviewState(fiftyDrafts) });
+
+    const response = await bulkReview(app, {
+      action: "accept",
+      draftIds: fiftyDrafts.map((draft) => draft.id)
+    });
+
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    expect(body.accepted).toBe(50);
+    expect(body.failed).toBe(0);
+    expect(body.results).toHaveLength(50);
   });
 
   it("returns 404 for an unknown language", async () => {

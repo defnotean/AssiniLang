@@ -8,6 +8,8 @@ describe("NoLanguageNotice", () => {
     render(<NoLanguageNotice />);
 
     const notice = screen.getByRole("status");
+    expect(notice).toHaveClass("empty-state");
+    expect(notice).toHaveAttribute("aria-live", "polite");
     expect(notice).toHaveTextContent("Select or create a language first.");
     expect(notice).toHaveTextContent(
       "Use New language in the sidebar to open a workspace, then return to this section."

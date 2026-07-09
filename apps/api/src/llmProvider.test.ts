@@ -353,6 +353,45 @@ describe("llm provider", () => {
     await expect(result).rejects.not.toThrow("sk-provider-secret");
   });
 
+  it("redacts bearer and api_key shapes from non-sk provider error bodies", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({
+        error: {
+          message: "Unauthorized Bearer plain-provider-secret api_key=query-leak"
+        }
+      }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const provider = createOpenAiCompatibleLlmProvider({
+      baseUrl: "https://203.0.113.1/v1",
+      model: "gpt-test",
+      apiKey: "plain-provider-secret"
+    }, fetchFn);
+
+    await expect(provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "programmer_debug",
+      prompt: "Summarize safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }))).rejects.toThrow(/\[redacted-secret\]/);
+
+    try {
+      await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "programmer_debug",
+        prompt: "Summarize safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      }));
+    } catch (error) {
+      expect((error as Error).message).not.toContain("plain-provider-secret");
+      expect((error as Error).message).not.toContain("query-leak");
+    }
+  });
+
   it("sends a default max_tokens on every request and never a response_format on the chat path", async () => {
     const { calls, fetchFn } = captureFetch("Chat response");
     const provider = createLlmProviderFromEnv({

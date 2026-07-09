@@ -1,4 +1,5 @@
 import { lookup as dnsLookup } from "node:dns/promises";
+import { redactErrorSecrets } from "./secretRedaction.js";
 
 type Env = Record<string, string | undefined>;
 type LookupFn = (hostname: string) => Promise<{ address: string; family: number }>;
@@ -106,7 +107,7 @@ export async function assertOutboundHttpUrlAllowed(
   try {
     parsed = new URL(url);
   } catch {
-    throw new Error(`URL is not valid: ${url}`);
+    throw new Error(`URL is not valid: ${redactErrorSecrets(url)}`);
   }
 
   assertHttpProtocol(parsed);

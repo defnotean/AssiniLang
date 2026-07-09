@@ -161,4 +161,54 @@ describe("ModelSetupView settings save status", () => {
     expect(screen.getByRole("option", { name: "Remote OpenAI" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "LM Studio" })).toBeInTheDocument();
   });
+
+  it("shows a next-step hint when LLM status fails to load", () => {
+    const reload = vi.fn();
+    render(
+      <ModelSetupView
+        model={createModelWorkspace({
+          llmState: { status: "error", message: "Runtime settings could not be loaded" },
+          settingsSaveResult: null,
+          reloadModelWorkspace: reload
+        })}
+      />
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Runtime settings could not be loaded");
+    expect(
+      screen.getByText(/Check that the local API is running, then retry/i)
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("shows next-step empty states when setup examples are missing", () => {
+    const workspace = createModelWorkspace({ settingsSaveResult: null });
+    const status = workspace.llmState.status === "ready" ? workspace.llmState.data : null;
+    if (!status) throw new Error("expected ready llm status");
+
+    render(
+      <ModelSetupView
+        model={createModelWorkspace({
+          settingsSaveResult: null,
+          llmState: {
+            status: "ready",
+            data: {
+              ...status,
+              setup: { localExamples: [], remoteExamples: [] }
+            }
+          }
+        })}
+      />
+    );
+
+    const localEmpty = screen.getByText(/No local setup examples were returned/i);
+    expect(localEmpty).toHaveAttribute("role", "status");
+    expect(localEmpty).toHaveAttribute("aria-live", "polite");
+    expect(localEmpty).toHaveClass("empty-state");
+
+    const remoteEmpty = screen.getByText(/No remote setup examples were returned/i);
+    expect(remoteEmpty).toHaveAttribute("role", "status");
+    expect(remoteEmpty).toHaveAttribute("aria-live", "polite");
+    expect(remoteEmpty).toHaveClass("empty-state");
+  });
 });

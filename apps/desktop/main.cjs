@@ -4,6 +4,14 @@ const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { app, BrowserWindow, Menu, Tray, dialog, ipcMain, nativeImage, screen, shell } = require("electron");
+const {
+  DESKTOP_IPC_ERRORS,
+  desktopIpcFailure,
+  desktopIpcFailureFromError,
+  normalizeDesktopAction,
+  normalizeDesktopPreferencesPatch,
+  normalizeDiagnosticsReportText
+} = require("./desktopIpc.cjs");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const apiModuleUrl = pathToFileURL(path.join(repoRoot, "apps", "api", "dist", "index.js")).href;
@@ -210,19 +218,26 @@ function refreshDesktopBridgePreferences() {
 }
 
 async function updateDesktopPreferences(patch) {
-  const next = { ...desktopPreferences };
-  if (typeof patch?.hideToTray === "boolean") {
-    next.hideToTray = patch.hideToTray;
+  const normalized = normalizeDesktopPreferencesPatch(patch);
+  if (!normalized.ok) {
+    return {
+      ...normalized,
+      preferences: currentDesktopPreferences()
+    };
   }
-  if (typeof patch?.launchAtLogin === "boolean") {
+
+  const next = { ...desktopPreferences };
+  if (typeof normalized.patch.hideToTray === "boolean") {
+    next.hideToTray = normalized.patch.hideToTray;
+  }
+  if (typeof normalized.patch.launchAtLogin === "boolean") {
     if (!app.isPackaged || IS_SMOKE_MODE) {
       return {
-        ok: false,
-        message: "Launch at sign-in is available in the packaged desktop app.",
+        ...desktopIpcFailure(DESKTOP_IPC_ERRORS.LAUNCH_AT_LOGIN_PACKAGED_ONLY),
         preferences: currentDesktopPreferences()
       };
     }
-    next.launchAtLogin = patch.launchAtLogin;
+    next.launchAtLogin = normalized.patch.launchAtLogin;
   }
 
   desktopPreferences = sanitizeDesktopPreferences(next);
@@ -284,17 +299,23 @@ async function openDesktopPath(target) {
 }
 
 async function saveDesktopDiagnosticsReport(text) {
+  const normalized = normalizeDiagnosticsReportText(text, DIAGNOSTICS_REPORT_MAX_CHARS);
+  if (!normalized.ok) {
+    return normalized;
+  }
+
   const diagnosticsDir = diagnosticsRootPath();
   mkdirSync(diagnosticsDir, { recursive: true });
-  const reportText = typeof text === "string" && text.trim().length > 0
-    ? text.slice(0, DIAGNOSTICS_REPORT_MAX_CHARS)
-    : `AssiniLang Desktop diagnostics\nGenerated: ${new Date().toISOString()}\n`;
+  const reportText = normalized.usedFallback
+    ? `AssiniLang Desktop diagnostics\nGenerated: ${new Date().toISOString()}\n`
+    : normalized.text;
   const reportPath = path.join(diagnosticsDir, `diagnostics-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`);
   writeFileSync(reportPath, reportText, "utf8");
   return {
     ...actionResult(`Saved diagnostics report at ${reportPath}`),
     diagnosticsDir,
-    diagnosticsPath: reportPath
+    diagnosticsPath: reportPath,
+    truncated: Boolean(normalized.truncated)
   };
 }
 
@@ -384,7 +405,9 @@ function refreshDesktopBridgeShortcutSummary() {
 
 async function createDesktopShortcut() {
   if (!app.isPackaged) {
-    return { ok: false, message: "Desktop shortcut creation is available in the packaged app." };
+    return desktopIpcFailure(DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY, {
+      message: "Desktop shortcut creation is available in the packaged app."
+    });
   }
 
   const shortcutPath = createWindowsShortcut(desktopShortcutPath());
@@ -397,7 +420,9 @@ async function createDesktopShortcut() {
 
 async function createStartMenuShortcut() {
   if (!app.isPackaged) {
-    return { ok: false, message: "Start Menu shortcut creation is available in the packaged app." };
+    return desktopIpcFailure(DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY, {
+      message: "Start Menu shortcut creation is available in the packaged app."
+    });
   }
 
   const shortcutPath = createWindowsShortcut(startMenuShortcutPath());
@@ -410,7 +435,7 @@ async function createStartMenuShortcut() {
 
 async function createAppShortcuts() {
   if (!app.isPackaged) {
-    return { ok: false, message: "Shortcut setup is available in the packaged app." };
+    return desktopIpcFailure(DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY);
   }
 
   const desktopPath = createWindowsShortcut(desktopShortcutPath());
@@ -710,10 +735,7 @@ function registerDesktopActions() {
         backupSummary: desktopBackupSummary()
       };
     } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error)
-      };
+      return desktopIpcFailureFromError(error);
     }
   });
 
@@ -724,10 +746,7 @@ function registerDesktopActions() {
         shortcutSummary: refreshDesktopBridgeShortcutSummary()
       };
     } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error)
-      };
+      return desktopIpcFailureFromError(error);
     }
   });
 
@@ -735,16 +754,18 @@ function registerDesktopActions() {
     try {
       return await saveDesktopDiagnosticsReport(text);
     } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error)
-      };
+      return desktopIpcFailureFromError(error);
     }
   });
 
   ipcMain.handle("assini:desktop-action", async (_event, action) => {
     try {
-      switch (action) {
+      const normalized = normalizeDesktopAction(action);
+      if (!normalized.ok) {
+        return normalized;
+      }
+
+      switch (normalized.action) {
         case "openDataFolder":
           return await openDesktopPath("dataFolder");
         case "openAppFolder":
@@ -772,13 +793,12 @@ function registerDesktopActions() {
         case "resetWindowLayout":
           return await resetWindowLayout();
         default:
-          return { ok: false, message: "Unknown desktop action." };
+          return desktopIpcFailure(DESKTOP_IPC_ERRORS.UNKNOWN_ACTION, {
+            message: `Unknown desktop action: ${normalized.action}.`
+          });
       }
     } catch (error) {
-      return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error)
-      };
+      return desktopIpcFailureFromError(error);
     }
   });
 
@@ -787,8 +807,7 @@ function registerDesktopActions() {
       return await updateDesktopPreferences(patch);
     } catch (error) {
       return {
-        ok: false,
-        message: error instanceof Error ? error.message : String(error),
+        ...desktopIpcFailureFromError(error),
         preferences: currentDesktopPreferences()
       };
     }
@@ -877,7 +896,7 @@ function applyWindowState(window, state) {
 
 async function resetWindowLayout() {
   if (!mainWindow || mainWindow.isDestroyed()) {
-    return { ok: false, message: "No desktop window is open." };
+    return desktopIpcFailure(DESKTOP_IPC_ERRORS.NO_WINDOW);
   }
 
   if (mainWindow.isMaximized()) {

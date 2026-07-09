@@ -127,7 +127,7 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
   app.patch("/languages/:languageId", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const body = parseLanguagePatchBody(request.body ?? {});
-    if (!body) {
+    if (!body || Object.keys(body).length === 0) {
       reply.code(400);
       return {
         error: "Invalid language patch body",
@@ -243,7 +243,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     const state = await readState();
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
   });
@@ -254,7 +257,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     const profile = buildLanguageProfile(state, languageId);
     if (!profile) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return profile;
   });

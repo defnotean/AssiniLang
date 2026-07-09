@@ -578,6 +578,27 @@ describe("extractCandidatesForAsset", () => {
     expect(JSON.stringify(result.warnings)).not.toContain("sk-test-secret");
   });
 
+  it("redacts bearer and configured secrets from model extraction fallback warnings", async () => {
+    const previous = process.env.ASSINI_LLM_API_KEY;
+    process.env.ASSINI_LLM_API_KEY = "plain-provider-secret";
+    try {
+      const result = await extractCandidatesForAsset({
+        asset: makeAsset({ rawText: "mira = river" }),
+        language,
+        provider: providerWithChatError(
+          new Error("timed out after Bearer plain-provider-secret api_key=query-leak")
+        ),
+        dataDir: tmpdir()
+      });
+
+      expect(result.warnings.some((warning) => warning.includes("[redacted-secret]"))).toBe(true);
+      expect(JSON.stringify(result.warnings)).not.toContain("plain-provider-secret");
+      expect(JSON.stringify(result.warnings)).not.toContain("query-leak");
+    } finally {
+      process.env.ASSINI_LLM_API_KEY = previous;
+    }
+  });
+
   it("uses heuristics with a warning when no model is configured", async () => {
     const result = await extractCandidatesForAsset({
       asset: makeAsset({ rawText: "mira = river" }),
@@ -592,7 +613,8 @@ describe("extractCandidatesForAsset", () => {
 
   it.each([
     ["parent traversal", "../outside.txt"],
-    ["absolute path", undefined]
+    ["absolute path", undefined],
+    ["NUL control character", "assets/avenik/a\0.txt"]
   ])("rejects unsafe persisted file paths before reading %s", async (_caseName, relativePath) => {
     const dir = await mkdtemp(join(tmpdir(), "assini-ingest-path-"));
     const outsidePath = join(dir, "outside.txt");

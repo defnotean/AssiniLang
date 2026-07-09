@@ -13,13 +13,15 @@ import {
 import { JsonStore, type AppState, type User } from "@assini/db";
 import { createMutableLlmProvider, type LlmProvider } from "./llmProvider.js";
 import { resolveRuntimeSettingsPath } from "./runtimePath.js";
-import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
+import { isCorsOriginAllowed, resolveAllowedOrigins } from "./corsOrigins.js";
 import {
   readPrototypeSessionAbsoluteMaxMs,
   readPrototypeSessionTtlMs,
   type PrototypeSessionMap,
   type PrototypeSessionRecord
 } from "./routeHelpers.js";
+import { censorLogSecret, redactErrorSecrets } from "./secretRedaction.js";
+import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
 import type { RequestStatusClass, RouteContext } from "./routes/context.js";
 import { registerAiSessionRoutes } from "./routes/aiSessions.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -34,7 +36,12 @@ import { registerLanguageRoutes } from "./routes/languages.js";
 import { registerLlmRoutes } from "./routes/llm.js";
 import { registerNoteRoutes } from "./routes/notes.js";
 import { registerObservabilityRoutes } from "./routes/observability.js";
-import { registerSourceRoutes } from "./routes/sources.js";
+import {
+  MAX_SOURCE_UPLOAD_BYTES,
+  MAX_SOURCE_UPLOAD_TITLE_BYTES,
+  registerSourceRoutes,
+  SOURCE_UPLOAD_MULTIPART_LIMITS
+} from "./routes/sources.js";
 import { registerStudyLoopRoutes } from "./routes/studyLoop.js";
 import { registerSystemRoutes } from "./routes/system.js";
 
@@ -49,6 +56,8 @@ type ServerOptions = {
   initialState?: AppState;
   allowedOrigins?: string[];
   bodyLimitBytes?: number;
+  /** Multipart source-upload file size cap in bytes. Defaults to 25 MB. */
+  multipartFileSizeBytes?: number;
   rateLimit?: RateLimitOptions | false;
   /** Server-only token used by tests or explicitly configured internal tools. Never bundle this into the browser. */
   authToken?: string;
@@ -70,9 +79,10 @@ type ServerOptions = {
   settingsPath?: string;
   logger?: any;
   concurrency?: number;
+  /** Optional job queue override for tests (e.g. failing getStatus). */
+  jobQueue?: JobQueue;
 };
 
-const DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"];
 const TEST_ONLY_AUTH_TOKEN = "test";
 const DEFAULT_RATE_LIMIT: RateLimitOptions = { max: 120, windowMs: 60_000 };
 const RATE_LIMITED_METHODS = new Set(["POST", "PATCH", "PUT", "DELETE"]);
@@ -86,10 +96,6 @@ function responseStatusClass(statusCode: number): RequestStatusClass | undefined
   if (statusCode >= 400 && statusCode < 500) return "4xx";
   if (statusCode >= 500 && statusCode < 600) return "5xx";
   return undefined;
-}
-
-function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: readonly string[]): boolean {
-  return origin === undefined || allowedOrigins.includes(origin);
 }
 
 function singleHeaderValue(value: string | string[] | undefined): string | undefined {
@@ -116,14 +122,14 @@ export function createServer(options: ServerOptions = {}) {
           level: "info",
           redact: {
             paths: [...FASTIFY_LOGGER_REDACT_PATHS],
-            censor: "[REDACTED]"
+            censor: censorLogSecret
           }
         }
       : false,
     bodyLimit: options.bodyLimitBytes ?? 64 * 1024
   });
   const store = options.store ?? new JsonStore();
-  const jobQueue = new JobQueue(options.concurrency ?? 2, app.log);
+  const jobQueue = options.jobQueue ?? new JobQueue(options.concurrency ?? 2, app.log);
   const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? DEFAULT_RATE_LIMIT;
   const authToken = options.authToken ?? process.env.ASSINI_DEV_AUTH_TOKEN ?? (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
@@ -135,6 +141,7 @@ export function createServer(options: ServerOptions = {}) {
   const now = options.now ?? Date.now;
   prototypeSessions.now = now;
   const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
+  const multipartFileSizeBytes = options.multipartFileSizeBytes ?? MAX_SOURCE_UPLOAD_BYTES;
   const ingestionFetch = options.ingestionFetch ?? globalThis.fetch;
   const mutableLlmProvider = options.llmProvider ? undefined : createMutableLlmProvider(process.env, ingestionFetch);
   const llmProvider = options.llmProvider ?? mutableLlmProvider as LlmProvider;
@@ -234,7 +241,7 @@ export function createServer(options: ServerOptions = {}) {
     const requestId = requestIdForResponse(request);
     reply.header(REQUEST_ID_HEADER, requestId);
 
-    const maybeStatusError = error as { statusCode?: number };
+    const maybeStatusError = error as { statusCode?: number; message?: string };
     if (maybeStatusError.statusCode === 413) {
       reply.code(413).send({
         error: "Payload too large",
@@ -244,10 +251,25 @@ export function createServer(options: ServerOptions = {}) {
       return;
     }
 
+    const statusCode = typeof maybeStatusError.statusCode === "number" && maybeStatusError.statusCode >= 400
+      ? maybeStatusError.statusCode
+      : 500;
+    if (statusCode >= 500) {
+      app.log.error({ err: error, requestId }, "Unhandled request error");
+      reply.code(statusCode).send({
+        error: "Internal Server Error",
+        requestId
+      });
+      return;
+    }
+
+    if (error instanceof Error) {
+      error.message = redactErrorSecrets(error.message);
+    }
     reply.send(error);
   });
 
-  const allowedOrigins = options.allowedOrigins ?? DEFAULT_ALLOWED_ORIGINS;
+  const allowedOrigins = resolveAllowedOrigins(options.allowedOrigins);
   app.register(cors, {
     credentials: true,
     origin: (origin, callback) => {
@@ -256,8 +278,9 @@ export function createServer(options: ServerOptions = {}) {
   });
   app.register(multipart, {
     limits: {
-      fileSize: 25 * 1024 * 1024,
-      files: 1
+      ...SOURCE_UPLOAD_MULTIPART_LIMITS,
+      fileSize: multipartFileSizeBytes,
+      fieldSize: MAX_SOURCE_UPLOAD_TITLE_BYTES
     }
   });
 
@@ -273,6 +296,7 @@ export function createServer(options: ServerOptions = {}) {
     now,
     llmProvider,
     dataDir,
+    multipartFileSizeBytes,
     ingestionFetch,
     settingsPath,
     reloadLlmProvider: mutableLlmProvider

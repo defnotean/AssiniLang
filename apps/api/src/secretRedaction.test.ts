@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.js";
+import { censorLogSecret, redactConfiguredSecrets, redactErrorSecrets } from "./secretRedaction.js";
 
 const ORIGINAL_ENV = {
   ASSINI_LLM_API_KEY: process.env.ASSINI_LLM_API_KEY,
@@ -62,5 +62,21 @@ describe("secret redaction", () => {
     expect(redacted).not.toContain("query-secret-value");
     expect(redacted).not.toContain("header-secret-value");
     expect(redacted).not.toContain("oauth-secret");
+  });
+
+  it("redacts URL userinfo credentials embedded in error text", () => {
+    const redacted = redactErrorSecrets(
+      "URL is not valid: https://user:url-pass-secret@api.example/v1?api_key=query-secret"
+    );
+
+    expect(redacted).toBe("URL is not valid: https://[redacted-secret]@api.example/v1?[redacted-secret]");
+    expect(redacted).not.toContain("url-pass-secret");
+    expect(redacted).not.toContain("query-secret");
+  });
+
+  it("censors credential log fields while scrubbing err.message in place", () => {
+    expect(censorLogSecret("plain-provider-secret", ["body", "apiKey"])).toBe("[REDACTED]");
+    expect(censorLogSecret("failed with Bearer sk-live-token", ["err", "message"]))
+      .toBe("failed with [redacted-secret]");
   });
 });

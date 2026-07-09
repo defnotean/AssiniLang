@@ -7,9 +7,9 @@ import {
   runVerifyBeta
 } from "./verifyBeta.mjs";
 
-function exitOnNextTick(code: number) {
+function exitOnNextTick(code: number | null, signal: NodeJS.Signals | null = null) {
   const child = new EventEmitter();
-  queueMicrotask(() => child.emit("exit", code, null));
+  queueMicrotask(() => child.emit("exit", code, signal));
   return child;
 }
 
@@ -74,19 +74,26 @@ describe("verify:beta launcher", () => {
 
   it("runs model:verify when ASSINI_VERIFY_MODEL=1", async () => {
     const calls: string[] = [];
+    const stdout: string[] = [];
     const result = await runVerifyBeta({
-      env: { ASSINI_VERIFY_MODEL: "1" },
+      env: { ASSINI_VERIFY_MODEL: "1", ASSINI_VERIFY_MODEL_NAME: "llama3.1" },
       platform: "linux",
       spawnFn(command, args) {
         calls.push(`${command} ${args.join(" ")}`);
         return exitOnNextTick(0);
       },
-      stdout: { write() {} },
+      stdout: {
+        write(message) {
+          stdout.push(String(message));
+        }
+      },
       stderr: { write() {} }
     });
 
     expect(calls).toEqual(["npm run model:verify"]);
-    expect(result).toEqual({ exitCode: 0, skipped: false });
+    expect(result).toEqual({ exitCode: 0, skipped: false, model: "llama3.1" });
+    expect(stdout.join("")).toContain("preferred model: llama3.1");
+    expect(stdout.join("")).toContain("model:verify passed");
   });
 
   it("propagates a non-zero model:verify exit code", async () => {
@@ -109,6 +116,31 @@ describe("verify:beta launcher", () => {
     expect(stderr.join("")).toContain("model:verify failed with exit code 2");
   });
 
+  it("reports signal terminations without claiming a clean skip", async () => {
+    const stderr: string[] = [];
+    const result = await runVerifyBeta({
+      env: { ASSINI_VERIFY_MODEL: "1" },
+      platform: "linux",
+      spawnFn() {
+        return exitOnNextTick(null, "SIGTERM");
+      },
+      stdout: { write() {} },
+      stderr: {
+        write(message) {
+          stderr.push(String(message));
+        }
+      }
+    });
+
+    expect(result).toEqual({
+      exitCode: 1,
+      skipped: false,
+      failedStep: "model:verify",
+      signal: "SIGTERM"
+    });
+    expect(stderr.join("")).toContain("model:verify terminated by signal SIGTERM");
+  });
+
   it("reports spawn startup failures without claiming a clean skip", async () => {
     const stderr: string[] = [];
     const result = await runVerifyBeta({
@@ -125,8 +157,36 @@ describe("verify:beta launcher", () => {
       }
     });
 
-    expect(result).toEqual({ exitCode: 1, skipped: false, failedStep: "model:verify" });
+    expect(result.exitCode).toBe(1);
+    expect(result.skipped).toBe(false);
+    expect(result.failedStep).toBe("model:verify");
+    expect(result.error).toBeInstanceOf(Error);
     expect(stderr.join("")).toContain("model:verify failed to start: npm missing");
+  });
+
+  it("reports async child error events without claiming a clean skip", async () => {
+    const stderr: string[] = [];
+    const result = await runVerifyBeta({
+      env: { ASSINI_VERIFY_MODEL: "1" },
+      platform: "linux",
+      spawnFn() {
+        const child = new EventEmitter();
+        queueMicrotask(() => child.emit("error", new Error("spawn npm ENOENT")));
+        return child;
+      },
+      stdout: { write() {} },
+      stderr: {
+        write(message) {
+          stderr.push(String(message));
+        }
+      }
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.skipped).toBe(false);
+    expect(result.failedStep).toBe("model:verify");
+    expect(result.error).toBeInstanceOf(Error);
+    expect(stderr.join("")).toContain("model:verify failed to start: spawn npm ENOENT");
   });
 
   it("does not build a model:verify step when the opt-in gate is unset", () => {

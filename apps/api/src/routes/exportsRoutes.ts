@@ -1,10 +1,20 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { toPublicEvaluationArtifact, toPublicLanguageSnapshot } from "../publicLanguageViews.js";
-import { requireActor } from "../routeHelpers.js";
+import { appendAuditEvent, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
+function safeExportFileToken(value: string): string {
+  return value.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "export";
+}
+
+function setExportResponseHeaders(reply: FastifyReply, fileName: string): void {
+  reply.header("Cache-Control", "no-store, max-age=0");
+  reply.header("Pragma", "no-cache");
+  reply.header("Content-Disposition", `attachment; filename="${fileName}"`);
+}
+
 export function registerExportRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, authToken, prototypeSessions } = ctx;
+  const { readState, updateState, authToken, prototypeSessions } = ctx;
 
   app.get("/exports/languages/:languageId/snapshot", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
@@ -21,6 +31,23 @@ export function registerExportRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
 
+    setExportResponseHeaders(reply, `assini-${safeExportFileToken(languageId)}-snapshot.json`);
+
+    await updateState((current) => appendAuditEvent(current, {
+      actor,
+      at: snapshot.exportedAt,
+      action: "language_snapshot.exported",
+      entityType: "language",
+      entityId: languageId,
+      languageId,
+      summary: `Exported language snapshot for ${languageId}.`,
+      metadata: {
+        exportVersion: snapshot.exportVersion,
+        contentHash: snapshot.integrity.contentHash,
+        algorithm: snapshot.integrity.algorithm
+      }
+    }));
+
     return snapshot;
   });
 
@@ -29,6 +56,28 @@ export function registerExportRoutes(app: FastifyInstance, ctx: RouteContext): v
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "programmer"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
-    return toPublicEvaluationArtifact(state);
+    const artifact = toPublicEvaluationArtifact(state);
+    setExportResponseHeaders(reply, "assini-evaluation-artifact.json");
+
+    await updateState((current) => appendAuditEvent(current, {
+      actor,
+      at: artifact.exportedAt,
+      action: "evaluation_artifact.exported",
+      entityType: "evaluation_run",
+      entityId: "evaluation-artifact",
+      languageId: null,
+      summary: "Exported sanitized evaluation artifact.",
+      metadata: {
+        exportVersion: artifact.exportVersion,
+        contentHash: artifact.integrity.contentHash,
+        algorithm: artifact.integrity.algorithm,
+        passed: artifact.summary.passed,
+        languages: artifact.summary.languages,
+        totalRuns: artifact.summary.totalRuns,
+        failureCount: artifact.summary.failureCount
+      }
+    }));
+
+    return artifact;
   });
 }

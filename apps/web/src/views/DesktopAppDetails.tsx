@@ -72,7 +72,9 @@ export function DesktopAppDetails({
         {desktopBackupSummary && desktopBackupSummary.count === 0 && (
           <div data-desktop-backup-summary="empty">
             <dt>{t("model.desktopLatestBackup")}</dt>
-            <dd className="inline-empty">{t("model.desktopNoBackupsHint")}</dd>
+            <dd className="inline-empty empty-state" role="status" aria-live="polite">
+              {t("model.desktopNoBackupsHint")}
+            </dd>
           </div>
         )}
         {desktopBackupSummary?.latestName && (

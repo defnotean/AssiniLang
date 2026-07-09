@@ -114,7 +114,7 @@ export function ProviderReadinessPanel({
         </>
       )}
       {reachabilityError && (
-        <p className="result-notice error" role="alert">
+        <p className="result-notice error" role="alert" aria-live="assertive">
           {reachabilityError}
         </p>
       )}

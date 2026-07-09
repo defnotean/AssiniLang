@@ -87,6 +87,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
       <StatusScreen
         kind="error"
         message={llmState.message}
+        hint={t("model.loadFailedHint")}
         onRetry={onReloadModelWorkspace}
         retryLabel={t("app.retryLoad")}
       />
@@ -98,6 +99,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
       <StatusScreen
         kind="error"
         message={settingsState.message}
+        hint={t("model.loadFailedHint")}
         onRetry={onReloadModelWorkspace}
         retryLabel={t("app.retryLoad")}
       />
@@ -428,22 +430,34 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
         <span className="detail-label">{t("model.localEndpoints")}</span>
         <h2>{t("model.localProviders")}</h2>
         <p>{t("model.localSetupIntroBefore")}<code>/v1/chat/completions</code>{t("model.localSetupIntroAfter")}</p>
-        <div className="command-list">
-          {status.setup.localExamples.map((example) => (
-            <code key={example}>{example}</code>
-          ))}
-        </div>
+        {status.setup.localExamples.length === 0 ? (
+          <p className="muted empty-state" role="status" aria-live="polite">
+            {t("model.localSetupEmpty")}
+          </p>
+        ) : (
+          <div className="command-list">
+            {status.setup.localExamples.map((example) => (
+              <code key={example}>{example}</code>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="panel-card setup-card" aria-label={t("model.remoteSetupAria")}>
         <span className="detail-label">{t("model.remoteIntegration")}</span>
         <h2>{t("model.serverSideKeysOnly")}</h2>
         <p>{t("model.remoteSetupIntro")}</p>
-        <div className="command-list">
-          {status.setup.remoteExamples.map((example) => (
-            <code key={example}>{example}</code>
-          ))}
-        </div>
+        {status.setup.remoteExamples.length === 0 ? (
+          <p className="muted empty-state" role="status" aria-live="polite">
+            {t("model.remoteSetupEmpty")}
+          </p>
+        ) : (
+          <div className="command-list">
+            {status.setup.remoteExamples.map((example) => (
+              <code key={example}>{example}</code>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

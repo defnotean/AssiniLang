@@ -35,25 +35,64 @@ export function createCiGreenAuditSpec({
   });
 }
 
+function formatSpawnFailure(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function runCiGreenSmoke({
   platform = process.platform,
   env = process.env,
   spawnSyncFn = spawnSync,
+  stdout = process.stdout,
   stderr = process.stderr
 } = {}) {
   const npmSpec = createCiGreenAuditSpec({ platform, env });
-  const result = spawnSyncFn(npmSpec.command, npmSpec.args, {
-    stdio: "inherit",
-    windowsHide: platform === "win32",
-    env
-  });
-
-  const exitCode = result.status ?? 1;
-  if (exitCode !== 0) {
-    stderr.write("[ciGreenSmoke] production dependency audit failed\n");
+  let result;
+  try {
+    result = spawnSyncFn(npmSpec.command, npmSpec.args, {
+      stdio: "inherit",
+      windowsHide: platform === "win32",
+      env
+    });
+  } catch (error) {
+    stderr.write(
+      `[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(error)}\n`
+    );
+    return { exitCode: 1, command: npmSpec.command, args: npmSpec.args, error };
   }
 
-  return { exitCode, command: npmSpec.command, args: npmSpec.args };
+  if (result?.error) {
+    stderr.write(
+      `[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(result.error)}\n`
+    );
+    return {
+      exitCode: 1,
+      command: npmSpec.command,
+      args: npmSpec.args,
+      error: result.error
+    };
+  }
+
+  if (result?.signal) {
+    stderr.write(
+      `[ciGreenSmoke] production dependency audit terminated by signal ${result.signal}\n`
+    );
+    return {
+      exitCode: 1,
+      command: npmSpec.command,
+      args: npmSpec.args,
+      signal: result.signal
+    };
+  }
+
+  const exitCode = result?.status ?? 1;
+  if (exitCode !== 0) {
+    stderr.write("[ciGreenSmoke] production dependency audit failed\n");
+    return { exitCode, command: npmSpec.command, args: npmSpec.args };
+  }
+
+  stdout.write("[ciGreenSmoke] production dependency audit passed\n");
+  return { exitCode: 0, command: npmSpec.command, args: npmSpec.args };
 }
 
 const isMain =

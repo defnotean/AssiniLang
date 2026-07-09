@@ -57,19 +57,40 @@ function ensureCorpusDraftSegmentation(
     }));
 }
 
+type DraftReviewI18n = {
+  i18nKey: string;
+  i18nParams?: Record<string, string | number>;
+};
+
 type AcceptDraftOutcome = {
   state: AppState;
   committed?: { draft: ExtractionDraft; entity: Lexeme | CorpusPassage | Note };
   draftMissing?: boolean;
   validationError?: string;
-};
+} & Partial<DraftReviewI18n>;
 
 type RejectDraftOutcome = {
   state: AppState;
   rejected?: ExtractionDraft;
   draftMissing?: boolean;
   validationError?: string;
-};
+} & Partial<DraftReviewI18n>;
+
+function alreadyReviewedI18n(status: string): DraftReviewI18n {
+  if (status === "accepted") {
+    return { i18nKey: "errors.extractionDraftAlreadyAccepted" };
+  }
+  if (status === "rejected") {
+    return { i18nKey: "errors.extractionDraftAlreadyRejected" };
+  }
+  if (status === "proposed") {
+    return { i18nKey: "errors.extractionDraftAlreadyProposed" };
+  }
+  return {
+    i18nKey: "errors.extractionDraftAlreadyStatus",
+    i18nParams: { status }
+  };
+}
 
 /**
  * Pure state transition that accepts a single proposed extraction draft:
@@ -84,7 +105,11 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
   }
 
   if (draft.status !== "proposed") {
-    return { state, validationError: `Extraction draft is already ${draft.status}.` };
+    return {
+      state,
+      validationError: `Extraction draft is already ${draft.status}.`,
+      ...alreadyReviewedI18n(draft.status)
+    };
   }
 
   const reviewedAt = new Date().toISOString();
@@ -93,7 +118,11 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
     const form = draft.payload.form?.trim() ?? "";
     const gloss = draft.payload.gloss?.trim() ?? "";
     if (!form || !gloss) {
-      return { state, validationError: "Lexeme draft is missing form or gloss." };
+      return {
+        state,
+        validationError: "Lexeme draft is missing form or gloss.",
+        i18nKey: "errors.lexemeDraftMissingFormOrGloss"
+      };
     }
 
     const duplicate = state.lexemes.some((lexeme) =>
@@ -102,7 +131,12 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
       && lexeme.gloss.trim().toLowerCase() === gloss.toLowerCase()
     );
     if (duplicate) {
-      return { state, validationError: `Lexeme already exists: ${form} (${gloss})` };
+      return {
+        state,
+        validationError: `Lexeme already exists: ${form} (${gloss})`,
+        i18nKey: "errors.lexemeAlreadyExists",
+        i18nParams: { form, gloss }
+      };
     }
 
     const lexeme: Lexeme = {
@@ -148,7 +182,11 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
     const textTarget = draft.payload.textTarget?.trim().replace(/\s+/g, " ") ?? "";
     const textTranslation = draft.payload.textTranslation?.trim().replace(/\s+/g, " ") ?? "";
     if (!textTarget || !textTranslation) {
-      return { state, validationError: "Corpus draft is missing target text or translation." };
+      return {
+        state,
+        validationError: "Corpus draft is missing target text or translation.",
+        i18nKey: "errors.corpusDraftMissingTextOrTranslation"
+      };
     }
 
     const normalizedTarget = textTarget.toLowerCase();
@@ -157,7 +195,12 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
       && passage.textTarget.trim().replace(/\s+/g, " ").toLowerCase() === normalizedTarget
     );
     if (duplicate) {
-      return { state, validationError: `Corpus passage already exists for target text: ${textTarget}` };
+      return {
+        state,
+        validationError: `Corpus passage already exists for target text: ${textTarget}`,
+        i18nKey: "errors.corpusPassageAlreadyExists",
+        i18nParams: { textTarget }
+      };
     }
 
     const sourceAsset = state.sourceAssets.find((item) => item.id === draft.sourceAssetId);
@@ -190,7 +233,11 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
 
     const phonologyError = corpusPhonologyValidationError(state, draft.languageId, passage);
     if (phonologyError) {
-      return { state, validationError: phonologyError };
+      return {
+        state,
+        validationError: phonologyError,
+        i18nKey: "errors.corpusDraftPhonologyInvalid"
+      };
     }
 
     const updatedDraft: ExtractionDraft = {
@@ -224,7 +271,11 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
   const topic = draft.payload.topic?.trim() ?? "";
   const explanation = draft.payload.explanation?.trim() ?? "";
   if (!topic || !explanation) {
-    return { state, validationError: "Grammar note draft is missing topic or explanation." };
+    return {
+      state,
+      validationError: "Grammar note draft is missing topic or explanation.",
+      i18nKey: "errors.grammarNoteDraftMissingTopicOrExplanation"
+    };
   }
 
   const note: Note = {
@@ -292,7 +343,11 @@ function applyRejectDraft(state: AppState, draftId: string, actor: User): Reject
   }
 
   if (draft.status !== "proposed") {
-    return { state, validationError: `Extraction draft is already ${draft.status}.` };
+    return {
+      state,
+      validationError: `Extraction draft is already ${draft.status}.`,
+      ...alreadyReviewedI18n(draft.status)
+    };
   }
 
   const reviewedAt = new Date().toISOString();
@@ -325,8 +380,23 @@ type BulkReviewItemResult = {
   draftId: string;
   ok: boolean;
   error?: string;
+  i18nKey?: string;
+  i18nParams?: Record<string, string | number>;
   committedEntityId?: string;
 };
+
+function bulkItemFailure(
+  draftId: string,
+  error: string,
+  i18n?: DraftReviewI18n
+): BulkReviewItemResult {
+  return {
+    draftId,
+    ok: false,
+    error,
+    ...(i18n?.i18nKey ? { i18nKey: i18n.i18nKey, ...(i18n.i18nParams ? { i18nParams: i18n.i18nParams } : {}) } : {})
+  };
+}
 
 export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, updateState, checkRateLimit, authToken, prototypeSessions } = ctx;
@@ -378,7 +448,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (outcome?.validationError) {
       reply.code(400);
-      return { error: outcome.validationError };
+      return {
+        error: outcome.validationError,
+        ...(outcome.i18nKey ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) } : {})
+      };
     }
 
     if (!outcome?.committed) {
@@ -418,7 +491,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (outcome?.validationError) {
       reply.code(400);
-      return { error: outcome.validationError };
+      return {
+        error: outcome.validationError,
+        ...(outcome.i18nKey ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) } : {})
+      };
     }
 
     if (!outcome?.rejected) {
@@ -465,7 +541,7 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
         i18nParams: { max: BULK_REVIEW_MAX_IDS }
       };
     }
-    const draftIds = [...new Set(rawDraftIds as string[])];
+    const draftIds = [...new Set((rawDraftIds as string[]).map((id) => id.trim()))];
 
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
@@ -492,11 +568,19 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
       for (const draftId of draftIds) {
         const draft = working.extractionDrafts.find((item) => item.id === draftId);
         if (!draft) {
-          results.push({ draftId, ok: false, error: `Extraction draft not found: ${draftId}` });
+          results.push(bulkItemFailure(
+            draftId,
+            `Extraction draft not found: ${draftId}`,
+            { i18nKey: "errors.extractionDraftNotFound" }
+          ));
           continue;
         }
         if (draft.languageId !== languageId) {
-          results.push({ draftId, ok: false, error: `Extraction draft does not belong to language ${languageId}.` });
+          results.push(bulkItemFailure(
+            draftId,
+            `Extraction draft does not belong to language ${languageId}.`,
+            { i18nKey: "errors.extractionDraftWrongLanguage", i18nParams: { languageId } }
+          ));
           continue;
         }
 
@@ -506,7 +590,13 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
           if (outcome.committed) {
             results.push({ draftId, ok: true, committedEntityId: outcome.committed.draft.committedEntityId });
           } else {
-            results.push({ draftId, ok: false, error: outcome.validationError ?? `Extraction draft not found: ${draftId}` });
+            results.push(bulkItemFailure(
+              draftId,
+              outcome.validationError ?? `Extraction draft not found: ${draftId}`,
+              outcome.i18nKey
+                ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
+                : { i18nKey: "errors.extractionDraftNotFound" }
+            ));
           }
         } else {
           const outcome = applyRejectDraft(working, draftId, actor);
@@ -514,7 +604,13 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
           if (outcome.rejected) {
             results.push({ draftId, ok: true });
           } else {
-            results.push({ draftId, ok: false, error: outcome.validationError ?? `Extraction draft not found: ${draftId}` });
+            results.push(bulkItemFailure(
+              draftId,
+              outcome.validationError ?? `Extraction draft not found: ${draftId}`,
+              outcome.i18nKey
+                ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
+                : { i18nKey: "errors.extractionDraftNotFound" }
+            ));
           }
         }
       }

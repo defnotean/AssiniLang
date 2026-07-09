@@ -6,7 +6,11 @@ describe("Fastify logger redaction", () => {
     expect(FASTIFY_LOGGER_REDACT_PATHS).toEqual(expect.arrayContaining([
       "body.apiKey",
       "body.transcriptionApiKey",
-      "body.ocrApiKey"
+      "body.ocrApiKey",
+      "req.body.apiKey",
+      "req.body.transcriptionApiKey",
+      "req.body.ocrApiKey",
+      "err.message"
     ]));
   });
 });

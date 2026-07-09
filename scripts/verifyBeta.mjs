@@ -44,6 +44,10 @@ export function createVerifyBetaStep({ platform = process.platform, env = proces
   };
 }
 
+function formatSpawnFailure(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function runStep(step, spawnFn) {
   return new Promise((resolve) => {
     let child;
@@ -58,7 +62,10 @@ function runStep(step, spawnFn) {
       resolve({ exitCode: 1, error });
     });
     child.once("exit", (code, signal) => {
-      resolve({ exitCode: code ?? (signal ? 1 : 0) });
+      resolve({
+        exitCode: code ?? (signal ? 1 : 0),
+        signal: signal || undefined
+      });
     });
   });
 }
@@ -85,18 +92,29 @@ export async function runVerifyBeta({
     return { exitCode: 0, skipped: true };
   }
 
-  stdout.write("\n[verify:beta] model:verify (ASSINI_VERIFY_MODEL=1)\n");
+  const modelName = resolveModelNameForVerify(env);
+  stdout.write(`\n[verify:beta] model:verify (preferred model: ${modelName})\n`);
   const result = await runStep(step, spawnFn);
 
   if (result.exitCode !== 0) {
     if (result.error) {
-      stderr.write(`[verify:beta] model:verify failed to start: ${result.error.message}\n`);
+      stderr.write(
+        `[verify:beta] model:verify failed to start: ${formatSpawnFailure(result.error)}\n`
+      );
+    } else if (result.signal) {
+      stderr.write(`[verify:beta] model:verify terminated by signal ${result.signal}\n`);
     } else {
       stderr.write(`[verify:beta] model:verify failed with exit code ${result.exitCode}\n`);
     }
-    return { exitCode: result.exitCode, skipped: false, failedStep: "model:verify" };
+    return {
+      exitCode: result.exitCode,
+      skipped: false,
+      failedStep: "model:verify",
+      ...(result.signal ? { signal: result.signal } : {}),
+      ...(result.error ? { error: result.error } : {})
+    };
   }
 
   stdout.write("\n[verify:beta] model:verify passed\n");
-  return { exitCode: 0, skipped: false };
+  return { exitCode: 0, skipped: false, model: modelName };
 }

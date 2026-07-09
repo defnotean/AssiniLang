@@ -60,6 +60,21 @@ describe("locale catalogs", () => {
     expect(ar["model.reachability.notConfigured"]).not.toBe(en["model.reachability.notConfigured"]);
   });
 
+  it("localizes Settings load-error and setup-example empty-state next-step guidance", () => {
+    expect(en["model.loadFailedHint"]).toContain("local API");
+    expect(en["model.discoveryFailedHint"]).toContain("Refresh models");
+    expect(en["model.localSetupEmpty"]).toContain("Runtime settings");
+    expect(en["model.remoteSetupEmpty"]).toContain("API keys");
+    expect(ar["model.loadFailedHint"]).toContain("API");
+    expect(ar["model.discoveryFailedHint"]).toContain("تحديث");
+    expect(ar["model.localSetupEmpty"]).toContain("Ollama");
+    expect(ar["model.remoteSetupEmpty"]).toContain("API");
+    expect(ar["model.loadFailedHint"]).not.toBe(en["model.loadFailedHint"]);
+    expect(ar["model.discoveryFailedHint"]).not.toBe(en["model.discoveryFailedHint"]);
+    expect(ar["model.localSetupEmpty"]).not.toBe(en["model.localSetupEmpty"]);
+    expect(ar["model.remoteSetupEmpty"]).not.toBe(en["model.remoteSetupEmpty"]);
+  });
+
   it("localizes integrity and extraction-draft placeholder strings in Arabic", () => {
     expect(ar["format.integrityLabel"]).toContain("{algorithm}");
     expect(ar["format.integrityLabel"]).toContain("{hash}");
@@ -139,6 +154,18 @@ describe("locale catalogs", () => {
       "لا توجد لغات متاحة للتقييم. أنشئ لغة من الشريط الجانبي أولاً، ثم شغّل تقييم النظام."
     );
     expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
+  });
+
+  it("localizes evaluation run summary and failure message templates in Arabic", () => {
+    expect(en["eval.runSummary"]).toContain("{percent}");
+    expect(en["eval.runSummary"]).toContain("{count}");
+    expect(ar["eval.runSummary"]).toContain("{name}");
+    expect(ar["eval.runSummary"]).toContain("{percent}");
+    expect(ar["eval.failure.missingNoteContent"]).toContain("{topic}");
+    expect(ar["eval.failure.emptyNoteKeys"]).toContain("{category}");
+    expect(ar["eval.failure.expectedAnswerRejected"]).not.toBe(en["eval.failure.expectedAnswerRejected"]);
+    expect(ar["eval.runSummary"]).not.toBe(en["eval.runSummary"]);
+    expect(ar["eval.failure.missingCorpusPassage"]).not.toBe(en["eval.failure.missingCorpusPassage"]);
   });
 
   it("localizes corpus import validation errors in Arabic", () => {
@@ -232,6 +259,22 @@ describe("locale catalogs", () => {
     expect(ar["profile.grammarEmptyState"]).not.toBe(en["profile.grammarEmptyState"]);
   });
 
+  it("localizes Start/home empty-state next-step guidance", () => {
+    expect(en["simple.emptyLanguage"]).toContain("no saved material");
+    expect(en["simple.emptyLanguageHint"]).toContain("Build");
+    expect(en["simple.emptyLanguageHint"]).toContain("Saved examples");
+    expect(en["sidebar.noLanguagesHint"]).toContain("New language");
+    expect(en["sidebar.noLanguagesHint"]).toContain("Start");
+    expect(ar["simple.emptyLanguage"]).toContain("مواد محفوظة");
+    expect(ar["simple.emptyLanguageHint"]).toContain("البناء");
+    expect(ar["simple.emptyLanguageHint"]).toContain("الأمثلة المحفوظة");
+    expect(ar["sidebar.noLanguagesHint"]).toContain("لغة جديدة");
+    expect(ar["sidebar.noLanguagesHint"]).toContain("الملف اللغوي");
+    expect(ar["simple.emptyLanguage"]).not.toBe(en["simple.emptyLanguage"]);
+    expect(ar["simple.emptyLanguageHint"]).not.toBe(en["simple.emptyLanguageHint"]);
+    expect(ar["sidebar.noLanguagesHint"]).not.toBe(en["sidebar.noLanguagesHint"]);
+  });
+
   it("localizes Review and extraction-draft empty-state next-step guidance", () => {
     expect(en["reviewView.noNotesForLanguageHint"]).toContain("Build");
     expect(en["reviewView.noNotesForLanguageHint"]).toContain("accept grammar-note drafts");
@@ -260,6 +303,10 @@ describe("locale catalogs", () => {
     expect(ar["elderWs.errCorrectionNotLinkedToNote"]).not.toBe(en["elderWs.errCorrectionNotLinkedToNote"]);
     expect(ar["model.desktopOnlyActions"]).not.toBe(en["model.desktopOnlyActions"]);
     expect(ar["model.desktopActionUnavailable"]).not.toBe(en["model.desktopActionUnavailable"]);
+    expect(ar["model.desktopUnknownAction"]).not.toBe(en["model.desktopUnknownAction"]);
+    expect(ar["model.desktopInvalidPreferencesPatch"]).not.toBe(en["model.desktopInvalidPreferencesPatch"]);
+    expect(ar["model.desktopShortcutPackagedOnly"]).not.toBe(en["model.desktopShortcutPackagedOnly"]);
+    expect(ar["model.desktopIpcInvokeFailed"]).not.toBe(en["model.desktopIpcInvokeFailed"]);
   });
 });
 

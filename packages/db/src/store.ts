@@ -12,6 +12,14 @@ import { runSqliteMigrations } from "./sqliteMigrations.js";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
+/**
+ * Milliseconds SQLite waits on a locked database before failing with
+ * SQLITE_BUSY. Shared across read/write/backup opens so concurrent store
+ * instances (or a reader overlapping a writer) retry briefly instead of
+ * failing on the first lock collision.
+ */
+export const SQLITE_BUSY_TIMEOUT_MS = 5_000;
+
 export type StoreBackend = "json" | "sqlite";
 
 export interface JsonStoreOptions {
@@ -118,7 +126,7 @@ function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBacken
  * that cannot rename over an existing file (Windows), moves the live file
  * aside first and restores it if the final rename fails.
  */
-async function replaceFileAtomically(tempPath: string, destPath: string): Promise<void> {
+export async function replaceFileAtomically(tempPath: string, destPath: string): Promise<void> {
   try {
     await rename(tempPath, destPath);
     return;
@@ -209,6 +217,20 @@ async function loadSqliteRuntime(): Promise<SqliteRuntime> {
     import("drizzle-orm/better-sqlite3")
   ]);
   return { Database, drizzle };
+}
+
+/**
+ * Opens a better-sqlite3 connection with a shared busy timeout so overlapping
+ * readers/writers retry briefly instead of failing on the first lock.
+ */
+function openSqliteDatabase(
+  DatabaseCtor: typeof Database,
+  dbPath: string,
+  options?: ConstructorParameters<typeof Database>[1]
+): Database.Database {
+  const db = new DatabaseCtor(dbPath, options);
+  db.pragma(`busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+  return db;
 }
 
 export class JsonStore {
@@ -510,10 +532,17 @@ export class JsonStore {
       }
     }
 
+    // Match JSON missing-file semantics: a read must not create an empty
+    // SQLite file (better-sqlite3 creates by default). Operators and tests
+    // expect "no database yet" to leave the path untouched.
+    if (key === null) {
+      return createEmptyState();
+    }
+
     let db: Database.Database | undefined;
     try {
       const { Database, drizzle } = await loadSqliteRuntime();
-      db = new Database(this.dbPath);
+      db = openSqliteDatabase(Database, this.dbPath, { fileMustExist: true });
       this.ensureTablesOnce(db, key);
       const drizzleDb = drizzle(db, { schema });
 
@@ -570,6 +599,16 @@ export class JsonStore {
         try {
           db.close();
         } catch {}
+      }
+      // Race: file vanished between snapshotKey() and open (or fileMustExist
+      // lost a TOCTOU). Match JSON ENOENT -> empty-state semantics.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (
+        code === "ENOENT"
+        || code === "SQLITE_CANTOPEN"
+        || (error instanceof Error && /unable to open database file/i.test(error.message))
+      ) {
+        return createEmptyState();
       }
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to read local database at ${this.dbPath}: ${message}`, { cause: error });
@@ -645,7 +684,9 @@ export class JsonStore {
       await mkdir(dbDir, { recursive: true });
       try {
         await writeFile(tempPath, `${JSON.stringify(parsed, null, 2)}\n`, "utf8");
-        await rename(tempPath, this.dbPath);
+        // Use the Windows-safe replace helper (rename-over-existing fails with
+        // EPERM/EEXIST on Win32). Same path restoreFrom already uses.
+        await replaceFileAtomically(tempPath, this.dbPath);
       } catch (error) {
         await unlink(tempPath).catch(() => undefined);
         throw error;
@@ -661,7 +702,7 @@ export class JsonStore {
     const preWriteKey = await this.snapshotKey();
 
     const { Database, drizzle } = await loadSqliteRuntime();
-    const db = new Database(this.dbPath);
+    const db = openSqliteDatabase(Database, this.dbPath);
     this.ensureTablesOnce(db, preWriteKey);
     const drizzleDb = drizzle(db, { schema });
 
@@ -748,7 +789,7 @@ export class JsonStore {
       }
 
       const { Database } = await loadSqliteRuntime();
-      const db = new Database(this.dbPath);
+      const db = openSqliteDatabase(Database, this.dbPath);
       try {
         this.ensureTables(db);
         await db.backup(destination);

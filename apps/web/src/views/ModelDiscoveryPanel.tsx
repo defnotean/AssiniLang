@@ -117,10 +117,13 @@ export function ModelDiscoveryPanel({
         </button>
       </div>
       {modelDiscoveryState.status === "error" && (
-        <p className="inline-error" role="alert">{modelDiscoveryState.message}</p>
+        <div className="inline-error" role="alert" aria-live="assertive">
+          <p>{modelDiscoveryState.message}</p>
+          <p className="muted">{t("model.discoveryFailedHint")}</p>
+        </div>
       )}
       {modelDiscoveryState.status === "ready" && discoveredModels.length === 0 && !isScanningModels && (
-        <p className="muted empty-state" role="status">
+        <p className="muted empty-state" role="status" aria-live="polite">
           {t("model.noDiscoveredModelsHint")}
         </p>
       )}
@@ -185,6 +188,7 @@ export function ModelDiscoveryPanel({
           key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`}
           className="inline-error"
           role="alert"
+          aria-live="assertive"
         >
           {t("model.endpointConnectionFailed", {
             baseUrl: endpoint.baseUrl,
@@ -193,7 +197,12 @@ export function ModelDiscoveryPanel({
         </p>
       ))}
       {failedEndpoints.length === 0 && connectedEndpoints.length === 0 && discoveryErrors.slice(0, 2).map((error) => (
-        <p key={`${error.source}:${error.baseUrl}:${error.detail}`} className="inline-error" role="alert">
+        <p
+          key={`${error.source}:${error.baseUrl}:${error.detail}`}
+          className="inline-error"
+          role="alert"
+          aria-live="assertive"
+        >
           {t("model.endpointConnectionFailed", { baseUrl: error.baseUrl, detail: error.detail })}
         </p>
       ))}

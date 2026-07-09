@@ -175,4 +175,51 @@ describe("evaluation run gate", () => {
     expect(run).toBeDefined();
     expect(run?.systemVersion).toBe("deterministic-study-loop-v1");
   });
+
+  it("falls back to languageId when the run summary has no usable label", () => {
+    const [run] = runEvaluationForState(buildTestWorkspaceState());
+    if (!run) throw new Error("Missing evaluation run");
+
+    const gate = summarizeEvaluationGate([
+      {
+        ...run,
+        summary: "   : blank label should not win",
+        failures: [
+          {
+            category: "noteCoverage",
+            languageId: run.languageId,
+            itemId: "note-1",
+            message: "Missing note topic"
+          }
+        ],
+        scores: run.scores
+      }
+    ]);
+
+    expect(gate.passed).toBe(false);
+    expect(gate.failureLines[0]).toBe(`${run.languageId} noteCoverage note-1: Missing note topic`);
+  });
+
+  it("applies the default threshold to unknown score categories", () => {
+    const [run] = runEvaluationForState(buildTestWorkspaceState());
+    if (!run) throw new Error("Missing evaluation run");
+
+    const gate = summarizeEvaluationGate([
+      {
+        ...run,
+        failures: [],
+        scores: {
+          ...run.scores,
+          experimentalMetric: 0.5
+        }
+      }
+    ]);
+
+    expect(gate.passed).toBe(false);
+    expect(gate.failureLines).toEqual(
+      expect.arrayContaining([
+        "Testlang experimentalMetric threshold: score 50.0% is below required 96.0%."
+      ])
+    );
+  });
 });

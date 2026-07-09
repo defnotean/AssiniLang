@@ -16,7 +16,7 @@ flowchart LR
         A --> L[llmProvider.ts<br>provider wiring]
     end
     subgraph Storage
-        S[(data/local-db.json<br>JsonStore)]
+        S[(JsonStore / SQLite<br>data/local-db.json or ASSINI_DB_PATH)]
         F[(data/assets/<br>uploaded files)]
         O[(data/ocr-cache/)]
     end
@@ -41,32 +41,44 @@ flowchart LR
 ```text
 apps/
   api/                 Fastify API.
-    src/server.ts        createServer: plugin setup, shared RouteContext, route registration.
+    src/server.ts        createServer: plugin setup, shared RouteContext, route registration,
+                         startup interrupted-job recovery, and in-process stale-heartbeat sweep.
     src/routes/          One module per domain (languages, sources, corpus, notes, exercises,
                          evaluations, governance, studyLoop, aiSessions, elder, observability,
                          exports, llm, auth, system) plus context.ts (shared RouteContext type).
     src/routeHelpers.ts  Cross-domain helpers: audit builders, actor resolution, redaction.
     src/ingestion.ts     Raw-source extraction pipeline (chunking, OCR, transcription, fallbacks).
+    src/jobQueue.ts      In-process async job queue (pending/active counts for /ready and metrics).
+    src/jobRecovery.ts   Interrupted-processing and stale-heartbeat recovery sweeps.
+    src/readiness.ts     Storage + job-queue readiness report for GET /ready.
+    src/prototypeSessions.ts  HTTP-only prototype session mint/renew/revoke (sliding ∩ absolute).
     src/publicLanguageViews.ts  Public projection and redaction.
-    src/llmProvider.ts   LLM/transcription provider wiring.
+    src/segmentationProposals.ts  Lexicon longest-match proposals on draft accept.
+    src/draftGrounding.ts  Model-draft grounding checks and scores.
+    src/llmProvider.ts   LLM/transcription/OCR provider wiring.
     src/llmDiscovery.ts  Model endpoint discovery for Model Setup.
     src/appSettings.ts   Runtime settings read/write (.env persistence).
-    src/runtimeEnvLoader.ts  Documented env-file bootstrap precedence.
-    src/llmEnvShared.ts  Shared env parsing and URL normalization helpers.
+    src/runtimeConfig.ts / runtimeEnv.ts / runtimeEnvLoader.ts / runtimeLifecycle.ts
+                         Validated config, env bootstrap, and graceful lifecycle seams.
+    src/observabilityMetrics.ts  Privileged /observability/metrics snapshot shaping.
+    src/secretRedaction.ts / serverLogRedaction.ts  Secret scrubbing for errors, audit, logs.
+    src/vaultPathSafety.ts  Obsidian vault path allowlist / containment.
     src/urlSafety.ts     SSRF guard shared by ingestion and model discovery.
+    src/llmEnvShared.ts  Shared env parsing and URL normalization helpers.
   web/                 React research console.
     src/App.tsx          App shell: layout, sidebar, theme, top-level state and data fetching.
     src/views/           One module per workspace (CorpusView, ReviewView, GovernanceView, ...).
     src/hooks/           Workspace state hooks (useModelWorkspace, useGovernanceWorkspace, ...).
     src/components/      Shared presentational pieces (badges, marks, ScoreRing, StatusScreen, ...).
     src/lib/             Pure helpers: formatting, view config, theme + workspace persistence, types.
+  desktop/             Electron shell that embeds the local API + web console (backup/restore IPC).
 
 packages/
   api-contract/        Shared API payload/response contracts (including LLM settings schemas).
   db/                  Zod schemas, TypeScript types, JSON/SQLite persistence, migrations, seed CLI.
   eval/                Deterministic study-loop generation, answer grading, and evaluation scoring.
 
-scripts/               Dev/verify launchers, ingestion smoke test, documentation guard tests.
+scripts/               Dev/verify launchers, smoke/backup/CI gates, documentation guard tests.
 docs/                  The handbook, plus dated history under docs/specs and docs/plans.
 ```
 
@@ -114,7 +126,7 @@ Ingestion-facing collections:
 
 - `languages`: user-created language records. `status` is `active`, `draft`, or `archived`. Each language may carry an optional `phonology` object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) plus optional `createdBy` and `createdAt` fields.
 - `lexemes`: the per-language lexicon. Each lexeme keeps `form`, `gloss`, `partOfSpeech`, `tags`, and `sourceAssetIds` linking it back to the raw materials it came from.
-- `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a canonical `filePath` under `assets/<languageId>/` inside the configured data directory, plus an optional `transcript` for audio.
+- `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a canonical `filePath` under `assets/<languageId>/` inside the configured data directory, plus an optional `transcript` for audio. While a claim is in flight, assets may also carry `processingStartedAt`, `processingHeartbeatAt`, and `processingAttempts` (cleared on success; kept on failure/recovery so the five-attempt cap still applies).
 - `extractionDrafts`: reviewable extraction output. `kind` is `lexeme`, `corpus_passage`, or `grammar_note`; each draft carries a `payload`, a `confidence` level, an optional `rationale`, and a `status` of `proposed`, `accepted`, or `rejected` with `reviewedBy`/`reviewedAt` and a `committedEntityId` once accepted.
 
 `consentStatus.use` on corpus passages is an enum (`CONSENT_USE_VALUES`): `testing-only`, `community-approved`, `personal-study`, `research`, `public-domain`, `licensed`, or `pending-review`.
@@ -126,8 +138,9 @@ Source processing lives in `apps/api/src/ingestion.ts` and is driven by the serv
 - Per-kind text resolution (URL fetch, transcription, document parsing, OCR) is isolated in the pipeline; the route handler only validates, claims status, and persists results.
 - Long sources are chunked (~12,000 characters, up to 8 chunks) and per-chunk results are merged and deduplicated; nothing is silently truncated without a warning.
 - Without a configured model, deterministic mode falls back to offline heuristic parsing (and local OCR for images), with explicit warnings on the result.
-- `POST /sources/:sourceId/process` with `{ "async": true }` claims the asset as `processing`, returns `202`, and persists completion through the same state mutation as the synchronous path; clients poll the source list.
-- Extraction output is never committed directly. Accepting a draft commits a lexeme, a corpus passage (with a derived private answer key; incomplete segmentation falls back to honest token-level "unanalyzed" morphemes), or a grammar note that enters the normal review workflow as a `draft`. Uploaded files are stored under `data/assets/` with a 25 MB cap per file.
+- `POST /sources/:sourceId/process` with `{ "async": true }` claims the asset as `processing`, returns `202`, enqueues work on the in-process `JobQueue`, and persists completion through the same state mutation as the synchronous path; clients poll the source list. After five failed or abandoned claims, further process calls return `409` (`ingest.sourceMaxProcessingAttempts`).
+- Startup recovery (`jobRecovery.ts` via the server `onReady` hook) resets every asset left in `processing` to `failed` with an operator-visible interrupted-restart error and a `source_asset.processing_recovered` audit event. An in-process stale-heartbeat sweep (default 10 minutes without progress, every 60 seconds) does the same for orphaned runs while the API stays up, skipping ids still pending or active in the job queue.
+- Extraction output is never committed directly. Accepting a draft commits a lexeme, a corpus passage (with a derived private answer key; incomplete segmentation first tries lexicon longest-match proposals from `segmentationProposals.ts`, then falls back to honest token-level "unanalyzed" morphemes), or a grammar note that enters the normal review workflow as a `draft`. Uploaded files are stored under `data/assets/` with a 25 MB cap per file.
 
 ## Local persistence
 
@@ -226,10 +239,14 @@ Most categories use a 96% minimum threshold. Generation policy requires 100% bec
 
 Persisted evaluation runs must keep nonblank language IDs that reference an existing language, nonblank system version, fixture version, score categories, and summary text, a parseable creation timestamp, and failure lines that match their parent run's language.
 
+## Health and readiness
+
+`GET /health` is the cheap liveness probe. `GET /ready` (via `readiness.ts`) reads the configured store through the same schema-validation path used by normal API reads and reports safe `jobQueue` pending/active counts. A ready response includes `schemaVersion` (currently 8) and never exposes database paths, exception messages, job IDs, or workspace contents. Privileged `GET /observability/metrics` returns a similarly sanitized operational snapshot (uptime, request status-class counts, job-queue counts, storage status).
+
 ## LLM provider boundary
 
 LLM provider configuration is server-only. The browser can view readiness status but must never receive provider API keys. All provider, transcription, OCR, and URL-guard environment variables are documented in the [Configuration Reference](configuration.md).
 
-`GET /llm/status` reports provider readiness and transcription readiness without exposing keys. Provider errors are sanitized before returning to clients or storing observable session records.
+`GET /llm/status` reports provider readiness, transcription readiness, and OCR readiness without exposing keys. Provider errors are sanitized (and secret-looking values redacted) before returning to clients or storing observable session records.
 
 Persisted AI sessions must keep nonblank language and creator IDs, reference an existing language, be created by a known local user whose role is allowed for the session mode, keep nonblank diagnostics and context IDs, and keep parseable timestamps inside the session timeline.

@@ -42,6 +42,8 @@ export type RouteContext = {
   now: () => number;
   llmProvider: LlmProvider;
   dataDir: string;
+  /** Multipart file size cap for source uploads (bytes). */
+  multipartFileSizeBytes: number;
   ingestionFetch: typeof fetch;
   settingsPath: string;
   reloadLlmProvider?: () => void;

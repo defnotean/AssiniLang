@@ -1,16 +1,30 @@
 import { describe, expect, it } from "vitest";
 import {
+  aiMessagePayloadSchema,
+  apiErrorEnvelopeSchema,
+  BULK_REVIEW_MAX_DRAFT_IDS,
+  bulkReviewPayloadSchema,
   createAiSessionPayloadSchema,
   elderCorrectionPayloadSchema,
+  exerciseSubmissionPayloadSchema,
+  governancePayloadSchema,
   languageCreatePayloadSchema,
   languagePatchPayloadSchema,
   obsidianVaultImportPayloadSchema,
+  obsidianVaultImportResponseSchema,
   processSourceOptionsSchema,
+  processSourceResponseSchema,
+  prototypeSessionPayloadSchema,
+  reviewDispositionResolveByIdPayloadSchema,
+  reviewDispositionResolvePayloadSchema,
+  reviewPolicyPayloadSchema,
   sourceRegistrationPayloadSchema,
   sourceTextRegistrationKindSchema,
   sourceUploadKindSchema
 } from "./apiContract.js";
 import {
+  llmModelDiscoveryResponseSchema,
+  llmReachabilitySchema,
   modelProfileSavePayloadSchema,
   runtimeSettingsPatchSchema,
   runtimeSettingsResponseSchema
@@ -172,6 +186,185 @@ describe("api contract schemas", () => {
       contextNoteIds: [" "]
     }).success).toBe(false);
   });
+
+  it("trims exercise submission answers and rejects blanks or unknown keys", () => {
+    expect(exerciseSubmissionPayloadSchema.parse({ answer: "  mira  " })).toEqual({
+      answer: "mira"
+    });
+    expect(exerciseSubmissionPayloadSchema.safeParse({ answer: "   " }).success).toBe(false);
+    expect(exerciseSubmissionPayloadSchema.safeParse({}).success).toBe(false);
+    expect(exerciseSubmissionPayloadSchema.safeParse({
+      answer: "mira",
+      extra: true
+    }).success).toBe(false);
+  });
+
+  it("accepts process-source responses with asset drafts and warnings", () => {
+    const asset = {
+      id: "src-1",
+      languageId: "bisaya",
+      kind: "text" as const,
+      title: "Notes",
+      status: "processed" as const,
+      createdBy: "u1",
+      createdAt: "2026-01-01T00:00:00.000Z"
+    };
+    const draft = {
+      id: "draft-1",
+      languageId: "bisaya",
+      sourceAssetId: "src-1",
+      kind: "lexeme" as const,
+      payload: { tags: [], morphologicalSegmentation: [], topicTags: [] },
+      confidence: "medium" as const,
+      status: "proposed" as const,
+      createdAt: "2026-01-01T00:00:00.000Z"
+    };
+
+    expect(processSourceResponseSchema.parse({
+      asset,
+      drafts: [draft],
+      warnings: ["ok"]
+    })).toMatchObject({
+      asset: { id: "src-1" },
+      drafts: [{ id: "draft-1" }],
+      warnings: ["ok"]
+    });
+
+    expect(processSourceResponseSchema.safeParse({
+      asset,
+      drafts: [draft]
+    }).success).toBe(false);
+  });
+
+  it("accepts Obsidian vault import response summaries", () => {
+    expect(obsidianVaultImportResponseSchema.parse({
+      imported: [],
+      skipped: [{ path: "a.md", reason: "empty" }],
+      warnings: ["Import stopped at the configured 100 file limit."],
+      summary: { scanned: 1, imported: 0, skipped: 1 }
+    })).toMatchObject({
+      summary: { scanned: 1, imported: 0, skipped: 1 },
+      skipped: [{ path: "a.md", reason: "empty" }]
+    });
+  });
+
+  it("rejects blank language create fields and empty text registration bodies", () => {
+    expect(languageCreatePayloadSchema.safeParse({
+      name: " ",
+      description: "desc",
+      orthography: "Latin"
+    }).success).toBe(false);
+
+    expect(sourceRegistrationPayloadSchema.safeParse({
+      kind: "text",
+      title: "Notes",
+      rawText: "   "
+    }).success).toBe(false);
+
+    expect(sourceRegistrationPayloadSchema.safeParse({
+      kind: "url",
+      title: "List"
+    }).success).toBe(false);
+  });
+
+  it("validates AI message, prototype session, and API error envelopes", () => {
+    expect(aiMessagePayloadSchema.parse({ content: "  hello  " })).toEqual({ content: "hello" });
+    expect(aiMessagePayloadSchema.safeParse({ content: " " }).success).toBe(false);
+    expect(aiMessagePayloadSchema.safeParse({ content: "hi", extra: 1 }).success).toBe(false);
+
+    expect(prototypeSessionPayloadSchema.parse({ userId: " learner " })).toEqual({
+      userId: "learner"
+    });
+    expect(prototypeSessionPayloadSchema.safeParse({}).success).toBe(false);
+
+    expect(apiErrorEnvelopeSchema.parse({
+      error: "Language not found: x",
+      i18nKey: "errors.languageNotFound"
+    })).toEqual({
+      error: "Language not found: x",
+      i18nKey: "errors.languageNotFound"
+    });
+
+    expect(apiErrorEnvelopeSchema.parse({
+      error: "Too many draftIds",
+      i18nKey: "errors.bulkReviewTooManyDraftIds",
+      i18nParams: { max: BULK_REVIEW_MAX_DRAFT_IDS },
+      requestId: "req-1"
+    })).toMatchObject({
+      i18nParams: { max: 50 },
+      requestId: "req-1"
+    });
+
+    expect(apiErrorEnvelopeSchema.safeParse({ i18nKey: "errors.languageNotFound" }).success)
+      .toBe(false);
+  });
+
+  it("dedupes bulk-review draft ids and enforces the max batch size", () => {
+    expect(bulkReviewPayloadSchema.parse({
+      action: "accept",
+      draftIds: [" d1 ", "d1", "d2"]
+    })).toEqual({
+      action: "accept",
+      draftIds: ["d1", "d2"]
+    });
+
+    expect(bulkReviewPayloadSchema.safeParse({
+      action: "noop",
+      draftIds: ["d1"]
+    }).success).toBe(false);
+
+    expect(bulkReviewPayloadSchema.safeParse({
+      action: "reject",
+      draftIds: []
+    }).success).toBe(false);
+
+    expect(bulkReviewPayloadSchema.safeParse({
+      action: "reject",
+      draftIds: Array.from({ length: BULK_REVIEW_MAX_DRAFT_IDS + 1 }, (_, i) => `d${i}`)
+    }).success).toBe(false);
+  });
+
+  it("validates governance and review-policy payloads", () => {
+    expect(governancePayloadSchema.parse({
+      languageId: " bisaya ",
+      policyType: "consent",
+      content: " Community approved. ",
+      effectiveDate: "2026-01-01"
+    })).toEqual({
+      languageId: "bisaya",
+      policyType: "consent",
+      content: "Community approved.",
+      effectiveDate: "2026-01-01"
+    });
+
+    expect(governancePayloadSchema.safeParse({
+      languageId: "bisaya",
+      policyType: "consent",
+      content: "ok",
+      effectiveDate: "not-a-date"
+    }).success).toBe(false);
+
+    expect(reviewPolicyPayloadSchema.parse({
+      assignedReviewerIds: [" r1 "],
+      approvalThreshold: 1
+    })).toEqual({
+      assignedReviewerIds: ["r1"],
+      approvalThreshold: 1,
+      requiresAssignedReviewer: true
+    });
+
+    expect(reviewDispositionResolvePayloadSchema.parse({
+      resolutionSummary: " Done. "
+    })).toEqual({ resolutionSummary: "Done." });
+
+    expect(reviewDispositionResolveByIdPayloadSchema.parse({
+      dispositionId: " disp-1 ",
+      resolutionSummary: "Done."
+    })).toEqual({
+      dispositionId: "disp-1",
+      resolutionSummary: "Done."
+    });
+  });
 });
 
 describe("llm contract schemas", () => {
@@ -268,5 +461,50 @@ describe("llm contract schemas", () => {
 
     expect(parsed.profiles).toEqual([]);
     expect(parsed.activeProfileId).toBeUndefined();
+  });
+
+  it("accepts LLM reachability and discovery response shapes", () => {
+    expect(llmReachabilitySchema.parse({
+      reachable: true,
+      checked: true,
+      mode: "local-openai-compatible",
+      status: 200,
+      latencyMs: 12
+    })).toMatchObject({
+      reachable: true,
+      checked: true,
+      status: 200
+    });
+
+    expect(llmReachabilitySchema.safeParse({
+      reachable: true,
+      mode: "local"
+    }).success).toBe(false);
+
+    expect(llmModelDiscoveryResponseSchema.parse({
+      scannedAt: "2026-01-01T00:00:00.000Z",
+      models: [{
+        id: "ollama:llama3",
+        provider: "ollama",
+        providerLabel: "Ollama",
+        source: "local",
+        baseUrl: "http://127.0.0.1:11434",
+        model: "llama3",
+        requiresApiKey: false
+      }],
+      endpoints: [{
+        source: "local",
+        baseUrl: "http://127.0.0.1:11434",
+        provider: "ollama",
+        providerLabel: "Ollama",
+        connected: true,
+        modelCount: 1
+      }],
+      errors: []
+    })).toMatchObject({
+      models: [{ model: "llama3" }],
+      endpoints: [{ connected: true }],
+      errors: []
+    });
   });
 });
