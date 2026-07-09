@@ -93,7 +93,7 @@ export function CreateLanguageForm({
           ))}
         </select>
       </div>
-      <button type="submit" disabled={isWorkflowBusy || isCreating}>
+      <button type="submit" disabled={isWorkflowBusy || isCreating} aria-busy={isCreating}>
         {isCreating ? t("createLang.creating") : t("createLang.createLanguage")}
       </button>
       <button type="button" className="secondary" disabled={isCreating} onClick={() => setIsOpen(false)}>

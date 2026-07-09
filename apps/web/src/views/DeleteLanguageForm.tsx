@@ -125,6 +125,7 @@ export function DeleteLanguageForm({
         type="submit"
         className="reject"
         disabled={isWorkflowBusy || isDeleting || !selectedLanguage || confirmName.trim() !== selectedLanguage.name}
+        aria-busy={isDeleting}
       >
         {isDeleting ? t("deleteLang.deleting") : t("deleteLang.confirmDelete")}
       </button>

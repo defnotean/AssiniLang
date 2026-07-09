@@ -205,6 +205,7 @@ describe("AssistantView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI session message failed 502");
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
     expect(screen.getByText("Avenik verbs stack transparent suffix chains.")).toBeInTheDocument();
   });
 

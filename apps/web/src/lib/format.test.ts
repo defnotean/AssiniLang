@@ -25,7 +25,7 @@ import {
   trendVerb
 } from "./format";
 import { en } from "../i18n/en";
-import type { Translate } from "../i18n";
+import { createTranslator, type Translate } from "../i18n";
 import type { EvaluationArtifact, ExtractionDraft, PublicExerciseSubmission } from "../api";
 
 const t: Translate = (key, vars) => {
@@ -367,6 +367,9 @@ describe("formatReachability", () => {
       latencyMs: 42
     };
     expect(formatReachability(reachable, t)).toBe("Reachable (local openai compatible, 42 ms)");
+    expect(formatReachability(reachable, createTranslator("ar"))).toBe(
+      "قابل للوصول (محلي متوافق مع OpenAI، 42 مللي ثانية)"
+    );
 
     const unreachable: LlmReachability = {
       checked: true,

@@ -43,8 +43,10 @@ const MODE_MESSAGE_KEYS: Record<LlmStatus["mode"], MessageKey> = {
   invalid: "format.mode.invalid"
 };
 
-export function formatMode(mode: LlmStatus["mode"], t?: Translate): string {
-  if (t) return t(MODE_MESSAGE_KEYS[mode]);
+export function formatMode(mode: string, t?: Translate): string {
+  if (t && Object.prototype.hasOwnProperty.call(MODE_MESSAGE_KEYS, mode)) {
+    return t(MODE_MESSAGE_KEYS[mode as LlmStatus["mode"]]);
+  }
   return mode.replace(/-/g, " ");
 }
 
@@ -63,7 +65,7 @@ export function formatReachability(result: LlmReachability, t?: Translate): stri
   if (!result.checked) {
     return t ? t("model.reachability.notConfigured") : "No external provider configured.";
   }
-  const modeLabel = result.mode.replace(/-/g, " ");
+  const modeLabel = formatMode(result.mode, t);
   if (result.reachable) {
     if (typeof result.latencyMs === "number") {
       return t

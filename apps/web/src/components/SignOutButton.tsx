@@ -22,7 +22,13 @@ export function SignOutButton() {
   };
 
   return (
-    <button type="button" className="sign-out-button" onClick={handleSignOut} disabled={isSigningOut}>
+    <button
+      type="button"
+      className="sign-out-button"
+      onClick={handleSignOut}
+      disabled={isSigningOut}
+      aria-busy={isSigningOut}
+    >
       {isSigningOut ? t("signout.signingOut") : t("signout.signOut")}
     </button>
   );

@@ -165,7 +165,7 @@ export function AssistantView({
         <div ref={endRef} />
       </div>
       {sendError && (
-        <p className="result-notice error" role="alert">
+        <p className="result-notice error" role="alert" aria-live="assertive">
           {sendError}
         </p>
       )}
