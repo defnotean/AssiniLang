@@ -1172,7 +1172,7 @@ describe("api server", () => {
     const response = await app.inject({ method: "POST", url: "/evaluations/run", headers: authHeaders("reviewer-1") });
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({
-      error: "No languages available to evaluate",
+      error: "No languages available to evaluate. Create a language from the sidebar first, then run System Eval.",
       i18nKey: "errors.noLanguagesToEvaluate"
     });
 

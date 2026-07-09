@@ -150,7 +150,7 @@ export const ar: Record<MessageKey, string> = {
   "palette.toggleTheme": "تبديل السمة",
 
   "errors.evaluationRunFailed": "فشلت جولة التقييم",
-  "errors.noLanguagesToEvaluate": "لا توجد لغات متاحة للتقييم",
+  "errors.noLanguagesToEvaluate": "لا توجد لغات متاحة للتقييم. أنشئ لغة من الشريط الجانبي أولاً، ثم شغّل تقييم النظام.",
   "errors.draftGenerationFailed": "فشل توليد المسودات",
   "errors.modelDraftGenerationFailed": "فشل توليد مسودات النموذج",
   "errors.noteReviewFailed": "فشلت مراجعة الملاحظة",

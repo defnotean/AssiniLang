@@ -568,7 +568,9 @@ describe("localizeApiError", () => {
       "errors.evaluationRunFailed"
     );
 
-    expect(message).toBe("No languages available to evaluate");
+    expect(message).toBe(
+      "No languages available to evaluate. Create a language from the sidebar first, then run System Eval."
+    );
   });
 
   it("localizes unknown language snapshot exports from i18n metadata", () => {

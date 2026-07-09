@@ -62,6 +62,20 @@ describe("prototype session lifecycle", () => {
     clock.advance(DEFAULT_PROTOTYPE_SESSION_TTL_MS + 1);
     const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(expired.statusCode).toBe(401);
+    const expiredSetCookie = expired.headers["set-cookie"];
+    const expiredCookieHeader = Array.isArray(expiredSetCookie) ? expiredSetCookie[0] : expiredSetCookie;
+    expect(expiredCookieHeader).toContain("assini_prototype_session=");
+    expect(expiredCookieHeader).toContain("Max-Age=0");
+    expect(expiredCookieHeader).toContain("HttpOnly");
+    expect(expiredCookieHeader).toContain("SameSite=Strict");
+    expect(expiredCookieHeader).toContain("Path=/");
+
+    // requireActor paths (not only /users/me) also expire the stale cookie on 401.
+    const expiredList = await app.inject({ method: "GET", url: "/evaluations", headers: { cookie } });
+    expect(expiredList.statusCode).toBe(401);
+    const listSetCookie = expiredList.headers["set-cookie"];
+    const listCookieHeader = Array.isArray(listSetCookie) ? listSetCookie[0] : listSetCookie;
+    expect(listCookieHeader).toContain("Max-Age=0");
 
     // Lazy eviction: the expired record was deleted, so a retry is still 401.
     const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
@@ -94,6 +108,11 @@ describe("prototype session lifecycle", () => {
 
     const orphaned = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(orphaned.statusCode).toBe(401);
+    const orphanSetCookie = orphaned.headers["set-cookie"];
+    const orphanCookieHeader = Array.isArray(orphanSetCookie) ? orphanSetCookie[0] : orphanSetCookie;
+    expect(orphanCookieHeader).toContain("Max-Age=0");
+    expect(orphanCookieHeader).toContain("HttpOnly");
+    expect(orphanCookieHeader).toContain("SameSite=Strict");
 
     // Orphan eviction: the map entry is gone, so a retry stays 401 (no zombie renewal).
     const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
@@ -103,6 +122,34 @@ describe("prototype session lifecycle", () => {
     const elderCookie = await openSession(app, "elder-1");
     const elder = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: elderCookie } });
     expect(elder.statusCode).toBe(200);
+  });
+
+  it("expires an unknown prototype-session cookie on 401 without inventing a session", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/users/me",
+      headers: { cookie: "assini_prototype_session=does-not-exist" }
+    });
+    expect(response.statusCode).toBe(401);
+    const setCookie = response.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    expect(cookieHeader).toContain("assini_prototype_session=");
+    expect(cookieHeader).toContain("Max-Age=0");
+    expect(cookieHeader).toContain("HttpOnly");
+    expect(cookieHeader).toContain("SameSite=Strict");
+    expect(cookieHeader).toContain("Path=/");
+  });
+
+  it("does not emit Set-Cookie on 401 when no prototype-session cookie was sent", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+
+    const response = await app.inject({ method: "GET", url: "/users/me" });
+    expect(response.statusCode).toBe(401);
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 
   it("slides the session expiry forward on each successful use (documented sliding renewal)", async () => {

@@ -1,6 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { createReadinessReport } from "../readiness.js";
-import { refreshPrototypeSessionCookie, resolveActorContext } from "../routeHelpers.js";
+import {
+  expireStalePrototypeSessionCookie,
+  refreshPrototypeSessionCookie,
+  resolveActorContext
+} from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): void {
@@ -12,6 +16,7 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): v
     const state = await readState();
     const resolved = resolveActorContext(state, request, authToken, prototypeSessions);
     if (!resolved) {
+      expireStalePrototypeSessionCookie(request, reply);
       reply.code(401);
       return { error: "Unauthorized" };
     }

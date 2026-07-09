@@ -193,7 +193,9 @@ describe("project documentation", () => {
         "Relative segments",
         "Timeout and max-token recommendations for slow local models",
         "ASSINI_LLM_TIMEOUT_MS",
-        "ASSINI_LLM_MAX_TOKENS"
+        "ASSINI_LLM_MAX_TOKENS",
+        "expires the browser cookie with `Max-Age=0`",
+        "raise if extractions are getting truncated"
       ],
       "docs/development.md": [
         "npm.cmd run verify",

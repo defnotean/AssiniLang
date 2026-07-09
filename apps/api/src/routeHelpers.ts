@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   PROTOTYPE_SESSION_COOKIE,
   isPrototypeSessionActive,
+  serializeExpiredPrototypeSessionCookie,
   serializePrototypeSessionCookie,
   type PrototypeSessionMap,
   type PrototypeSessionRecord
@@ -256,6 +257,21 @@ export function refreshPrototypeSessionCookie(
   );
 }
 
+/**
+ * When auth fails but the browser still sent a prototype-session cookie
+ * (expired, orphaned, or unknown), expire it so the client stops replaying
+ * a dead session id on every subsequent request.
+ */
+export function expireStalePrototypeSessionCookie(
+  request: FastifyRequest,
+  reply: FastifyReply
+): void {
+  if (!cookieValue(request, PROTOTYPE_SESSION_COOKIE)) {
+    return;
+  }
+  reply.header("Set-Cookie", serializeExpiredPrototypeSessionCookie());
+}
+
 export function actorCan(actor: User, allowedRoles: readonly UserRole[]): boolean {
   return allowedRoles.includes(actor.role);
 }
@@ -272,6 +288,7 @@ export function requireActor(
 ): User | undefined {
   const resolved = resolveActorContext(state, request, authToken, prototypeSessions, now);
   if (!resolved) {
+    expireStalePrototypeSessionCookie(request, reply);
     reply.code(401);
     return undefined;
   }

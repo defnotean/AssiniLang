@@ -59,7 +59,7 @@ export function registerEvaluationRoutes(app: FastifyInstance, ctx: RouteContext
     if (noLanguages) {
       reply.code(400);
       return {
-        error: "No languages available to evaluate",
+        error: "No languages available to evaluate. Create a language from the sidebar first, then run System Eval.",
         i18nKey: "errors.noLanguagesToEvaluate"
       };
     }

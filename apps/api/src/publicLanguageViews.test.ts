@@ -409,6 +409,67 @@ describe("public language views", () => {
     expect(JSON.stringify(artifact)).not.toContain("answer key");
   });
 
+  it("rejects evaluation artifacts whose integrity hash was tampered with", () => {
+    const state = buildTestWorkspaceState();
+    state.evaluationRuns = [
+      {
+        id: "eval-testlang-latest",
+        languageId: TEST_LANGUAGE_ID,
+        createdAt: "2026-06-06T00:00:00.000Z",
+        systemVersion: "deterministic-study-loop-v1",
+        fixtureVersion: "workspace-corpus-v1",
+        scores: { noteAccuracy: 1 },
+        failures: [],
+        summary: "Testlang: 100.0% average score across 1 categories."
+      }
+    ];
+
+    const artifact = toPublicEvaluationArtifact(state, "2026-06-06T00:02:00.000Z");
+    expect(verifyExportIntegrity(artifact)).toBe(true);
+
+    const tampered = {
+      ...artifact,
+      integrity: {
+        ...artifact.integrity,
+        contentHash: "0".repeat(64)
+      }
+    };
+    expect(verifyExportIntegrity(tampered)).toBe(false);
+
+    const wrongGenerator = {
+      ...artifact,
+      integrity: {
+        ...artifact.integrity,
+        generatedBy: "not-assini-local-export"
+      }
+    };
+    expect(verifyExportIntegrity(wrongGenerator)).toBe(false);
+
+    const wrongPolicy = {
+      ...artifact,
+      integrity: {
+        ...artifact.integrity,
+        redactionPolicy: artifact.integrity.redactionPolicy.filter((entry) => entry !== "ai-sessions-omitted")
+      }
+    };
+    expect(verifyExportIntegrity(wrongPolicy)).toBe(false);
+
+    const uppercaseHash = {
+      ...artifact,
+      integrity: {
+        ...artifact.integrity,
+        contentHash: artifact.integrity.contentHash.toUpperCase()
+      }
+    };
+    expect(verifyExportIntegrity(uppercaseHash)).toBe(true);
+
+    const mutatedPayload = {
+      ...artifact,
+      exportedAt: "2099-01-01T00:00:00.000Z"
+    };
+    expect(verifyExportIntegrity(mutatedPayload)).toBe(false);
+  });
+
   it("counts threshold-only latest evaluation runs as failed in exported summaries", () => {
     const state = buildTestWorkspaceState();
     state.evaluationRuns = [

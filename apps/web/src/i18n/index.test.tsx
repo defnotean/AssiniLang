@@ -105,7 +105,9 @@ describe("locale catalogs", () => {
   });
 
   it("localizes empty-workspace evaluation errors in Arabic", () => {
-    expect(ar["errors.noLanguagesToEvaluate"]).toBe("لا توجد لغات متاحة للتقييم");
+    expect(ar["errors.noLanguagesToEvaluate"]).toBe(
+      "لا توجد لغات متاحة للتقييم. أنشئ لغة من الشريط الجانبي أولاً، ثم شغّل تقييم النظام."
+    );
     expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
   });
 

@@ -123,7 +123,7 @@ export const en = {
 
   // Errors surfaced to the operator (fallbacks when a workflow throws).
   "errors.evaluationRunFailed": "Evaluation run failed",
-  "errors.noLanguagesToEvaluate": "No languages available to evaluate",
+  "errors.noLanguagesToEvaluate": "No languages available to evaluate. Create a language from the sidebar first, then run System Eval.",
   "errors.draftGenerationFailed": "Draft generation failed",
   "errors.modelDraftGenerationFailed": "Model draft generation failed",
   "errors.noteReviewFailed": "Note review failed",
