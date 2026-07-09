@@ -61,6 +61,23 @@ describe("EvaluationView", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Evaluating...");
   });
 
+  it("announces export success with aria-live status messaging", () => {
+    renderEvaluationView({
+      evaluations: [createRun()],
+      artifactDownload: {
+        fileName: "assini-evaluation-artifact.json",
+        href: "data:application/json;charset=utf-8,%7B%7D",
+        summary: "Evaluation artifact ready: 1 latest run, 0 failed latest runs.",
+        exportedAt: "2026-07-01T00:00:00.000Z"
+      }
+    });
+
+    const exportStatus = screen.getByText("Evaluation artifact exported.").closest("[aria-live]");
+    expect(exportStatus).toHaveAttribute("role", "status");
+    expect(exportStatus).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByText(/1 latest run/)).toBeInTheDocument();
+  });
+
   it("surfaces artifact export errors as alerts", () => {
     renderEvaluationView({
       evaluations: [createRun()],
@@ -68,6 +85,15 @@ describe("EvaluationView", () => {
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Export failed.");
+  });
+
+  it("disables the export button while an export is in progress", () => {
+    renderEvaluationView({
+      evaluations: [createRun()],
+      isExportingArtifact: true
+    });
+
+    expect(screen.getByRole("button", { name: "Exporting..." })).toBeDisabled();
   });
 
   it("shows next-step guidance after a single baseline evaluation run", () => {

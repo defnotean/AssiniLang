@@ -72,12 +72,12 @@ describe("ReviewView", () => {
       />
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "No notes for this language yet. Process a source in Build to propose grammar notes, then review them here."
-    );
+    const reviewQueue = screen.getByRole("region", { name: "Review queue" });
+    expect(reviewQueue).toHaveTextContent("No notes for this language yet.");
+    expect(reviewQueue).toHaveTextContent("Process a source in Build to propose grammar notes, then review them here.");
   });
 
-  it("shows a filter-specific empty state when no notes match", () => {
+  it("shows filter-specific next-step guidance when no notes match the active filter", () => {
     const note = createReviewNote({ status: "approved" });
 
     render(
@@ -94,7 +94,9 @@ describe("ReviewView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Rejected/i }));
 
-    expect(screen.getByRole("status")).toHaveTextContent("No Rejected notes.");
+    const reviewQueue = screen.getByRole("region", { name: "Review queue" });
+    expect(reviewQueue).toHaveTextContent("No Rejected notes.");
+    expect(reviewQueue).toHaveTextContent("Try another filter, or process a source in Build to add notes.");
     expect(document.querySelector("button.note-row")).not.toBeInTheDocument();
   });
 

@@ -84,3 +84,95 @@ describe("GovernanceView consent empty states", () => {
     expect(screen.queryByText("No governance policy records for this language yet.")).not.toBeInTheDocument();
   });
 });
+
+describe("GovernanceView export and disposition guards", () => {
+  it("announces snapshot export success with aria-live status messaging", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.snapshotDownload = {
+      fileName: "assini-avenik-snapshot.json",
+      href: "data:application/json;charset=utf-8,%7B%7D",
+      summary: "Snapshot ready: 0 corpus passages, 0 notes.",
+      exportedAt: "2026-07-01T00:00:00.000Z"
+    };
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    const exportStatus = screen.getByText("Language snapshot exported.").closest("[aria-live]");
+    expect(exportStatus).toHaveAttribute("role", "status");
+    expect(exportStatus).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByText(/0 corpus passages/)).toBeInTheDocument();
+  });
+
+  it("disables snapshot export while another governance action is in progress", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.isSubmittingReviewPolicy = true;
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Export review snapshot" })).toBeDisabled();
+  });
+
+  it("disables other disposition resolve buttons while one resolution is in flight", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.reviewDispositionState = {
+      status: "ready",
+      data: [
+        {
+          id: "disposition-1",
+          languageId: "avenik",
+          noteId: "note-1",
+          disposition: "deferred",
+          status: "open",
+          reason: "Needs elder input.",
+          assignedTo: "elder-1",
+          openedAt: "2026-06-06T00:00:00.000Z",
+          openedBy: "reviewer-1",
+          dueAt: null,
+          resolvedAt: null,
+          resolvedBy: null,
+          resolutionSummary: null
+        },
+        {
+          id: "disposition-2",
+          languageId: "avenik",
+          noteId: "note-2",
+          disposition: "escalated",
+          status: "open",
+          reason: "Policy conflict.",
+          assignedTo: "lead-1",
+          openedAt: "2026-06-07T00:00:00.000Z",
+          openedBy: "reviewer-2",
+          dueAt: null,
+          resolvedAt: null,
+          resolvedBy: null,
+          resolutionSummary: null
+        }
+      ]
+    };
+    workspace.reviewDispositionDrafts = {
+      "disposition-1": "Deferred pending consultation.",
+      "disposition-2": "Escalated to lead reviewer."
+    };
+    workspace.resolvingReviewDispositionId = "disposition-1";
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Resolving disposition-1..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Resolve disposition-2" })).toBeDisabled();
+  });
+});

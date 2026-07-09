@@ -105,11 +105,18 @@ export function ReviewView({
 
         <div className="note-table-body">
           {filteredNotes.length === 0 ? (
-            <p className="empty-state" role="status">
-              {filter === "all"
-                ? t("reviewView.noNotesForLanguage")
-                : t("reviewView.noNotesInFilterNamed", { filter: t(`reviewView.filter.${filter}`) })}
-            </p>
+            <div className="empty-state" role="status">
+              <p>
+                {filter === "all"
+                  ? t("reviewView.noNotesForLanguage")
+                  : t("reviewView.noNotesInFilterNamed", { filter: t(`reviewView.filter.${filter}`) })}
+              </p>
+              <p className="muted">
+                {filter === "all"
+                  ? t("reviewView.noNotesForLanguageHint")
+                  : t("reviewView.noNotesInFilterHint")}
+              </p>
+            </div>
           ) : (
             filteredNotes.map((note) => (
               <button
@@ -304,7 +311,10 @@ export function ReviewView({
             </div>
           </article>
         ) : (
-          <p className="empty-state">{t("reviewView.noNotesForLanguage")}</p>
+          <div className="empty-state" role="status">
+            <p>{t("reviewView.noNotesForLanguage")}</p>
+            <p className="muted">{t("reviewView.noNotesForLanguageHint")}</p>
+          </div>
         )}
       </section>
     </div>

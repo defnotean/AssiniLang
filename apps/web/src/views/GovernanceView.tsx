@@ -260,7 +260,11 @@ export function GovernanceView({
                       <button
                         type="button"
                         className="secondary"
-                        disabled={isResolving || resolutionDraft.trim().length === 0}
+                        disabled={
+                          resolvingReviewDispositionId !== null
+                          || isResolving
+                          || resolutionDraft.trim().length === 0
+                        }
                         onClick={() => onResolveReviewDisposition(disposition.id)}
                       >
                         {isResolving ? t("governance.resolvingButton", { id: disposition.id }) : t("governance.resolveButton", { id: disposition.id })}
@@ -326,7 +330,17 @@ export function GovernanceView({
           {t("governance.languageSnapshotDescription")}
         </p>
         <div className="snapshot-actions">
-          <button type="button" className="secondary" disabled={isExportingSnapshot} onClick={onExportSnapshot}>
+          <button
+            type="button"
+            className="secondary"
+            disabled={
+              isExportingSnapshot
+              || isSubmittingGovernance
+              || isSubmittingReviewPolicy
+              || resolvingReviewDispositionId !== null
+            }
+            onClick={onExportSnapshot}
+          >
             {isExportingSnapshot ? t("governance.exporting") : t("governance.exportReviewSnapshot")}
           </button>
           {snapshotDownload && (
@@ -336,11 +350,12 @@ export function GovernanceView({
           )}
         </div>
         {snapshotDownload && (
-          <p className="result-notice" role="status">
-            {snapshotDownload.summary}
-          </p>
+          <div role="status" aria-live="polite">
+            <p className="result-notice">{t("governance.exportSuccess")}</p>
+            <p className="muted">{snapshotDownload.summary}</p>
+          </div>
         )}
-        {snapshotError && <p className="result-notice error">{snapshotError}</p>}
+        {snapshotError && <p className="result-notice error" role="alert">{snapshotError}</p>}
       </section>
 
       <div className="table-card">

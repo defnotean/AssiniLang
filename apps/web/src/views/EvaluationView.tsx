@@ -115,9 +115,10 @@ export function EvaluationView({
           )}
         </div>
         {artifactDownload && (
-          <p className="result-notice">
-            {artifactDownload.summary}
-          </p>
+          <div role="status" aria-live="polite">
+            <p className="result-notice">{t("eval.exportSuccess")}</p>
+            <p className="muted">{artifactDownload.summary}</p>
+          </div>
         )}
         {artifactError && <p className="result-notice error" role="alert">{artifactError}</p>}
       </section>
