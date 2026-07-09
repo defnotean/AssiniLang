@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 export type DesktopActionButton = {
+  busy?: boolean;
   disabled?: boolean;
   key: string;
   label: ReactNode;
@@ -39,6 +40,7 @@ export function DesktopActionGroups({ ariaLabel, groups }: DesktopActionGroupsPr
                   type="button"
                   className="secondary"
                   disabled={button.disabled}
+                  aria-busy={button.busy || undefined}
                   onClick={button.onClick}
                 >
                   {button.label}

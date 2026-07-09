@@ -82,6 +82,7 @@ export function DeleteLanguageForm({
     <form
       className="form-panel compact delete-language-form"
       aria-label={t("deleteLang.deleteLanguage")}
+      aria-busy={isDeleting || undefined}
       onSubmit={handleSubmit}
     >
       <div>
@@ -99,6 +100,7 @@ export function DeleteLanguageForm({
         <select
           id="delete-language-select"
           value={languageId}
+          disabled={isDeleting}
           onChange={(event) => {
             setLanguageId(event.target.value);
             setConfirmName("");
@@ -118,6 +120,7 @@ export function DeleteLanguageForm({
           id="delete-language-confirm"
           value={confirmName}
           placeholder={selectedLanguage?.name ?? ""}
+          disabled={isDeleting}
           onChange={(event) => setConfirmName(event.target.value)}
         />
       </div>
@@ -125,7 +128,7 @@ export function DeleteLanguageForm({
         type="submit"
         className="reject"
         disabled={isWorkflowBusy || isDeleting || !selectedLanguage || confirmName.trim() !== selectedLanguage.name}
-        aria-busy={isDeleting}
+        aria-busy={isDeleting || undefined}
       >
         {isDeleting ? t("deleteLang.deleting") : t("deleteLang.confirmDelete")}
       </button>

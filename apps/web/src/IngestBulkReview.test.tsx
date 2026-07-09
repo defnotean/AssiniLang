@@ -143,6 +143,7 @@ describe("IngestView bulk draft review", () => {
     expect(busyButtons).toHaveLength(2);
     for (const button of busyButtons) {
       expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-busy", "true");
     }
     expect(screen.getByLabelText("Select all proposed drafts")).toBeDisabled();
     expect(screen.getByLabelText("Select draft draft-1")).toBeDisabled();

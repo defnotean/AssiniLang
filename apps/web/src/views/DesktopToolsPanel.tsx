@@ -288,6 +288,7 @@ export function DesktopToolsPanel({
     onClick
   }: DesktopActionButtonConfig) {
     return {
+      busy: isBusy,
       disabled,
       key,
       label: isBusy && busyLabelKey ? t(busyLabelKey) : t(labelKey),

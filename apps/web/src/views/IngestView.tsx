@@ -316,6 +316,9 @@ export function IngestView({
                   type="button"
                   className="secondary"
                   disabled={processingSourceId !== null || source.status === "processing"}
+                  aria-busy={
+                    processingSourceId === source.id || source.status === "processing" || undefined
+                  }
                   onClick={() => handleProcessSource(source.id)}
                 >
                   {processingSourceId === source.id || source.status === "processing"
@@ -369,6 +372,7 @@ export function IngestView({
                 type="button"
                 className="secondary"
                 disabled={isBulkReviewing || selectedDraftIds.length === 0}
+                aria-busy={isBulkReviewing || undefined}
                 onClick={() => { void handleBulkReview("accept"); }}
               >
                 {isBulkReviewing
@@ -381,6 +385,7 @@ export function IngestView({
                 type="button"
                 className="contest"
                 disabled={isBulkReviewing || selectedDraftIds.length === 0}
+                aria-busy={isBulkReviewing || undefined}
                 onClick={() => { void handleBulkReview("reject"); }}
               >
                 {isBulkReviewing
@@ -428,6 +433,7 @@ export function IngestView({
                     className="secondary"
                     aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
                     disabled={reviewingDraftId !== null}
+                    aria-busy={reviewingDraftId === draft.id || undefined}
                     onClick={() => handleDraftDecision(draft.id, "accept")}
                   >
                     {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
@@ -437,6 +443,7 @@ export function IngestView({
                     className="contest"
                     aria-label={t("ingest.rejectDraftAria", { id: draft.id })}
                     disabled={reviewingDraftId !== null}
+                    aria-busy={reviewingDraftId === draft.id || undefined}
                     onClick={() => handleDraftDecision(draft.id, "reject")}
                   >
                     {t("ingest.reject")}

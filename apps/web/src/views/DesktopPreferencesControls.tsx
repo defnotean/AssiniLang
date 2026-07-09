@@ -34,6 +34,7 @@ export function DesktopPreferencesControls({
             controlsBusy
             || preferences.launchAtLoginSupported === false
           }
+          aria-busy={preferenceBusy === "launchAtLogin" || undefined}
           onChange={(event) => void onPreferenceChange("launchAtLogin", event.target.checked)}
         />
         {preferenceBusy === "launchAtLogin" ? savingDesktopPreferenceLabel : launchAtSignInLabel}
@@ -47,6 +48,7 @@ export function DesktopPreferencesControls({
             controlsBusy
             || preferences.hideToTraySupported === false
           }
+          aria-busy={preferenceBusy === "hideToTray" || undefined}
           onChange={(event) => void onPreferenceChange("hideToTray", event.target.checked)}
         />
         {preferenceBusy === "hideToTray" ? savingDesktopPreferenceLabel : hideToTrayOnCloseLabel}
