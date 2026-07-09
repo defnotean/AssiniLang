@@ -69,4 +69,16 @@ describe("EvaluationView", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Export failed.");
   });
+
+  it("shows next-step guidance after a single baseline evaluation run", () => {
+    renderEvaluationView({
+      evaluations: [createRun()]
+    });
+
+    const trendPanel = screen.getByRole("region", { name: "Evaluation trends" });
+    expect(trendPanel).toHaveTextContent("Run evaluations more than once to show score movement.");
+    expect(trendPanel).toHaveTextContent(
+      "Baseline captured. Run System Eval again after language changes to compare scores here, or export the artifact below for offline review."
+    );
+  });
 });

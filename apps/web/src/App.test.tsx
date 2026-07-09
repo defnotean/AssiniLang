@@ -869,6 +869,18 @@ describe("App", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Workspace data unavailable");
   });
 
+  it("localizes expired prototype sessions when dashboard load is unauthorized", async () => {
+    apiMock.fetchDashboardData.mockRejectedValue(
+      new ApiError("Request failed: /dashboard (401): Unauthorized", { status: 401 })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+    );
+  });
+
   it("navigates between the four simplified tabs", async () => {
     await renderReady();
 

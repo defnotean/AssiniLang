@@ -72,7 +72,27 @@ describe("IngestView Obsidian vault import", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import vault sources" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent(/ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/);
+    expect(alert).toHaveTextContent(
+      "That folder is outside the allowed vault roots. Update ASSINI_OBSIDIAN_VAULT_ROOTS or choose a folder under an allowed root."
+    );
+  });
+
+  it("surfaces unreadable vault paths with operator guidance", async () => {
+    apiMock.importObsidianVault.mockRejectedValue(
+      new Error("Obsidian vault import failed (400): Obsidian vault path could not be read.")
+    );
+
+    await renderIngestView();
+
+    fireEvent.change(screen.getByLabelText("Vault folder path"), {
+      target: { value: VAULT_PATH }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Import vault sources" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(
+      "That folder could not be read. Check the path exists and AssiniLang can access it."
+    );
   });
 
   it("disables the import button while a vault import is running", async () => {

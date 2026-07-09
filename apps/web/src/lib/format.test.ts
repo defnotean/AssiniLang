@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LanguageSnapshot } from "../api";
 import { ApiError } from "./apiClient";
-import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError } from "./format";
+import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError, localizeVaultImportError } from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
 
@@ -161,6 +161,44 @@ describe("localizeApiError", () => {
     );
 
     expect(message).toBe("The configured model provider is offline. Check Runtime settings or try again later.");
+  });
+
+  it("localizes expired prototype sessions with recovery guidance", () => {
+    const message = localizeApiError(
+      new ApiError("Request failed: /dashboard (401): Unauthorized", { status: 401 }),
+      t,
+      "app.workspaceUnavailable"
+    );
+
+    expect(message).toBe(
+      "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+    );
+  });
+
+  it("localizes vault allowlist failures with operator guidance", () => {
+    const message = localizeVaultImportError(
+      new Error(
+        "Obsidian vault import failed (400): Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist."
+      ),
+      t,
+      "ingest.vaultImportFailed"
+    );
+
+    expect(message).toBe(
+      "That folder is outside the allowed vault roots. Update ASSINI_OBSIDIAN_VAULT_ROOTS or choose a folder under an allowed root."
+    );
+  });
+
+  it("localizes unreadable vault paths", () => {
+    const message = localizeVaultImportError(
+      new Error("Obsidian vault import failed (400): Obsidian vault path could not be read."),
+      t,
+      "ingest.vaultImportFailed"
+    );
+
+    expect(message).toBe(
+      "That folder could not be read. Check the path exists and AssiniLang can access it."
+    );
   });
 
   it("localizes OCR setup failures from persisted source errors", () => {

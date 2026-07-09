@@ -225,9 +225,49 @@ function retryAfterSecondsFromMessage(message: string): number | undefined {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
 
+function vaultImportErrorI18n(error: string): { i18nKey: MessageKey } | undefined {
+  const normalized = error.trim();
+  if (!normalized) return undefined;
+
+  if (/ASSINI_OBSIDIAN_VAULT_ROOTS is set/i.test(normalized) && /disabled until/i.test(normalized)) {
+    return { i18nKey: "ingest.errorVaultRootsUnset" };
+  }
+  if (/outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/i.test(normalized)) {
+    return { i18nKey: "ingest.errorVaultOutsideAllowlist" };
+  }
+  if (/vault path is not a directory/i.test(normalized)) {
+    return { i18nKey: "ingest.errorVaultNotDirectory" };
+  }
+  if (/vault path could not be read/i.test(normalized)) {
+    return { i18nKey: "ingest.errorVaultUnreadable" };
+  }
+
+  return undefined;
+}
+
+/** Localizes Obsidian vault import failures for operator-facing UI. */
+export function localizeVaultImportError(error: unknown, t: Translate, fallback: MessageKey): string {
+  if (error instanceof ApiError) {
+    const vaultI18n = vaultImportErrorI18n(error.message);
+    if (vaultI18n) return t(vaultI18n.i18nKey);
+    return localizeApiError(error, t, fallback);
+  }
+
+  if (error instanceof Error) {
+    const vaultI18n = vaultImportErrorI18n(error.message);
+    if (vaultI18n) return t(vaultI18n.i18nKey);
+    return error.message;
+  }
+
+  return t(fallback);
+}
+
 /** Localizes API and persisted processing errors for operator-facing UI. */
 export function localizeApiError(error: unknown, t: Translate, fallback: MessageKey): string {
   if (error instanceof ApiError) {
+    if (error.status === 401) {
+      return t("app.sessionExpired");
+    }
     if (error.i18nKey) {
       return t(error.i18nKey as MessageKey, error.i18nParams);
     }

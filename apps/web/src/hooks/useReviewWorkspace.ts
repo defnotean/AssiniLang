@@ -55,6 +55,7 @@ export function useReviewWorkspace(
   }, [view, selectedLanguageId]);
 
   async function handleRunEval() {
+    if (isEvaluating) return;
     setIsEvaluating(true);
     setWorkspaceActionError(null);
     try {

@@ -11,7 +11,7 @@ import {
   uploadSourceFile
 } from "../api";
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
-import { localizeApiError, localizeSourceProcessingError } from "../lib/format";
+import { localizeApiError, localizeSourceProcessingError, localizeVaultImportError } from "../lib/format";
 import type { Translate } from "../i18n";
 
 export const INGEST_POLL_INTERVAL_MS = 2500;
@@ -215,7 +215,7 @@ export function useIngestExtraction(
       );
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.vaultImportFailed");
+      const message = localizeVaultImportError(error, t, "ingest.vaultImportFailed");
       setVaultError(message);
     } finally {
       setIsImportingVault(false);

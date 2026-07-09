@@ -128,7 +128,12 @@ export function EvaluationView({
           <h2>{formatCount(comparableTrends.length, "comparison")}</h2>
         </div>
         {comparableTrends.length === 0 ? (
-          <p className="empty-state">{t("eval.runMoreThanOnce")}</p>
+          <div className="empty-state" role="status">
+            <p>{t("eval.runMoreThanOnce")}</p>
+            {evaluations.length > 0 && (
+              <p className="muted">{t("eval.trendsNextStep")}</p>
+            )}
+          </div>
         ) : (
           <div className="trend-grid">
             {comparableTrends.map((trend) => {
