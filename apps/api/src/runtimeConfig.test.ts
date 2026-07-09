@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readRuntimeConfig } from "./runtimeConfig.js";
+import { applyLoopbackPrivateUrlDefault, readRuntimeConfig } from "./runtimeConfig.js";
 
 describe("readRuntimeConfig", () => {
   it("uses local-safe defaults", () => {
@@ -26,6 +26,44 @@ describe("readRuntimeConfig", () => {
       bodyLimitBytes: 131072,
       logger: true
     });
+  });
+
+  it.each(["127.0.0.1", "127.0.0.42", "localhost", "::1", "[::1]"])(
+    "allows local prototype authentication on loopback host %s",
+    (host) => {
+      expect(readRuntimeConfig({
+        HOST: host,
+        ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
+        ASSINI_DEV_AUTH_TOKEN: "dev-local"
+      }).host).toBe(host);
+    }
+  );
+
+  it.each([
+    { ASSINI_ENABLE_PROTOTYPE_AUTH: "true" },
+    { ASSINI_DEV_AUTH_TOKEN: "dev-local" },
+    { ASSINI_DEV_AUTH_TOKEN: "test" },
+    { ASSINI_DEV_AUTH_TOKEN: "changeme" }
+  ])("rejects insecure prototype authentication on a network-facing host", (authEnv) => {
+    expect(() => readRuntimeConfig({ HOST: "0.0.0.0", ...authEnv })).toThrow(
+      "Refusing to expose insecure prototype authentication"
+    );
+  });
+
+  it("requires an explicit override for intentionally isolated development networks", () => {
+    expect(readRuntimeConfig({
+      HOST: "0.0.0.0",
+      ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
+      ASSINI_DEV_AUTH_TOKEN: "dev-local",
+      ASSINI_ALLOW_INSECURE_NETWORK_AUTH: "true"
+    }).host).toBe("0.0.0.0");
+  });
+
+  it("allows a network-facing API when prototype auth is disabled and the server token is not predictable", () => {
+    expect(readRuntimeConfig({
+      HOST: "192.168.1.20",
+      ASSINI_DEV_AUTH_TOKEN: "a-long-random-operator-secret"
+    }).host).toBe("192.168.1.20");
   });
 
   it("treats blank HOST and empty origin lists as defaults", () => {
@@ -74,5 +112,28 @@ describe("readRuntimeConfig", () => {
     "0.0.0.0/24"
   ])("rejects invalid HOST %s", (host) => {
     expect(() => readRuntimeConfig({ HOST: host })).toThrow("HOST");
+  });
+});
+
+describe("applyLoopbackPrivateUrlDefault", () => {
+  it.each(["127.0.0.1", "127.0.0.42", "localhost", "::1", "[::1]"])(
+    "enables private model and source URLs by default on loopback host %s",
+    (host) => {
+      const env: Record<string, string | undefined> = {};
+      applyLoopbackPrivateUrlDefault(env, host);
+      expect(env.ASSINI_ALLOW_PRIVATE_URLS).toBe("1");
+    }
+  );
+
+  it("respects an explicit loopback opt-out", () => {
+    const env: Record<string, string | undefined> = { ASSINI_ALLOW_PRIVATE_URLS: "" };
+    applyLoopbackPrivateUrlDefault(env, "127.0.0.1");
+    expect(env.ASSINI_ALLOW_PRIVATE_URLS).toBe("");
+  });
+
+  it("keeps network-facing servers fail-closed", () => {
+    const env: Record<string, string | undefined> = {};
+    applyLoopbackPrivateUrlDefault(env, "0.0.0.0");
+    expect(env).not.toHaveProperty("ASSINI_ALLOW_PRIVATE_URLS");
   });
 });

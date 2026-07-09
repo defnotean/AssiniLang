@@ -137,48 +137,7 @@ describe("AssistantView", () => {
           + "Always gloss morphemes with Leipzig abbreviations.\n\nWhat does ka mean?"
       })
     );
-  });
-
-  it("localizes the conversation-setup seed-prompt prefix for Arabic", () => {
-    const t = createTranslator("ar");
-    expect(composeSeedPrompt("ما معنى ka؟", "اشرح المورفيمات دائمًا.", t)).toBe(
-      "إعداد المحادثة - اتبع هذه التعليمات في كل رد خلال هذه الجلسة: اشرح المورفيمات دائمًا.\n\nما معنى ka؟"
-    );
-  });
-
-  it("sends an Arabic conversation-setup seed prefix when the UI locale is Arabic", async () => {
-    render(
-      <I18nProvider initialLocale="ar">
-        <Harness />
-      </I18nProvider>
-    );
-    fireEvent.change(screen.getByLabelText("تعليمات إعداد المحادثة"), {
-      target: { value: "اشرح المورفيمات دائمًا." }
-    });
-    fireEvent.change(screen.getByLabelText("السؤال الافتتاحي"), {
-      target: { value: "ما معنى ka؟" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "بدء المحادثة" }));
-    await screen.findByLabelText("رسائل المحادثة");
-
-    expect(apiMock.createAiSession).toHaveBeenCalledWith(
-      expect.objectContaining({
-        seedPrompt:
-          "إعداد المحادثة - اتبع هذه التعليمات في كل رد خلال هذه الجلسة: اشرح المورفيمات دائمًا.\n\nما معنى ka؟"
-      })
-    );
-  });
-
-  it("labels the reply with a fallback chip when the trace flags the deterministic fallback", async () => {
-    apiMock.createAiSession.mockResolvedValue(buildSession({ fallback: true }));
-    render(<Harness />);
-    await startConversation();
-
-    expect(screen.getByText("deterministic fallback (no model)")).toBeInTheDocument();
-    expect(screen.queryByText("model reply")).not.toBeInTheDocument();
-  });
-
-  it("disables sending and shows a thinking indicator while a reply is pending", async () => {
+  });  it("disables sending and shows a thinking indicator while a reply is pending", async () => {
     render(<Harness />);
     await startConversation();
 

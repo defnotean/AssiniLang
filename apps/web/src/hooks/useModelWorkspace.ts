@@ -112,6 +112,7 @@ export function useModelWorkspace(
   const [isAutoRefreshingModels, setIsAutoRefreshingModels] = useState(false);
   const discoveryRequestIdRef = useRef(0);
   const activeDiscoveryRequestIdRef = useRef<number | null>(null);
+  const reachabilityRequestIdRef = useRef(0);
   const configuredDiscoveryBaseUrlRef = useRef<string | undefined>(undefined);
   const manualDiscoveryInFlightRef = useRef(false);
   const autoAppliedDiscoveryModelIdRef = useRef<string | null>(null);
@@ -165,6 +166,27 @@ export function useModelWorkspace(
       }
       if (options.automatic) {
         setIsAutoRefreshingModels(false);
+      }
+    }
+  }, [t]);
+
+  const runReachabilityCheck = useCallback(async () => {
+    const requestId = ++reachabilityRequestIdRef.current;
+    setIsCheckingReachability(true);
+    setReachabilityError(null);
+    setReachabilityResult(null);
+    try {
+      const result = await checkLlmReachability();
+      if (reachabilityRequestIdRef.current === requestId) {
+        setReachabilityResult(result);
+      }
+    } catch (error) {
+      if (reachabilityRequestIdRef.current === requestId) {
+        setReachabilityError(localizeApiError(error, t, "model.errReachabilityFailed"));
+      }
+    } finally {
+      if (reachabilityRequestIdRef.current === requestId) {
+        setIsCheckingReachability(false);
       }
     }
   }, [t]);
@@ -250,6 +272,17 @@ export function useModelWorkspace(
       discoveryRequestIdRef.current += 1;
     };
   }, [startModelDiscovery, view]);
+
+  useEffect(() => {
+    if (view !== "model" || llmState.status !== "ready" || !isRealModelProvider(llmState.data)) {
+      return undefined;
+    }
+
+    void runReachabilityCheck();
+    return () => {
+      reachabilityRequestIdRef.current += 1;
+    };
+  }, [llmState, runReachabilityCheck, view]);
 
   useEffect(() => {
     if (view !== "model") return undefined;
@@ -455,16 +488,7 @@ export function useModelWorkspace(
   }
 
   async function handleTestConnection() {
-    setIsCheckingReachability(true);
-    setReachabilityError(null);
-    setReachabilityResult(null);
-    try {
-      setReachabilityResult(await checkLlmReachability());
-    } catch (error) {
-      setReachabilityError(localizeApiError(error, t, "model.errReachabilityFailed"));
-    } finally {
-      setIsCheckingReachability(false);
-    }
+    await runReachabilityCheck();
   }
 
   return {

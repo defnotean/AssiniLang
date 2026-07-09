@@ -108,7 +108,7 @@ Extraction quality depends on the configured local model. All provider configura
 
 The workspace has no hardcoded language data. To populate a language locally:
 
-1. Create the language with a name, typology, description, and orthography. The web console's New language form in the sidebar collects those four fields; a phonology inventory can be supplied only through `POST /languages`. Declaring the inventory enables orthography validation for later corpus text.
+1. Create the language with a name, typology, description, and orthography. The web console's New language form in the sidebar collects those four fields. After creation, use the phonology inventory editor on Start to add consonants, vowels, stress, and syllable templates. Declaring the inventory enables orthography validation for later corpus text; API clients can provide the same data through `POST /languages` or `PUT /languages/:languageId/phonology`.
 2. Register or upload raw sources for it in the Build tab: pasted text, word lists, URLs, Obsidian Markdown vault imports, or files including images, audio, and PDF/DOCX documents.
 3. Process each source (`POST /sources/:sourceId/process`; the console uses async mode and polls) and review the proposed extraction drafts. Duplicate badges flag drafts that repeat existing entries or other pending drafts.
 4. Accept the good drafts. Lexemes build the lexicon, corpus drafts build the corpus and its private answer keys, and grammar-note drafts enter the note review queue.

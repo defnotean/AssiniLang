@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./sourceProcessingErrors": {
+      "types": "./dist/sourceProcessingErrors.d.ts",
+      "import": "./dist/sourceProcessingErrors.js"
+    }
+  },
   "scripts": {
     "build": "tsc -b"
   },

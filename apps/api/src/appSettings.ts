@@ -1,4 +1,5 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import {
   LLM_PROVIDERS,
@@ -467,6 +468,22 @@ export function updateEnvFileText(
   return `${nextLines.join("\n").replace(/\n+$/g, "")}\n`;
 }
 
+/** Replaces the settings file only after the complete replacement has been written. */
+export async function writeEnvFileAtomically(settingsPath: string, text: string): Promise<void> {
+  const tempPath = `${settingsPath}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(tempPath, text, { encoding: "utf8", flag: "wx" });
+    await rename(tempPath, settingsPath);
+  } catch (error) {
+    try {
+      await unlink(tempPath);
+    } catch {
+      // Preserve the original write or rename failure if cleanup also fails.
+    }
+    throw error;
+  }
+}
+
 async function readOptionalText(path: string): Promise<string> {
   try {
     return await readFile(path, "utf8");
@@ -498,7 +515,7 @@ async function applyRuntimeSettingsPatchUnlocked(
   await assertRuntimeSettingsPatchUrlsAllowed(params.patch, env);
   const updates = envUpdatesFromPatch(params.patch);
   const existingText = await readOptionalText(params.settingsPath);
-  await writeFile(params.settingsPath, updateEnvFileText(existingText, updates), "utf8");
+  await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
   applyUpdatesToEnv(updates, env);
   params.reloadLlmProvider?.();
 
@@ -566,7 +583,7 @@ async function saveRuntimeModelProfileUnlocked(
     ...(shouldActivate ? envUpdatesFromStoredProfile(profile) : {})
   };
   const existingText = await readOptionalText(params.settingsPath);
-  await writeFile(params.settingsPath, updateEnvFileText(existingText, updates), "utf8");
+  await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
   applyUpdatesToEnv(updates, env);
   if (shouldActivate) params.reloadLlmProvider?.();
   return runtimeSettingsResponse(env);
@@ -604,7 +621,7 @@ async function activateRuntimeModelProfileUnlocked(
 
   const updates = envUpdatesFromStoredProfile(profile);
   const existingText = await readOptionalText(params.settingsPath);
-  await writeFile(params.settingsPath, updateEnvFileText(existingText, updates), "utf8");
+  await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
   applyUpdatesToEnv(updates, env);
   params.reloadLlmProvider?.();
   return runtimeSettingsResponse(env);
@@ -652,7 +669,7 @@ async function deleteRuntimeModelProfileUnlocked(
     ...(deletingActive ? envUpdatesForClearedActiveProfile() : {})
   };
   const existingText = await readOptionalText(params.settingsPath);
-  await writeFile(params.settingsPath, updateEnvFileText(existingText, updates), "utf8");
+  await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
   applyUpdatesToEnv(updates, env);
   if (deletingActive) params.reloadLlmProvider?.();
   return runtimeSettingsResponse(env);

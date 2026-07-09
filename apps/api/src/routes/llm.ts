@@ -11,7 +11,7 @@ import {
   runtimeSettingsResponse,
   saveRuntimeModelProfile
 } from "../appSettings.js";
-import { discoverLlmModels } from "../llmDiscovery.js";
+import { discoverLlmModels, LlmDiscoveryInputLimitError } from "../llmDiscovery.js";
 import { describeLlmProviderFromEnv, probeLlmProviderReachability } from "../llmProvider.js";
 import { requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
@@ -107,12 +107,20 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
 
     reply.header("Cache-Control", "no-store, max-age=0");
     reply.header("Pragma", "no-cache");
-    return discoverLlmModels({
-      env: process.env,
-      fetchFn: ingestionFetch,
-      extraBaseUrls: queryBaseUrls(request.query),
-      includeCommonTargets: queryIncludeCommonTargets(request.query) ?? true
-    });
+    try {
+      return await discoverLlmModels({
+        env: process.env,
+        fetchFn: ingestionFetch,
+        extraBaseUrls: queryBaseUrls(request.query),
+        includeCommonTargets: queryIncludeCommonTargets(request.query) ?? true
+      });
+    } catch (error) {
+      if (error instanceof LlmDiscoveryInputLimitError) {
+        reply.code(400);
+        return { error: error.message };
+      }
+      throw error;
+    }
   });
 
   app.put("/llm/settings", async (request, reply) => {

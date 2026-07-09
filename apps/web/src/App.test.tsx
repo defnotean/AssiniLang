@@ -760,7 +760,7 @@ describe("App", () => {
     expect(screen.queryByRole("button", { name: "Corpus Browser" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Note Review Queue" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Model Setup" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Corpus passages" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Corpus passages" })).toBeInTheDocument();
     expect(screen.getByText("mira talo-mi-na")).toBeInTheDocument();
     expect(apiMock.fetchCurrentUser).toHaveBeenCalledTimes(1);
   });
@@ -1039,18 +1039,18 @@ describe("App", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Build" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Build" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Review queue" })).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Review queue" })).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "Registered sources" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Extraction draft queue" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Practice" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Practice" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Exercise answer")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Exercise answer")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Run System Eval" })).toBeInTheDocument();
-    expect(screen.getByText("Avenik evaluation completed.")).toBeInTheDocument();
+    expect(await screen.findByText("Avenik evaluation completed.")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Data Stewardship Policy" })).toBeInTheDocument();
     expect(await screen.findByText("Only reviewers may approve community notes.")).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "LLM provider readiness" })).toBeInTheDocument();
@@ -2042,7 +2042,7 @@ describe("App", () => {
       expect(screen.getByLabelText("Base URL")).toHaveValue("http://irene-box:8080/v1");
       expect(screen.getByLabelText("Model")).toHaveValue("irene-fusion");
     });
-    expect(screen.getByText("Connected to 2 models at http://irene-box:8080/v1: irene-fusion, irene-small.")).toBeInTheDocument();
+    expect(screen.getByText("Model catalog available at http://irene-box:8080/v1: 2 models (irene-fusion, irene-small).")).toBeInTheDocument();
 
     await waitFor(() => expect(apiMock.updateRuntimeSettings).toHaveBeenCalledWith(expect.objectContaining({
       provider: "openai-compatible",
@@ -2179,7 +2179,7 @@ describe("App", () => {
     });
     expect(discoveredOption).toBeInTheDocument();
     expect(discoveredOption).toHaveAttribute("title", `${fullModelPath} (LM Studio, http://127.0.0.1:1234/v1)`);
-    expect(screen.getByText("Connected to irene-fusion-Q4_K_M.gguf at http://127.0.0.1:1234/v1.")).toBeInTheDocument();
+    expect(screen.getByText("Model catalog available: irene-fusion-Q4_K_M.gguf at http://127.0.0.1:1234/v1.")).toBeInTheDocument();
     expect(screen.getAllByText("irene-fusion-Q4_K_M.gguf").length).toBeGreaterThan(0);
     await waitFor(() => expect(screen.getByLabelText("Model")).toHaveValue(fullModelPath));
     expect(screen.getByLabelText("Discovered models")).toHaveValue(discoveredId);
@@ -2410,7 +2410,7 @@ describe("App", () => {
       expect(screen.getByLabelText("Discovered models")).toHaveValue("");
       expect(screen.getByLabelText("Model")).toHaveValue("");
     });
-    expect(screen.getByText("Connected to http://127.0.0.1:1234/v1, but it did not return any models.")).toBeInTheDocument();
+    expect(screen.getByText("The endpoint at http://127.0.0.1:1234/v1 responded, but its catalog listed no models.")).toBeInTheDocument();
     const staleNotice = screen.getByText(
       "Saved model old-loaded-model is no longer loaded at http://127.0.0.1:1234/v1. Choose another discovered model or switch back to offline mode."
     );
@@ -3014,7 +3014,7 @@ describe("App", () => {
       expect(apiMock.applyElderCorrection).toHaveBeenCalledWith("elder-correction-1", revisedExplanation)
     );
     expect(await screen.findByText("Saved into the lesson")).toBeInTheDocument();
-    expect(screen.getByText("Elder correction applied to linked note.")).toBeInTheDocument();
+    expect(screen.getByText("Suggestion saved into the linked lesson.")).toBeInTheDocument();
   });
 
   const reviewActionCases = [

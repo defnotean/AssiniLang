@@ -17,12 +17,21 @@ export function resolveApiProxyTarget(env: ApiProxyEnv = process.env): string {
   return `http://${host}:${port}`;
 }
 
+function apiProxy() {
+  return {
+    target: resolveApiProxyTarget(),
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api/, "")
+  };
+}
+
 export default defineConfig({
   base: "./",
   plugins: [react()],
   resolve: {
     alias: {
       "@assini/api-contract/llm": `${repoRoot}/packages/api-contract/src/llmContract.ts`,
+      "@assini/api-contract/sourceProcessingErrors": `${repoRoot}/packages/api-contract/src/sourceProcessingErrors.ts`,
       "@assini/db/schema": `${repoRoot}/packages/db/src/schema.ts`
     }
   },
@@ -31,11 +40,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": {
-        target: resolveApiProxyTarget(),
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, "")
-      }
+      "/api": apiProxy()
+    }
+  },
+  preview: {
+    proxy: {
+      "/api": apiProxy()
     }
   }
 });

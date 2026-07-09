@@ -64,10 +64,10 @@ export async function runEvaluationCli({
     return 1;
   }
 
-  await store.write({
-    ...state,
-    evaluationRuns: [...state.evaluationRuns, ...runs]
-  });
+  await store.update((current) => ({
+    ...current,
+    evaluationRuns: [...current.evaluationRuns, ...runs]
+  }));
 
   for (const run of runs) {
     stdout(run.summary);

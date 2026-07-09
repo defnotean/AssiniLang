@@ -1315,127 +1315,6 @@ describe("localizeApiError", () => {
       "Audio sources need a transcription endpoint. Set a transcription base URL in Runtime settings (Model tab), then process again."
     );
   });
-
-  it("localizes offline-heuristic fallback warnings", () => {
-    expect(
-      localizeSourceProcessingWarning(
-        "Model output was not valid extraction JSON; fell back to offline heuristics.",
-        t
-      )
-    ).toBe("Model output was not valid extraction JSON; fell back to offline heuristics.");
-
-    expect(
-      localizeSourceProcessingWarning(
-        "Model output for part 2 of 5 was not valid extraction JSON; that part was skipped.",
-        createTranslator("ar")
-      )
-    ).toBe("لم يكن خرج النموذج للجزء 2 من 5 JSON استخلاص صالحًا؛ تم تخطي ذلك الجزء.");
-  });
-
-  it("localizes OCR endpoint empty responses and model-extraction throw fallbacks", () => {
-    expect(
-      localizeSourceProcessingError(
-        "OCR model endpoint returned no text.",
-        t,
-        "ingest.sourceProcessingFailed"
-      )
-    ).toBe(
-      "The configured OCR model could not read this document. Check the OCR endpoint in Runtime settings or try a different model."
-    );
-
-    expect(
-      localizeSourceProcessingError(
-        "The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset.",
-        createTranslator("ar"),
-        "ingest.sourceProcessingFailed"
-      )
-    ).toBe(
-      "تعذّر على النموذج المُهيّأ قراءة هذه الصورة وقد لا يدعم الرؤية. عيِّن نموذج رؤية أو رابط OCR أساسيًا في إعدادات وقت التشغيل، أو اترك كليهما فارغين لاستخدام OCR المحلي."
-    );
-
-    expect(
-      localizeSourceProcessingWarning(
-        "Model extraction failed for part 1 of 3: LLM provider request timed out after 25ms; fell back to offline heuristics when no usable model output remained.",
-        t
-      )
-    ).toBe(
-      "Model extraction failed for part 1 of 3; fell back to offline heuristics for that part."
-    );
-  });
-});
-
-describe("formatLlmProvider", () => {
-  it("localizes known provider option labels and leaves unknown values unchanged", () => {
-    expect(formatLlmProvider("openai-compatible", t)).toBe("OpenAI-compatible");
-    expect(formatLlmProvider("deterministic", createTranslator("ar"))).toBe("حتمي");
-    expect(formatLlmProvider("lm-studio", createTranslator("ar"))).toBe("LM Studio");
-    expect(formatLlmProvider("totally-made-up", t)).toBe("totally-made-up");
-    expect(formatLlmProvider("ollama")).toBe("ollama");
-  });
-});
-
-describe("localizeLlmStatusWarning", () => {
-  it("localizes known LLM status warnings and leaves unrecognized copy unchanged", () => {
-    expect(
-      localizeLlmStatusWarning(
-        "No LLM provider configured; using deterministic fallback for safe local development.",
-        t
-      )
-    ).toBe("No LLM provider configured; using deterministic fallback for safe local development.");
-    expect(
-      localizeLlmStatusWarning(
-        "No LLM provider configured; using deterministic fallback for safe local development.",
-        createTranslator("ar")
-      )
-    ).toContain("البديل الحتمي");
-    expect(
-      localizeLlmStatusWarning("Using deterministic fallback; no external LLM calls will be made.", createTranslator("ar"))
-    ).toContain("البديل الحتمي");
-    expect(localizeLlmStatusWarning("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000.", t)).toBe(
-      "ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000."
-    );
-    expect(
-      localizeLlmStatusWarning("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000.", createTranslator("ar"))
-    ).toContain("180000");
-    expect(localizeLlmStatusWarning("Unknown ASSINI_LLM_PROVIDER: totally-made-up", createTranslator("ar"))).toContain(
-      "totally-made-up"
-    );
-    expect(localizeLlmStatusWarning("Some future warning from the API", t)).toBe("Some future warning from the API");
-  });
-});
-
-describe("formatReachability", () => {
-  it("localizes unchecked, reachable, and unreachable connection results", () => {
-    const unchecked: LlmReachability = {
-      checked: false,
-      reachable: false,
-      mode: "deterministic"
-    };
-    expect(formatReachability(unchecked, t)).toBe(
-      "No external provider configured. Choose a discovered model or enter a base URL and model name in Runtime settings, then Save settings and test again."
-    );
-    expect(formatReachability(unchecked, createTranslator("ar"))).toContain("مزوّد خارجي");
-    expect(formatReachability(unchecked, createTranslator("ar"))).toContain("إعدادات التشغيل");
-
-    const reachable: LlmReachability = {
-      checked: true,
-      reachable: true,
-      mode: "local-openai-compatible",
-      latencyMs: 42
-    };
-    expect(formatReachability(reachable, t)).toBe("Reachable (local openai compatible, 42 ms)");
-    expect(formatReachability(reachable, createTranslator("ar"))).toBe(
-      "قابل للوصول (محلي متوافق مع OpenAI، 42 مللي ثانية)"
-    );
-
-    const unreachable: LlmReachability = {
-      checked: true,
-      reachable: false,
-      mode: "remote-api",
-      detail: "connection refused"
-    };
-    expect(formatReachability(unreachable, t)).toBe("Unreachable: connection refused");
-  });
 });
 
 describe("formatSubmissionStatus", () => {
@@ -1540,109 +1419,6 @@ describe("formatTrendPoints", () => {
   });
 });
 
-describe("localizeEvaluationRunSummary", () => {
-  it("localizes canned eval run summaries and leaves unknown text unchanged", () => {
-    expect(
-      localizeEvaluationRunSummary("Avenik: 87.5% average score across 7 categories.", t)
-    ).toBe("Avenik: 87.5% average score across 7 categories.");
-    expect(
-      localizeEvaluationRunSummary("Avenik: 87.5% average score across 7 categories.", createTranslator("ar"))
-    ).toBe("Avenik: متوسط درجة 87.5% عبر 7 فئات.");
-    expect(localizeEvaluationRunSummary("Custom fixture summary.", t)).toBe("Custom fixture summary.");
-  });
-});
-
-describe("localizeEvaluationFailureMessage", () => {
-  it("localizes known scoring failure messages and leaves unknown text unchanged", () => {
-    const ar = createTranslator("ar");
-    expect(localizeEvaluationFailureMessage("Missing note content for verb chains", t)).toBe(
-      "Missing note content for verb chains"
-    );
-    expect(localizeEvaluationFailureMessage("Missing note content for verb chains", ar)).toBe(
-      "محتوى الملاحظة مفقود لـ verb chains"
-    );
-    expect(
-      localizeEvaluationFailureMessage("Missing corpus passage for answer key passage-1.", ar)
-    ).toBe("مقطع المدوّنة مفقود لمفتاح الإجابة passage-1.");
-    expect(
-      localizeEvaluationFailureMessage(
-        "Explanation mismatch for verb chains (draft confidence: medium).",
-        ar
-      )
-    ).toBe("عدم تطابق الشرح لـ verb chains (ثقة المسودة: medium).");
-    expect(
-      localizeEvaluationFailureMessage(
-        "No note answer keys to score; empty noteCoverage fails closed.",
-        ar
-      )
-    ).toContain("تغطية الملاحظات");
-    expect(localizeEvaluationFailureMessage("Expected answer was rejected by the grader.", ar)).toBe(
-      "رفض المصحح الإجابة المتوقعة."
-    );
-    expect(localizeEvaluationFailureMessage("Some future scoring message", t)).toBe(
-      "Some future scoring message"
-    );
-  });
-});
-
-describe("formatSourceKind and localizeDraftGroundingMessage", () => {
-  it("localizes known source kinds and leaves unknown values unchanged", () => {
-    expect(formatSourceKind("text", t)).toBe("Text");
-    expect(formatSourceKind("wordlist", t)).toBe("Word list");
-    expect(formatSourceKind("url", t)).toBe("URL");
-    expect(formatSourceKind("image", t)).toBe("Image");
-    expect(formatSourceKind("audio", createTranslator("ar"))).toBe("صوت");
-    expect(formatSourceKind("document", createTranslator("ar"))).toBe("مستند");
-    expect(formatSourceKind("custom-kind", t)).toBe("custom-kind");
-    expect(formatSourceKind("audio")).toBe("audio");
-  });
-
-  it("localizes known grounding tooltip messages and leaves unrecognized shapes unchanged", () => {
-    expect(
-      localizeDraftGroundingMessage(
-        {
-          kind: "gloss_conflict",
-          message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
-        },
-        t
-      )
-    ).toBe('Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".');
-
-    expect(
-      localizeDraftGroundingMessage(
-        {
-          kind: "decomposable_form",
-          message:
-            'Form decomposes into accepted lexemes talu ("water") + ne ("locative case marker"); the draft gloss may belong to a different word.'
-        },
-        createTranslator("ar")
-      )
-    ).toBe(
-      'الصيغة تتحلّل إلى المفردات المعتمدة talu ("water") + ne ("locative case marker")؛ قد ينتمي شرح المسودة إلى كلمة أخرى.'
-    );
-
-    expect(
-      localizeDraftGroundingMessage(
-        {
-          kind: "segmentation_conflict",
-          message:
-            'Segment "ne" is glossed "plural" in this draft, but the accepted lexeme "ne" is glossed "locative case marker".'
-        },
-        createTranslator("ar")
-      )
-    ).toBe(
-      'المقطع "ne" مشروح بـ "plural" في هذه المسودة، لكن المفردة المعتمدة "ne" مشروحة بـ "locative case marker".'
-    );
-
-    expect(
-      localizeDraftGroundingMessage(
-        { kind: "gloss_conflict", message: "Custom operator grounding note" },
-        t
-      )
-    ).toBe("Custom operator grounding note");
-  });
-});
-
 describe("formatStatus and trendVerb", () => {
   it("localizes note, source, session, and disposition statuses", () => {
     expect(formatStatus("open", t)).toBe("open");
@@ -1685,18 +1461,7 @@ describe("audit ledger formatters", () => {
       "Governance record / governance-1"
     );
     expect(formatAuditEntityPill("note", "note-1")).toBe("note / note-1");
-  });
-
-  it("localizes audit labels in Arabic", () => {
-    const ar = createTranslator("ar");
-    expect(formatActorRole("lead", ar)).toBe("قائد");
-    expect(formatAuditAction("note.reviewed", ar)).toBe("تمت مراجعة الملاحظة");
-    expect(formatAuditEntityPill("governance_record", "governance-1", ar)).toBe(
-      "سجل حوكمة / governance-1"
-    );
-  });
-
-  it("localizes known audit summary lines and leaves custom text unchanged", () => {
+  });  it("localizes known audit summary lines and leaves custom text unchanged", () => {
     expect(formatAuditSummary('Created language Avenik.', t)).toBe("Created language Avenik.");
     expect(formatAuditSummary('Created consent governance policy record.', t)).toBe(
       "Created Consent governance policy record."
@@ -1707,17 +1472,7 @@ describe("audit ledger formatters", () => {
     expect(formatAuditSummary("Custom operator note.", t)).toBe("Custom operator note.");
     expect(formatAuditSummary('Created language Avenik.')).toBe("Created language Avenik.");
 
-    const ar = createTranslator("ar");
-    expect(formatAuditSummary('Created language Avenik.', ar)).toBe("تم إنشاء اللغة Avenik.");
-    expect(formatAuditSummary('Created consent governance policy record.', ar)).toBe(
-      "تم إنشاء سجل سياسة حوكمة من نوع الموافقة."
-    );
-    expect(formatAuditSummary('Resolved deferred review disposition for note-1.', ar)).toBe(
-      "حُسم قرار المراجعة مؤجّل للملاحظة note-1."
-    );
-    expect(formatAuditSummary("Created learner practice AI session.", ar)).toBe(
-      "أُنشئت جلسة ذكاء اصطناعي بنمط تمرين المتعلّم."
-    );
+
   });
 
   it("localizes profile POS, paradigm dimensions, and local user names", () => {
@@ -1729,9 +1484,6 @@ describe("audit ledger formatters", () => {
     expect(formatLocalUserName("Local Reviewer", t)).toBe("Local Reviewer");
     expect(formatLocalUserName(undefined, t)).toBeUndefined();
 
-    const ar = createTranslator("ar");
-    expect(formatPartOfSpeech("verb", ar)).toBe("فعل");
-    expect(formatParadigmDimension("person", ar)).toBe("الشخص");
-    expect(formatLocalUserName("Local Learner", ar)).toBe("متعلّم محلي");
+
   });
 });

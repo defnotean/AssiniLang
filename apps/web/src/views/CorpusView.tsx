@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   fetchNeuralMap,
   validateCorpusBulk,
@@ -20,6 +20,7 @@ import {
 import { MorphChips } from "../components/MorphChips";
 import { localizeApiError } from "../lib/format";
 import type { CorpusPassage } from "../lib/types";
+import { OPEN_CORPUS_BULK_EVENT } from "../lib/workspaceFocus";
 import { useI18n, type MessageKey, type Translate } from "../i18n";
 
 function formatServerBulkDryRunAppendix(response: CorpusBulkImportResponse, t: Translate): string {
@@ -75,6 +76,8 @@ export function CorpusView({
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [isValidatingBulk, setIsValidatingBulk] = useState(false);
   const [isImportingBulk, setIsImportingBulk] = useState(false);
+  const importFormRef = useRef<HTMLFormElement | null>(null);
+  const bulkFormRef = useRef<HTMLDivElement | null>(null);
   const normalized = search.trim().toLowerCase();
   const isCorpusBusy = isImportingCorpus || isValidatingCorpus || isValidatingBulk || isImportingBulk;
   const canImportPassage = canSubmitCorpusImportDraft(importDraft)
@@ -151,6 +154,34 @@ export function CorpusView({
     setBulkMessage(null);
     setBulkError(null);
   }
+
+  function openSingleImport() {
+    setIsImportOpen(true);
+    clearImportNotice();
+    queueMicrotask(() => {
+      importFormRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      document.getElementById("corpus-import-target")?.focus();
+    });
+  }
+
+  function openBulkImport() {
+    setIsBulkOpen(true);
+    clearBulkNotice();
+    queueMicrotask(() => {
+      bulkFormRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+      document.getElementById("corpus-bulk-paste")?.focus();
+    });
+  }
+
+  useEffect(() => {
+    function handleOpenBulkImport() {
+      setIsBulkOpen(true);
+      setBulkMessage(null);
+      setBulkError(null);
+    }
+    window.addEventListener(OPEN_CORPUS_BULK_EVENT, handleOpenBulkImport);
+    return () => window.removeEventListener(OPEN_CORPUS_BULK_EVENT, handleOpenBulkImport);
+  }, []);
 
   function updateImportDraft(field: keyof CorpusImportDraft, value: string) {
     setImportDraft((current) => ({ ...current, [field]: value }));
@@ -327,7 +358,12 @@ export function CorpusView({
 
   return (
     <div className="corpus-view">
-      <form className="record-card form-panel compact corpus-import-form" aria-label={t("corpus.importFormLabel")} onSubmit={handleImportCorpus}>
+      <form
+        ref={importFormRef}
+        className="record-card form-panel compact corpus-import-form"
+        aria-label={t("corpus.importFormLabel")}
+        onSubmit={handleImportCorpus}
+      >
         <button
           type="button"
           className="secondary corpus-import-toggle"
@@ -473,7 +509,11 @@ export function CorpusView({
         {importError && <p className="result-notice error" role="alert">{importError}</p>}
       </form>
 
-      <div className="record-card form-panel compact corpus-import-form" aria-label={t("corpus.bulkImportLabel")}>
+      <div
+        ref={bulkFormRef}
+        className="record-card form-panel compact corpus-import-form"
+        aria-label={t("corpus.bulkImportLabel")}
+      >
         <button
           type="button"
           className="secondary corpus-import-toggle"
@@ -599,6 +639,8 @@ export function CorpusView({
           <CorpusGraph
             graphLanguageId={graphLanguageId}
             graphState={graphState}
+            onOpenSingleImport={openSingleImport}
+            onOpenBulkImport={openBulkImport}
             onRetry={() => {
               if (!graphLanguageId) return;
               setGraphState({ status: "loading" });
@@ -761,11 +803,15 @@ function buildGraphLayout(nodes: NeuralMapResponse["nodes"]): Map<string, GraphP
 function CorpusGraph({
   graphLanguageId,
   graphState,
-  onRetry
+  onRetry,
+  onOpenSingleImport,
+  onOpenBulkImport
 }: {
   graphLanguageId: string;
   graphState: { status: "idle" | "loading" } | { status: "ready"; data: NeuralMapResponse } | { status: "error"; message: string };
   onRetry: () => void;
+  onOpenSingleImport: () => void;
+  onOpenBulkImport: () => void;
 }) {
   const { t } = useI18n();
   const visibleGraph = useMemo(() => {
@@ -779,28 +825,57 @@ function CorpusGraph({
   }, [graphState]);
   const graphData = graphState.status === "ready" ? graphState.data : null;
 
+  if (!graphLanguageId) {
+    return (
+      <div className="empty-state corpus-network-empty" role="status" aria-live="polite">
+        <p>{t("corpus.noLanguageNetwork")}</p>
+      </div>
+    );
+  }
+
   if (graphState.status === "idle" || graphState.status === "loading") {
-    return <p className="empty-state" role="status" aria-live="polite">{t("corpus.loadingNetwork")}</p>;
+    return (
+      <div className="empty-state corpus-network-empty" role="status" aria-live="polite" aria-busy="true">
+        <p>{t("corpus.loadingNetwork")}</p>
+        <p className="muted">{t("corpus.loadingNetworkHint")}</p>
+      </div>
+    );
   }
 
   if (graphState.status === "error") {
     return (
-      <div className="result-notice error" role="alert">
+      <div className="result-notice error corpus-network-empty" role="alert">
         <p>{graphState.message}</p>
-        {graphLanguageId ? (
+        <p className="muted">{t("corpus.errorNetworkHint")}</p>
+        <div className="practice-next-actions">
           <button type="button" className="secondary" onClick={onRetry}>
             {t("corpus.retryNetwork")}
           </button>
-        ) : null}
+          <button type="button" className="secondary" onClick={onOpenSingleImport}>
+            {t("corpus.emptyNetworkAddPassage")}
+          </button>
+          <button type="button" className="secondary" onClick={onOpenBulkImport}>
+            {t("corpus.emptyNetworkAddBulk")}
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!visibleGraph || !graphData || visibleGraph.nodes.length === 0) {
     return (
-      <p className="empty-state" role="status" aria-live="polite">
-        {t("corpus.emptyNetwork")}
-      </p>
+      <div className="empty-state corpus-network-empty" role="status" aria-live="polite">
+        <p>{t("corpus.emptyNetwork")}</p>
+        <p className="muted">{t("corpus.emptyNetworkHint")}</p>
+        <div className="practice-next-actions">
+          <button type="button" className="secondary" onClick={onOpenSingleImport}>
+            {t("corpus.emptyNetworkAddPassage")}
+          </button>
+          <button type="button" className="secondary" onClick={onOpenBulkImport}>
+            {t("corpus.emptyNetworkAddBulk")}
+          </button>
+        </div>
+      </div>
     );
   }
 

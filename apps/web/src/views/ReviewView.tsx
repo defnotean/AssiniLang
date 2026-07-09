@@ -8,6 +8,8 @@ import type { NoteReviewEdits } from "../hooks/useReviewWorkspace";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
 const REVIEW_FILTERS: ReviewFilter[] = ["all", "pending", "contested", "rejected", "deferred", "escalated", "approved"];
+const REVIEW_SORTS = ["newest", "oldest", "evidence"] as const;
+type ReviewSort = (typeof REVIEW_SORTS)[number];
 
 type NoteExample = Note["examples"][number];
 
@@ -15,6 +17,35 @@ function matchesReviewFilter(note: Note, filter: ReviewFilter): boolean {
   if (filter === "all") return true;
   if (filter === "pending") return note.status === "draft" || note.status === "under_review";
   return note.status === filter;
+}
+
+function noteSortTimestamp(note: Note): number {
+  const reviewedAt = note.reviewer?.lastReviewedAt;
+  if (reviewedAt) {
+    const reviewedTime = Date.parse(reviewedAt);
+    if (!Number.isNaN(reviewedTime)) return reviewedTime;
+  }
+  const history = note.editHistory;
+  if (history.length > 0) {
+    const last = history[history.length - 1]?.at;
+    if (last) {
+      const historyTime = Date.parse(last);
+      if (!Number.isNaN(historyTime)) return historyTime;
+    }
+  }
+  return 0;
+}
+
+function compareReviewNotes(left: Note, right: Note, sort: ReviewSort): number {
+  if (sort === "evidence") {
+    const byEvidence = right.evidenceCount - left.evidenceCount;
+    if (byEvidence !== 0) return byEvidence;
+  }
+  const leftTime = noteSortTimestamp(left);
+  const rightTime = noteSortTimestamp(right);
+  const byTime = sort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+  if (byTime !== 0) return byTime;
+  return left.id.localeCompare(right.id);
 }
 
 function cloneExamples(examples: NoteExample[]): NoteExample[] {
@@ -56,6 +87,7 @@ export function ReviewView({
 }) {
   const { t } = useI18n();
   const [filter, setFilter] = useState<ReviewFilter>("all");
+  const [sort, setSort] = useState<ReviewSort>("newest");
   const [noteExplanationDraft, setNoteExplanationDraft] = useState(selectedNote?.explanation ?? "");
   const [examplesDraft, setExamplesDraft] = useState<NoteExample[]>(() => cloneExamples(selectedNote?.examples ?? []));
   const [passageToAdd, setPassageToAdd] = useState("");
@@ -73,9 +105,9 @@ export function ReviewView({
     }, { all: 0, pending: 0, contested: 0, rejected: 0, deferred: 0, escalated: 0, approved: 0 })
   ), [notes]);
   const filteredNotes = useMemo(() => {
-    if (filter === "all") return notes;
-    return notes.filter((note) => matchesReviewFilter(note, filter));
-  }, [filter, notes]);
+    const matched = filter === "all" ? notes : notes.filter((note) => matchesReviewFilter(note, filter));
+    return matched.slice().sort((left, right) => compareReviewNotes(left, right, sort));
+  }, [filter, notes, sort]);
   // Hide detail when the selection is outside the active filter so Approve/etc.
   // never apply to a note the queue is not listing.
   const detailNote = useMemo(() => {
@@ -178,6 +210,21 @@ export function ReviewView({
             >
               <span>{t(`reviewView.filter.${item}`)}</span>
               <strong aria-hidden="true">{counts[item]}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="pill-row review-sort-bar" aria-label={t("reviewView.sortAria")}>
+          <span className="muted">{t("reviewView.sortLabel")}</span>
+          {REVIEW_SORTS.map((item) => (
+            <button
+              type="button"
+              key={item}
+              className={sort === item ? "active" : "secondary"}
+              aria-pressed={sort === item}
+              onClick={() => setSort(item)}
+            >
+              {t(`reviewView.sort.${item}`)}
             </button>
           ))}
         </div>

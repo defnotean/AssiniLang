@@ -1,5 +1,15 @@
 const { randomUUID } = require("node:crypto");
-const { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } = require("node:fs");
+const {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} = require("node:fs");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -15,6 +25,40 @@ const {
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const apiModuleUrl = pathToFileURL(path.join(repoRoot, "apps", "api", "dist", "index.js")).href;
+const DESKTOP_UI_ROUTE_PREFIX = "/desktop-ui";
+const DESKTOP_UI_ROOT = path.resolve(repoRoot, "apps", "web", "dist");
+const DESKTOP_UI_MIME_TYPES = Object.freeze({
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".ico": "image/x-icon",
+  ".jpeg": "image/jpeg",
+  ".jpg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+  ".woff2": "font/woff2"
+});
+const DESKTOP_UI_HEADERS = Object.freeze({
+  "Cache-Control": "no-store",
+  "Content-Security-Policy": [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "connect-src 'self'",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data: blob:",
+    "object-src 'none'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "worker-src 'self' blob:"
+  ].join("; "),
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Referrer-Policy": "no-referrer",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY"
+});
 const IS_SMOKE_MODE = process.env.ASSINI_DESKTOP_SMOKE === "1";
 const DEFAULT_WINDOW_BOUNDS = { width: 1280, height: 860 };
 const MIN_WINDOW_BOUNDS = { width: 1040, height: 720 };
@@ -57,6 +101,23 @@ if (!IS_SMOKE_MODE) {
 
 function distUrl(relativePath) {
   return pathToFileURL(path.join(repoRoot, relativePath)).href;
+}
+
+function resolveExternalNavigationUrl(value) {
+  if (typeof value !== "string") return null;
+  try {
+    const url = new URL(value);
+    if (
+      (url.protocol !== "http:" && url.protocol !== "https:")
+      || url.username
+      || url.password
+    ) {
+      return null;
+    }
+    return url.href;
+  } catch {
+    return null;
+  }
 }
 
 function focusMainWindow() {
@@ -915,16 +976,93 @@ async function resetWindowLayout() {
   return actionResult("Reset window layout.");
 }
 
+function isStrictChildPath(parentPath, targetPath) {
+  const relative = path.relative(parentPath, targetPath);
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+function resolveDesktopUiAssetPath(requestPath, desktopUiRoot) {
+  if (typeof requestPath !== "string" || !requestPath) return null;
+
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(requestPath);
+  } catch {
+    return null;
+  }
+
+  if (
+    !decodedPath
+    || decodedPath.startsWith("/")
+    || decodedPath.includes("\\")
+    || decodedPath.includes("\0")
+    || decodedPath.includes("%")
+  ) {
+    return null;
+  }
+
+  const segments = decodedPath.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === ".." || segment.includes(":"))) {
+    return null;
+  }
+
+  const candidatePath = path.resolve(desktopUiRoot, ...segments);
+  if (!isStrictChildPath(desktopUiRoot, candidatePath)) return null;
+
+  try {
+    const resolvedPath = realpathSync(candidatePath);
+    if (!isStrictChildPath(desktopUiRoot, resolvedPath) || !statSync(resolvedPath).isFile()) return null;
+    return resolvedPath;
+  } catch {
+    return null;
+  }
+}
+
+function applyDesktopUiHeaders(reply) {
+  for (const [name, value] of Object.entries(DESKTOP_UI_HEADERS)) {
+    reply.header(name, value);
+  }
+}
+
+function registerDesktopUiRoute(server) {
+  let desktopUiRoot;
+  try {
+    desktopUiRoot = realpathSync(DESKTOP_UI_ROOT);
+  } catch {
+    throw new Error("The web app is not built yet. Run `npm.cmd run build` before launching AssiniLang Desktop.");
+  }
+  const indexPath = resolveDesktopUiAssetPath("index.html", desktopUiRoot);
+  if (!indexPath) {
+    throw new Error("The web app is not built yet. Run `npm.cmd run build` before launching AssiniLang Desktop.");
+  }
+
+  server.get(`${DESKTOP_UI_ROUTE_PREFIX}/*`, async (request, reply) => {
+    applyDesktopUiHeaders(reply);
+    const requestPath = request.params && typeof request.params === "object"
+      ? request.params["*"]
+      : undefined;
+    const assetPath = resolveDesktopUiAssetPath(requestPath, desktopUiRoot);
+    const contentType = assetPath ? DESKTOP_UI_MIME_TYPES[path.extname(assetPath).toLowerCase()] : undefined;
+    if (!assetPath || !contentType) {
+      return reply.code(404).type("text/plain; charset=utf-8").send("Not found");
+    }
+
+    return reply.type(contentType).send(readFileSync(assetPath));
+  });
+}
+
 async function startApiServer() {
   const [
     { JsonStore },
     { createServer },
     { bootstrapRuntimeEnvironment },
+    { applyLoopbackPrivateUrlDefault },
     { resolveRuntimeDataDir, resolveRuntimeDbPath }
   ] = await Promise.all([
     import("@assini/db"),
     import(distUrl(path.join("apps", "api", "dist", "server.js"))),
     import(distUrl(path.join("apps", "api", "dist", "runtimeEnvLoader.js"))),
+    import(distUrl(path.join("apps", "api", "dist", "runtimeConfig.js"))),
     import(distUrl(path.join("apps", "api", "dist", "runtimePath.js")))
   ]);
 
@@ -941,6 +1079,7 @@ async function startApiServer() {
     cwd: userDataDir,
     settingsPath: desktopSettingsPath
   });
+  applyLoopbackPrivateUrlDefault(process.env, "127.0.0.1");
   desktopRuntime = {
     backupsDir: path.join(userDataDir, "backups"),
     dataDir: resolveRuntimeDataDir({ moduleUrl: apiModuleUrl }),
@@ -955,10 +1094,11 @@ async function startApiServer() {
     settingsPath,
     authToken,
     enablePrototypeAuth: true,
-    allowedOrigins: ["http://localhost:5173", "http://127.0.0.1:5173", "file://", "null"],
+    allowedOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
     logger: false
   });
 
+  registerDesktopUiRoute(server);
   await server.listen({ host: "127.0.0.1", port: 0 });
   const address = server.server.address();
   if (!address || typeof address === "string") {
@@ -998,8 +1138,13 @@ function createSmokeEventLog(webContents) {
     }
   };
 
-  webContents.on("console-message", (_event, level, message, line, sourceId) => {
-    add("console", { level, line, message, sourceId });
+  webContents.on("console-message", (details) => {
+    add("console", {
+      level: details.level,
+      line: details.lineNumber,
+      message: details.message,
+      sourceId: details.sourceId
+    });
   });
   webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     const event = { errorCode, errorDescription, isMainFrame, validatedURL };
@@ -1213,7 +1358,6 @@ function desktopSmokeScript() {
         const root = document.documentElement;
         const pageOverflowX = Math.max(root.scrollWidth, document.body?.scrollWidth ?? 0) - root.clientWidth;
         const controls = [
-          "Interface language",
           "Discovered models",
           "Base URL",
           "Model",
@@ -1227,7 +1371,8 @@ function desktopSmokeScript() {
           noteTopicOverflow: visibleTextOverflow(".note-topic strong"),
           pageOverflowX,
           screen,
-          sidebarBrandOverflow: visibleTextOverflow(".brand-copy strong, .brand-copy span"),
+          // The subtitle is intentionally single-line with CSS ellipsis; the title must fit without clipping.
+          sidebarBrandOverflow: visibleTextOverflow(".brand-copy strong"),
           viewport: { width: window.innerWidth, height: window.innerHeight }
         };
 
@@ -1243,7 +1388,6 @@ function desktopSmokeScript() {
         if (screen === "Settings") {
           fit.desktopActionGroups = desktopActionGroupMetrics();
           const minimums = {
-            "Interface language": 80,
             "Discovered models": 320,
             "Base URL": 240,
             "Model": 240,
@@ -1468,15 +1612,23 @@ async function runDesktopSmoke(api, eventLog) {
   mainWindow.center();
   await new Promise((resolve) => setTimeout(resolve, 250));
 
+  const desktopUi = await verifyDesktopUiRoute(api.server);
   const bridge = await mainWindow.webContents.executeJavaScript(`
     Promise.all([
       Boolean(window.assiniDesktop && window.assiniDesktop.apiBaseUrl && window.assiniDesktop.authToken),
       Boolean(window.assiniDesktop && window.assiniDesktop.dataDir && window.assiniDesktop.settingsPath),
       Boolean(window.assiniDesktop && window.assiniDesktop.openDataFolder && window.assiniDesktop.openSettingsFolder),
-      fetch("/api/health").then((response) => ({ ok: response.ok, status: response.status }))
+      fetch("/api/health").then((response) => ({ ok: response.ok, status: response.status })),
+      window.location.origin === new URL(window.assiniDesktop.apiBaseUrl).origin
+        && window.location.pathname === "${DESKTOP_UI_ROUTE_PREFIX}/index.html"
     ])
   `);
-  if (!Array.isArray(bridge) || bridge.slice(0, 3).some((item) => item !== true) || bridge[3]?.ok !== true) {
+  if (
+    !Array.isArray(bridge)
+    || bridge.slice(0, 3).some((item) => item !== true)
+    || bridge[3]?.ok !== true
+    || bridge[4] !== true
+  ) {
     throw new Error("Desktop preload or API health check failed.");
   }
 
@@ -1500,6 +1652,7 @@ async function runDesktopSmoke(api, eventLog) {
     dataDir: desktopRuntime?.dataDir,
     dbPath: desktopRuntime?.dbPath,
     backupsDir: desktopRuntime?.backupsDir,
+    desktopUi,
     isPackaged: app.isPackaged,
     rendererEvents: eventLog.events,
     settingsPath: desktopRuntime?.settingsPath,
@@ -1558,6 +1711,51 @@ function analyzeSmokeImage(image) {
   return visual;
 }
 
+async function verifyDesktopUiRoute(server) {
+  const [index, encodedTraversal, encodedBackslash, directory, writeAttempt] = await Promise.all([
+    server.inject({ method: "GET", url: `${DESKTOP_UI_ROUTE_PREFIX}/index.html` }),
+    server.inject({ method: "GET", url: `${DESKTOP_UI_ROUTE_PREFIX}/%252e%252e%252fmain.cjs` }),
+    server.inject({ method: "GET", url: `${DESKTOP_UI_ROUTE_PREFIX}/assets%255c..%255cindex.html` }),
+    server.inject({ method: "GET", url: `${DESKTOP_UI_ROUTE_PREFIX}/assets` }),
+    server.inject({ method: "POST", url: `${DESKTOP_UI_ROUTE_PREFIX}/index.html` })
+  ]);
+
+  const csp = index.headers["content-security-policy"];
+  if (
+    index.statusCode !== 200
+    || !index.body.includes('<div id="root"></div>')
+    || index.headers["cache-control"] !== "no-store"
+    || typeof csp !== "string"
+    || !csp.includes("default-src 'self'")
+    || index.headers["x-content-type-options"] !== "nosniff"
+  ) {
+    throw new Error(`Desktop UI index route failed security checks: ${JSON.stringify({
+      cacheControl: index.headers["cache-control"],
+      contentSecurityPolicy: csp,
+      contentTypeOptions: index.headers["x-content-type-options"],
+      statusCode: index.statusCode
+    })}`);
+  }
+
+  const rejectedStatuses = [
+    encodedTraversal.statusCode,
+    encodedBackslash.statusCode,
+    directory.statusCode,
+    writeAttempt.statusCode
+  ];
+  if (rejectedStatuses.some((statusCode) => statusCode !== 404)) {
+    throw new Error(`Desktop UI route accepted a forbidden request: ${JSON.stringify(rejectedStatuses)}.`);
+  }
+
+  return {
+    cacheControl: index.headers["cache-control"],
+    contentSecurityPolicy: csp,
+    contentType: index.headers["content-type"],
+    indexStatus: index.statusCode,
+    rejectedStatuses
+  };
+}
+
 async function createMainWindow(api) {
   const indexPath = path.join(repoRoot, "apps", "web", "dist", "index.html");
   if (!existsSync(indexPath)) {
@@ -1602,7 +1800,8 @@ async function createMainWindow(api) {
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
-      contextIsolation: false
+      contextIsolation: true,
+      sandbox: true
     }
   });
   applyWindowState(mainWindow, savedWindowState);
@@ -1649,11 +1848,14 @@ async function createMainWindow(api) {
     });
   }
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    const externalUrl = resolveExternalNavigationUrl(url);
+    if (externalUrl) {
+      void shell.openExternal(externalUrl);
+    }
     return { action: "deny" };
   });
 
-  await mainWindow.loadFile(indexPath);
+  await mainWindow.loadURL(`${api.baseUrl}${DESKTOP_UI_ROUTE_PREFIX}/index.html`);
 }
 
 async function boot() {

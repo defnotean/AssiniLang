@@ -6,6 +6,7 @@ packages/*/node_modules/
 # Build output and TypeScript incremental state
 dist/
 dist-desktop/
+.dist-desktop-stage-*/
 apps/*/dist/
 packages/*/dist/
 *.tsbuildinfo
@@ -13,6 +14,8 @@ packages/*/dist/
 # Test and coverage artifacts
 coverage/
 .nyc_output/
+vitest-*.txt
+apps/*/vitest-*.txt
 
 # Local runtime data
 data/local-db.json
@@ -44,6 +47,8 @@ tmp-session.json
 delete-body.txt
 tmp-*.txt
 tmp-*.json
+.tmp-*
+_e3_keys.txt
 
 # Local continuous-improvement wake / verify scratch
 _loop_wake.ps1

@@ -34,7 +34,7 @@ function createRun(overrides: Partial<EvaluationRun> = {}): EvaluationRun {
 
 function renderEvaluationView(
   overrides: Partial<Parameters<typeof EvaluationView>[0]> = {},
-  locale: "en" | "ar" = "en"
+  locale: "en" = "en"
 ) {
   return render(
     <I18nProvider initialLocale={locale}>
@@ -166,31 +166,4 @@ describe("EvaluationView", () => {
 
     expect(screen.getByText("Note accuracy note-1: Missing note content for verb chains")).toBeInTheDocument();
     expect(screen.queryByText(/noteAccuracy/)).not.toBeInTheDocument();
-  });
-
-  it("localizes run summaries and failure messages in Arabic", () => {
-    renderEvaluationView(
-      {
-        evaluations: [
-          createRun({
-            summary: "Avenik: 90.0% average score across 2 categories.",
-            failures: [
-              {
-                category: "noteAccuracy",
-                languageId: "avenik",
-                itemId: "note-1",
-                message: "Missing note content for verb chains"
-              }
-            ]
-          })
-        ]
-      },
-      "ar"
-    );
-
-    expect(screen.getByText("Avenik: متوسط درجة 90.0% عبر 2 فئات.")).toBeInTheDocument();
-    expect(screen.getByText("دقة الملاحظات note-1: محتوى الملاحظة مفقود لـ verb chains")).toBeInTheDocument();
-    expect(screen.queryByText(/average score across/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Missing note content/i)).not.toBeInTheDocument();
-  });
-});
+  });});

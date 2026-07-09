@@ -1,7 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { discoverLlmModels } from "./llmDiscovery.js";
+import {
+  DISCOVERY_SCAN_CONCURRENCY,
+  discoverLlmModels,
+  LlmDiscoveryInputLimitError,
+  MAX_EXTRA_DISCOVERY_BASE_URLS
+} from "./llmDiscovery.js";
 
 describe("LLM model discovery", () => {
+  it("rejects excessive unique requested endpoints before network work", async () => {
+    let fetchCalls = 0;
+    let lookupCalls = 0;
+
+    await expect(discoverLlmModels({
+      env: {},
+      fetchFn: async () => {
+        fetchCalls += 1;
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      },
+      extraBaseUrls: Array.from(
+        { length: MAX_EXTRA_DISCOVERY_BASE_URLS + 1 },
+        (_, index) => `https://models-${index}.example/v1`
+      ),
+      includeCommonTargets: false,
+      lookupFn: async () => {
+        lookupCalls += 1;
+        return { address: "93.184.216.34", family: 4 };
+      }
+    })).rejects.toBeInstanceOf(LlmDiscoveryInputLimitError);
+
+    expect(fetchCalls).toBe(0);
+    expect(lookupCalls).toBe(0);
+  });
+
   it("discovers OpenAI-compatible and Ollama native model lists", async () => {
     const seenUrls: string[] = [];
     const fetchStub: typeof fetch = async (input) => {
@@ -302,24 +332,78 @@ describe("LLM model discovery", () => {
   });
 
   it("deduplicates localhost and 127.0.0.1 aliases for the same local model", async () => {
+    const seenUrls: string[] = [];
     const result = await discoverLlmModels({
       env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
-      fetchFn: async () => new Response(JSON.stringify({
-        data: [{ id: "Irene" }]
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      }),
-      extraBaseUrls: ["http://127.0.0.1:12345/v1", "http://localhost:12345/v1"],
+      fetchFn: async (input) => {
+        seenUrls.push(input.toString());
+        return new Response(JSON.stringify({
+          data: [{ id: "Irene" }]
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      },
+      extraBaseUrls: [
+        "http://127.0.0.1:12345",
+        "http://localhost:12345/v1/",
+        "http://127.0.0.1:12345/v1?refresh=true"
+      ],
       includeCommonTargets: false,
       timeoutMs: 500
     });
 
+    expect(seenUrls).toEqual(["http://127.0.0.1:12345/v1/models"]);
     expect(result.models).toHaveLength(1);
     expect(result.models[0]).toMatchObject({
       baseUrl: "http://127.0.0.1:12345/v1",
       model: "Irene"
     });
     expect(result.endpoints).toHaveLength(1);
+  });
+
+  it("keeps discovery fetches within the configured concurrency bound", async () => {
+    const targetCount = DISCOVERY_SCAN_CONCURRENCY + 2;
+    let active = 0;
+    let maxActive = 0;
+    let started = 0;
+    let releaseFetches!: () => void;
+    let resolveSaturated!: () => void;
+    const fetchGate = new Promise<void>((resolve) => {
+      releaseFetches = resolve;
+    });
+    const saturated = new Promise<void>((resolve) => {
+      resolveSaturated = resolve;
+    });
+
+    const discovery = discoverLlmModels({
+      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+      fetchFn: async () => {
+        started += 1;
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        if (active === DISCOVERY_SCAN_CONCURRENCY) resolveSaturated();
+        await fetchGate;
+        active -= 1;
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      },
+      extraBaseUrls: Array.from(
+        { length: targetCount },
+        (_, index) => `http://127.0.0.1:${9_000 + index}/v1`
+      ),
+      includeCommonTargets: false,
+      timeoutMs: 5_000
+    });
+
+    await saturated;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const startedBeforeRelease = started;
+    releaseFetches();
+    const result = await discovery;
+
+    expect(startedBeforeRelease).toBe(DISCOVERY_SCAN_CONCURRENCY);
+    expect(maxActive).toBe(DISCOVERY_SCAN_CONCURRENCY);
+    expect(started).toBe(targetCount);
+    expect(result.endpoints).toHaveLength(targetCount);
   });
 });

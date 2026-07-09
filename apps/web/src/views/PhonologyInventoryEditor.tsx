@@ -11,6 +11,7 @@ import {
   type PhonologyInventoryDraft,
   type PhonologyInventoryKind
 } from "../lib/phonologyInventory";
+import { WORKSPACE_FOCUS } from "../lib/workspaceFocus";
 import { useI18n } from "../i18n";
 
 function InventoryChipList({
@@ -69,7 +70,7 @@ export function PhonologyInventoryEditor({
 }) {
   const { t } = useI18n();
   const baseId = useId();
-  const consonantInputId = `${baseId}-consonant`;
+  const consonantInputId = WORKSPACE_FOCUS.phonologyEditor;
   const vowelInputId = `${baseId}-vowel`;
 
   const [draft, setDraft] = useState<PhonologyInventoryDraft>(() => draftFromLanguage(language));

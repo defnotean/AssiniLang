@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import type { ElderCorrection } from "@assini/db";
 import type { ElderContext, ElderCorrectionPayload, ElderCorrectionReviewStatus } from "../api";
 import { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "../api";
@@ -59,31 +59,51 @@ export function useElderWorkspace(
   const [reviewingCorrectionId, setReviewingCorrectionId] = useState<string | null>(null);
   const [applyingCorrectionId, setApplyingCorrectionId] = useState<string | null>(null);
   const [correctionApplyDrafts, setCorrectionApplyDrafts] = useState<Record<string, string>>({});
+  const scopeRef = useRef({ selectedLanguageId, isElderMode });
+  const contextRequestRef = useRef(0);
+  const submitRequestRef = useRef(0);
+  const reviewRequestRef = useRef(0);
+  const applyRequestRef = useRef(0);
+
+  if (
+    scopeRef.current.selectedLanguageId !== selectedLanguageId ||
+    scopeRef.current.isElderMode !== isElderMode
+  ) {
+    scopeRef.current = { selectedLanguageId, isElderMode };
+  }
+
+  function isCurrentScope(languageId: string): boolean {
+    return scopeRef.current.isElderMode && scopeRef.current.selectedLanguageId === languageId;
+  }
 
   const reloadElderContext = useCallback(() => {
     if (!isElderMode || !selectedLanguageId) return;
 
+    const requestId = ++contextRequestRef.current;
+    const languageId = selectedLanguageId;
     setIsLoadingElder(true);
     setCorrectionError(null);
-    fetchElderContext(selectedLanguageId)
+    fetchElderContext(languageId)
       .then((context) => {
-        setElderContext(context);
+        if (requestId === contextRequestRef.current && isCurrentScope(languageId)) setElderContext(context);
       })
       .catch((error: unknown) => {
+        if (requestId !== contextRequestRef.current || !isCurrentScope(languageId)) return;
         setElderContext(null);
         setCorrectionError(localizeApiError(error, t, "elderWs.errContextLoadFailed"));
       })
       .finally(() => {
-        setIsLoadingElder(false);
+        if (requestId === contextRequestRef.current && isCurrentScope(languageId)) setIsLoadingElder(false);
       });
   }, [isElderMode, selectedLanguageId, t]);
 
   useEffect(() => {
-    let isCurrent = true;
+    const requestId = ++contextRequestRef.current;
     if (!isElderMode || !selectedLanguageId) {
       setElderContext(null);
+      setIsLoadingElder(false);
       return () => {
-        isCurrent = false;
+        contextRequestRef.current += 1;
       };
     }
 
@@ -91,21 +111,22 @@ export function useElderWorkspace(
     setCorrectionSuccess(null);
     setCorrectionError(null);
 
-    fetchElderContext(selectedLanguageId)
+    const languageId = selectedLanguageId;
+    fetchElderContext(languageId)
       .then((context) => {
-        if (isCurrent) setElderContext(context);
+        if (requestId === contextRequestRef.current && isCurrentScope(languageId)) setElderContext(context);
       })
       .catch((error: unknown) => {
-        if (!isCurrent) return;
+        if (requestId !== contextRequestRef.current || !isCurrentScope(languageId)) return;
         setElderContext(null);
         setCorrectionError(localizeApiError(error, t, "elderWs.errContextLoadFailed"));
       })
       .finally(() => {
-        if (isCurrent) setIsLoadingElder(false);
+        if (requestId === contextRequestRef.current && isCurrentScope(languageId)) setIsLoadingElder(false);
       });
 
     return () => {
-      isCurrent = false;
+      contextRequestRef.current += 1;
     };
   }, [selectedLanguageId, isElderMode, t]);
 
@@ -119,6 +140,12 @@ export function useElderWorkspace(
     setCorrectionApplyDrafts({});
     setCorrectionSuccess(null);
     setCorrectionError(null);
+    setIsSubmittingCorrection(false);
+    setReviewingCorrectionId(null);
+    setApplyingCorrectionId(null);
+    submitRequestRef.current += 1;
+    reviewRequestRef.current += 1;
+    applyRequestRef.current += 1;
   }, [selectedLanguageId, isElderMode]);
 
   async function handleSubmitCorrection(event: FormEvent) {
@@ -142,8 +169,10 @@ export function useElderWorkspace(
     setCorrectionSuccess(null);
     setCorrectionError(null);
 
+    const languageId = selectedLanguageId;
+    const requestId = ++submitRequestRef.current;
     const payload: ElderCorrectionPayload = {
-      languageId: selectedLanguageId,
+      languageId,
       noteId: formNoteId || undefined,
       passageId: formPassageId || undefined,
       correction: formCorrection.trim(),
@@ -154,35 +183,45 @@ export function useElderWorkspace(
 
     try {
       await submitElderCorrection(payload);
+      if (requestId !== submitRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionSuccess(t("elderWs.msgSubmitSuccess"));
       setFormCorrection("");
       setFormRationale("");
       setFormContextText("");
       setFormNoteId("");
       setFormPassageId("");
-      setElderContext(await fetchElderContext(selectedLanguageId));
+      const context = await fetchElderContext(languageId);
+      if (requestId !== submitRequestRef.current || !isCurrentScope(languageId)) return;
+      setElderContext(context);
       await refreshDashboard();
     } catch (error) {
+      if (requestId !== submitRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionError(localizeApiError(error, t, "elderWs.errSubmitFailed"));
     } finally {
-      setIsSubmittingCorrection(false);
+      if (requestId === submitRequestRef.current && isCurrentScope(languageId)) setIsSubmittingCorrection(false);
     }
   }
 
   async function handleReviewCorrection(correctionId: string, status: ElderCorrectionReviewStatus) {
     if (!selectedLanguageId) return;
+    const languageId = selectedLanguageId;
+    const requestId = ++reviewRequestRef.current;
     setReviewingCorrectionId(correctionId);
     setCorrectionSuccess(null);
     setCorrectionError(null);
     try {
       await reviewElderCorrection(correctionId, status);
+      if (requestId !== reviewRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionSuccess(status === "accepted" ? t("elderWs.msgReviewAccepted") : t("elderWs.msgReviewRejected"));
-      setElderContext(await fetchElderContext(selectedLanguageId));
+      const context = await fetchElderContext(languageId);
+      if (requestId !== reviewRequestRef.current || !isCurrentScope(languageId)) return;
+      setElderContext(context);
       await refreshModelObservability();
     } catch (error) {
+      if (requestId !== reviewRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionError(localizeApiError(error, t, "elderWs.errReviewFailed"));
     } finally {
-      setReviewingCorrectionId(null);
+      if (requestId === reviewRequestRef.current && isCurrentScope(languageId)) setReviewingCorrectionId(null);
     }
   }
 
@@ -200,23 +239,29 @@ export function useElderWorkspace(
       return;
     }
 
+    const languageId = selectedLanguageId;
+    const requestId = ++applyRequestRef.current;
     setApplyingCorrectionId(correctionId);
     setCorrectionSuccess(null);
     setCorrectionError(null);
     try {
       await applyElderCorrection(correctionId, revisedExplanation);
+      if (requestId !== applyRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionSuccess(t("elderWs.msgApplySuccess"));
       setCorrectionApplyDrafts((current) => {
         const next = { ...current };
         delete next[correctionId];
         return next;
       });
-      setElderContext(await fetchElderContext(selectedLanguageId));
+      const context = await fetchElderContext(languageId);
+      if (requestId !== applyRequestRef.current || !isCurrentScope(languageId)) return;
+      setElderContext(context);
       await refreshDashboard();
     } catch (error) {
+      if (requestId !== applyRequestRef.current || !isCurrentScope(languageId)) return;
       setCorrectionError(localizeApiError(error, t, "elderWs.errApplyFailed"));
     } finally {
-      setApplyingCorrectionId(null);
+      if (requestId === applyRequestRef.current && isCurrentScope(languageId)) setApplyingCorrectionId(null);
     }
   }
 

@@ -2,6 +2,7 @@ import { useMemo, type Dispatch, type SetStateAction } from "react";
 import type { PaletteCommand } from "../components/CommandPalette";
 import type { Translate } from "../i18n";
 import type { Language, Theme, ViewMode } from "../lib/types";
+import { scheduleWorkspaceFocus, WORKSPACE_FOCUS } from "../lib/workspaceFocus";
 import { VIEW_ORDER } from "../lib/viewConfig";
 
 type UseWorkspacePaletteCommandsParams = {
@@ -11,6 +12,11 @@ type UseWorkspacePaletteCommandsParams = {
   onViewSelect: (mode: ViewMode) => void;
   setTheme: Dispatch<SetStateAction<Theme>>;
 };
+
+function jumpToViewAndFocus(onViewSelect: (mode: ViewMode) => void, mode: ViewMode, focusId: string): void {
+  onViewSelect(mode);
+  scheduleWorkspaceFocus(focusId);
+}
 
 export function useWorkspacePaletteCommands({
   workspace,
@@ -28,11 +34,34 @@ export function useWorkspacePaletteCommands({
     const viewCommands: PaletteCommand[] = VIEW_ORDER.map((mode) => ({
       id: `view-${mode}`,
       label: t("palette.open", { label: t(`viewConfig.${mode}.label`) }),
-      run: () => onViewSelect(mode)
+      run: () => {
+        onViewSelect(mode);
+        if (mode === "model") {
+          scheduleWorkspaceFocus(WORKSPACE_FOCUS.modelSetup);
+        }
+      }
     }));
+    const workflowJumps: PaletteCommand[] = [
+      {
+        id: "jump-practice-authoring",
+        label: t("palette.jumpPracticeAuthoring"),
+        run: () => jumpToViewAndFocus(onViewSelect, "learner", WORKSPACE_FOCUS.practiceAuthoring)
+      },
+      {
+        id: "jump-corpus-bulk-import",
+        label: t("palette.jumpCorpusBulkImport"),
+        run: () => jumpToViewAndFocus(onViewSelect, "profile", WORKSPACE_FOCUS.corpusBulkImport)
+      },
+      {
+        id: "jump-phonology-editor",
+        label: t("palette.jumpPhonologyEditor"),
+        run: () => jumpToViewAndFocus(onViewSelect, "profile", WORKSPACE_FOCUS.phonologyEditor)
+      }
+    ];
     return [
       ...languageCommands,
       ...viewCommands,
+      ...workflowJumps,
       {
         id: "toggle-theme",
         label: t("palette.toggleTheme"),

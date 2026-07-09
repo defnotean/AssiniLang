@@ -151,6 +151,53 @@ function desktopBridge(): AssiniDesktopBridge | undefined {
   return typeof window === "undefined" ? undefined : window.assiniDesktop;
 }
 
+const desktopApiPathPattern = /^\/api(?:[/?#]|$)/;
+
+function desktopApiBaseUrl(): string | undefined {
+  const candidate = desktopBridge()?.apiBaseUrl;
+  if (typeof candidate !== "string" || candidate.length === 0) return undefined;
+
+  try {
+    const url = new URL(candidate);
+    const isLoopback = url.hostname === "127.0.0.1"
+      || url.hostname === "localhost"
+      || url.hostname === "[::1]";
+    if (
+      url.protocol !== "http:"
+      || !isLoopback
+      || url.username
+      || url.password
+      || url.pathname !== "/"
+      || url.search
+      || url.hash
+    ) {
+      return undefined;
+    }
+    return url.origin;
+  } catch {
+    return undefined;
+  }
+}
+
+function resolveDesktopApiInput(input: RequestInfo | URL): RequestInfo | URL {
+  if (typeof input !== "string" || !desktopApiPathPattern.test(input)) return input;
+
+  const baseUrl = desktopApiBaseUrl();
+  if (!baseUrl) return input;
+
+  const apiPath = input.slice("/api".length);
+  return `${baseUrl}${apiPath || "/"}`;
+}
+
+function installDesktopApiFetch(): void {
+  if (typeof window === "undefined" || !desktopApiBaseUrl() || typeof window.fetch !== "function") return;
+
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => nativeFetch(resolveDesktopApiInput(input), init);
+}
+
+installDesktopApiFetch();
+
 function desktopActorHeaders(actor: LocalActor, json = false): HeadersInit | undefined {
   const bridge = desktopBridge();
   if (!bridge?.prototypeAuth || !bridge.authToken) return undefined;

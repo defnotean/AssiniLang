@@ -66,6 +66,11 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `ASSINI_DESKTOP_SMOKE` | unset | `1` | Internal flag used by `npm.cmd run desktop:smoke` to make the packaged Electron app run its rendered UI smoke check and exit automatically. |
 | `ASSINI_DESKTOP_SMOKE_REPORT` | `dist-desktop/desktop-smoke-report.json` from the launcher | file path | Internal report path used by the packaged desktop smoke check. |
 | `ASSINI_DESKTOP_SMOKE_SCREENSHOT` | `dist-desktop/desktop-smoke.png` from the launcher | file path | Internal screenshot path used by the packaged desktop smoke check to prove the window is not blank. |
+| `ASSINI_WEB_SMOKE_URL` | auto-selected local preview URL | URL | Optional explicit URL for `npm run smoke:web`; when set, the smoke runner uses that already-running target instead of choosing a preview port. |
+| `ASSINI_WEB_SMOKE_HOST` / `ASSINI_WEB_SMOKE_PORT` | `127.0.0.1` / auto-selected | hostname / port | Optional host and preferred port for the rendered web smoke preview. |
+| `ASSINI_WEB_SMOKE_API_PORT` | auto-selected | port | Optional preferred API port for the rendered web smoke. |
+| `ASSINI_WEB_SMOKE_SKIP_SERVER` | unset | `1` | Test-only switch that tells the rendered web smoke to use an already-running target instead of starting its API and preview processes. |
+| `ASSINI_WEB_SMOKE_SCREENSHOT` | unset | file path | Optional screenshot destination for the rendered web smoke. |
 
 ## Transcription (audio sources)
 
@@ -88,7 +93,7 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 
 | Variable | Default | Accepted values | Effect |
 | --- | --- | --- | --- |
-| `ASSINI_ALLOW_PRIVATE_URLS` | unset (guard active) | `1` or `true` | Disables the SSRF guard so URL sources may point at localhost and private networks. Only enable in a trusted local setup; see [ingestion](ingestion.md#ssrf-guard). |
+| `ASSINI_ALLOW_PRIVATE_URLS` | enabled when `HOST` is loopback; disabled otherwise | `1`/`true` to allow, empty/`0`/`false` to block | Allows model endpoints and URL sources on localhost or private networks. AssiniLang Desktop and the default local dev server enable this so Ollama, LM Studio, Irene, and other LAN models work without editing code. An explicit value is always respected, and network-facing APIs remain guarded; see [ingestion](ingestion.md#ssrf-guard). |
 | `ASSINI_OBSIDIAN_VAULT_ROOTS` | unset (vault import disabled) | semicolon-separated absolute directory paths | Allowlist of roots for `POST /languages/:languageId/sources/obsidian-vault`. The resolved vault path must equal a root or sit under `root` + path separator. Fail-closed: when unset or empty, vault imports return `400`. Relative segments (for example `./vaults`) are dropped so the process CWD cannot silently widen the allowlist; if every entry is relative, imports return `400` with an absolute-path message. Prefer `realpath` so symlink escapes cannot leave an allowlisted root. Example: `C:\Users\you\Documents\Obsidian;D:\LanguageVaults`. |
 | `ASSINI_OCR_LANG` | `eng` | tesseract.js language code (`eng`, `spa`, `fra`, ...) | Language for the local tesseract.js fallback on image sources when neither the OCR model nor a vision-capable main LLM is configured. The first run per language downloads trained data (a few MB, internet required once) and caches it under `data/ocr-cache/`. |
 
@@ -100,6 +105,7 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `ASSINI_DEV_WEB_PORT` | `5173` | port number | Vite dev-server port used by `npm.cmd run dev`. |
 | `PORT` | `4321` | port number | API listen port when running the API workspace directly. |
 | `HOST` | `127.0.0.1` | hostname/IP | API listen host; also the host the dev launcher binds both processes to. |
+| `ASSINI_ALLOW_INSECURE_NETWORK_AUTH` | unset | `true` | Explicit override for running passwordless prototype sessions or a known development token on a non-loopback `HOST`. Startup refuses that combination by default. Use only on an intentionally isolated development network; it does not make prototype auth production-safe. |
 | `ASSINI_API_HOST` | `127.0.0.1` | hostname/IP | Where the Vite `/api` proxy forwards requests (set automatically by the dev launcher). |
 | `ASSINI_API_PORT` | `4321` | port number | Port for the Vite `/api` proxy target (set automatically by the dev launcher). |
 | `ASSINI_DB_PATH` | `data/local-db.json` in the repo | absolute or relative file path | Overrides where the local database lives. Paths ending in `.json` use the JSON store; any other extension uses SQLite. Uploaded assets and the OCR cache live next to it. Honored by seed, eval, and `db:backup`. |

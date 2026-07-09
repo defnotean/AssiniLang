@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative } from "node:path";
 import type { FastifyInstance } from "fastify";
 import {
@@ -237,6 +237,37 @@ function parseObsidianVaultImportBody(input: unknown): ObsidianVaultImportPayloa
 function sanitizeStoredFileName(name: string): string {
   const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
   return cleaned.length > 0 ? cleaned.slice(0, 80) : "upload";
+}
+
+async function unlinkIfPresent(filePath: string): Promise<void> {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
+async function cleanupUnpersistedUpload(
+  stagingPath: string,
+  finalPath: string,
+  finalFileCreated: boolean
+): Promise<void> {
+  const cleanupErrors: unknown[] = [];
+  const paths = finalFileCreated ? [finalPath, stagingPath] : [stagingPath];
+
+  for (const filePath of paths) {
+    try {
+      await unlinkIfPresent(filePath);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+
+  if (cleanupErrors.length > 0) {
+    throw new AggregateError(cleanupErrors, "Failed to clean up an unpersisted source upload.");
+  }
 }
 
 function sourceKindForUpload(mimeType: string, fileName: string): SourceAssetKind {
@@ -641,50 +672,76 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         i18nKey: "errors.sourceStoreFailed"
       };
     }
-    await mkdir(dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, buffer);
-
     const mimeType = file.mimetype || "application/octet-stream";
     const kind = sourceKindForUpload(mimeType, originalName);
     const titleValue = titleResult.title;
-
     let asset: SourceAsset | undefined;
+    const uploadDirectory = dirname(absolutePath);
+    const stagingPath = join(
+      uploadDirectory,
+      `.${basename(absolutePath)}.${randomUUID()}.uploading`
+    );
+    let finalFileCreated = false;
 
-    await updateState((state) => {
-      const createdAt = new Date().toISOString();
-      asset = {
-        id: assetId,
-        languageId,
-        kind,
-        title: titleValue || originalName,
-        originalName,
-        mimeType,
-        filePath: relativePath,
-        status: "pending",
-        createdBy: actor.id,
-        createdAt
-      };
+    try {
+      await mkdir(uploadDirectory, { recursive: true });
+      await writeFile(stagingPath, buffer, { flag: "wx" });
+      // Staging beside the destination guarantees that finalization is an
+      // atomic same-filesystem rename. State is persisted only after the final
+      // path exists, so a successful row never points at a staging file.
+      await rename(stagingPath, absolutePath);
+      finalFileCreated = true;
 
-      return appendAuditEvent({
-        ...state,
-        sourceAssets: [...state.sourceAssets, asset]
-      }, {
-        actor,
-        at: createdAt,
-        action: "source_asset.uploaded",
-        entityType: "source_asset",
-        entityId: asset.id,
-        languageId,
-        summary: `Uploaded ${kind} source "${asset.title}".`,
-        metadata: {
+      await updateState((state) => {
+        const createdAt = new Date().toISOString();
+        asset = {
+          id: assetId,
+          languageId,
           kind,
+          title: titleValue || originalName,
+          originalName,
           mimeType,
-          byteSize: buffer.length
-        }
+          filePath: relativePath,
+          status: "pending",
+          createdBy: actor.id,
+          createdAt
+        };
+
+        return appendAuditEvent({
+          ...state,
+          sourceAssets: [...state.sourceAssets, asset]
+        }, {
+          actor,
+          at: createdAt,
+          action: "source_asset.uploaded",
+          entityType: "source_asset",
+          entityId: asset.id,
+          languageId,
+          summary: `Uploaded ${kind} source "${asset.title}".`,
+          metadata: {
+            kind,
+            mimeType,
+            byteSize: buffer.length
+          }
+        });
       });
-    });
+    } catch (error) {
+      // updateState resolves only after persistence. On rejection, neither a
+      // finalized file nor its staging predecessor may outlive the failed row.
+      try {
+        await cleanupUnpersistedUpload(stagingPath, absolutePath, finalFileCreated);
+      } catch (cleanupError) {
+        request.log.error({ err: cleanupError }, "Failed to clean up unpersisted source upload");
+      }
+      throw error;
+    }
 
     if (!asset) {
+      try {
+        await cleanupUnpersistedUpload(stagingPath, absolutePath, finalFileCreated);
+      } catch (cleanupError) {
+        request.log.error({ err: cleanupError }, "Failed to clean up source upload without a persisted asset");
+      }
       reply.code(500);
       return {
         error: "Source could not be stored",

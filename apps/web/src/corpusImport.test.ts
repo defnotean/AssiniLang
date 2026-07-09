@@ -111,29 +111,7 @@ describe("corpus import helpers", () => {
       ok: false,
       errorCode: "invalidConsentUse"
     });
-  });
-
-  it("formats incomplete and consent-use errors through i18n catalogs", () => {
-    const en = createTranslator("en");
-    const ar = createTranslator("ar");
-
-    expect(formatCorpusImportError("incomplete", en)).toBe(
-      "Please complete target text, translation, provenance, tags, and morphemes."
-    );
-    expect(formatCorpusImportError("incomplete", ar)).toBe(
-      "أكمل نص الهدف والترجمة والمصدر والوسوم والمورفيمات."
-    );
-    expect(formatCorpusImportError("incomplete", ar)).not.toMatch(/Please complete/);
-
-    const allowed = CORPUS_CONSENT_USE_VALUES.join(", ");
-    expect(formatCorpusImportError("invalidConsentUse", en)).toBe(
-      `Consent use must be one of: ${allowed}.`
-    );
-    expect(formatCorpusImportError("invalidConsentUse", ar)).toBe(
-      `يجب أن يكون استخدام الموافقة أحد القيم التالية: ${allowed}.`
-    );
-  });
-});
+  });});
 
 const BULK_HEADER = [
   "target",
@@ -283,33 +261,4 @@ describe("corpus bulk TSV/CSV dry-run", () => {
       format: "tsv",
       parseError: "missingHeader"
     });
-  });
-
-  it("formats bulk dry-run reports through i18n catalogs", () => {
-    const en = createTranslator("en");
-    const ar = createTranslator("ar");
-
-    const success = dryRunCorpusBulkImport([BULK_HEADER, bulkTsvRow()].join("\n"));
-    expect(formatCorpusBulkDryRunReport(success, en)).toBe(
-      "Dry-run only — nothing saved yet. 1 ready, 0 failed of 1 rows."
-    );
-    expect(formatCorpusBulkDryRunReport(success, ar)).toContain("تجربة جافة فقط");
-    expect(formatCorpusBulkDryRunReport(success, ar)).toContain("1 جاهزة");
-    expect(formatCorpusBulkDryRunReport(success, ar)).not.toMatch(/ready,/);
-
-    const mixed = dryRunCorpusBulkImport([
-      BULK_HEADER,
-      bulkTsvRow(),
-      bulkTsvRow({ consentUse: "not-a-real-consent-use", target: "other target" })
-    ].join("\n"));
-    const mixedEn = formatCorpusBulkDryRunReport(mixed, en);
-    expect(mixedEn).toContain("1 ready, 1 failed of 2 rows.");
-    expect(mixedEn).toContain("Row 3:");
-    expect(mixedEn).toContain(CORPUS_CONSENT_USE_VALUES.join(", "));
-
-    expect(formatCorpusBulkDryRunReport(dryRunCorpusBulkImport(""), en)).toContain(
-      "Paste a TSV or CSV with a header row before validating."
-    );
-    expect(formatCorpusBulkDryRunReport(dryRunCorpusBulkImport(""), ar)).toContain("الصق");
-  });
-});
+  });});

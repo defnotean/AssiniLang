@@ -392,9 +392,18 @@ export function useIngestExtraction(
     );
   }
 
-  function toggleSelectAllProposed() {
+  function toggleSelectAllProposed(visibleDraftIds?: string[]) {
     setPendingBulkAction(null);
-    setSelectedDraftIds((previous) => (previous.length === drafts.length ? [] : drafts.map((draft) => draft.id)));
+    const targetIds = visibleDraftIds ?? drafts.map((draft) => draft.id);
+    setSelectedDraftIds((previous) => {
+      const allVisibleSelected =
+        targetIds.length > 0 && targetIds.every((id) => previous.includes(id));
+      if (allVisibleSelected) {
+        const hide = new Set(targetIds);
+        return previous.filter((id) => !hide.has(id));
+      }
+      return [...new Set([...previous, ...targetIds])];
+    });
   }
 
   async function handleBulkReview(action: BulkReviewAction) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { Language, User } from "@assini/db";
 import type {
   CorpusImportPayload,
@@ -30,7 +30,6 @@ import type {
   ViewMode
 } from "./lib/types";
 import { useI18n } from "./i18n";
-import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
 import { useElderWorkspace } from "./hooks/useElderWorkspace";
 import { useGovernanceWorkspace } from "./hooks/useGovernanceWorkspace";
@@ -39,21 +38,44 @@ import { useModelWorkspace } from "./hooks/useModelWorkspace";
 import { useReviewWorkspace } from "./hooks/useReviewWorkspace";
 import { useWorkspacePaletteCommands } from "./hooks/useWorkspacePaletteCommands";
 import { TOUR_STEPS, useWorkspaceTour } from "./hooks/useWorkspaceTour";
-import { AssistantView } from "./views/AssistantView";
-import { CorpusView } from "./views/CorpusView";
 import { CreateLanguageForm } from "./views/CreateLanguageForm";
 import { DeleteLanguageForm } from "./views/DeleteLanguageForm";
-import { ElderPage } from "./views/ElderPage";
-import { EvaluationView } from "./views/EvaluationView";
-import { GovernanceView } from "./views/GovernanceView";
-import { IngestView } from "./views/IngestView";
-import { LearnerView } from "./views/LearnerView";
-import { ModelSetupView } from "./views/ModelSetupView";
 import { NoLanguageNotice } from "./views/NoLanguageNotice";
-import { PhonologyInventoryEditor } from "./views/PhonologyInventoryEditor";
-import { ReviewView } from "./views/ReviewView";
 import { GuidedTour } from "./components/GuidedTour";
 import "./styles.css";
+
+const AssistantView = lazy(() =>
+  import("./views/AssistantView").then(({ AssistantView }) => ({ default: AssistantView }))
+);
+const CorpusView = lazy(() =>
+  import("./views/CorpusView").then(({ CorpusView }) => ({ default: CorpusView }))
+);
+const ElderPage = lazy(() =>
+  import("./views/ElderPage").then(({ ElderPage }) => ({ default: ElderPage }))
+);
+const EvaluationView = lazy(() =>
+  import("./views/EvaluationView").then(({ EvaluationView }) => ({ default: EvaluationView }))
+);
+const GovernanceView = lazy(() =>
+  import("./views/GovernanceView").then(({ GovernanceView }) => ({ default: GovernanceView }))
+);
+const IngestView = lazy(() =>
+  import("./views/IngestView").then(({ IngestView }) => ({ default: IngestView }))
+);
+const LearnerView = lazy(() =>
+  import("./views/LearnerView").then(({ LearnerView }) => ({ default: LearnerView }))
+);
+const ModelSetupView = lazy(() =>
+  import("./views/ModelSetupView").then(({ ModelSetupView }) => ({ default: ModelSetupView }))
+);
+const PhonologyInventoryEditor = lazy(() =>
+  import("./views/PhonologyInventoryEditor").then(({ PhonologyInventoryEditor }) => ({
+    default: PhonologyInventoryEditor
+  }))
+);
+const ReviewView = lazy(() =>
+  import("./views/ReviewView").then(({ ReviewView }) => ({ default: ReviewView }))
+);
 
 export { getInitialTheme } from "./lib/theme";
 
@@ -340,7 +362,6 @@ export function App() {
             <span>{t("sidebar.brandSubtitle")}</span>
           </div>
           <div className="brand-controls">
-            <LanguageSwitcher />
             <button
               type="button"
               className="theme-toggle"
@@ -430,8 +451,7 @@ export function App() {
             {currentTitle}
           </h2>
 
-          {(
-            <>
+          <Suspense fallback={<StatusScreen kind="loading" message={t("app.loadingWorkspace")} />}>
               {view === "profile" && (
                 selectedLanguageId ? (
                   <div className="simple-workspace-stack">
@@ -606,8 +626,7 @@ export function App() {
                   ) : <NoLanguageNotice />}
                 </div>
               )}
-            </>
-          )}
+          </Suspense>
         </section>
       </main>
       </div>

@@ -1,6 +1,6 @@
 {
   "name": "assini-lang",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.11.1",
@@ -13,7 +13,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npm run check && npm run build --workspaces --if-present",
     "check": "tsc -b packages/db packages/eval apps/api apps/web",
     "test": "vitest run --passWithNoTests",
     "seed": "npm --workspace @assini/db run seed",
@@ -29,6 +29,8 @@
     "desktop:package": "npm run build && node scripts/packageDesktop.mjs",
     "desktop:smoke": "node scripts/smokeDesktopPackage.mjs",
     "desktop:package:smoke": "npm run desktop:package && npm run desktop:smoke",
+    "desktop:package:smoke:built": "node scripts/packageDesktop.mjs && npm run desktop:smoke",
+    "smoke:web": "electron scripts/smokeWeb.cjs",
     "dev": "node scripts/dev.mjs",
     "demo": "npm run seed && npm run eval && npm run dev"
   },

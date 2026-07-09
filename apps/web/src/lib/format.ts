@@ -3,7 +3,7 @@ import {
   sourceProcessingErrorI18n,
   sourceProcessingWarningI18n,
   vaultImportSkipReasonI18n
-} from "@assini/api-contract";
+} from "@assini/api-contract/sourceProcessingErrors";
 import type {
   EvaluationArtifact,
   ExtractionDraft,

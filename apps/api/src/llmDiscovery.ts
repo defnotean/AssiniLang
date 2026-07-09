@@ -24,7 +24,16 @@ export type {
 
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_DISCOVERY_TIMEOUT_MS = 1_800;
-const MAX_DISCOVERY_BASE_URLS = 12;
+const MAX_DISCOVERY_TARGETS = 12;
+export const MAX_EXTRA_DISCOVERY_BASE_URLS = 12;
+export const DISCOVERY_SCAN_CONCURRENCY = 4;
+
+export class LlmDiscoveryInputLimitError extends Error {
+  constructor(readonly limit = MAX_EXTRA_DISCOVERY_BASE_URLS) {
+    super(`Too many model discovery base URLs: at most ${limit} per request.`);
+    this.name = "LlmDiscoveryInputLimitError";
+  }
+}
 
 type DiscoveryProvider = DiscoveredLlmModel["provider"];
 type DiscoveryKind = "openai-models" | "ollama-tags" | "lm-studio-native-v1" | "lm-studio-native-v0";
@@ -75,6 +84,25 @@ function canonicalLocalBaseUrl(baseUrl: string): string {
   } catch {
     return normalizeBaseUrl(baseUrl);
   }
+}
+
+function normalizeAndDedupeDiscoveryBaseUrls(values: readonly string[]): string[] {
+  const byCanonicalBaseUrl = new Map<string, string>();
+
+  for (const value of values) {
+    const trimmed = trimValue(value);
+    if (!trimmed) continue;
+    const normalized = normalizeHttpBaseUrl(trimmed) ?? trimmed;
+    const normalizedTargetBaseUrl = inferProvider(normalized) === "openai"
+      ? normalized
+      : ensureV1BaseUrl(normalized);
+    const key = canonicalLocalBaseUrl(normalizedTargetBaseUrl);
+    if (!byCanonicalBaseUrl.has(key)) {
+      byCanonicalBaseUrl.set(key, normalized);
+    }
+  }
+
+  return [...byCanonicalBaseUrl.values()];
 }
 
 function providerLabel(provider: DiscoveryProvider): string {
@@ -138,10 +166,10 @@ function splitDiscoveryBaseUrls(value: string | undefined): string[] {
 }
 
 function discoveryBaseUrlsFromEnv(env: Env): string[] {
-  return [
+  return normalizeAndDedupeDiscoveryBaseUrls([
     ...splitDiscoveryBaseUrls(env.ASSINI_LLM_DISCOVERY_BASE_URLS),
     ...splitDiscoveryBaseUrls(env.ASSINI_MODEL_DISCOVERY_URLS)
-  ];
+  ]);
 }
 
 function openAiTarget(params: {
@@ -347,14 +375,14 @@ function buildDiscoveryTargets(params: {
 
   const byScanUrl = new Map<string, DiscoveryTarget>();
   for (const target of targets) {
-    const key = `${target.kind}:${target.scanUrl}`;
+    const key = `${target.kind}:${canonicalLocalBaseUrl(target.scanUrl)}`;
     const existing = byScanUrl.get(key);
     if (!existing || (!existing.reportErrors && target.reportErrors)) {
       byScanUrl.set(key, target);
     }
   }
 
-  return [...byScanUrl.values()].slice(0, MAX_DISCOVERY_BASE_URLS);
+  return [...byScanUrl.values()].slice(0, MAX_DISCOVERY_TARGETS);
 }
 
 function errorDetail(error: unknown, apiKey?: string): string {
@@ -517,6 +545,25 @@ function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
 }
 
+async function forEachWithConcurrency<T>(
+  values: readonly T[],
+  concurrency: number,
+  task: (value: T) => Promise<void>
+): Promise<void> {
+  let nextIndex = 0;
+  const workers = Array.from(
+    { length: Math.min(concurrency, values.length) },
+    async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        await task(values[index]!);
+      }
+    }
+  );
+  await Promise.all(workers);
+}
+
 async function scanTarget(
   fetchFn: FetchFn,
   target: DiscoveryTarget,
@@ -607,8 +654,14 @@ export async function discoverLlmModels(options: {
     : DEFAULT_DISCOVERY_TIMEOUT_MS;
   const errors: LlmModelDiscoveryError[] = [];
   const validatedExtraBaseUrls: string[] = [];
+  const suppliedExtraBaseUrls = options.extraBaseUrls ?? [];
 
-  for (const baseUrl of options.extraBaseUrls ?? []) {
+  if (suppliedExtraBaseUrls.length > MAX_EXTRA_DISCOVERY_BASE_URLS) {
+    throw new LlmDiscoveryInputLimitError();
+  }
+  const extraBaseUrls = normalizeAndDedupeDiscoveryBaseUrls(suppliedExtraBaseUrls);
+
+  for (const baseUrl of extraBaseUrls) {
     try {
       await assertOutboundHttpUrlAllowed(baseUrl, { env, lookupFn: options.lookupFn });
       validatedExtraBaseUrls.push(baseUrl);
@@ -637,7 +690,7 @@ export async function discoverLlmModels(options: {
     error: LlmModelDiscoveryError;
   }> = [];
 
-  await Promise.all(targets.map(async (target) => {
+  await forEachWithConcurrency(targets, DISCOVERY_SCAN_CONCURRENCY, async (target) => {
     try {
       await assertOutboundHttpUrlAllowed(target.baseUrl, { env, lookupFn: options.lookupFn });
     } catch (error) {
@@ -690,7 +743,7 @@ export async function discoverLlmModels(options: {
         });
       }
     }
-  }));
+  });
 
   const lmStudioNativeBaseUrls = new Set(
     successfulScans

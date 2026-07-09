@@ -213,12 +213,12 @@ describe("ElderPage review and apply busy guards", () => {
       />
     );
 
-    const approveButton = screen.getByRole("button", { name: "Working…" });
-    const rejectButton = screen.getByRole("button", { name: "Can't use this" });
-    expect(approveButton).toBeDisabled();
-    expect(approveButton).toHaveAttribute("aria-busy", "true");
-    expect(rejectButton).toBeDisabled();
-    expect(rejectButton).toHaveAttribute("aria-busy", "true");
+    const busyButtons = screen.getAllByRole("button", { name: "Working…" });
+    expect(busyButtons).toHaveLength(2);
+    for (const button of busyButtons) {
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("aria-busy", "true");
+    }
   });
 
   it("marks save-into-lesson busy while an accepted correction is applying", () => {
@@ -255,5 +255,109 @@ describe("ElderPage review and apply busy guards", () => {
     const saveButton = screen.getByRole("button", { name: "Saving…" });
     expect(saveButton).toBeDisabled();
     expect(saveButton).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("seeds the apply editor from the suggested fix and shows save guidance", () => {
+    const data = createDashboardData();
+    const elderContext = createElderContext();
+    elderContext.corrections = [
+      {
+        id: "corr-3",
+        languageId: "avenik",
+        noteId: data.notes[0]!.id,
+        correction: "Use -na for locative.",
+        rationale: "That is how elders say it.",
+        severity: "minor",
+        status: "accepted",
+        proposedBy: "elder-1",
+        proposedAt: "2026-06-06T00:00:00.000Z",
+        reviewedBy: "reviewer-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }
+    ];
+
+    render(
+      <ElderPage
+        elder={createElderState({ elderContext })}
+        data={data}
+        isWorkflowBusy={false}
+      />
+    );
+
+    expect(screen.getByText(/Edit the wording below/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Use -na for locative.")).toBeInTheDocument();
+  });
+
+  it("shows next-step guidance when an accepted correction has no linked lesson", () => {
+    const data = createDashboardData();
+    const elderContext = createElderContext();
+    elderContext.corrections = [
+      {
+        id: "corr-4",
+        languageId: "avenik",
+        passageId: data.corpus[0]!.id,
+        correction: "Say mira talo-mi-na.",
+        rationale: "That is the river walk form.",
+        severity: "minor",
+        status: "accepted",
+        proposedBy: "elder-1",
+        proposedAt: "2026-06-06T00:00:00.000Z",
+        reviewedBy: "reviewer-1",
+        reviewedAt: "2026-06-06T01:00:00.000Z"
+      }
+    ];
+
+    render(
+      <ElderPage
+        elder={createElderState({ elderContext })}
+        data={data}
+        isWorkflowBusy={false}
+      />
+    );
+
+    const emptyState = screen.getByText(/not linked to a lesson/).closest("[role='status']");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveTextContent(/choose a lesson in step 1/);
+  });
+
+  it("keeps success feedback visible on the thank-you screen after send", () => {
+    const data = createDashboardData();
+    const elderContext = createElderContext();
+    elderContext.corrections = [
+      {
+        id: "corr-5",
+        languageId: "avenik",
+        noteId: data.notes[0]!.id,
+        correction: "Use -na for locative.",
+        rationale: "That is how elders say it.",
+        severity: "minor",
+        status: "pending_review",
+        proposedBy: "elder-1",
+        proposedAt: "2026-06-06T00:00:00.000Z",
+        reviewedBy: null,
+        reviewedAt: null
+      }
+    ];
+
+    render(
+      <ElderPage
+        elder={createElderState({
+          elderContext,
+          formContextText: "mira talo-mi-na",
+          formCorrection: "Use -na for locative.",
+          formRationale: "That is how elders say it.",
+          correctionSuccess: "Elder Correction submitted successfully!"
+        })}
+        data={data}
+        isWorkflowBusy={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send my suggestion" }));
+
+    expect(screen.getByText("Thank you")).toBeInTheDocument();
+    expect(screen.getByText("Elder Correction submitted successfully!")).toBeInTheDocument();
   });
 });

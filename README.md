@@ -2,7 +2,7 @@
 
 A local-first workbench for documenting a language from raw materials and proving a language-learning AI workflow before any real community data is used.
 
-The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, Obsidian Markdown vaults, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Every extracted item is a reviewable draft: nothing enters the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
+The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, allowlisted Obsidian Markdown vaults, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Extracted candidates enter a review queue: nothing reaches the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
 
 On top of the reviewed data sit learner exercises with private answer keys, a deterministic evaluation harness, review policies and dispositions, elder corrections, audit trails, sanitized SHA-256-integrity exports, and AI-session observability.
 
@@ -19,11 +19,11 @@ flowchart LR
 
 ## Features
 
-- Ingestion: six source kinds plus Obsidian vault import, chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
+- Ingestion: six source kinds plus one-way Obsidian vault import (not live MCP sync), chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
 - Review and governance: single and bulk extraction-draft review, note review queue with per-language policies and approval thresholds, model-drafted notes with automatic grounding scores, review dispositions, elder corrections, audit events.
 - Learning and evaluation: server-graded exercises with private answer keys and adversarial probes, spaced-repetition practice recommendations, deterministic evaluation across seven categories, paradigm-gap detection as a fieldwork to-do.
 - AI Assistant: grounded chat with the configured local model - natural-language corrections, standing setup instructions, per-reply fallback labeling, conversations that survive reloads.
-- Console ergonomics: command palette (Ctrl+K), interlinear glossed text, concordance, and corpus graph in the examples browser, persisted theme/view/language selection.
+- Console ergonomics: command palette (Ctrl+K), interlinear glossed text, concordance, and corpus graph in the examples browser, with persisted theme, view, and active language-project selection. The operator interface is English-only; documented target languages remain independent projects.
 - Model setup: discovers local/OpenAI-compatible models, saves named model profiles, hot-swaps the active provider, and keeps provider keys server-side.
 - Safety boundaries: public projection layer strips answer keys and internals, exports carry SHA-256 integrity manifests, provider keys never reach the browser, corrupted local data fails loudly, validated database backup/restore.
 
@@ -63,9 +63,9 @@ To verify that the packaged app really renders instead of opening to a white scr
 npm.cmd run desktop:smoke
 ```
 
-That command launches the packaged `.exe` with a temporary profile, creates a disposable Bisaya smoke workspace, clicks through Start, Build, Practice, and Settings, verifies the model/provider controls, and writes `dist-desktop\desktop-smoke-report.json` plus `dist-desktop\desktop-smoke.png`. Use `npm.cmd run desktop:package:smoke` when you want to rebuild the package and immediately run the visual smoke check.
+That command launches the packaged `.exe` with a temporary profile, creates a disposable synthetic workspace whose smoke data is labeled Bisaya, clicks through Start, Build, Practice, and Settings, verifies the model/provider controls, and writes `dist-desktop\desktop-smoke-report.json` plus `dist-desktop\desktop-smoke.png`. The fixture is test data, not a bundled Bisaya language pack or interface mode. Use `npm.cmd run desktop:package:smoke` when you want to rebuild the package and immediately run the visual smoke check.
 
-To use a real local model, point the API at an OpenAI-compatible endpoint before `npm.cmd run dev`:
+The Settings tab automatically probes common local OpenAI-compatible endpoints and lists every model they expose. Start or load a model, select it from the dropdown, and switch models without restarting the app. You can also configure a known endpoint before `npm.cmd run dev`:
 
 ```powershell
 $env:ASSINI_LLM_PROVIDER="ollama"
@@ -73,7 +73,7 @@ $env:ASSINI_LLM_BASE_URL="http://127.0.0.1:11434/v1"
 $env:ASSINI_LLM_MODEL="llama3.1"
 ```
 
-Without a model, ingestion still works through offline heuristic parsing and local OCR.
+Without a model, ingestion still works through offline heuristic parsing and local OCR. Smaller local models can handle chat and simple word-list extraction, but strict structured extraction is the harder workload; use Test connection and the model smoke test in Settings before a long import.
 
 ## Configuration
 
@@ -85,8 +85,9 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `ASSINI_LLM_API_KEY` | Server-side key for remote endpoints. |
 | `ASSINI_TRANSCRIBE_BASE_URL` | Whisper-style endpoint required for audio sources. |
 | `ASSINI_OCR_LANG` | OCR language for image sources without a vision model. |
-| `ASSINI_ALLOW_PRIVATE_URLS` | Disable the SSRF guard in trusted local setups. |
+| `ASSINI_ALLOW_PRIVATE_URLS` | Allow LAN models and private source URLs. Defaults on only for loopback-bound installs; network-facing APIs stay guarded. |
 | `ASSINI_DEV_API_PORT` / `ASSINI_DEV_WEB_PORT` | Alternate dev ports. |
+| `ASSINI_ALLOW_INSECURE_NETWORK_AUTH` | Explicitly acknowledge prototype auth on a non-loopback API host; never use for production. |
 
 ## Common commands
 
@@ -97,6 +98,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run desktop:package` | Build `dist-desktop\AssiniLang-win32-x64\AssiniLang.exe` plus `dist-desktop\AssiniLang-win32-x64.zip` for a click-to-run Windows desktop release. |
 | `npm.cmd run desktop:smoke` | Launch the packaged `.exe` with a temporary profile and verify the rendered desktop UI plus screenshot. |
 | `npm.cmd run desktop:package:smoke` | Rebuild the Windows package and immediately run the packaged desktop visual smoke check. |
+| `npm.cmd run smoke:web` | Render the built web app in Electron and fail on blank output, fatal renderer events, or console errors. |
 | `AssiniLang Desktop.cmd` | Windows double-click launcher for the desktop shell. |
 | `npm.cmd run verify` | Full quality gate: tests, type checks, seed, eval, builds. |
 | `npm.cmd run verify:beta` | Optional live-model gate; skips cleanly unless `ASSINI_VERIFY_MODEL=1`. |
@@ -142,8 +144,4 @@ data/            Generated local database, uploaded assets, OCR cache (gitignore
 
 ## Data stewardship
 
-The workspace ships empty. All language data is created by users from raw materials they bring themselves, and every corpus passage carries consent and provenance metadata.
-
-Do not connect real First Nations, Indigenous, or community language data without the governance, consent, access-control, and review infrastructure described in the [Roadmap](docs/roadmap.md). The prototype is a workflow testbed, not a stewardship platform.
-
-The default branch is `master`. The project is intentionally local-first: generated data and build output are ignored by Git, and prototype auth is not production security.
+The workspace ships empty. All language data is created by users from raw materials they bring themselves, and every corpus passage carries consent and provenance metadata. Do not connect real First Nations, Indigenous, or community language data without the governance, consent, access-control, and review infrastructure described in the [Roadmap](docs/roadmap.md). The prototype is a workflow testbed, not a stewardship platform. The default branch is `master`; generated data and build output are ignored by Git, and prototype auth is not production security.

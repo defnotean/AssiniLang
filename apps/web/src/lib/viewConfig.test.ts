@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { en } from "../i18n/en";
-import { ar } from "../i18n/ar";
 import type { ViewMode } from "./types";
 import { LANGUAGE_TYPOLOGY_OPTIONS, VIEW_ORDER } from "./viewConfig";
 
@@ -30,8 +29,6 @@ describe("viewConfig", () => {
       for (const part of ["label", "title", "eyebrow"] as const) {
         const key = `viewConfig.${mode}.${part}` as keyof typeof en;
         expect(en[key]).toBeTruthy();
-        expect(ar[key]).toBeTruthy();
-        expect(ar[key]).not.toBe(en[key]);
       }
     }
   });

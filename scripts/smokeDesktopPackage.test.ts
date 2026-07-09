@@ -40,7 +40,6 @@ function createReport(overrides: Record<string, unknown> = {}) {
           noteTopicOverflow: [],
           modelGridColumns: 1,
           controls: [
-            { label: "Interface language", width: 120 },
             { label: "Discovered models", width: 520 },
             { label: "Base URL", width: 340 },
             { label: "Model", width: 340 },

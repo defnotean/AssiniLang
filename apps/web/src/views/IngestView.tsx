@@ -1,4 +1,10 @@
-import type { SourceAsset, SourceAssetView, SourceRegistrationPayload } from "../api";
+import { useMemo, useState } from "react";
+import type {
+  ExtractionDraftView,
+  SourceAsset,
+  SourceAssetView,
+  SourceRegistrationPayload
+} from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import {
@@ -16,6 +22,47 @@ import { hasSegmentationConflict, SegmentationConflictPanel } from "./Segmentati
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
 /** Matches API `MAX_SOURCE_PROCESSING_ATTEMPTS`. */
 const MAX_PROCESSING_ATTEMPTS = 5;
+
+const DRAFT_KIND_FILTERS = ["all", "lexeme", "corpus_passage", "grammar_note"] as const;
+type DraftKindFilter = (typeof DRAFT_KIND_FILTERS)[number];
+
+const DRAFT_ISSUE_FILTERS = ["all", "grounding", "clean"] as const;
+type DraftIssueFilter = (typeof DRAFT_ISSUE_FILTERS)[number];
+
+const DRAFT_SORTS = ["newest", "oldest", "confidence"] as const;
+type DraftSort = (typeof DRAFT_SORTS)[number];
+
+const CONFIDENCE_RANK: Record<ExtractionDraftView["confidence"], number> = {
+  high: 3,
+  medium: 2,
+  low: 1
+};
+
+function draftHasGrounding(draft: ExtractionDraftView): boolean {
+  return (draft.grounding?.length ?? 0) > 0;
+}
+
+function matchesDraftKindFilter(draft: ExtractionDraftView, filter: DraftKindFilter): boolean {
+  return filter === "all" || draft.kind === filter;
+}
+
+function matchesDraftIssueFilter(draft: ExtractionDraftView, filter: DraftIssueFilter): boolean {
+  if (filter === "all") return true;
+  if (filter === "grounding") return draftHasGrounding(draft);
+  return !draftHasGrounding(draft);
+}
+
+function compareDrafts(left: ExtractionDraftView, right: ExtractionDraftView, sort: DraftSort): number {
+  if (sort === "confidence") {
+    const byConfidence = CONFIDENCE_RANK[right.confidence] - CONFIDENCE_RANK[left.confidence];
+    if (byConfidence !== 0) return byConfidence;
+  }
+  const leftTime = Date.parse(left.createdAt);
+  const rightTime = Date.parse(right.createdAt);
+  const byCreated = sort === "oldest" ? leftTime - rightTime : rightTime - leftTime;
+  if (byCreated !== 0) return byCreated;
+  return left.id.localeCompare(right.id);
+}
 
 function isAttemptCapped(source: Pick<SourceAsset, "status" | "processingAttempts">): boolean {
   return source.status === "failed" && (source.processingAttempts ?? 0) >= MAX_PROCESSING_ATTEMPTS;
@@ -58,6 +105,9 @@ export function IngestView({
   onIntakeCommitted?: () => Promise<void> | void;
 }) {
   const { t } = useI18n();
+  const [kindFilter, setKindFilter] = useState<DraftKindFilter>("all");
+  const [issueFilter, setIssueFilter] = useState<DraftIssueFilter>("all");
+  const [draftSort, setDraftSort] = useState<DraftSort>("newest");
   const {
     sources,
     drafts,
@@ -110,6 +160,41 @@ export function IngestView({
     toggleSelectAllProposed,
     handleBulkReview
   } = useIngestExtraction(languageId, t, onIntakeCommitted);
+
+  const kindCounts = useMemo(() => (
+    drafts.reduce<Record<DraftKindFilter, number>>((counts, draft) => {
+      counts.all += 1;
+      counts[draft.kind] += 1;
+      return counts;
+    }, { all: 0, lexeme: 0, corpus_passage: 0, grammar_note: 0 })
+  ), [drafts]);
+
+  const issueCounts = useMemo(() => (
+    drafts.reduce<Record<DraftIssueFilter, number>>((counts, draft) => {
+      counts.all += 1;
+      if (draftHasGrounding(draft)) counts.grounding += 1;
+      else counts.clean += 1;
+      return counts;
+    }, { all: 0, grounding: 0, clean: 0 })
+  ), [drafts]);
+
+  const visibleDrafts = useMemo(() => (
+    drafts
+      .filter((draft) => matchesDraftKindFilter(draft, kindFilter) && matchesDraftIssueFilter(draft, issueFilter))
+      .slice()
+      .sort((left, right) => compareDrafts(left, right, draftSort))
+  ), [drafts, draftSort, issueFilter, kindFilter]);
+
+  const visibleDraftIds = useMemo(() => visibleDrafts.map((draft) => draft.id), [visibleDrafts]);
+  const allVisibleSelected = visibleDraftIds.length > 0
+    && visibleDraftIds.every((id) => selectedDraftIds.includes(id));
+  const filtersActive = kindFilter !== "all" || issueFilter !== "all";
+  const shownCountLabel = filtersActive
+    ? t(
+      visibleDrafts.length === 1 ? "ingest.draftShownCountOne" : "ingest.draftShownCountMany",
+      { shown: visibleDrafts.length, total: drafts.length }
+    )
+    : t(drafts.length === 1 ? "ingest.draftCountOne" : "ingest.draftCountMany", { count: drafts.length });
 
   if (isLoadingIntake) {
     return (
@@ -405,7 +490,7 @@ export function IngestView({
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("ingest.extractionDrafts")}</span>
-            <h2>{t(drafts.length === 1 ? "ingest.draftCountOne" : "ingest.draftCountMany", { count: drafts.length })}</h2>
+            <h2>{shownCountLabel}</h2>
           </div>
         </div>
         {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}
@@ -429,14 +514,60 @@ export function IngestView({
           </div>
         ) : (
           <>
+            <div className="filter-strip" aria-label={t("ingest.draftKindFiltersAria")}>
+              {DRAFT_KIND_FILTERS.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  className={kindFilter === item ? "active" : ""}
+                  aria-pressed={kindFilter === item}
+                  onClick={() => setKindFilter(item)}
+                >
+                  <span>
+                    {item === "all"
+                      ? t("ingest.draftFilter.all")
+                      : t(`draftKind.${item}`)}
+                  </span>
+                  <strong aria-hidden="true">{kindCounts[item]}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="filter-strip" aria-label={t("ingest.draftIssueFiltersAria")}>
+              {DRAFT_ISSUE_FILTERS.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  className={issueFilter === item ? "active" : ""}
+                  aria-pressed={issueFilter === item}
+                  onClick={() => setIssueFilter(item)}
+                >
+                  <span>{t(`ingest.draftIssueFilter.${item}`)}</span>
+                  <strong aria-hidden="true">{issueCounts[item]}</strong>
+                </button>
+              ))}
+            </div>
+            <div className="pill-row draft-sort-bar" aria-label={t("ingest.draftSortAria")}>
+              <span className="muted">{t("ingest.draftSortLabel")}</span>
+              {DRAFT_SORTS.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  className={draftSort === item ? "active" : "secondary"}
+                  aria-pressed={draftSort === item}
+                  onClick={() => setDraftSort(item)}
+                >
+                  {t(`ingest.draftSort.${item}`)}
+                </button>
+              ))}
+            </div>
             <div className="pill-row bulk-review-bar" aria-label={t("ingest.bulkDraftReviewAria")}>
               <label className="checkbox-row">
                 <input
                   type="checkbox"
                   aria-label={t("ingest.selectAllProposedAria")}
-                  checked={drafts.length > 0 && selectedDraftIds.length === drafts.length}
-                  disabled={isBulkReviewing}
-                  onChange={toggleSelectAllProposed}
+                  checked={allVisibleSelected}
+                  disabled={isBulkReviewing || visibleDraftIds.length === 0}
+                  onChange={() => toggleSelectAllProposed(visibleDraftIds)}
                 />
                 <span>{t("ingest.selectAllProposed")}</span>
               </label>
@@ -469,7 +600,13 @@ export function IngestView({
               </button>
             </div>
             <div className="detail-list">
-            {drafts.map((draft) => (
+            {visibleDrafts.length === 0 ? (
+              <div className="empty-state" role="status" aria-live="polite">
+                <p>{t("ingest.noDraftsInFilter")}</p>
+                <p className="muted">{t("ingest.noDraftsInFilterHint")}</p>
+              </div>
+            ) : (
+              visibleDrafts.map((draft) => (
               <article className="detail-row draft-row" key={draft.id} aria-label={t("ingest.extractionDraftRowAria", { id: draft.id })}>
                 <div>
                   <div className="pill-row">
@@ -535,7 +672,8 @@ export function IngestView({
                   </button>
                 </div>
               </article>
-            ))}
+              ))
+            )}
             </div>
           </>
         )}

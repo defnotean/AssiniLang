@@ -102,11 +102,42 @@ describe("ProviderReadinessPanel", () => {
     expect(screen.queryByText("Ready")).not.toBeInTheDocument();
   });
 
-  it("hides the configuration hint once the provider is ready", () => {
+  it("shows configured but not checked until a real connection result arrives", () => {
     renderPanel();
 
-    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Configured")).toBeInTheDocument();
+    expect(screen.getByText("Not checked")).toBeInTheDocument();
     expect(screen.queryByText(/Choose a discovered model below/i)).not.toBeInTheDocument();
+  });
+
+  it("shows connected only after a successful completion probe", () => {
+    renderPanel({
+      reachabilityResult: {
+        checked: true,
+        reachable: true,
+        mode: "local-openai-compatible",
+        status: 200,
+        latencyMs: 42
+      }
+    });
+
+    expect(screen.getAllByText("Connected")).toHaveLength(2);
+    expect(screen.getByText(/Reachable \(local openai compatible, 42 ms\)/i)).toBeInTheDocument();
+  });
+
+  it("shows unavailable when the catalog exists but generation fails", () => {
+    renderPanel({
+      reachabilityResult: {
+        checked: true,
+        reachable: false,
+        mode: "local-openai-compatible",
+        status: 502,
+        detail: "Upstream connection refused"
+      }
+    });
+
+    expect(screen.getAllByText("Unavailable")).toHaveLength(2);
+    expect(screen.getByText("Unreachable: Upstream connection refused")).toBeInTheDocument();
   });
 
   it("announces reachability failures with assertive aria-live", () => {

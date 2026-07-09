@@ -1,5 +1,103 @@
-const { ipcRenderer } = require("electron");
-const { normalizeDesktopIpcResult } = require("./desktopIpc.cjs");
+const { contextBridge, ipcRenderer } = require("electron");
+
+const IPC_FAILURE = Object.freeze({
+  code: "DESKTOP_IPC_INVOKE_FAILED",
+  i18nKey: "model.desktopIpcInvokeFailed",
+  message: "Desktop IPC invoke failed."
+});
+const INVALID_PREFERENCES_PATCH = Object.freeze({
+  code: "DESKTOP_INVALID_PREFERENCES_PATCH",
+  i18nKey: "model.desktopInvalidPreferencesPatch",
+  message: "Desktop preferences patch must be an object with boolean hideToTray and/or launchAtLogin."
+});
+const INVALID_DIAGNOSTICS_TEXT = Object.freeze({
+  code: "DESKTOP_INVALID_DIAGNOSTICS_TEXT",
+  i18nKey: "model.desktopInvalidDiagnosticsText",
+  message: "Diagnostics report text must be a string."
+});
+
+function isRecord(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function ipcFailure(errorSpec = IPC_FAILURE, message = errorSpec.message) {
+  return {
+    ok: false,
+    code: errorSpec.code,
+    i18nKey: errorSpec.i18nKey,
+    message
+  };
+}
+
+function normalizeDesktopIpcResult(result, error) {
+  if (error != null) {
+    const message = error instanceof Error ? error.message : String(error);
+    return ipcFailure(IPC_FAILURE, message || IPC_FAILURE.message);
+  }
+  if (!isRecord(result) || typeof result.ok !== "boolean") {
+    return ipcFailure(IPC_FAILURE, "Desktop IPC returned an invalid result.");
+  }
+  return result;
+}
+
+function optionalString(value) {
+  return typeof value === "string" ? value : undefined;
+}
+
+function optionalBoolean(value) {
+  return typeof value === "boolean" ? value : undefined;
+}
+
+function withoutUndefined(value) {
+  return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+}
+
+function sanitizeBackupSummary(value) {
+  if (!isRecord(value) || !Number.isSafeInteger(value.count) || value.count < 0) return undefined;
+  return withoutUndefined({
+    backupsDir: optionalString(value.backupsDir),
+    count: value.count,
+    latestCreatedAt: optionalString(value.latestCreatedAt),
+    latestName: optionalString(value.latestName),
+    latestPath: optionalString(value.latestPath)
+  });
+}
+
+function sanitizeDesktopPreferences(value) {
+  if (!isRecord(value) || typeof value.hideToTray !== "boolean" || typeof value.launchAtLogin !== "boolean") {
+    return undefined;
+  }
+  return withoutUndefined({
+    hideToTray: value.hideToTray,
+    hideToTraySupported: optionalBoolean(value.hideToTraySupported),
+    launchAtLogin: value.launchAtLogin,
+    launchAtLoginSupported: optionalBoolean(value.launchAtLoginSupported)
+  });
+}
+
+function sanitizeShortcutSummary(value) {
+  if (!isRecord(value) || typeof value.desktopExists !== "boolean" || typeof value.startMenuExists !== "boolean") {
+    return undefined;
+  }
+  return withoutUndefined({
+    desktopExists: value.desktopExists,
+    desktopPath: optionalString(value.desktopPath),
+    startMenuExists: value.startMenuExists,
+    startMenuPath: optionalString(value.startMenuPath)
+  });
+}
+
+function normalizePreferencesPatch(patch) {
+  if (!isRecord(patch)) return undefined;
+
+  const normalized = {};
+  for (const key of ["hideToTray", "launchAtLogin"]) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue;
+    if (typeof patch[key] !== "boolean") return undefined;
+    normalized[key] = patch[key];
+  }
+  return Object.keys(normalized).length > 0 ? normalized : undefined;
+}
 
 function readDesktopInfo() {
   try {
@@ -10,34 +108,19 @@ function readDesktopInfo() {
 }
 
 const desktopInfo = readDesktopInfo();
-const apiBaseUrl = desktopInfo.apiBaseUrl || process.env.ASSINI_DESKTOP_API_URL;
-const authToken = desktopInfo.authToken || process.env.ASSINI_DESKTOP_AUTH_TOKEN;
-const appFolder = desktopInfo.appFolder || process.env.ASSINI_DESKTOP_APP_FOLDER;
-const appPath = desktopInfo.appPath || process.env.ASSINI_DESKTOP_APP_PATH;
-const appVersion = desktopInfo.appVersion || process.env.ASSINI_DESKTOP_APP_VERSION;
-let backupSummary = desktopInfo.backupSummary;
-const backupsDir = desktopInfo.backupsDir || process.env.ASSINI_DESKTOP_BACKUPS_DIR;
-const dataDir = desktopInfo.dataDir || process.env.ASSINI_DESKTOP_DATA_DIR;
-const diagnosticsDir = desktopInfo.diagnosticsDir || process.env.ASSINI_DESKTOP_DIAGNOSTICS_DIR;
-let desktopPreferences = desktopInfo.desktopPreferences;
-const isPackaged = typeof desktopInfo.isPackaged === "boolean"
-  ? desktopInfo.isPackaged
-  : process.env.ASSINI_DESKTOP_IS_PACKAGED === "1";
-const settingsPath = desktopInfo.settingsPath || process.env.ASSINI_DESKTOP_SETTINGS_PATH;
-let shortcutSummary = desktopInfo.shortcutSummary;
-
-function rewriteApiUrl(input) {
-  if (typeof input !== "string" || !input.startsWith("/api")) {
-    return input;
-  }
-
-  if (!apiBaseUrl) {
-    return input;
-  }
-
-  const apiPath = input.replace(/^\/api/, "") || "/";
-  return `${apiBaseUrl}${apiPath}`;
-}
+const apiBaseUrl = optionalString(desktopInfo.apiBaseUrl);
+const authToken = optionalString(desktopInfo.authToken);
+const appFolder = optionalString(desktopInfo.appFolder);
+const appPath = optionalString(desktopInfo.appPath);
+const appVersion = optionalString(desktopInfo.appVersion);
+const backupSummary = sanitizeBackupSummary(desktopInfo.backupSummary);
+const backupsDir = optionalString(desktopInfo.backupsDir);
+const dataDir = optionalString(desktopInfo.dataDir);
+const diagnosticsDir = optionalString(desktopInfo.diagnosticsDir);
+const desktopPreferences = sanitizeDesktopPreferences(desktopInfo.desktopPreferences);
+const isPackaged = desktopInfo.isPackaged === true;
+const settingsPath = optionalString(desktopInfo.settingsPath);
+const shortcutSummary = sanitizeShortcutSummary(desktopInfo.shortcutSummary);
 
 async function invokeDesktopChannel(channel, ...args) {
   try {
@@ -49,25 +132,16 @@ async function invokeDesktopChannel(channel, ...args) {
 }
 
 async function invokeDesktopAction(action) {
-  const result = await invokeDesktopChannel("assini:desktop-action", action);
-  if (result?.backupSummary) {
-    backupSummary = result.backupSummary;
-  }
-  if (result?.shortcutSummary) {
-    shortcutSummary = result.shortcutSummary;
-  }
-  return result;
+  return invokeDesktopChannel("assini:desktop-action", action);
 }
 
-window.assiniDesktop = Object.freeze({
+const assiniDesktop = Object.freeze(withoutUndefined({
   apiBaseUrl,
   appFolder,
   appPath,
   appVersion,
   authToken,
-  get backupSummary() {
-    return backupSummary;
-  },
+  backupSummary,
   backupsDir,
   createAppShortcuts: () => invokeDesktopAction("createAppShortcuts"),
   createDataBackup: () => invokeDesktopAction("createDataBackup"),
@@ -75,9 +149,7 @@ window.assiniDesktop = Object.freeze({
   createStartMenuShortcut: () => invokeDesktopAction("createStartMenuShortcut"),
   dataDir,
   diagnosticsDir,
-  get desktopPreferences() {
-    return desktopPreferences;
-  },
+  desktopPreferences,
   isPackaged,
   openBackupsFolder: () => invokeDesktopAction("openBackupsFolder"),
   openAppFolder: () => invokeDesktopAction("openAppFolder"),
@@ -87,35 +159,25 @@ window.assiniDesktop = Object.freeze({
   openSettingsFolder: () => invokeDesktopAction("openSettingsFolder"),
   pruneOldDataBackups: () => invokeDesktopAction("pruneOldDataBackups"),
   prototypeAuth: true,
-  refreshShortcutSummary: async () => {
-    const result = await invokeDesktopChannel("assini:desktop-shortcut-summary");
-    if (result?.shortcutSummary) {
-      shortcutSummary = result.shortcutSummary;
-    }
-    return result;
-  },
-  refreshBackupSummary: async () => {
-    const result = await invokeDesktopChannel("assini:desktop-backup-summary");
-    if (result?.backupSummary) {
-      backupSummary = result.backupSummary;
-    }
-    return result;
-  },
+  refreshShortcutSummary: () => invokeDesktopChannel("assini:desktop-shortcut-summary"),
+  refreshBackupSummary: () => invokeDesktopChannel("assini:desktop-backup-summary"),
   restoreLatestDataBackup: () => invokeDesktopAction("restoreLatestDataBackup"),
   resetWindowLayout: () => invokeDesktopAction("resetWindowLayout"),
-  saveDiagnosticsReport: (text) => invokeDesktopChannel("assini:desktop-diagnostics", text),
-  setDesktopPreferences: async (patch) => {
-    const result = await invokeDesktopChannel("assini:desktop-preferences", patch);
-    if (result?.preferences) {
-      desktopPreferences = result.preferences;
+  saveDiagnosticsReport: (text) => {
+    if (text != null && typeof text !== "string") {
+      return Promise.resolve(ipcFailure(INVALID_DIAGNOSTICS_TEXT));
     }
-    return result;
+    return invokeDesktopChannel("assini:desktop-diagnostics", text);
   },
-  get shortcutSummary() {
-    return shortcutSummary;
+  setDesktopPreferences: (patch) => {
+    const normalized = normalizePreferencesPatch(patch);
+    if (!normalized) {
+      return Promise.resolve(ipcFailure(INVALID_PREFERENCES_PATCH));
+    }
+    return invokeDesktopChannel("assini:desktop-preferences", normalized);
   },
+  shortcutSummary,
   settingsPath
-});
+}));
 
-const nativeFetch = window.fetch.bind(window);
-window.fetch = (input, init) => nativeFetch(rewriteApiUrl(input), init);
+contextBridge.exposeInMainWorld("assiniDesktop", assiniDesktop);

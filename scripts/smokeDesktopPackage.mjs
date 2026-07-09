@@ -65,7 +65,6 @@ export function validateSmokeReport(report) {
   const settingsLayout = layoutFit.settings ?? {};
   assert((settingsLayout.modelGridColumns ?? 0) === 1, "Settings model grid did not collapse at the packaged minimum width.");
   const settingControls = new Map((settingsLayout.controls ?? []).map((control) => [control.label, control.width]));
-  assert((settingControls.get("Interface language") ?? 0) >= 80, "Interface language control is too narrow in desktop smoke.");
   assert((settingControls.get("Discovered models") ?? 0) >= 320, "Discovered models control is too narrow in desktop smoke.");
   assert((settingControls.get("Base URL") ?? 0) >= 240, "Base URL control is too narrow in desktop smoke.");
   assert((settingControls.get("Model") ?? 0) >= 240, "Model control is too narrow in desktop smoke.");

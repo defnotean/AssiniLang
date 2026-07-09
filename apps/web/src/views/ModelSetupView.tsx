@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useState, type FormEvent } from "react";
 import type {
   DiscoveredLlmModel,
   ModelProfileSavePayload,
@@ -58,7 +58,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
   const [profileName, setProfileName] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (settingsState.status === "ready") {
       setForm(formFromSettings(settingsState.data));
       const activeProfile = settingsState.data.profiles?.find((profile) => profile.id === settingsState.data.activeProfileId);

@@ -12,6 +12,7 @@ export type RuntimeConfig = {
 const DEFAULT_BODY_LIMIT_BYTES = 64 * 1024;
 /** Align with the multipart upload cap so JSON bodies cannot exceed file-upload limits. */
 const MAX_BODY_LIMIT_BYTES = 25 * 1024 * 1024;
+const INSECURE_NETWORK_AUTH_OVERRIDE = "ASSINI_ALLOW_INSECURE_NETWORK_AUTH";
 
 function readOptionalString(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim();
@@ -49,9 +50,46 @@ function readLogger(value: string | undefined): FastifyServerOptions["logger"] {
   return normalized === "1" || normalized === "true";
 }
 
+function isLoopbackHost(host: string): boolean {
+  const normalized = host.toLowerCase();
+  return normalized === "localhost"
+    || normalized === "::1"
+    || normalized === "[::1]"
+    || /^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
+export function applyLoopbackPrivateUrlDefault(
+  env: Record<string, string | undefined>,
+  host: string
+): void {
+  if (
+    isLoopbackHost(host)
+    && !Object.prototype.hasOwnProperty.call(env, "ASSINI_ALLOW_PRIVATE_URLS")
+  ) {
+    env.ASSINI_ALLOW_PRIVATE_URLS = "1";
+  }
+}
+
+function assertNetworkAuthIsExplicit(host: string, env: Record<string, string | undefined>): void {
+  if (isLoopbackHost(host) || env[INSECURE_NETWORK_AUTH_OVERRIDE]?.trim().toLowerCase() === "true") return;
+
+  const prototypeAuthEnabled = env.ASSINI_ENABLE_PROTOTYPE_AUTH?.trim().toLowerCase() === "true";
+  const devToken = env.ASSINI_DEV_AUTH_TOKEN?.trim().toLowerCase();
+  const predictableDevToken = devToken === "dev-local" || devToken === "test" || devToken === "changeme";
+  if (!prototypeAuthEnabled && !predictableDevToken) return;
+
+  throw new Error(
+    `Refusing to expose insecure prototype authentication on HOST=${host}. `
+    + `Use loopback, configure production authentication, or set ${INSECURE_NETWORK_AUTH_OVERRIDE}=true `
+    + "only for an intentionally isolated development network."
+  );
+}
+
 export function readRuntimeConfig(env: Record<string, string | undefined> = process.env): RuntimeConfig {
+  const host = readHost(env.HOST);
+  assertNetworkAuthIsExplicit(host, env);
   return {
-    host: readHost(env.HOST),
+    host,
     port: readPositiveInteger(env, "PORT", 4321, { min: 1, max: 65535 }),
     allowedOrigins: readAllowedOrigins(env.ASSINI_ALLOWED_ORIGINS),
     bodyLimitBytes: readPositiveInteger(env, "ASSINI_BODY_LIMIT_BYTES", DEFAULT_BODY_LIMIT_BYTES, {

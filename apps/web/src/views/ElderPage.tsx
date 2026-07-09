@@ -78,6 +78,7 @@ export function ElderPage({
   }
 
   function handleSend(event: FormEvent) {
+    event.preventDefault();
     setPendingSend(true);
     elder.handleSubmitCorrection(event);
   }
@@ -288,7 +289,13 @@ export function ElderPage({
               const linkedNote = correction.noteId
                 ? elder.elderContext?.notes.find((note) => note.id === correction.noteId)
                 : undefined;
-              const applyDraft = elder.correctionApplyDrafts[correction.id] ?? linkedNote?.explanation ?? "";
+              // Prefer an in-progress draft, then the elder's suggested fix, then the
+              // existing lesson wording so reviewers can edit before apply.
+              const applyDraft =
+                elder.correctionApplyDrafts[correction.id] ??
+                correction.correction ??
+                linkedNote?.explanation ??
+                "";
               const isReviewing = elder.reviewingCorrectionId === correction.id;
               const isApplying = elder.applyingCorrectionId === correction.id;
 
@@ -331,7 +338,7 @@ export function ElderPage({
                         aria-busy={isReviewing || isWorkflowBusy}
                         onClick={() => elder.handleReviewCorrection(correction.id, "rejected")}
                       >
-                        {t("elderPage.cannotUse")}
+                        {isReviewing ? t("elderPage.working") : t("elderPage.cannotUse")}
                       </button>
                     </div>
                   )}
@@ -339,6 +346,7 @@ export function ElderPage({
                   {correction.status === "accepted" && correction.noteId && (
                     <div className="elder-apply">
                       <h4>{t("elderPage.saveHeading")}</h4>
+                      <p className="elder-help">{t("elderPage.saveHelp")}</p>
                       <label className="elder-field">
                         <span>{t("elderPage.revisedWording")}</span>
                         <textarea
@@ -363,14 +371,26 @@ export function ElderPage({
                       </button>
                     </div>
                   )}
+
+                  {correction.status === "accepted" && !correction.noteId && (
+                    <div className="elder-empty empty-state" role="status" aria-live="polite">
+                      <p>{t("elderPage.acceptedNoLesson")}</p>
+                      <p className="muted">{t("elderPage.acceptedNoLessonHint")}</p>
+                    </div>
+                  )}
                 </li>
               );
             })}
           </ul>
         )}
-        {elder.correctionSuccess && !sent && (
+        {elder.correctionSuccess && (
           <p className="result-notice" role="status" aria-live="polite">
             {elder.correctionSuccess}
+          </p>
+        )}
+        {elder.elderContext && elder.correctionError && (
+          <p className="result-notice error" role="alert">
+            {elder.correctionError}
           </p>
         )}
       </section>

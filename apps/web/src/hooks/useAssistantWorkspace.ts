@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { AiSession } from "@assini/db";
 import { continueAiSession, createAiSession, fetchAiSession } from "../api";
 import { useI18n, type Translate } from "../i18n";
@@ -109,6 +109,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
   const [sendError, setSendError] = useState<string | null>(null);
   const [fallbackMessageIds, setFallbackMessageIds] = useState<ReadonlySet<string>>(new Set());
   const [restoreAttemptedFor, setRestoreAttemptedFor] = useState<string | null>(null);
+  const requestVersionRef = useRef(0);
 
   function recordFallback(session: AiSession) {
     if (!latestReplyUsedFallback(session)) return;
@@ -126,6 +127,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
   ): Promise<void> {
     const prompt = composeSeedPrompt(seedPrompt, setupInstructions, t);
     if (!prompt) return;
+    const requestVersion = ++requestVersionRef.current;
     setSessionState({ status: "loading" });
     setSendError(null);
     setFallbackMessageIds(new Set());
@@ -137,11 +139,13 @@ export function useAssistantWorkspace(): AssistantWorkspace {
         contextNoteIds,
         contextPassageIds
       });
+      if (requestVersion !== requestVersionRef.current) return;
       recordFallback(session);
       setSessionState({ status: "ready", data: session });
       rememberSessionId(languageId, session.id);
       setInput("");
     } catch (error) {
+      if (requestVersion !== requestVersionRef.current) return;
       setSessionState({
         status: "error",
         message: localizeApiError(error, t, "assistant.errSessionCreateFailed")
@@ -153,29 +157,34 @@ export function useAssistantWorkspace(): AssistantWorkspace {
     if (sessionState.status !== "ready" || isSending) return;
     const content = text.trim();
     if (!content) return;
+    const requestVersion = ++requestVersionRef.current;
     setIsSending(true);
     setSendError(null);
     try {
       const session = await continueAiSession(sessionState.data.id, content, sessionState.data.mode);
+      if (requestVersion !== requestVersionRef.current) return;
       recordFallback(session);
       setSessionState({ status: "ready", data: session });
       rememberSessionId(session.languageId, session.id);
       setInput("");
     } catch (error) {
+      if (requestVersion !== requestVersionRef.current) return;
       setSendError(localizeApiError(error, t, "assistant.errSessionMessageFailed"));
     } finally {
-      setIsSending(false);
+      if (requestVersion === requestVersionRef.current) setIsSending(false);
     }
   }
 
   async function restoreSession(languageId: string): Promise<void> {
     if (sessionState.status !== "idle" || restoreAttemptedFor === languageId) return;
+    const requestVersion = ++requestVersionRef.current;
     setRestoreAttemptedFor(languageId);
     const sessionId = storedSessionId(languageId);
     if (!sessionId) return;
     setSessionState({ status: "loading" });
     try {
       const session = await fetchAiSession(sessionId, "learner");
+      if (requestVersion !== requestVersionRef.current) return;
       if (session.languageId !== languageId) {
         forgetSessionId(languageId);
         setSessionState({ status: "idle" });
@@ -183,6 +192,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       }
       setSessionState({ status: "ready", data: session });
     } catch {
+      if (requestVersion !== requestVersionRef.current) return;
       // A stale or deleted session must never wedge the workspace.
       forgetSessionId(languageId);
       setSessionState({ status: "idle" });
@@ -190,6 +200,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
   }
 
   function resetConversation(languageId?: string | null) {
+    requestVersionRef.current += 1;
     if (languageId) forgetSessionId(languageId);
     setSessionState({ status: "idle" });
     setInput("");

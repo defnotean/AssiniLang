@@ -94,35 +94,7 @@ describe("IngestView grounding flag badges", () => {
     const cleanRow = screen.getByRole("article", { name: "Extraction draft draft-clean" });
     expect(within(cleanRow).queryByText("Form decomposes into accepted lexemes")).not.toBeInTheDocument();
     expect(within(cleanRow).queryByText("Conflicts with accepted gloss")).not.toBeInTheDocument();
-  });
-
-  it("localizes grounding badge labels and tooltip detail in Arabic", async () => {
-    apiMock.fetchExtractionDrafts.mockResolvedValue([
-      createLexemeDraft({
-        grounding: [
-          {
-            kind: "gloss_conflict",
-            message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
-          }
-        ]
-      })
-    ]);
-
-    render(
-      <I18nProvider initialLocale="ar">
-        <IngestView languageId="avenik" />
-      </I18nProvider>
-    );
-
-    const row = await screen.findByRole("article", { name: "مسودة استخلاص draft-talune" });
-    const badge = within(row).getByText("يتعارض مع شرح مُعتمد");
-    expect(badge).toHaveAttribute(
-      "title",
-      'المفردة المعتمدة "talu" مشروحة بـ "water"، لكن هذه المسودة تشرحها بـ "swims".'
-    );
-  });
-
-  it("renders grounding badges alongside an existing duplicate badge", async () => {
+  });  it("renders grounding badges alongside an existing duplicate badge", async () => {
     apiMock.fetchExtractionDrafts.mockResolvedValue([
       createLexemeDraft({
         duplicate: { kind: "form", entityId: "lex-talu" },

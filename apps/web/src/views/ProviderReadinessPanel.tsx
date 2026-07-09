@@ -29,16 +29,36 @@ export function ProviderReadinessPanel({
   status
 }: ProviderReadinessPanelProps) {
   const { t } = useI18n();
+  const connectionChecked = reachabilityResult?.checked === true;
+  const connected = connectionChecked && reachabilityResult.reachable;
+  const unavailable = connectionChecked && !reachabilityResult.reachable;
+  const heading = !status.configured
+    ? t("model.needsConfiguration")
+    : isCheckingReachability
+      ? t("model.connectionChecking")
+      : connected
+        ? t("model.connected")
+        : unavailable
+          ? t("model.unavailable")
+          : t("model.configured");
+  const badge = !status.configured
+    ? t("model.incomplete")
+    : connected
+      ? t("model.connected")
+      : unavailable
+        ? t("model.unavailable")
+        : t("model.notChecked");
+  const badgeClass = connected ? "approved" : unavailable ? "rejected" : "under_review";
 
   return (
     <section className="panel-card model-status" aria-label={t("model.providerReadinessAria")}>
       <div className="record-topline">
         <div>
           <span className="detail-label">{t("model.providerReadiness")}</span>
-          <h2>{status.configured ? t("model.ready") : t("model.needsConfiguration")}</h2>
+          <h2>{heading}</h2>
         </div>
-        <span className={`status-badge ${status.configured ? "approved" : "under_review"}`}>
-          {status.configured ? t("model.configured") : t("model.incomplete")}
+        <span className={`status-badge ${badgeClass}`}>
+          {badge}
         </span>
       </div>
       {!status.configured && (

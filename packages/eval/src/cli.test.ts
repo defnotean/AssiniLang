@@ -2,7 +2,7 @@ import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildTestWorkspaceState, createBootstrapState, JsonStore } from "@assini/db";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   defaultEvalDbPath,
   EMPTY_WORKSPACE_EVAL_GUIDANCE,
@@ -116,6 +116,44 @@ describe("evaluation CLI", () => {
 
     const persisted = await new JsonStore(dbPath).read();
     expect(persisted.evaluationRuns.length).toBeGreaterThan(0);
+  });
+
+  it("preserves unrelated state updates made after its initial read", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-eval-cli-stale-"));
+    const dbPath = join(dir, "local-db.json");
+    const state = buildTestWorkspaceState();
+    await new JsonStore(dbPath).write(state);
+    const concurrentDescription = "Updated concurrently after evaluation loaded its snapshot.";
+    const originalRead = JsonStore.prototype.read;
+    const readSpy = vi.spyOn(JsonStore.prototype, "read").mockImplementationOnce(async function (this: JsonStore) {
+      const staleState = await originalRead.call(this);
+      await new JsonStore(dbPath).update((current) => ({
+        ...current,
+        languages: current.languages.map((language) =>
+          language.id === state.languages[0]?.id
+            ? { ...language, description: concurrentDescription }
+            : language
+        )
+      }));
+      return staleState;
+    });
+
+    try {
+      const exitCode = await runEvaluationCli({
+        dbPath,
+        env: {},
+        stderr: () => undefined,
+        stdout: () => undefined
+      });
+
+      expect(exitCode).toBe(0);
+    } finally {
+      readSpy.mockRestore();
+    }
+
+    const persisted = await new JsonStore(dbPath).read();
+    expect(persisted.languages[0]?.description).toBe(concurrentDescription);
+    expect(persisted.evaluationRuns.length).toBeGreaterThan(state.evaluationRuns.length);
   });
 
   it("persists failing runs and prints Evaluation gate failed lines", async () => {

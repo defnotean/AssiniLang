@@ -15,7 +15,7 @@ jobs:
   verify:
     name: Verify (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -33,6 +33,17 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Typecheck and build web assets
+        run: npm run build
+
+      - name: Rendered web smoke (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run smoke:web
+
+      - name: Rendered web smoke (Windows)
+        if: runner.os == 'Windows'
+        run: npm run smoke:web
 
       - name: Run repository verifier
         run: npm run verify
@@ -69,6 +80,10 @@ jobs:
           ready_body="$(curl -fsS "http://127.0.0.1:4517/ready")"
           node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}' "$health_body"
           node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}; if(!body.checks?.storage?.ok){console.error(body); process.exit(1)}; if(!body.checks?.jobQueue?.ok){console.error(body); process.exit(1)}; if(typeof body.checks.jobQueue.pending!=="number"||typeof body.checks.jobQueue.active!=="number"){console.error(body); process.exit(1)}' "$ready_body"
+
+      - name: Packaged desktop smoke (Windows)
+        if: runner.os == 'Windows'
+        run: npm run desktop:package:smoke:built
 
       - name: Audit dependencies
         run: npm audit --audit-level=moderate

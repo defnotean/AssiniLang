@@ -1,68 +1,143 @@
+import { randomUUID } from "node:crypto";
 import { constants } from "node:fs";
-import { access, cp, mkdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { access, cp, mkdir, mkdtemp, open, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
+import {
+  assertInstalledPackageMatchesLock,
+  assertRuntimeManifestsMatchLock,
+  createDesktopChecksumManifest,
+  createDesktopRuntimeMetadata,
+  publishStagedDirectory
+} from "./lib/desktopPackageIntegrity.mjs";
+import { desktopPackageLayout, desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
+import {
+  createIExpressSed,
+  desktopSetupLayout,
+  setupExtractorPowerShell
+} from "./lib/desktopSetup.mjs";
 import { readJsonFile } from "./lib/jsonHelpers.mjs";
 import { npmSpawnSpec, run } from "./lib/processHelpers.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const {
-  appRoot,
-  archivePath,
-  electronDist,
-  outputRoot,
-  packageRoot
-} = desktopPackagePaths(repoRoot);
+const finalPackagePaths = desktopPackagePaths(repoRoot);
+const { electronDist, outputRoot } = finalPackagePaths;
+const checksumManifestName = "SHA256SUMS.txt";
+const iexpressPath = "C:\\Windows\\System32\\iexpress.exe";
+const runtimePackageFiles = [
+  ["", join(repoRoot, "package.json")],
+  ["apps/api", join(repoRoot, "apps", "api", "package.json")],
+  ["packages/db", join(repoRoot, "packages", "db", "package.json")],
+  ["packages/api-contract", join(repoRoot, "packages", "api-contract", "package.json")],
+  ["packages/eval", join(repoRoot, "packages", "eval", "package.json")]
+];
 
-async function assertExists(path, label) {
+function releasePaths(releaseRoot) {
+  const packageRoot = join(releaseRoot, desktopPackageLayout.packageDirName);
+  return {
+    appRoot: join(packageRoot, ...desktopPackageLayout.appResourceSegments),
+    archivePath: join(releaseRoot, desktopPackageLayout.archiveName),
+    checksumManifestPath: join(releaseRoot, checksumManifestName),
+    executablePath: join(packageRoot, desktopPackageLayout.executableName),
+    outputRoot: releaseRoot,
+    packageRoot,
+    setupPath: join(releaseRoot, desktopSetupLayout.artifactName)
+  };
+}
+
+async function assertExists(path, label, hint = "Run npm.cmd install first.") {
   try {
     await access(path, constants.F_OK);
   } catch {
-    throw new Error(`${label} was not found at ${path}. Run npm.cmd install first.`);
+    throw new Error(`${label} was not found at ${path}. ${hint}`);
   }
-}
-
-function externalDependencies(...dependencySets) {
-  const dependencies = {};
-  for (const dependencySet of dependencySets) {
-    for (const [name, version] of Object.entries(dependencySet ?? {})) {
-      if (name.startsWith("@assini/")) continue;
-      dependencies[name] = version;
-    }
-  }
-
-  // The desktop shell uses the JSON store. SQLite stays available in dev, but
-  // the packaged runtime avoids shipping Electron-native SQLite bindings until
-  // the desktop app exposes SQLite as a supported packaged storage option.
-  delete dependencies["better-sqlite3"];
-  return dependencies;
 }
 
 function psQuote(value) {
   return `'${value.replace(/'/g, "''")}'`;
 }
 
-async function createPortableArchive() {
-  await rm(archivePath, { force: true });
+export async function createPortableArchive(packageRoot, archivePath) {
+  const temporaryArchivePath = `${archivePath}.${randomUUID()}.tmp`;
   const archiveCommand = [
+    "$ErrorActionPreference = 'Stop'",
     `$source = ${psQuote(packageRoot)}`,
-    `$destination = ${psQuote(archivePath)}`,
-    "$zipEpoch = Get-Date '1980-01-01T00:00:00'",
-    "Get-Item -LiteralPath $source | Where-Object { $_.LastWriteTime -lt $zipEpoch } | ForEach-Object { $_.LastWriteTime = $zipEpoch }",
-    "Get-ChildItem -LiteralPath $source -Recurse -Force | Where-Object { $_.LastWriteTime -lt $zipEpoch } | ForEach-Object { $_.LastWriteTime = $zipEpoch }",
-    "Compress-Archive -LiteralPath $source -DestinationPath $destination -Force"
-  ].join("; ");
-  await run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", archiveCommand], {
-    logPrefix: "[desktop-package]"
+    `$destination = ${psQuote(temporaryArchivePath)}`,
+    `$entryRoot = ${psQuote(basename(packageRoot))}`,
+    "Add-Type -AssemblyName System.IO.Compression",
+    "$epoch = [DateTimeOffset]::new(1980, 1, 1, 0, 0, 0, [TimeSpan]::Zero)",
+    "$output = [System.IO.File]::Open($destination, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)",
+    "$zip = $null",
+    "try {",
+    "  $zip = [System.IO.Compression.ZipArchive]::new($output, [System.IO.Compression.ZipArchiveMode]::Create, $false)",
+    "  $filePaths = [System.Collections.Generic.List[string]]::new()",
+    "  Get-ChildItem -LiteralPath $source -Recurse -File -Force | ForEach-Object { $filePaths.Add($_.FullName) }",
+    "  $filePaths.Sort([System.StringComparer]::Ordinal)",
+    "  foreach ($filePath in $filePaths) {",
+    "    $relativePath = $filePath.Substring($source.Length + 1).Replace('\\', '/')",
+    "    $entry = $zip.CreateEntry(($entryRoot + '/' + $relativePath), [System.IO.Compression.CompressionLevel]::Optimal)",
+    "    $entry.LastWriteTime = $epoch",
+    "    $input = [System.IO.File]::OpenRead($filePath)",
+    "    try {",
+    "      $entryStream = $entry.Open()",
+    "      try { $input.CopyTo($entryStream) } finally { $entryStream.Dispose() }",
+    "    } finally { $input.Dispose() }",
+    "  }",
+    "} finally {",
+    "  if ($null -ne $zip) { $zip.Dispose() }",
+    "  $output.Dispose()",
+    "}"
+  ].join("\n");
+
+  try {
+    await run("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", archiveCommand], {
+      logPrefix: "[desktop-package]"
+    });
+    await rename(temporaryArchivePath, archivePath);
+  } finally {
+    await rm(temporaryArchivePath, { force: true });
+  }
+}
+
+export async function createWindowsSetup(paths, { iexpressExecutablePath = iexpressPath } = {}) {
+  const helperPath = join(paths.outputRoot, desktopSetupLayout.helperName);
+  const sedPath = join(paths.outputRoot, desktopSetupLayout.sedName);
+  const payloadFileNames = [basename(paths.archivePath), desktopSetupLayout.helperName];
+  const helperScript = setupExtractorPowerShell({
+    archiveName: basename(paths.archivePath),
+    packageDirectoryName: basename(paths.packageRoot)
   });
+  const sed = createIExpressSed({
+    launcherFileName: desktopSetupLayout.helperName,
+    payloadFileNames,
+    sourceDirectory: paths.outputRoot,
+    targetPath: paths.setupPath
+  });
+
+  try {
+    await writeFile(helperPath, helperScript, "utf8");
+    await writeFile(sedPath, sed, "utf8");
+    await run(iexpressExecutablePath, ["/N", "/Q", desktopSetupLayout.sedName], {
+      cwd: paths.outputRoot,
+      logPrefix: "[desktop-package]"
+    });
+    const setupStats = await stat(paths.setupPath);
+    if (!setupStats.isFile() || setupStats.size === 0) {
+      throw new Error(`IExpress did not create a non-empty setup executable at ${paths.setupPath}.`);
+    }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`IExpress setup creation failed: ${detail}`, { cause: error });
+  } finally {
+    await Promise.all([rm(helperPath, { force: true }), rm(sedPath, { force: true })]);
+  }
 }
 
 async function copyDir(source, target) {
   await cp(source, target, { recursive: true, force: true });
 }
 
-async function copyPackageRuntime(packageName, sourceDir) {
+async function copyPackageRuntime(appRoot, packageName, sourceDir) {
   const targetDir = join(appRoot, "node_modules", "@assini", packageName);
   await mkdir(targetDir, { recursive: true });
   await cp(join(sourceDir, "package.json"), join(targetDir, "package.json"), { force: true });
@@ -130,9 +205,14 @@ export function outputRootReadme() {
   return [
     "AssiniLang Desktop Build",
     "",
+    "Double-click AssiniLang-Setup-x64.exe for a single-file, per-user install that creates Desktop and Start Menu shortcuts.",
     "Double-click Open AssiniLang.cmd to run the packaged desktop app from this folder.",
     "Double-click Install AssiniLang.cmd to install it into your user Programs folder and create Start Menu/Desktop shortcuts.",
+    "Share AssiniLang-Setup-x64.exe when you need one downloadable setup file.",
     "Share AssiniLang-win32-x64.zip when you need a portable copy.",
+    "SHA256SUMS.txt contains SHA-256 checksums for the setup, portable zip, and packaged Windows x64 executable.",
+    "The portable zip is deterministic. The Windows IExpress setup wrapper may not be byte-reproducible and is not code-signed.",
+    "The packaged Windows x64 executable is also unsigned and depends on the sibling files in its folder.",
     "",
     "The app stores local language data and model settings in its user-data folder, not in dist-desktop.",
     ""
@@ -156,10 +236,10 @@ export function packageRootLauncherScript() {
   ].join("\r\n");
 }
 
-async function writeOutputRootHelpers() {
-  await writeFile(join(outputRoot, "Open AssiniLang.cmd"), outputRootLauncherScript(), "utf8");
-  await writeFile(join(outputRoot, "Install AssiniLang.cmd"), outputRootInstallScript(), "utf8");
-  await writeFile(join(outputRoot, "README.txt"), outputRootReadme(), "utf8");
+async function writeOutputRootHelpers(releaseRoot) {
+  await writeFile(join(releaseRoot, "Open AssiniLang.cmd"), outputRootLauncherScript(), "utf8");
+  await writeFile(join(releaseRoot, "Install AssiniLang.cmd"), outputRootInstallScript(), "utf8");
+  await writeFile(join(releaseRoot, "README.txt"), outputRootReadme(), "utf8");
 }
 
 function shortcutPowerShell() {
@@ -247,41 +327,73 @@ function uninstallScript() {
   ].join("\r\n");
 }
 
-async function stageDesktopApp() {
-  const [rootPackage, apiPackage, dbPackage, apiContractPackage, evalPackage] = await Promise.all([
-    readJsonFile(join(repoRoot, "package.json")),
-    readJsonFile(join(repoRoot, "apps", "api", "package.json")),
-    readJsonFile(join(repoRoot, "packages", "db", "package.json")),
-    readJsonFile(join(repoRoot, "packages", "api-contract", "package.json")),
-    readJsonFile(join(repoRoot, "packages", "eval", "package.json"))
-  ]);
+async function prepareDesktopRuntimeMetadata() {
+  const [repositoryLockfile, installedElectronManifest, electronRuntimeVersion, manifestEntries] =
+    await Promise.all([
+      readJsonFile(join(repoRoot, "package-lock.json")),
+      readJsonFile(join(repoRoot, "node_modules", "electron", "package.json")),
+      readFile(join(electronDist, "version"), "utf8"),
+      Promise.all(
+        runtimePackageFiles.map(async ([packagePath, filePath]) => [packagePath, await readJsonFile(filePath)])
+      )
+    ]);
 
-  await rm(outputRoot, { recursive: true, force: true });
+  const runtimeManifests = Object.fromEntries(manifestEntries);
+  assertRuntimeManifestsMatchLock(repositoryLockfile, runtimeManifests);
+  const lockedElectronVersion = assertInstalledPackageMatchesLock(
+    repositoryLockfile,
+    "electron",
+    installedElectronManifest
+  );
+  const installedRuntimeVersion = electronRuntimeVersion.trim();
+  if (installedRuntimeVersion !== lockedElectronVersion) {
+    throw new Error(
+      `Installed Electron runtime ${installedRuntimeVersion || "<missing>"} does not match package-lock.json ${lockedElectronVersion}. Run npm.cmd ci before packaging.`
+    );
+  }
+
+  return createDesktopRuntimeMetadata(repositoryLockfile, {
+    runtimePackagePaths: runtimePackageFiles.map(([packagePath]) => packagePath),
+    version: runtimeManifests[""].version
+  });
+}
+
+async function assertWindowsX64Executable(executablePath) {
+  const file = await open(executablePath, "r");
+  try {
+    const dosHeader = Buffer.alloc(64);
+    const dosRead = await file.read(dosHeader, 0, dosHeader.length, 0);
+    if (dosRead.bytesRead !== dosHeader.length || dosHeader.toString("ascii", 0, 2) !== "MZ") {
+      throw new Error(`Electron runtime is not a valid Windows executable: ${executablePath}`);
+    }
+
+    const peOffset = dosHeader.readUInt32LE(0x3c);
+    const peHeader = Buffer.alloc(6);
+    const peRead = await file.read(peHeader, 0, peHeader.length, peOffset);
+    const isPe = peRead.bytesRead === peHeader.length && peHeader.readUInt32LE(0) === 0x00004550;
+    const machine = isPe ? peHeader.readUInt16LE(4) : undefined;
+    if (!isPe || machine !== 0x8664) {
+      throw new Error(`Electron runtime is not a Windows x64 executable: ${executablePath}`);
+    }
+  } finally {
+    await file.close();
+  }
+}
+
+async function writeArtifactChecksums(paths) {
+  const manifest = await createDesktopChecksumManifest(paths);
+  await writeFile(paths.checksumManifestPath, manifest, "utf8");
+}
+
+async function stageDesktopApp(paths, runtimeMetadata) {
+  const { appRoot, packageRoot } = paths;
   await mkdir(appRoot, { recursive: true });
 
   await copyDir(electronDist, packageRoot);
   await rename(join(packageRoot, "electron.exe"), join(packageRoot, "AssiniLang.exe"));
 
-  const dependencies = externalDependencies(
-    rootPackage.dependencies,
-    apiPackage.dependencies,
-    dbPackage.dependencies,
-    apiContractPackage.dependencies,
-    evalPackage.dependencies
-  );
-
-  await writeFile(
-    join(appRoot, "package.json"),
-    `${JSON.stringify({
-      name: "assini-lang-desktop",
-      productName: "AssiniLang",
-      version: rootPackage.version,
-      private: true,
-      main: "apps/desktop/main.cjs",
-      dependencies
-    }, null, 2)}\n`,
-    "utf8"
-  );
+  await writeFile(join(appRoot, "package.json"), runtimeMetadata.packageJsonText, "utf8");
+  await writeFile(join(appRoot, "package-lock.json"), runtimeMetadata.packageLockText, "utf8");
 
   await copyDir(join(repoRoot, "apps", "desktop"), join(appRoot, "apps", "desktop"));
   await mkdir(join(appRoot, "apps", "api"), { recursive: true });
@@ -291,12 +403,12 @@ async function stageDesktopApp() {
   await copyDir(join(repoRoot, "apps", "api", "dist"), join(appRoot, "apps", "api", "dist"));
   await copyDir(join(repoRoot, "apps", "web", "dist"), join(appRoot, "apps", "web", "dist"));
 
-  const npmInstall = npmSpawnSpec(["install", "--omit=dev", "--no-audit", "--no-fund"]);
-  await run(npmInstall.command, npmInstall.args, { cwd: appRoot, logPrefix: "[desktop-package]" });
+  const npmCi = npmSpawnSpec(["ci", "--omit=dev", "--ignore-scripts", "--no-audit", "--no-fund"]);
+  await run(npmCi.command, npmCi.args, { cwd: appRoot, logPrefix: "[desktop-package]" });
 
-  await copyPackageRuntime("api-contract", join(repoRoot, "packages", "api-contract"));
-  await copyPackageRuntime("db", join(repoRoot, "packages", "db"));
-  await copyPackageRuntime("eval", join(repoRoot, "packages", "eval"));
+  await copyPackageRuntime(appRoot, "api-contract", join(repoRoot, "packages", "api-contract"));
+  await copyPackageRuntime(appRoot, "db", join(repoRoot, "packages", "db"));
+  await copyPackageRuntime(appRoot, "eval", join(repoRoot, "packages", "eval"));
 
   await writeFile(
     join(packageRoot, "README.txt"),
@@ -310,6 +422,7 @@ async function stageDesktopApp() {
       "Run Uninstall AssiniLang.cmd to remove installed program files and shortcuts. Local data is kept.",
       "Opening AssiniLang while it is already running focuses the existing window, and the app remembers your last window size and position.",
       "Local data and model settings are stored in Electron's user-data folder for this app, not in this install folder.",
+      "This executable targets Windows x64 and is not code-signed.",
       ""
     ].join("\r\n"),
     "utf8"
@@ -340,18 +453,46 @@ async function stageDesktopApp() {
 }
 
 async function main() {
-  if (process.platform !== "win32") {
-    throw new Error("The current desktop package script builds the Windows x64 package from a Windows machine.");
+  if (process.platform !== "win32" || process.arch !== "x64") {
+    throw new Error("The desktop package script only builds a Windows x64 package from Windows x64 Node.js.");
   }
 
   await assertExists(join(electronDist, "electron.exe"), "Electron runtime");
+  await assertExists(join(electronDist, "version"), "Electron runtime version");
+  await assertExists(join(repoRoot, "node_modules", "electron", "package.json"), "Electron package manifest");
+  await assertExists(join(repoRoot, "package-lock.json"), "npm lockfile");
+  await assertExists(
+    iexpressPath,
+    "Windows IExpress",
+    "This Windows installation must provide System32\\iexpress.exe to build the setup artifact."
+  );
   await assertExists(join(repoRoot, "apps", "api", "dist", "index.js"), "Built API");
   await assertExists(join(repoRoot, "apps", "web", "dist", "index.html"), "Built web app");
-  await stageDesktopApp();
-  await writeOutputRootHelpers();
-  console.log(`[desktop-package] Wrote ${join(packageRoot, "AssiniLang.exe")}`);
-  await createPortableArchive();
-  console.log(`[desktop-package] Wrote ${archivePath}`);
+  await assertWindowsX64Executable(join(electronDist, "electron.exe"));
+
+  const runtimeMetadata = await prepareDesktopRuntimeMetadata();
+  const stagedOutputRoot = await mkdtemp(join(repoRoot, ".dist-desktop-stage-"));
+  const stagedPaths = releasePaths(stagedOutputRoot);
+  let published = false;
+
+  try {
+    await stageDesktopApp(stagedPaths, runtimeMetadata);
+    await writeOutputRootHelpers(stagedOutputRoot);
+    await createPortableArchive(stagedPaths.packageRoot, stagedPaths.archivePath);
+    await createWindowsSetup(stagedPaths);
+    await writeArtifactChecksums(stagedPaths);
+    await publishStagedDirectory(stagedOutputRoot, outputRoot);
+    published = true;
+  } finally {
+    if (!published) {
+      await rm(stagedOutputRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
+  }
+
+  console.log(`[desktop-package] Wrote ${finalPackagePaths.executablePath}`);
+  console.log(`[desktop-package] Wrote ${finalPackagePaths.archivePath}`);
+  console.log(`[desktop-package] Wrote ${join(outputRoot, desktopSetupLayout.artifactName)}`);
+  console.log(`[desktop-package] Wrote ${join(outputRoot, checksumManifestName)}`);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

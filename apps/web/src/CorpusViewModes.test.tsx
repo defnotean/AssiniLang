@@ -289,11 +289,17 @@ describe("CorpusView network graph mode", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Graph" }));
 
-    expect(screen.getByText("Loading corpus graph...")).toBeInTheDocument();
+    const loading = screen.getByRole("status");
+    expect(loading).toHaveClass("empty-state");
+    expect(loading).toHaveAttribute("aria-busy", "true");
+    expect(loading).toHaveTextContent("Loading corpus graph...");
+    expect(loading).toHaveTextContent(
+      "Fetching linked passages, notes, sources, and morphemes for this language."
+    );
     expect(fetchNeuralMapMock).toHaveBeenCalledWith("avenik");
   });
 
-  it("shows an empty state when the neural map has no nodes", async () => {
+  it("shows an empty state with single and bulk import paths when the neural map has no nodes", async () => {
     fetchNeuralMapMock.mockResolvedValue({ nodes: [], edges: [] });
     renderCorpusView();
 
@@ -304,9 +310,43 @@ describe("CorpusView network graph mode", () => {
       expect(emptyState).toHaveClass("empty-state");
       expect(emptyState).toHaveAttribute("aria-live", "polite");
       expect(emptyState).toHaveTextContent(
-        "No graph records yet. Process a source in Build and accept corpus or note drafts, or import a passage above, so the graph has records to link."
+        "No graph records yet. The network links passages, notes, sources, and morphemes for this language."
+      );
+      expect(emptyState).toHaveTextContent(
+        "Process a source in Build and accept corpus or note drafts, or add passages here to seed the graph."
       );
     });
+
+    const emptyState = screen.getByRole("status");
+    expect(within(emptyState).getByRole("button", { name: "Add source passage" })).toBeInTheDocument();
+    expect(within(emptyState).getByRole("button", { name: "Paste bulk passages" })).toBeInTheDocument();
+
+    fireEvent.click(within(emptyState).getByRole("button", { name: "Add source passage" }));
+    expect(screen.getByLabelText("Corpus target text")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("No graph records yet.");
+    });
+    fireEvent.click(within(screen.getByRole("status")).getByRole("button", { name: "Paste bulk passages" }));
+    expect(screen.getByLabelText("Bulk TSV or CSV paste")).toBeInTheDocument();
+  });
+
+  it("asks for a language when graph mode has no language id", () => {
+    render(
+      <CorpusView
+        corpus={[]}
+        isWorkflowBusy={false}
+        onImportCorpusPassage={vi.fn()}
+        onImportCorpusBulk={onImportCorpusBulkMock}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+
+    const emptyState = screen.getByRole("status");
+    expect(emptyState).toHaveTextContent("Select a language to load its corpus graph.");
+    expect(fetchNeuralMapMock).not.toHaveBeenCalled();
   });
 
   it("shows a retry action when the neural map request fails", async () => {
@@ -316,7 +356,14 @@ describe("CorpusView network graph mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent("Offline");
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent("Offline");
+      expect(alert).toHaveTextContent(
+        "Check your connection, then retry. If the graph stays empty after it loads, add a passage or bulk import below."
+      );
+      expect(within(alert).getByRole("button", { name: "Retry network" })).toBeInTheDocument();
+      expect(within(alert).getByRole("button", { name: "Add source passage" })).toBeInTheDocument();
+      expect(within(alert).getByRole("button", { name: "Paste bulk passages" })).toBeInTheDocument();
     });
 
     fetchNeuralMapMock.mockResolvedValueOnce({

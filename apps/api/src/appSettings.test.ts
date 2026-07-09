@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,7 @@ import {
   RuntimeModelProfilesCorruptError,
   RuntimeSettingsUrlValidationError,
   saveRuntimeModelProfile,
+  writeEnvFileAtomically,
   updateEnvFileText
 } from "./appSettings.js";
 
@@ -146,6 +147,27 @@ describe("runtime app settings", () => {
     expect(response.settings.provider).toBe("openai-compatible");
     expect(response.settings.apiKeyConfigured).toBe(false);
     expect(reloadCount).toBe(1);
+  });
+
+  it("leaves no temporary file after an atomic settings write", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+
+    await writeEnvFileAtomically(settingsPath, "ASSINI_LLM_PROVIDER=openai-compatible\n");
+
+    expect(await readFile(settingsPath, "utf8")).toBe("ASSINI_LLM_PROVIDER=openai-compatible\n");
+    expect(await readdir(dir)).toEqual([".env"]);
+  });
+
+  it("cleans up the temporary file and leaves the destination unchanged when rename fails", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, "destination");
+    await mkdir(settingsPath);
+
+    await expect(writeEnvFileAtomically(settingsPath, "replacement\n")).rejects.toBeDefined();
+
+    expect((await readdir(dir)).filter((name) => name === "destination")).toEqual(["destination"]);
+    expect((await readdir(dir)).filter((name) => name.endsWith(".tmp"))).toEqual([]);
   });
 
   it("serializes concurrent settings writes so patches are not lost", async () => {

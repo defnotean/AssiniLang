@@ -56,7 +56,7 @@ function isPrivateHostname(hostname: string): boolean {
 }
 
 function privateUrlBlockedMessage(hostname: string): string {
-  return `URL points at a private or local network (${hostname}) and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`;
+  return `URL points at a private or local network (${hostname}) and was blocked. Only public URLs can be fetched; enable Allow private URLs in Settings or set ASSINI_ALLOW_PRIVATE_URLS=1 in a trusted local setup.`;
 }
 
 function assertHttpProtocol(parsed: URL): void {
@@ -84,13 +84,13 @@ async function assertResolvedAddressAllowed(hostname: string, env: Env, lookupFn
     resolvedAddress = (await lookupFn(hostname)).address;
   } catch {
     throw new Error(
-      `URL hostname ${hostname} could not be resolved and was blocked. Only resolvable public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
+      `URL hostname ${hostname} could not be resolved and was blocked. Only resolvable public URLs can be fetched; enable Allow private URLs in Settings or set ASSINI_ALLOW_PRIVATE_URLS=1 in a trusted local setup.`
     );
   }
 
   if (isPrivateAddress(resolvedAddress)) {
     throw new Error(
-      `URL hostname ${hostname} resolves to a private or local network address and was blocked. Only public URLs can be fetched; set ASSINI_ALLOW_PRIVATE_URLS=1 to allow private URLs in a trusted local setup.`
+      `URL hostname ${hostname} resolves to a private or local network address and was blocked. Only public URLs can be fetched; enable Allow private URLs in Settings or set ASSINI_ALLOW_PRIVATE_URLS=1 in a trusted local setup.`
     );
   }
 }

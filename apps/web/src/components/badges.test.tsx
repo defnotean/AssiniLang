@@ -21,15 +21,4 @@ describe("StatusBadge and ConfidenceBadge", () => {
 
     render(<ConfidenceBadge confidence="low" />);
     expect(screen.getByRole("status", { name: "low confidence" })).toBeInTheDocument();
-  });
-
-  it("renders Arabic confidence labels when the workspace locale is Arabic", () => {
-    render(
-      <I18nProvider initialLocale="ar">
-        <ConfidenceBadge confidence="high" />
-      </I18nProvider>
-    );
-    expect(screen.getByRole("status", { name: "ثقة عالية" })).toHaveTextContent("ثقة عالية");
-    expect(screen.queryByText("high confidence")).not.toBeInTheDocument();
-  });
-});
+  });});
