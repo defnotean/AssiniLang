@@ -214,14 +214,19 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
 /**
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
- * manifest is missing, uses an unexpected algorithm, or the hash does not match.
+ * manifest is missing, uses an unexpected algorithm or generator id, or the
+ * hash does not match.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;
   [key: string]: unknown;
 }): boolean {
   const integrity = exported.integrity;
-  if (!integrity || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM) {
+  if (
+    !integrity
+    || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM
+    || integrity.generatedBy !== EXPORT_GENERATOR_ID
+  ) {
     return false;
   }
   if (typeof integrity.contentHash !== "string" || !/^[a-f0-9]{64}$/.test(integrity.contentHash)) {

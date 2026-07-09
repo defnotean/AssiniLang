@@ -224,6 +224,15 @@ describe("public language views", () => {
     };
     expect(verifyExportIntegrity(tampered)).toBe(false);
 
+    const wrongGenerator = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        generatedBy: "not-assini-local-export"
+      }
+    };
+    expect(verifyExportIntegrity(wrongGenerator)).toBe(false);
+
     const mutatedPayload = {
       ...snapshot!,
       exportedAt: "2099-01-01T00:00:00.000Z"

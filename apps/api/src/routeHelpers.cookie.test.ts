@@ -36,4 +36,16 @@ describe("cookieValue", () => {
       )
     ).toBeUndefined();
   });
+
+  it("treats empty or whitespace-only cookie values as absent", () => {
+    expect(
+      cookieValue(requestWithCookie("assini_prototype_session=; other=ok"), "assini_prototype_session")
+    ).toBeUndefined();
+    expect(
+      cookieValue(requestWithCookie("assini_prototype_session=%20%20"), "assini_prototype_session")
+    ).toBeUndefined();
+    expect(
+      cookieValue(requestWithCookie("assini_prototype_session="), "assini_prototype_session")
+    ).toBeUndefined();
+  });
 });

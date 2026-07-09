@@ -100,6 +100,37 @@ describe("ReviewView", () => {
     expect(document.querySelector("button.note-row")).not.toBeInTheDocument();
   });
 
+  it("shows next-step guidance when a selected note has empty examples, comments, and edit history", () => {
+    const note = createReviewNote({
+      examples: [],
+      reviewer: {
+        lastReviewedBy: null,
+        lastReviewedAt: null,
+        comments: []
+      },
+      editHistory: []
+    });
+
+    render(
+      <ReviewView
+        notes={[note]}
+        selectedNote={note}
+        isWorkflowBusy={false}
+        reviewingNoteId={null}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/No examples on this note yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Link a corpus passage as evidence in Build/)).toBeInTheDocument();
+    expect(screen.getByText(/No reviewer comments yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Leave a note when contesting/)).toBeInTheDocument();
+    expect(screen.getByText(/No edit history yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Saving a revised explanation below starts this trail/)).toBeInTheDocument();
+  });
+
   it("disables review actions while workflow is busy", () => {
     const note = createReviewNote();
 

@@ -122,6 +122,7 @@ describe("project documentation", () => {
       "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
       "docs/api.md": [
         "verifyExportIntegrity",
+        "unexpected `algorithm`/`generatedBy`",
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
@@ -134,6 +135,7 @@ describe("project documentation", () => {
         "Evaluation artifact export",
         "uses the reviewer actor in the browser",
         "cookie `Max-Age` both refresh",
+        "Empty or whitespace-only session cookie",
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
