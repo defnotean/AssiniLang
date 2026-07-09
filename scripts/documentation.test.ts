@@ -158,7 +158,10 @@ describe("project documentation", () => {
         "ingest.sourceAlreadyProcessing",
         "ingest.processingInterruptedByRestart",
         "ingest.transcribeNotConfigured",
-        "ingest.warningOfflineHeuristicFallback"
+        "ingest.warningOfflineHeuristicFallback",
+        "ingest.warningModelExtractionFailed",
+        "OCR model endpoint returned no text",
+        "leaving the model unset"
       ],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
       "docs/operator-recovery.md": [

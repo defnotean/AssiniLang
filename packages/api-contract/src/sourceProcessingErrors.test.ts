@@ -25,6 +25,28 @@ describe("sourceProcessingErrorI18n", () => {
     )).toEqual({ i18nKey: "ingest.ocrModelFailed" });
   });
 
+  it("classifies OCR model endpoint empty or invalid responses", () => {
+    expect(sourceProcessingErrorI18n("OCR model endpoint returned no text."))
+      .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+    expect(sourceProcessingErrorI18n("OCR model endpoint returned invalid JSON."))
+      .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+    expect(sourceProcessingErrorI18n("OCR model endpoint returned no choices."))
+      .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+    expect(sourceProcessingErrorI18n("OCR model request failed with status 502."))
+      .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+  });
+
+  it("classifies non-vision main-LLM image failures", () => {
+    expect(sourceProcessingErrorI18n(
+      "The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset."
+    )).toEqual({ i18nKey: "ingest.visionModelRequired" });
+  });
+
+  it("classifies empty resolved source text", () => {
+    expect(sourceProcessingErrorI18n("Source contains no readable text."))
+      .toEqual({ i18nKey: "ingest.sourceNoReadableText" });
+  });
+
   it("classifies empty DOCX text layers where OCR is unsupported", () => {
     expect(sourceProcessingErrorI18n(
       "The document contains no extractable text — it may be a scanned image; OCR is not supported yet."
@@ -113,6 +135,15 @@ describe("sourceProcessingWarningI18n", () => {
     )).toEqual({
       i18nKey: "ingest.warningChunkCapSkipped",
       i18nParams: { parts: 8, skipped: 12000 }
+    });
+  });
+
+  it("classifies model-extraction throw fallbacks with part counts", () => {
+    expect(sourceProcessingWarningI18n(
+      "Model extraction failed for part 1 of 1: LLM provider returned only reasoning_content using [redacted-secret]; fell back to offline heuristics when no usable model output remained."
+    )).toEqual({
+      i18nKey: "ingest.warningModelExtractionFailed",
+      i18nParams: { part: 1, total: 1 }
     });
   });
 

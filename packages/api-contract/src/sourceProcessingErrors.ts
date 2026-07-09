@@ -26,12 +26,27 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.ocrPdfNoImage" };
   }
 
-  if (/Configured OCR model could not read/i.test(normalized) || /OCR model request failed/i.test(normalized)) {
+  if (
+    /Configured OCR model could not read/i.test(normalized)
+    || /OCR model request failed/i.test(normalized)
+    || /OCR model endpoint returned (invalid JSON|no choices|no text)/i.test(normalized)
+  ) {
     return { i18nKey: "ingest.ocrModelFailed" };
   }
 
   if (/OCR is not supported yet/i.test(normalized) && /no extractable text/i.test(normalized)) {
     return { i18nKey: "ingest.ocrDocxUnsupported" };
+  }
+
+  if (
+    /may not be vision-capable/i.test(normalized)
+    && /no usable result for this image/i.test(normalized)
+  ) {
+    return { i18nKey: "ingest.visionModelRequired" };
+  }
+
+  if (/Source contains no readable text/i.test(normalized)) {
+    return { i18nKey: "ingest.sourceNoReadableText" };
   }
 
   if (/Source is already processing/i.test(normalized)) {
@@ -112,6 +127,16 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
     return {
       i18nKey: "ingest.warningChunkCapSkipped",
       i18nParams: { parts: Number(chunkCap[1]), skipped: Number(chunkCap[2]) }
+    };
+  }
+
+  const extractionFailed = normalized.match(
+    /Model extraction failed for part (\d+) of (\d+):\s*.*fell back to offline heuristics/i
+  );
+  if (extractionFailed) {
+    return {
+      i18nKey: "ingest.warningModelExtractionFailed",
+      i18nParams: { part: Number(extractionFailed[1]), total: Number(extractionFailed[2]) }
     };
   }
 

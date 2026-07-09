@@ -418,6 +418,37 @@ describe("localizeApiError", () => {
       )
     ).toBe("لم يكن خرج النموذج للجزء 2 من 5 JSON استخلاص صالحًا؛ تم تخطي ذلك الجزء.");
   });
+
+  it("localizes OCR endpoint empty responses and model-extraction throw fallbacks", () => {
+    expect(
+      localizeSourceProcessingError(
+        "OCR model endpoint returned no text.",
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe(
+      "The configured OCR model could not read this document. Check the OCR endpoint in Runtime settings or try a different model."
+    );
+
+    expect(
+      localizeSourceProcessingError(
+        "The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or rely on the local OCR fallback by leaving the model unset.",
+        createTranslator("ar"),
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe(
+      "تعذّر على النموذج المُهيّأ قراءة هذه الصورة وقد لا يدعم الرؤية. عيِّن نموذج رؤية أو رابط OCR أساسيًا في إعدادات وقت التشغيل، أو اترك كليهما فارغين لاستخدام OCR المحلي."
+    );
+
+    expect(
+      localizeSourceProcessingWarning(
+        "Model extraction failed for part 1 of 3: LLM provider request timed out after 25ms; fell back to offline heuristics when no usable model output remained.",
+        t
+      )
+    ).toBe(
+      "Model extraction failed for part 1 of 3; fell back to offline heuristics for that part."
+    );
+  });
 });
 
 describe("formatReachability", () => {
