@@ -345,6 +345,56 @@ describe("localizeApiError", () => {
     ).toBe("Only note-linked elder corrections can be applied.");
   });
 
+  it("localizes prototype-auth and study-loop draft negatives from i18n metadata", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Prototype auth is disabled", {
+          status: 404,
+          i18nKey: "errors.prototypeAuthDisabled"
+        }),
+        t,
+        "app.workspaceUnavailable"
+      )
+    ).toBe(
+      "Local prototype sign-in is disabled on this API. Start with npm run dev, or set ASSINI_ENABLE_PROTOTYPE_AUTH=true."
+    );
+
+    expect(
+      localizeApiError(
+        new ApiError("Missing languageId", {
+          status: 400,
+          i18nKey: "errors.missingLanguageId"
+        }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("Choose a language before generating draft notes.");
+  });
+
+  it("localizes prototype-auth and missing-languageId failures from message text when metadata is absent", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /auth/prototype-session (404): Prototype auth is disabled", {
+          status: 404
+        }),
+        t,
+        "app.workspaceUnavailable"
+      )
+    ).toBe(
+      "Local prototype sign-in is disabled on this API. Start with npm run dev, or set ASSINI_ENABLE_PROTOTYPE_AUTH=true."
+    );
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /study-loop/draft (400): Missing languageId", {
+          status: 400
+        }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("Choose a language before generating draft notes.");
+  });
+
   it("localizes elder review negatives from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError(

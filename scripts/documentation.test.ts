@@ -135,6 +135,8 @@ describe("project documentation", () => {
         "cookie `Max-Age` both refresh",
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
+        "errors.prototypeAuthDisabled",
+        "errors.missingLanguageId",
         "elderWs.errCorrectionMustBeAccepted",
         "elderWs.errCorrectionNotPending"
       ],
@@ -191,7 +193,8 @@ describe("project documentation", () => {
         "ASSINI_TRANSCRIBE_BASE_URL",
         "ASSINI_ALLOW_PRIVATE_URLS",
         "data/local-db.json",
-        "ingest.processingInterruptedByRestart"
+        "ingest.processingInterruptedByRestart",
+        "errors.prototypeAuthDisabled"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

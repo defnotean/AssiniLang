@@ -69,7 +69,10 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     const body = parseStudyLoopDraftBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Missing languageId" };
+      return {
+        error: "Missing languageId",
+        i18nKey: "errors.missingLanguageId"
+      };
     }
 
     const current = await readState();
@@ -109,7 +112,10 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
 
     if (languageMissing) {
       reply.code(404);
-      return { error: `Language not found: ${body.languageId}` };
+      return {
+        error: `Language not found: ${body.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     return toPublicNotes(nextNotes);
@@ -126,7 +132,10 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     const language = current.languages.find((item) => item.id === languageId);
     if (!language) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const corpus = current.corpus.filter((passage) => passage.languageId === languageId);

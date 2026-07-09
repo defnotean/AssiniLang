@@ -625,7 +625,10 @@ describe("api server", () => {
       payload: { userId: "elder-1" }
     });
     expect(disabledResponse.statusCode).toBe(404);
-    expect(disabledResponse.json()).toEqual({ error: "Prototype auth is disabled" });
+    expect(disabledResponse.json()).toEqual({
+      error: "Prototype auth is disabled",
+      i18nKey: "errors.prototypeAuthDisabled"
+    });
 
     const enabled = createServer({ initialState: buildTestWorkspaceState(), enablePrototypeAuth: true });
     const session = await enabled.inject({
@@ -2504,7 +2507,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Missing languageId" });
+    expect(response.json()).toEqual({
+      error: "Missing languageId",
+      i18nKey: "errors.missingLanguageId"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(after.json()).toEqual(before.json());
@@ -2522,7 +2528,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    expect(response.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/notes` });
     expect(after.json()).toEqual(before.json());
@@ -2731,7 +2740,10 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+      expect(response.json()).toEqual({
+        error: "Language not found: not-a-language",
+        i18nKey: "errors.languageNotFound"
+      });
     });
 
     it("forbids learners from generating model-backed draft notes", async () => {

@@ -130,6 +130,8 @@ export const en = {
   "errors.selectOrCreateLanguage": "Select or create a language first.",
   "errors.selectOrCreateLanguageHint": "Use New language in the sidebar to open a workspace, then return to this section.",
   "errors.languageNotFound": "That language was not found. Select another language or create one first.",
+  "errors.missingLanguageId": "Choose a language before generating draft notes.",
+  "errors.prototypeAuthDisabled": "Local prototype sign-in is disabled on this API. Start with npm run dev, or set ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).
   "viewConfig.profile.label": "Start",

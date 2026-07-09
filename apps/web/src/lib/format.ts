@@ -476,11 +476,17 @@ function vaultImportErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   return undefined;
 }
 
-/** Maps known elder/export API English errors when response metadata is absent. */
+/** Maps known elder/export/auth/study-loop API English errors when response metadata is absent. */
 function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefined {
   const normalized = error.trim();
   if (!normalized) return undefined;
 
+  if (/Prototype auth is disabled/i.test(normalized)) {
+    return { i18nKey: "errors.prototypeAuthDisabled" };
+  }
+  if (/Missing languageId/i.test(normalized)) {
+    return { i18nKey: "errors.missingLanguageId" };
+  }
   if (/^Language not found:/i.test(normalized)) {
     return { i18nKey: "errors.languageNotFound" };
   }

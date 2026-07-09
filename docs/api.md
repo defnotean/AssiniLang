@@ -10,8 +10,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Health check. |
 | GET | `/ready` | Public | Readiness check for schema-valid persistence. |
-| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use (server `expiresAt` and cookie `Max-Age` both refresh); creating a session also sweeps expired session records. |
-| DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. |
+| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use (server `expiresAt` and cookie `Max-Age` both refresh); creating a session also sweeps expired session records. When prototype auth is off, returns `404` with `{ "error": "Prototype auth is disabled", "i18nKey": "errors.prototypeAuthDisabled" }`. |
+| DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. When prototype auth is off, returns `404` with the same `errors.prototypeAuthDisabled` payload as POST. |
 | GET | `/llm/status` | programmer, lead, admin | Sanitized LLM provider, transcription, and OCR readiness. |
 | GET | `/llm/settings` | programmer, lead, admin | Sanitized editable runtime settings for model, transcription, OCR, and URL-fetch behavior. |
 | GET | `/llm/models` | programmer, lead, admin | Discover model IDs exposed by configured, explicit, and common local OpenAI-compatible endpoints. Optional `?baseUrl=` adds one endpoint to the scan. |
@@ -40,7 +40,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
 | GET | `/languages/:languageId/notes` | Public | Public review notes. |
 | PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
-| POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. |
+| POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. Invalid bodies return `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
 | GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). |
@@ -232,7 +232,7 @@ Both generation routes are model-only: they reuse the same configured LLM provid
 
 `POST /languages/:languageId/study-loop/model-draft` (roles: reviewer, lead, admin, elder)
 
-Generates draft grammar notes from the language's approved corpus, lexicon, and existing notes. Each generated note is kept only if it is grounded: it must cite at least one real corpus passage id as evidence, carry a non-empty topic that is not a duplicate of an existing or already-generated note (case- and whitespace-insensitive), and provide a substantive explanation. Ungrounded or hallucinated notes are dropped and reported in `warnings`. Surviving notes are inserted as `draft` notes into the normal review queue - they are not auto-approved and must still be reviewed like any other draft. The response is `{ notes, warnings, generated }`, where `generated` is the count of drafts actually persisted.
+Generates draft grammar notes from the language's approved corpus, lexicon, and existing notes. Unknown language ids return `404` with `{ "error": "Language not found: …", "i18nKey": "errors.languageNotFound" }`. Each generated note is kept only if it is grounded: it must cite at least one real corpus passage id as evidence, carry a non-empty topic that is not a duplicate of an existing or already-generated note (case- and whitespace-insensitive), and provide a substantive explanation. Ungrounded or hallucinated notes are dropped and reported in `warnings`. Surviving notes are inserted as `draft` notes into the normal review queue - they are not auto-approved and must still be reviewed like any other draft. The response is `{ notes, warnings, generated }`, where `generated` is the count of drafts actually persisted.
 
 `POST /languages/:languageId/exercises/generate` (roles: reviewer, lead, admin)
 

@@ -32,7 +32,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
   app.post("/auth/prototype-session", async (request, reply) => {
     if (!enablePrototypeAuth) {
       reply.code(404);
-      return { error: "Prototype auth is disabled" };
+      return {
+        error: "Prototype auth is disabled",
+        i18nKey: "errors.prototypeAuthDisabled"
+      };
     }
 
     const body = parsePrototypeSessionBody(request.body ?? {});
@@ -65,7 +68,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
   app.delete("/auth/prototype-session", async (request, reply) => {
     if (!enablePrototypeAuth) {
       reply.code(404);
-      return { error: "Prototype auth is disabled" };
+      return {
+        error: "Prototype auth is disabled",
+        i18nKey: "errors.prototypeAuthDisabled"
+      };
     }
 
     const sessionId = cookieValue(request, PROTOTYPE_SESSION_COOKIE);

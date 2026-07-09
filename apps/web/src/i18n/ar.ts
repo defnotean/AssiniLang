@@ -157,6 +157,8 @@ export const ar: Record<MessageKey, string> = {
   "errors.selectOrCreateLanguage": "اختر لغة أو أنشئ واحدة أولًا.",
   "errors.selectOrCreateLanguageHint": "استخدم «لغة جديدة» في الشريط الجانبي لفتح مساحة عمل، ثم عد إلى هذا القسم.",
   "errors.languageNotFound": "لم يُعثر على تلك اللغة. اختر لغة أخرى أو أنشئ واحدة أولًا.",
+  "errors.missingLanguageId": "اختر لغة قبل توليد مسودات الملاحظات.",
+  "errors.prototypeAuthDisabled": "تسجيل الدخول المحلي معطّل على واجهة البرمجة هذه. شغّل عبر npm run dev، أو عيّن ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
 
   "viewConfig.profile.label": "الملف اللغوي",
   "viewConfig.profile.title": "الملف اللغوي",
