@@ -1,11 +1,13 @@
 export function StatusScreen({
   kind,
   message,
+  hint,
   onRetry,
   retryLabel
 }: {
   kind: "loading" | "error";
   message: string;
+  hint?: string;
   onRetry?: () => void;
   retryLabel?: string;
 }) {
@@ -21,9 +23,10 @@ export function StatusScreen({
   return (
     <div className="full-page-status error" role="alert">
       <p>{message}</p>
-      {onRetry && (
+      {hint && <p className="muted">{hint}</p>}
+      {onRetry && retryLabel && (
         <button type="button" className="secondary" onClick={onRetry}>
-          {retryLabel ?? "Retry"}
+          {retryLabel}
         </button>
       )}
     </div>

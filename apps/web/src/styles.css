@@ -630,6 +630,31 @@ label,
   text-overflow: ellipsis;
 }
 
+.connectivity-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.62rem;
+  min-height: 30px;
+  padding: 0 1.55rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+  background: color-mix(in srgb, var(--warning-bg, #fff8e6) 78%, var(--bg-strong));
+  color: var(--warning-strong, #8a5a00);
+  font-family: var(--font-serif);
+  white-space: nowrap;
+}
+
+.connectivity-banner strong {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.connectivity-banner span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+}
+
 .workspace-header {
   position: relative;
   display: flex;

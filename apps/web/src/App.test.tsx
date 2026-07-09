@@ -881,6 +881,53 @@ describe("App", () => {
     );
   });
 
+  it("shows desktop reconnect guidance when the workspace fails to load in AssiniLang Desktop", async () => {
+    Object.defineProperty(window, "assiniDesktop", {
+      configurable: true,
+      value: {
+        apiBaseUrl: "http://127.0.0.1:4567",
+        authToken: "desktop-token",
+        prototypeAuth: true
+      }
+    });
+    apiMock.fetchDashboardData.mockRejectedValue(new Error("Could not connect to the local API"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Could not connect to the local API");
+    expect(screen.getByText(
+      "AssiniLang Desktop could not reach the local API. Restart the app or open Settings → Desktop app to verify the data folder."
+    )).toBeInTheDocument();
+  });
+
+  it("shows a desktop offline banner when the browser reports no network", async () => {
+    const onlineDescriptor = Object.getOwnPropertyDescriptor(window.navigator, "onLine");
+    Object.defineProperty(window.navigator, "onLine", {
+      configurable: true,
+      get: () => false
+    });
+    Object.defineProperty(window, "assiniDesktop", {
+      configurable: true,
+      value: {
+        apiBaseUrl: "http://127.0.0.1:4567",
+        authToken: "desktop-token",
+        prototypeAuth: true
+      }
+    });
+
+    await renderReady();
+
+    const banner = screen.getByText("Network offline").closest("[role='status']");
+    expect(banner).toHaveAttribute("aria-live", "polite");
+    expect(banner).toHaveTextContent(
+      "AssiniLang Desktop keeps data local, but the workspace needs the embedded API. Reconnect, then press Retry if loading fails."
+    );
+
+    if (onlineDescriptor) {
+      Object.defineProperty(window.navigator, "onLine", onlineDescriptor);
+    }
+  });
+
   it("navigates between the four simplified tabs", async () => {
     await renderReady();
 

@@ -75,6 +75,14 @@ describe("paradigm gaps panel", () => {
   it("renders lexicon and inventory empty states when the profile has no entries", () => {
     render(<LanguageProfileView profileState={readyState(buildProfileFixture([]))} />);
 
+    const phonologyPanel = screen.getByRole("region", { name: "Phonology profile" });
+    expect(within(phonologyPanel).getByText("No phonology declared yet")).toBeInTheDocument();
+    expect(
+      within(phonologyPanel).getByText(
+        "No phonology recorded yet. Seed consonants, vowels, and syllable structure on the language record or import a snapshot that includes phonology."
+      )
+    ).toHaveAttribute("aria-live", "polite");
+
     const vocabularyPanel = screen.getByRole("region", { name: "Vocabulary inventory" });
     expect(within(vocabularyPanel).getByText("0 entries")).toBeInTheDocument();
     expect(

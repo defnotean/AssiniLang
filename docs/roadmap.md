@@ -32,6 +32,7 @@ Recent local-first improvements (prototype scope — not production claims):
 - **Model-draft grounding failure codes (July 2026):** model-backed note drafts persist `groundingScore` and `groundingFailureCodes` on `note.draft_generated` audit events; response payloads still include full grounding checks without widening the note schema.
 - **Eval baseline and verify gate (June 2026):** `fixtures/eval/testlang-baseline.json` retains deterministic Testlang scores; `npm run verify:beta` documents and optionally runs model verification when `ASSINI_VERIFY_MODEL=1`.
 - **Operator safety polish (June–July 2026):** `ConfirmDialog` guards destructive actions, backup CLI supports `--dry-run`, AI session writes enforce role policy, Obsidian vault import paths are CI-tested, and RTL layout has regression coverage.
+- **Local-beta UX polish (July 2026):** corpus validate dry-run notices mirror exercise authoring, phonology empty states include workflow hints, and AssiniLang Desktop surfaces offline/reconnect guidance when the embedded API is unreachable.
 
 ## Partial or prototype-only capabilities
 

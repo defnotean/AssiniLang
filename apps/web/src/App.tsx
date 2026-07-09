@@ -12,6 +12,7 @@ import {
   importCorpusPassage
 } from "./api";
 import { CommandPalette } from "./components/CommandPalette";
+import { DesktopOfflineBanner } from "./components/DesktopOfflineBanner";
 import { SignOutButton } from "./components/SignOutButton";
 import { SidebarLanguageNav } from "./components/SidebarLanguageNav";
 import { StatusScreen } from "./components/StatusScreen";
@@ -19,6 +20,7 @@ import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { CompassMark, DiamondBand } from "./components/marks";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
 import { localizeApiError } from "./lib/format";
+import { getDesktopBridgeInfo } from "./lib/desktopBridge";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
   DashboardLoadState,
@@ -243,10 +245,12 @@ export function App() {
   }
 
   if (loadState.status === "error") {
+    const desktopHint = getDesktopBridgeInfo() ? t("app.desktopReconnectHint") : undefined;
     return (
       <StatusScreen
         kind="error"
         message={loadState.message}
+        hint={desktopHint}
         onRetry={() => setDashboardReloadKey((key) => key + 1)}
         retryLabel={t("app.retryLoad")}
       />
@@ -340,6 +344,7 @@ export function App() {
       </aside>
 
       <main className="main-content" id="main-content" tabIndex={-1} aria-busy={isWorkflowBusy}>
+        <DesktopOfflineBanner />
         <div className="prototype-notice">
           <strong>{t("app.localPrototype")}</strong>
           <span>{t("app.dataStaysLocal")}</span>

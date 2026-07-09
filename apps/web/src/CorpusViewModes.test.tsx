@@ -279,4 +279,44 @@ describe("CorpusView import validation", () => {
     });
     expect(screen.getByRole("alert")).toHaveTextContent("ghost");
   });
+
+  it("shows a dry-run success notice with prefix without importing", async () => {
+    validateCorpusImportMock.mockResolvedValue({
+      ok: true,
+      errors: [],
+      warnings: [],
+      preview: {
+        morphologicalSegmentation: [
+          { surface: "saku", lemma: "child", gloss: "child", features: ["noun"] },
+          { surface: "nemi-na", lemma: "teach", gloss: "teach-1sg", features: ["present", "1sg"] }
+        ],
+        topicTags: ["learning"]
+      }
+    });
+
+    renderCorpusView();
+    fireEvent.click(screen.getByRole("button", { name: /Add source passage/i }));
+
+    fireEvent.change(screen.getByLabelText("Corpus target text"), { target: { value: "saku nemi-na" } });
+    fireEvent.change(screen.getByLabelText("English translation"), { target: { value: "The child teaches me." } });
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "local-import" } });
+    fireEvent.change(screen.getByLabelText("Author"), { target: { value: "Local Reviewer" } });
+    fireEvent.change(screen.getByLabelText("Year"), { target: { value: "2026" } });
+    fireEvent.change(screen.getByLabelText("License"), { target: { value: "local-test-data" } });
+    fireEvent.change(screen.getByLabelText("Consent record"), { target: { value: "local import consent" } });
+    fireEvent.change(screen.getByLabelText("Topic tags"), { target: { value: "learning" } });
+    fireEvent.change(screen.getByLabelText("Morpheme segmentation"), {
+      target: { value: "saku|child|child|noun\nnemi-na|teach|teach-1sg|present,1sg" }
+    });
+
+    expect(screen.getByText("Validate checks morpheme segmentation and consent fields without importing the passage.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate corpus passage import" }));
+
+    await waitFor(() => {
+      expect(validateCorpusImportMock).toHaveBeenCalled();
+    });
+    expect(screen.getByRole("status")).toHaveTextContent("Dry-run only — nothing saved yet.");
+    expect(screen.getByRole("status")).toHaveTextContent("Validation passed: 2 morphemes, 1 tags ready to import.");
+  });
 });

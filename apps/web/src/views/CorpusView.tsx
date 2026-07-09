@@ -125,10 +125,11 @@ export function CorpusView({
       if (validation.ok) {
         const morphemeCount = validation.preview?.morphologicalSegmentation.length ?? 0;
         const tagCount = validation.preview?.topicTags.length ?? 0;
-        const message = validation.warnings.length > 0
+        const dryRunPrefix = t("corpus.validateDryRunNote");
+        const success = validation.warnings.length > 0
           ? `${t("corpus.validateSuccess", { morphemeCount, tagCount })} ${validation.warnings.join(" ")}`
           : t("corpus.validateSuccess", { morphemeCount, tagCount });
-        setImportMessage(message);
+        setImportMessage(`${dryRunPrefix} ${success}`);
       } else {
         setImportError(validation.errors.join(" "));
       }
@@ -286,6 +287,7 @@ export function CorpusView({
               type="button"
               className="secondary"
               aria-label={t("corpus.validatePassageAria")}
+              aria-describedby="corpus-validate-dry-run-hint"
               disabled={!canValidatePassage}
               onClick={() => void handleValidateCorpus()}
             >
@@ -295,6 +297,11 @@ export function CorpusView({
               {isImportingCorpus ? t("corpus.importing") : t("corpus.importPassage")}
             </button>
           </div>
+        )}
+        {isImportOpen && (
+          <p id="corpus-validate-dry-run-hint" className="inline-empty muted">
+            {t("corpus.validateDryRunHint")}
+          </p>
         )}
         {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
         {importError && <p className="result-notice error" role="alert">{importError}</p>}
