@@ -138,7 +138,11 @@ describe("api server", () => {
     if (typeof responseRequestId !== "string") throw new Error("Expected safe x-request-id header");
     expect(responseRequestId).toMatch(SAFE_REQUEST_ID);
     expect(responseRequestId).not.toBe(unsafeRequestId);
-    expect(response.json()).toEqual({ error: "Payload too large", requestId: responseRequestId });
+    expect(response.json()).toEqual({
+      error: "Payload too large",
+      i18nKey: "errors.payloadTooLarge",
+      requestId: responseRequestId
+    });
   });
 
   it("reports readiness when persisted state can be read", async () => {
@@ -4164,7 +4168,12 @@ describe("api server", () => {
     expect(first.statusCode).toBe(201);
     expect(second.statusCode).toBe(201);
     expect(third.statusCode).toBe(429);
-    expect(third.json()).toEqual({ error: "Rate limit exceeded" });
+    expect(third.headers["retry-after"]).toBe("60");
+    expect(third.json()).toEqual({
+      error: "Rate limit exceeded",
+      i18nKey: "app.rateLimitExceeded",
+      i18nParams: { seconds: 60 }
+    });
 
     now += 60_001;
     const afterWindow = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });

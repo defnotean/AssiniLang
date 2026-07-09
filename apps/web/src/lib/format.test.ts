@@ -256,6 +256,41 @@ describe("localizeApiError", () => {
     expect(message).toBe("Too many requests. Wait 9 seconds, then retry.");
   });
 
+  it("localizes payload-too-large responses via status and i18nKey", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages (413): Payload too large", {
+          status: 413,
+          i18nKey: "errors.payloadTooLarge"
+        }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("That request is too large. Shrink the payload or upload a smaller file, then retry.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages (413): Payload too large", { status: 413 }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("That request is too large. Shrink the payload or upload a smaller file, then retry.");
+  });
+
+  it("prefers rate-limit i18nParams seconds over Retry-After message parsing", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /dashboard (429): Rate limit exceeded", {
+          status: 429,
+          i18nKey: "app.rateLimitExceeded",
+          i18nParams: { seconds: 4 }
+        }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("Too many requests. Wait 4 seconds, then retry.");
+  });
+
   it("localizes offline provider failures", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /llm/status (503): LLM provider is offline", { status: 503 }),

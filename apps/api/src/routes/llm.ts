@@ -100,7 +100,8 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const patch = parseSchemaBody(runtimeSettingsPatchSchema, request.body ?? {});
     if (!patch) {
@@ -127,7 +128,8 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const payload = parseSchemaBody(modelProfileSavePayloadSchema, request.body ?? {});
     if (!payload) {
@@ -152,7 +154,8 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const profileId = profileIdFromParams(request.params);
     try {
@@ -172,7 +175,8 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const profileId = profileIdFromParams(request.params);
     try {
@@ -192,7 +196,8 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
     const state = await readState();
     const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["programmer", "admin", "lead"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     return probeLlmProviderReachability({ env: process.env, fetchFn: ingestionFetch });
   });

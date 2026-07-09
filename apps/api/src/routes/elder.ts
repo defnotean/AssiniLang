@@ -108,7 +108,8 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ELDER_CORRECTION_MUTATION_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (!current.languages.some((language) => language.id === body.languageId)) {
       reply.code(404);
@@ -183,7 +184,8 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ELDER_CORRECTION_MUTATION_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const { correctionId } = request.params as { correctionId: string };
     const existingCorrection = current.elderCorrections.find((correction) => correction.id === correctionId);
@@ -251,7 +253,8 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ELDER_CORRECTION_MUTATION_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const { correctionId } = request.params as { correctionId: string };
     const existingCorrection = current.elderCorrections.find((correction) => correction.id === correctionId);

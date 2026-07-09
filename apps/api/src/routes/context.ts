@@ -22,7 +22,15 @@ export type RequestMetrics = {
 export type RouteContext = {
   readState: () => Promise<AppState>;
   updateState: (updater: (state: AppState) => AppState) => Promise<AppState>;
-  checkRateLimit: (request: FastifyRequest, reply: FastifyReply, actor: User | undefined) => boolean;
+  /**
+   * Returns an error body when the request is blocked (and sets 429 + Retry-After).
+   * Returns undefined when the request is allowed.
+   */
+  checkRateLimit: (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    actor: User | undefined
+  ) => { error: string; i18nKey: string; i18nParams?: Record<string, number> } | undefined;
   authToken: string | undefined;
   prototypeSessions: PrototypeSessionMap;
   enablePrototypeAuth: boolean;

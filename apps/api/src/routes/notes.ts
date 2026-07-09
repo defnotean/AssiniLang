@@ -153,7 +153,8 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (isReviewDispositionStatus(body.status)) {
       const validationError = reviewDispositionValidationError(current, body, actor);

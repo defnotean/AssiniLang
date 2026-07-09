@@ -78,7 +78,8 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     let nextNotes: Note[] = [];
     let languageMissing = false;
@@ -127,7 +128,8 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const language = current.languages.find((item) => item.id === languageId);
     if (!language) {

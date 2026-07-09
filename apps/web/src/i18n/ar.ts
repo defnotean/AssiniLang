@@ -159,6 +159,7 @@ export const ar: Record<MessageKey, string> = {
   "errors.languageNotFound": "لم يُعثر على تلك اللغة. اختر لغة أخرى أو أنشئ واحدة أولًا.",
   "errors.missingLanguageId": "اختر لغة قبل توليد مسودات الملاحظات.",
   "errors.prototypeAuthDisabled": "تسجيل الدخول المحلي معطّل على واجهة البرمجة هذه. شغّل عبر npm run dev، أو عيّن ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
+  "errors.payloadTooLarge": "الطلب كبير جدًا. قلّص الحمولة أو ارفع ملفًا أصغر، ثم أعد المحاولة.",
 
   "viewConfig.profile.label": "الملف اللغوي",
   "viewConfig.profile.title": "الملف اللغوي",

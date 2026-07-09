@@ -232,7 +232,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     let languageMissing = false;
     let asset: SourceAsset | undefined;
@@ -300,7 +301,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
@@ -417,7 +419,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
@@ -501,7 +504,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const asset = current.sourceAssets.find((item) => item.id === sourceId);
     if (!asset) {

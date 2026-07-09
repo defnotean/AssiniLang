@@ -183,9 +183,13 @@ export function createServer(options: ServerOptions = {}) {
     return operation;
   };
 
-  const checkRateLimit = (request: FastifyRequest, reply: FastifyReply, actor: User | undefined): boolean => {
+  const checkRateLimit = (
+    request: FastifyRequest,
+    reply: FastifyReply,
+    actor: User | undefined
+  ): { error: string; i18nKey: string; i18nParams?: Record<string, number> } | undefined => {
     if (!rateLimit || !RATE_LIMITED_METHODS.has(request.method)) {
-      return true;
+      return undefined;
     }
 
     const now = rateLimit.now?.() ?? Date.now();
@@ -195,14 +199,19 @@ export function createServer(options: ServerOptions = {}) {
 
     if (hits.length >= rateLimit.max) {
       const retryAfterMs = Math.max(1, hits[0] + rateLimit.windowMs - now);
-      reply.header("Retry-After", Math.ceil(retryAfterMs / 1000).toString());
+      const seconds = Math.ceil(retryAfterMs / 1000);
+      reply.header("Retry-After", seconds.toString());
       reply.code(429);
-      return false;
+      return {
+        error: "Rate limit exceeded",
+        i18nKey: "app.rateLimitExceeded",
+        i18nParams: { seconds }
+      };
     }
 
     hits.push(now);
     rateLimitBuckets.set(key, hits);
-    return true;
+    return undefined;
   };
 
   app.setErrorHandler((error, request, reply) => {
@@ -211,7 +220,11 @@ export function createServer(options: ServerOptions = {}) {
 
     const maybeStatusError = error as { statusCode?: number };
     if (maybeStatusError.statusCode === 413) {
-      reply.code(413).send({ error: "Payload too large", requestId });
+      reply.code(413).send({
+        error: "Payload too large",
+        i18nKey: "errors.payloadTooLarge",
+        requestId
+      });
       return;
     }
 

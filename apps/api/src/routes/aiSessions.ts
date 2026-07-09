@@ -56,7 +56,8 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, AI_SESSION_MODE_ROLES[body.mode]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (!current.languages.some((language) => language.id === body.languageId)) {
       reply.code(404);
@@ -164,7 +165,8 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions);
     if (!actor) return { error: "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     const currentSession = current.aiSessions.find((item) => item.id === sessionId);
     if (!currentSession) {

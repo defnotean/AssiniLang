@@ -50,4 +50,17 @@ describe("secret redaction", () => {
 
     expect(redacted).toBe("[redacted-secret] [redacted-secret] [redacted-secret] [redacted-secret] [redacted-secret]");
   });
+
+  it("redacts api_key query params and x-api-key header shapes from provider errors", () => {
+    const redacted = redactErrorSecrets(
+      "fetch failed https://api.example/v1/models?api_key=query-secret-value&limit=1 x-api-key: header-secret-value access_token=oauth-secret"
+    );
+
+    expect(redacted).toBe(
+      "fetch failed https://api.example/v1/models?[redacted-secret]&limit=1 [redacted-secret] [redacted-secret]"
+    );
+    expect(redacted).not.toContain("query-secret-value");
+    expect(redacted).not.toContain("header-secret-value");
+    expect(redacted).not.toContain("oauth-secret");
+  });
 });

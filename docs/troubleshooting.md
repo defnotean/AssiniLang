@@ -47,4 +47,4 @@ Symptom-cause-fix tables for the problems you are most likely to hit locally. Co
 | --- | --- | --- |
 | API fails on startup or read with a loud validation error naming `data/local-db.json` | The local database is corrupted or was hand-edited into an invalid state; integrity validation fails on purpose rather than serving malformed records | Read the error - it names the offending collection and field. Fix the JSON by hand, restore a backup, or reseed an empty workspace with `npm.cmd run seed` (this discards workspace data). |
 | Old local database from an earlier milestone will not load | Versions v1-v7 migrate forward automatically; anything older or hand-mangled does not | Reseed with `npm.cmd run seed`. |
-| Mutations suddenly return `429` | Per-actor rate limit (120 mutating requests/minute per route) | Wait for the `Retry-After` interval; bulk operations should pace themselves. |
+| Mutations suddenly return `429` (`i18nKey: app.rateLimitExceeded`, `i18nParams.seconds`) | Per-actor rate limit (120 mutating requests/minute per route) | Wait for the `Retry-After` / `seconds` interval; bulk operations should pace themselves. |

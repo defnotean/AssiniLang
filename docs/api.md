@@ -105,8 +105,8 @@ Do not treat prototype auth as production security.
 - Unknown language, source, or draft IDs return `404`.
 - Invalid mutation bodies return `400`.
 - Missing auth returns `401`; valid auth with an insufficient role returns `403`.
-- Mutating methods are rate-limited per actor and route (120 per minute by default); exceeding it returns `429` with a `Retry-After` header.
-- Request bodies are capped at 64 KB (`413` beyond that); file uploads at 25 MB.
+- Mutating methods are rate-limited per actor and route (120 per minute by default); exceeding it returns `429` with a `Retry-After` header and `{ "error": "Rate limit exceeded", "i18nKey": "app.rateLimitExceeded", "i18nParams": { "seconds": N } }`.
+- Request bodies are capped at 64 KB (`413` beyond that, with `i18nKey: "errors.payloadTooLarge"`); file uploads at 25 MB.
 - Mutation routes validate before changing local state and write audit events when state changes.
 
 ## Language management

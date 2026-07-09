@@ -514,6 +514,9 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/Invalid elder correction body/i.test(normalized)) {
     return { i18nKey: "elderWs.errInvalidCorrectionBody" };
   }
+  if (/Payload too large/i.test(normalized)) {
+    return { i18nKey: "errors.payloadTooLarge" };
+  }
 
   return undefined;
 }
@@ -549,6 +552,9 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
       return seconds
         ? t("app.rateLimitExceeded", { seconds })
         : t("app.rateLimitExceededGeneric");
+    }
+    if (error.status === 413) {
+      return t("errors.payloadTooLarge");
     }
     if (error.status === 503 && /offline/i.test(error.message)) {
       return t("app.providerOffline");

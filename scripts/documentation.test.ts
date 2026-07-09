@@ -137,6 +137,8 @@ describe("project documentation", () => {
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
         "errors.missingLanguageId",
+        "errors.payloadTooLarge",
+        "app.rateLimitExceeded",
         "elderWs.errInvalidCorrectionBody",
         "elderWs.errCorrectionMustBeAccepted",
         "elderWs.errCorrectionNotPending"
@@ -195,7 +197,8 @@ describe("project documentation", () => {
         "ASSINI_ALLOW_PRIVATE_URLS",
         "data/local-db.json",
         "ingest.processingInterruptedByRestart",
-        "errors.prototypeAuthDisabled"
+        "errors.prototypeAuthDisabled",
+        "app.rateLimitExceeded"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

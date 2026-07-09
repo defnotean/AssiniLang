@@ -124,7 +124,8 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     let dispositionMissing = false;
     let dispositionAlreadyResolved = false;
@@ -251,7 +252,8 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, GOVERNANCE_APPROVER_ROLES);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
 
     if (!current.languages.some((language) => language.id === body.languageId)) {
       reply.code(404);
@@ -323,7 +325,8 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES, ["reviewer"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+    const rateLimited = checkRateLimit(request, reply, actor);
+    if (rateLimited) return rateLimited;
     const policyAuthority = reviewPolicyAuthorityActor(current, actor);
     if (!policyAuthority) {
       reply.code(403);
