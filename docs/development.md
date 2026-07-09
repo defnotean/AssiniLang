@@ -125,6 +125,7 @@ For frontend changes, verify the user workflow in a browser in addition to autom
 Useful smoke checks:
 
 - Page title loads as `AssiniLang`.
+- With no language selected, Build/Practice/Chat show the select-or-create empty state with a New language sidebar hint.
 - A new language can be created and appears in the sidebar.
 - A pasted word-list source can be registered, processed, and its extraction drafts reviewed.
 - Accepting a lexeme draft updates the language's lexicon and profile counts.

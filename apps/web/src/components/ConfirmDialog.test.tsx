@@ -44,6 +44,20 @@ function openFromTrigger() {
 }
 
 describe("ConfirmDialog", () => {
+  it("exposes the confirmation message to assistive tech via aria-describedby", () => {
+    render(
+      <ConfirmDialog
+        message="Delete this language?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "Confirmation" });
+    expect(dialog).toHaveAttribute("aria-describedby", "confirm-dialog-message");
+    expect(dialog).toHaveAccessibleDescription("Delete this language?");
+  });
+
   it("cancels on Escape from the document listener and restores focus to the trigger", () => {
     const onCancel = vi.fn();
     render(<ConfirmDialogHarness onCancel={onCancel} />);

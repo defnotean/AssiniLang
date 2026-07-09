@@ -103,6 +103,51 @@ describe("GovernanceView consent empty states", () => {
   });
 });
 
+describe("GovernanceView form notices", () => {
+  it("announces policy, review-policy, and disposition errors as alerts", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.governanceError = "Policy content is required.";
+    workspace.reviewPolicyError = "Approval threshold must be at least 1.";
+    workspace.reviewDispositionError = "Resolution summary is required.";
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    for (const message of [
+      "Policy content is required.",
+      "Approval threshold must be at least 1.",
+      "Resolution summary is required."
+    ]) {
+      expect(screen.getByText(message)).toHaveAttribute("role", "alert");
+    }
+  });
+
+  it("announces policy and review-policy success with polite status messaging", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.governanceSuccess = "Governance policy recorded.";
+    workspace.reviewPolicySuccess = "Review policy updated.";
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    const policySuccess = screen.getByText("Governance policy recorded.");
+    expect(policySuccess).toHaveAttribute("role", "status");
+    expect(policySuccess).toHaveAttribute("aria-live", "polite");
+
+    const reviewSuccess = screen.getByText("Review policy updated.");
+    expect(reviewSuccess).toHaveAttribute("role", "status");
+    expect(reviewSuccess).toHaveAttribute("aria-live", "polite");
+  });
+});
+
 describe("GovernanceView export and disposition guards", () => {
   it("announces snapshot export success with aria-live status messaging", () => {
     const workspace = createGovernanceWorkspace();

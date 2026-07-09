@@ -2,7 +2,7 @@
 
 AssiniLang is a local research console for proving a language-learning AI workflow before any real community language data is introduced.
 
-The workspace starts empty. Users create their own languages, ingest their own raw materials, and review every extracted item before it becomes lexicon, corpus, or grammar data. Consent and provenance metadata travel with every corpus passage.
+The workspace starts empty. Users create their own languages, ingest their own raw materials, and review every extracted item before it becomes lexicon, corpus, or grammar data. Consent and provenance metadata travel with every corpus passage. Language-scoped views (Build, Practice, Chat, and related panels) show a next-step empty state — select or create a language via **New language** in the sidebar — until a workspace language exists.
 
 ## Core workflow
 
@@ -106,7 +106,7 @@ The evaluation dashboard shows latest evaluation runs, category scores, regressi
 - Exercise grading.
 - Generation-policy checks.
 
-Reviewers can export a sanitized evaluation artifact from this view (the API also allows lead, admin, and programmer). The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, and SHA-256 integrity metadata.
+Use **Run System Eval** in the Checks header after creating a language; an empty workspace returns a clear error instead of recording runs. Reviewers can export a sanitized evaluation artifact from this view (the API also allows lead, admin, and programmer). The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, and SHA-256 integrity metadata. Artifacts from an empty workspace or a workspace that has never run System Eval report `passed: false` with guidance rather than a vacuous green gate.
 
 ### Governance
 

@@ -33,6 +33,7 @@ describe("evaluation CLI", () => {
     expect(exitCode).toBe(0);
     expect(stderr).toEqual([]);
     expect(stdout.join("\n")).toContain("No languages in the workspace yet");
+    expect(stdout.join("\n")).toContain("System Eval");
   });
 
   it("fails when ASSINI_EVAL_REQUIRE_LANGUAGES is set and the workspace is empty", async () => {

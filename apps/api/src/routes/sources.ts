@@ -97,6 +97,8 @@ function applySourceProcessCompletion(
     createdAt: processedAt
   }));
 
+  // Successful runs clear the attempt counter so only failed/abandoned claims
+  // accumulate toward MAX_SOURCE_PROCESSING_ATTEMPTS (see docs/api.md).
   const updatedAsset: SourceAsset = {
     ...stored,
     status: "processed",
@@ -106,7 +108,8 @@ function applySourceProcessCompletion(
     warnings: extraction.warnings.length > 0 ? extraction.warnings : undefined,
     processedAt,
     processingStartedAt: undefined,
-    processingHeartbeatAt: undefined
+    processingHeartbeatAt: undefined,
+    processingAttempts: undefined
   };
   output.updatedAsset = updatedAsset;
 

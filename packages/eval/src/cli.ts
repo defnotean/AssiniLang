@@ -37,7 +37,7 @@ export async function runEvaluationCli({
       return 1;
     }
     stdout("No languages in the workspace yet; nothing to evaluate.");
-    stdout("Create a language and ingest sources through the web console or API, then re-run the evaluation.");
+    stdout("Create a language from the sidebar (or API), ingest sources, then run System Eval from Checks or re-run `npm run eval`.");
     return 0;
   }
 

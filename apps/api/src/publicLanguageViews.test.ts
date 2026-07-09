@@ -312,6 +312,22 @@ describe("public language views", () => {
       exportedAt: "2099-01-01T00:00:00.000Z"
     };
     expect(verifyExportIntegrity(mutatedPayload)).toBe(false);
+
+    const unknownExportVersion = {
+      ...snapshot!,
+      exportVersion: "language-snapshot-v1"
+    };
+    expect(verifyExportIntegrity(unknownExportVersion)).toBe(false);
+
+    const missingExportVersion = { ...snapshot! };
+    delete (missingExportVersion as { exportVersion?: unknown }).exportVersion;
+    expect(verifyExportIntegrity(missingExportVersion)).toBe(false);
+
+    const arrayIntegrity = {
+      ...snapshot!,
+      integrity: [snapshot!.integrity]
+    };
+    expect(verifyExportIntegrity(arrayIntegrity as typeof snapshot)).toBe(false);
   });
 
   it("returns undefined snapshots for unknown languages", () => {
@@ -493,6 +509,45 @@ describe("public language views", () => {
       exportedAt: "2099-01-01T00:00:00.000Z"
     };
     expect(verifyExportIntegrity(mutatedPayload)).toBe(false);
+  });
+
+  it("marks empty-workspace and no-run evaluation artifacts as failed gates", () => {
+    const emptyState = {
+      ...buildTestWorkspaceState(),
+      languages: [],
+      evaluationRuns: []
+    };
+    const emptyArtifact = toPublicEvaluationArtifact(emptyState, "2026-06-06T00:06:00.000Z");
+
+    expect(emptyArtifact.summary).toMatchObject({
+      languages: 0,
+      totalRuns: 0,
+      latestRuns: 0,
+      passed: false,
+      failureCount: 1
+    });
+    expect(emptyArtifact.failureLines).toEqual([
+      "No languages available to evaluate. Create a language from the sidebar first, then run System Eval."
+    ]);
+    expect(verifyExportIntegrity(emptyArtifact)).toBe(true);
+
+    const noRunsState = {
+      ...buildTestWorkspaceState(),
+      evaluationRuns: []
+    };
+    const noRunsArtifact = toPublicEvaluationArtifact(noRunsState, "2026-06-06T00:07:00.000Z");
+
+    expect(noRunsArtifact.summary).toMatchObject({
+      languages: 1,
+      totalRuns: 0,
+      latestRuns: 0,
+      passed: false,
+      failureCount: 1
+    });
+    expect(noRunsArtifact.failureLines).toEqual([
+      "No evaluation runs recorded. Run System Eval before exporting an evaluation artifact."
+    ]);
+    expect(verifyExportIntegrity(noRunsArtifact)).toBe(true);
   });
 
   it("counts threshold-only latest evaluation runs as failed in exported summaries", () => {

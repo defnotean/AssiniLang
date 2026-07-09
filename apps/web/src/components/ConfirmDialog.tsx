@@ -47,10 +47,13 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-label={t("confirmDialog.aria")}
+        aria-describedby="confirm-dialog-message"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
-        <p className="confirm-dialog-message">{message}</p>
+        <p id="confirm-dialog-message" className="confirm-dialog-message">
+          {message}
+        </p>
         <div className="confirm-dialog-actions">
           <button type="button" className="confirm-dialog-cancel" onClick={onCancel}>
             {t("common.cancel")}

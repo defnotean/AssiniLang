@@ -181,7 +181,11 @@ export function ModelDiscoveryPanel({
         </div>
       )}
       {failedEndpoints.slice(0, 2).map((endpoint) => (
-        <p key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`} className="inline-error">
+        <p
+          key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`}
+          className="inline-error"
+          role="alert"
+        >
           {t("model.endpointConnectionFailed", {
             baseUrl: endpoint.baseUrl,
             detail: endpoint.detail ?? t("model.errModelDiscoveryFailed")
@@ -189,7 +193,7 @@ export function ModelDiscoveryPanel({
         </p>
       ))}
       {failedEndpoints.length === 0 && connectedEndpoints.length === 0 && discoveryErrors.slice(0, 2).map((error) => (
-        <p key={`${error.source}:${error.baseUrl}:${error.detail}`} className="inline-error">
+        <p key={`${error.source}:${error.baseUrl}:${error.detail}`} className="inline-error" role="alert">
           {t("model.endpointConnectionFailed", { baseUrl: error.baseUrl, detail: error.detail })}
         </p>
       ))}

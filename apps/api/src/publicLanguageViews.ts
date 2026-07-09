@@ -211,13 +211,19 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
   };
 }
 
+const KNOWN_EXPORT_VERSIONS = new Set([
+  LANGUAGE_SNAPSHOT_EXPORT_VERSION,
+  EVALUATION_ARTIFACT_EXPORT_VERSION
+]);
+
 /**
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
  * manifest is missing or null, uses an unexpected algorithm or generator id, has
  * a mismatched or reordered redaction policy list, has a contentHash that is not
- * exactly 64 hex digits, or the hash does not match. Hex digests are compared
- * case-insensitively so uppercase `contentHash` values still verify.
+ * exactly 64 hex digits, has an unknown or missing `exportVersion`, or the hash
+ * does not match. Hex digests are compared case-insensitively so uppercase
+ * `contentHash` values still verify.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;
@@ -226,8 +232,16 @@ export function verifyExportIntegrity(exported: {
   const integrity = exported.integrity;
   if (
     !integrity
+    || typeof integrity !== "object"
+    || Array.isArray(integrity)
     || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM
     || integrity.generatedBy !== EXPORT_GENERATOR_ID
+  ) {
+    return false;
+  }
+  if (
+    typeof exported.exportVersion !== "string"
+    || !KNOWN_EXPORT_VERSIONS.has(exported.exportVersion)
   ) {
     return false;
   }
@@ -458,6 +472,11 @@ function buildMorphemeInventory(
     ));
 }
 
+const EMPTY_WORKSPACE_EVAL_FAILURE =
+  "No languages available to evaluate. Create a language from the sidebar first, then run System Eval.";
+const NO_EVAL_RUNS_FAILURE =
+  "No evaluation runs recorded. Run System Eval before exporting an evaluation artifact.";
+
 export function toPublicEvaluationArtifact(
   state: AppState,
   exportedAt = new Date().toISOString()
@@ -469,6 +488,18 @@ export function toPublicEvaluationArtifact(
   const gateSummary = summarizeEvaluationGate(latestRuns);
   const failedLatestRuns = latestRuns.filter((run) => !summarizeEvaluationGate([run]).passed).length;
   const trends = evaluationTrendsForRuns(state.evaluationRuns);
+
+  // An empty workspace or a workspace that has never run System Eval must not
+  // export as a green gate (summarizeEvaluationGate([]) is vacuously true).
+  const emptyWorkspaceGuidance = state.languages.length === 0
+    ? EMPTY_WORKSPACE_EVAL_FAILURE
+    : latestRuns.length === 0
+      ? NO_EVAL_RUNS_FAILURE
+      : null;
+  const failureLines = emptyWorkspaceGuidance
+    ? [emptyWorkspaceGuidance, ...gateSummary.failureLines]
+    : gateSummary.failureLines;
+  const passed = emptyWorkspaceGuidance ? false : gateSummary.passed;
 
   const artifact: Omit<PublicEvaluationArtifact, "integrity"> = {
     exportVersion: EVALUATION_ARTIFACT_EXPORT_VERSION,
@@ -483,8 +514,8 @@ export function toPublicEvaluationArtifact(
       stableLatestRuns: trends.filter((trend) => trend.status === "stable").length,
       singleRunLanguages: trends.filter((trend) => trend.status === "single-run").length,
       averageLatestScore,
-      passed: gateSummary.passed,
-      failureCount: gateSummary.failureLines.length
+      passed,
+      failureCount: failureLines.length
     },
     latestRuns,
     runsByLanguage: state.evaluationRuns.reduce<Record<string, string[]>>((runsByLanguage, run) => {
@@ -492,7 +523,7 @@ export function toPublicEvaluationArtifact(
       return runsByLanguage;
     }, {}),
     trends,
-    failureLines: gateSummary.failureLines
+    failureLines
   };
 
   return {

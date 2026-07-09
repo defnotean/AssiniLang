@@ -80,8 +80,16 @@ export function GovernanceView({
           <p className="eyebrow">{t("governance.policyAuthoring")}</p>
           <h2>{t("governance.createPolicyRecord")}</h2>
 
-          {governanceSuccess && <p className="result-notice">{governanceSuccess}</p>}
-          {governanceError && <p className="result-notice error">{governanceError}</p>}
+          {governanceSuccess && (
+            <p className="result-notice" role="status" aria-live="polite">
+              {governanceSuccess}
+            </p>
+          )}
+          {governanceError && (
+            <p className="result-notice error" role="alert">
+              {governanceError}
+            </p>
+          )}
 
           <div className="form-group">
             <label htmlFor="policy-type">{t("governance.policyType")}</label>
@@ -129,8 +137,16 @@ export function GovernanceView({
           <p className="eyebrow">{t("governance.reviewRouting")}</p>
           <h2>{t("governance.reviewPolicy")}</h2>
 
-          {reviewPolicySuccess && <p className="result-notice">{reviewPolicySuccess}</p>}
-          {reviewPolicyError && <p className="result-notice error">{reviewPolicyError}</p>}
+          {reviewPolicySuccess && (
+            <p className="result-notice" role="status" aria-live="polite">
+              {reviewPolicySuccess}
+            </p>
+          )}
+          {reviewPolicyError && (
+            <p className="result-notice error" role="alert">
+              {reviewPolicyError}
+            </p>
+          )}
           {reviewPolicyState.status === "loading" && (
             <p className="inline-empty" role="status" aria-live="polite">
               {t("governance.loadingReviewPolicy")}
@@ -196,8 +212,16 @@ export function GovernanceView({
         <p className="eyebrow">{t("governance.resolutionWorkflow")}</p>
         <h2>{t("governance.reviewDispositionWork")}</h2>
 
-        {reviewDispositionSuccess && <p className="result-notice" role="status">{reviewDispositionSuccess}</p>}
-        {reviewDispositionError && <p className="result-notice error">{reviewDispositionError}</p>}
+        {reviewDispositionSuccess && (
+          <p className="result-notice" role="status" aria-live="polite">
+            {reviewDispositionSuccess}
+          </p>
+        )}
+        {reviewDispositionError && (
+          <p className="result-notice error" role="alert">
+            {reviewDispositionError}
+          </p>
+        )}
 
         {reviewDispositionState.status === "loading" && (
           <p className="inline-empty" role="status" aria-live="polite">

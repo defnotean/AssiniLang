@@ -35,6 +35,49 @@ function renderPanel(overrides: Partial<Parameters<typeof ModelDiscoveryPanel>[0
   );
 }
 
+describe("ModelDiscoveryPanel connection errors", () => {
+  it("announces failed endpoint errors as alerts and prefers them over discovery errors", () => {
+    renderPanel({
+      failedEndpoints: [
+        {
+          source: "ollama",
+          baseUrl: "http://127.0.0.1:11434",
+          provider: "ollama",
+          providerLabel: "Ollama",
+          connected: false,
+          modelCount: 0,
+          detail: "Connection refused"
+        }
+      ],
+      discoveryErrors: [
+        {
+          source: "lmstudio",
+          baseUrl: "http://127.0.0.1:1234",
+          detail: "Timed out"
+        }
+      ]
+    });
+
+    const failedAlert = screen.getByText(/http:\/\/127\.0\.0\.1:11434/);
+    expect(failedAlert).toHaveAttribute("role", "alert");
+    expect(screen.queryByText(/http:\/\/127\.0\.0\.1:1234/)).not.toBeInTheDocument();
+  });
+
+  it("announces discovery errors when no endpoints connected or failed", () => {
+    renderPanel({
+      discoveryErrors: [
+        {
+          source: "lmstudio",
+          baseUrl: "http://127.0.0.1:1234",
+          detail: "Timed out"
+        }
+      ]
+    });
+
+    expect(screen.getByText(/http:\/\/127\.0\.0\.1:1234/)).toHaveAttribute("role", "alert");
+  });
+});
+
 describe("ModelDiscoveryPanel empty state", () => {
   it("shows a next-step hint when discovery finished with no models", () => {
     renderPanel();

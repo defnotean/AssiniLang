@@ -4803,7 +4803,7 @@ describe("api server", () => {
       expect(Array.isArray(processed.json().warnings)).toBe(true);
     });
 
-    it("increments processingAttempts and clears in-flight markers after completion", async () => {
+    it("clears processingAttempts and in-flight markers after successful completion", async () => {
       const app = createServer({ initialState: buildTestWorkspaceState() });
       const sourceId = await registerWordlistSource(app, "Attempt-tracked word list");
 
@@ -4815,10 +4815,10 @@ describe("api server", () => {
       expect(first.statusCode).toBe(200);
       expect(first.json().asset).toMatchObject({
         id: sourceId,
-        status: "processed",
-        processingAttempts: 1
+        status: "processed"
       });
-      // In-flight markers are cleared once processing finishes; attempts remain.
+      // Success clears the attempt counter and in-flight markers so healthy reprocessing is not capped.
+      expect(first.json().asset.processingAttempts).toBeUndefined();
       expect(first.json().asset.processingStartedAt).toBeUndefined();
       expect(first.json().asset.processingHeartbeatAt).toBeUndefined();
 
@@ -4830,15 +4830,24 @@ describe("api server", () => {
       expect(second.statusCode).toBe(200);
       expect(second.json().asset).toMatchObject({
         id: sourceId,
-        status: "processed",
-        processingAttempts: 2
+        status: "processed"
       });
+      expect(second.json().asset.processingAttempts).toBeUndefined();
       expect(second.json().asset.processingStartedAt).toBeUndefined();
       expect(second.json().asset.processingHeartbeatAt).toBeUndefined();
     });
 
-    it("returns 409 with i18n metadata when processingAttempts reaches the max", async () => {
-      const app = createServer({ initialState: buildTestWorkspaceState() });
+    it("returns 409 with i18n metadata after five failed processing attempts", async () => {
+      const llmProvider: LlmProvider = {
+        name: "always-failing-provider",
+        async generateAssistantMessage() {
+          return { content: "unused", warnings: [] };
+        },
+        async completeChat() {
+          throw new Error("Simulated extraction failure");
+        }
+      };
+      const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
       const sourceId = await registerWordlistSource(app, "Max-attempt word list");
 
       for (let attempt = 1; attempt <= 5; attempt += 1) {
@@ -4847,10 +4856,10 @@ describe("api server", () => {
           url: `/sources/${sourceId}/process`,
           headers: authHeaders("reviewer-1")
         });
-        expect(response.statusCode).toBe(200);
+        expect(response.statusCode).toBe(422);
         expect(response.json().asset).toMatchObject({
           id: sourceId,
-          status: "processed",
+          status: "failed",
           processingAttempts: attempt
         });
       }
@@ -5094,7 +5103,8 @@ describe("api server", () => {
       expect(processed.statusCode).toBe(200);
       expect(processed.json().asset.status).toBe("processed");
       expect(processed.json().asset.error).toBeUndefined();
-      expect(processed.json().asset.processingAttempts).toBe(2);
+      // Successful reprocess after recovery clears the attempt counter.
+      expect(processed.json().asset.processingAttempts).toBeUndefined();
     });
   });
 });

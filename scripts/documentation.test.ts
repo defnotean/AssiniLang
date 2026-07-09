@@ -118,13 +118,16 @@ describe("project documentation", () => {
     const docs = await readAllDocs();
 
     const expectedContent: Record<string, string[]> = {
-      "README.md": ["[Documentation Hub](docs/README.md)", "```mermaid", "First Nations"],
+      "README.md": ["[Documentation Hub](docs/README.md)", "```mermaid", "First Nations", "npm.cmd run smoke:backup"],
       "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
       "docs/api.md": [
         "verifyExportIntegrity",
         "missing or null `integrity`",
+        "non-object `integrity`",
         "unexpected `algorithm`/`generatedBy`",
         "mismatched or reordered `redactionPolicy`",
+        "missing or unknown `exportVersion`",
+        "vacuous green gate",
         "exactly 64 hex digits",
         "case-insensitive",
         "Relative root segments",
@@ -141,7 +144,9 @@ describe("project documentation", () => {
         "ExerciseAuthoringBody",
         "Evaluation artifact export",
         "uses the reviewer actor in the browser",
-        "cookie `Max-Age` both refresh",
+        "**remaining** lifetime",
+        "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
+        "sliding ∩ absolute",
         "Orphan sessions whose `userId` no longer exists",
         "same Secure/HttpOnly/SameSite/Path rules as create",
         "Empty or whitespace-only session cookie",
@@ -197,6 +202,9 @@ describe("project documentation", () => {
         "ASSINI_LLM_TIMEOUT_MS",
         "ASSINI_LLM_MAX_TOKENS",
         "expires the browser cookie with `Max-Age=0`",
+        "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
+        "sliding ∩ absolute",
+        "three times the configured sliding TTL",
         "raise if extractions are getting truncated"
       ],
       "docs/development.md": [
@@ -207,6 +215,7 @@ describe("project documentation", () => {
         "npm.cmd run smoke:backup",
         "CLI refusal checks",
         "SQLite force-overwrite",
+        "select-or-create empty state",
         "Building a language from raw sources"
       ],
       "docs/ingestion.md": [
@@ -289,7 +298,11 @@ describe("project documentation", () => {
         "leadless",
         "learner, Elder, reviewer, and programmer",
         "Build and sources & intake",
-        "evaluation artifact export"
+        "evaluation artifact export",
+        "Run System Eval",
+        "vacuous green gate",
+        "next-step empty state",
+        "New language"
       ],
       "docs/troubleshooting.md": [
         "## Startup and ports",
@@ -299,6 +312,8 @@ describe("project documentation", () => {
         "ingest.processingInterruptedByRestart",
         "relative roots were set",
         "errors.prototypeAuthDisabled",
+        "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
+        "absolute deadline",
         "app.rateLimitExceeded",
         "destination is a directory",
         "destination already exists",
@@ -307,6 +322,7 @@ describe("project documentation", () => {
         "backup source is a directory",
         "database file only",
         "could not create a safety backup",
+        "disk full",
         "newest **routine** backup"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]

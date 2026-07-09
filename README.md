@@ -105,6 +105,7 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run eval` | Deterministic evaluation CLI. |
 | `npm.cmd run build` | Build all workspaces. |
 | `npm.cmd run smoke` | End-to-end ingestion smoke script. |
+| `npm.cmd run smoke:backup` | Backup → corrupt → restore smoke plus CLI refusal / SQLite force / dry-run validation checks (also run in CI). |
 | `npm.cmd run model:verify` | Probe discovered local models and run a model-backed language workflow check. |
 | `npm.cmd run db:backup` | Validated backup of the local database to `data/backups/`. |
 | `npm.cmd run demo` | Seed, evaluate, and start the prototype. |
