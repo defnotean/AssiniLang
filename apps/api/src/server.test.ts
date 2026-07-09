@@ -1919,6 +1919,8 @@ describe("api server", () => {
 
   it.each([
     ["learners", "learner-1", 403, "Forbidden"],
+    // Elders may export language snapshots but not the evaluation artifact matrix.
+    ["elders", "elder-1", 403, "Forbidden"],
     ["unknown users", "missing-user", 401, "Unauthorized"]
   ])("rejects evaluation artifact exports from %s", async (_, userId, statusCode, error) => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
@@ -1931,6 +1933,26 @@ describe("api server", () => {
 
     expect(response.statusCode).toBe(statusCode);
     expect(response.json()).toEqual({ error });
+  });
+
+  it("allows elders to export a language snapshot while blocking evaluation artifacts", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const snapshot = await app.inject({
+      method: "GET",
+      url: `/exports/languages/${TEST_LANGUAGE_ID}/snapshot`,
+      headers: authHeaders("elder-1")
+    });
+    expect(snapshot.statusCode).toBe(200);
+    expect(snapshot.json()).toMatchObject({ language: { id: TEST_LANGUAGE_ID } });
+
+    const artifact = await app.inject({
+      method: "GET",
+      url: "/exports/evaluations/artifact",
+      headers: authHeaders("elder-1")
+    });
+    expect(artifact.statusCode).toBe(403);
+    expect(artifact.json()).toEqual({ error: "Forbidden" });
   });
 
   it("returns a not-found error for unknown language snapshot exports", async () => {

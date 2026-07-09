@@ -1,5 +1,6 @@
 import type { GovernanceRecord, ReviewDisposition } from "@assini/db";
 import type { DraftGroundingFlag, ExtractionDraft, ExtractionDraftDuplicate } from "../api";
+import type { MessageKey } from "../i18n/en";
 import type { Language, PublicExercise, ReviewStatus, ViewMode } from "./types";
 
 export const VIEW_CONFIG: Record<ViewMode, { label: string; title: string; eyebrow: string }> = {
@@ -44,13 +45,16 @@ export const EXTRACTION_DRAFT_GROUNDING_LABELS: Record<DraftGroundingFlag["kind"
   decomposable_form: "Form decomposes into accepted lexemes",
   segmentation_conflict: "Segment gloss conflicts with lexicon"
 };
-export const REVIEWER_COMMENTS: Record<ReviewStatus, string> = {
-  approved: "Approved in local prototype.",
-  contested: "Contested in local prototype.",
-  rejected: "Rejected in local prototype.",
-  deferred: "Deferred in local prototype.",
-  escalated: "Escalated in local prototype."
+/** i18n keys for persisted note-review comments (written into review history). */
+export const REVIEWER_COMMENT_KEYS: Record<ReviewStatus, MessageKey> = {
+  approved: "review.comment.approved",
+  contested: "review.comment.contested",
+  rejected: "review.comment.rejected",
+  deferred: "review.comment.deferred",
+  escalated: "review.comment.escalated"
 };
+
+export const REVIEWER_EDITED_EXPLANATION_COMMENT_KEY: MessageKey = "review.comment.editedExplanation";
 
 export const POLICY_TYPE_LABELS: Record<GovernanceRecord["policyType"], string> = {
   consent: "Consent",

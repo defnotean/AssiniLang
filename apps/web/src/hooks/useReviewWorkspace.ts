@@ -3,7 +3,7 @@ import type { DashboardData } from "../api";
 import { generateDraftNotes, generateModelDraftNotes, reviewNote, runEvaluation } from "../api";
 import type { PublicNote, ReviewStatus, ViewMode } from "../lib/types";
 import { localizeApiError } from "../lib/format";
-import { REVIEWER_COMMENTS } from "../lib/viewConfig";
+import { REVIEWER_COMMENT_KEYS, REVIEWER_EDITED_EXPLANATION_COMMENT_KEY } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 
 export interface ReviewWorkspace {
@@ -118,7 +118,7 @@ export function useReviewWorkspace(
     try {
       await reviewNote(selectedNote.id, {
         status,
-        reviewerComment: REVIEWER_COMMENTS[status]
+        reviewerComment: t(REVIEWER_COMMENT_KEYS[status])
       });
       await refreshDashboard();
     } catch (error) {
@@ -137,7 +137,7 @@ export function useReviewWorkspace(
     try {
       await reviewNote(selectedNote.id, {
         explanation,
-        reviewerComment: "Edited note explanation in local prototype."
+        reviewerComment: t(REVIEWER_EDITED_EXPLANATION_COMMENT_KEY)
       });
       await refreshDashboard();
     } catch (error) {

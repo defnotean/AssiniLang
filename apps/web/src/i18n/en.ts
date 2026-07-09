@@ -218,6 +218,12 @@ export const en = {
   "review.modelDraftSummaryOther": "Generated {count} model-backed draft notes.",
   "review.groundingLabel": "Grounding:",
   "review.reviewFlagged": "Review flagged checks before approving.",
+  "review.comment.approved": "Approved in local prototype.",
+  "review.comment.contested": "Contested in local prototype.",
+  "review.comment.rejected": "Rejected in local prototype.",
+  "review.comment.deferred": "Deferred in local prototype.",
+  "review.comment.escalated": "Escalated in local prototype.",
+  "review.comment.editedExplanation": "Edited note explanation in local prototype.",
   "eval.runSystemEval": "Run System Eval",
   "eval.evaluating": "Evaluating...",
 

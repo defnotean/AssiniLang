@@ -64,13 +64,17 @@ describe("repository production hygiene", () => {
       "ASSINI_OCR_API_KEY",
       "ASSINI_OCR_LANG",
       "ASSINI_ALLOW_PRIVATE_URLS",
+      "ASSINI_OBSIDIAN_VAULT_ROOTS",
       "ASSINI_DEV_API_PORT",
       "ASSINI_DEV_WEB_PORT",
       "ASSINI_DB_PATH",
       "ASSINI_ENABLE_PROTOTYPE_AUTH",
       "ASSINI_PROTOTYPE_SESSION_TTL_MS",
       "ASSINI_COOKIE_SECURE",
-      "ASSINI_DEV_AUTH_TOKEN"
+      "ASSINI_DEV_AUTH_TOKEN",
+      "ASSINI_ALLOWED_ORIGINS",
+      "ASSINI_BODY_LIMIT_BYTES",
+      "ASSINI_API_LOGGER"
     ]) {
       expect(example, `.env.example should include ${variable}`).toContain(variable);
     }

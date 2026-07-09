@@ -200,6 +200,12 @@ export const ar: Record<MessageKey, string> = {
   "review.modelDraftSummaryOther": "تم توليد {count} مسودة ملاحظة مُسنَدة إلى النموذج.",
   "review.groundingLabel": "الإسناد:",
   "review.reviewFlagged": "راجع الفحوصات المُعلَّمة قبل الاعتماد.",
+  "review.comment.approved": "مُعتمد في النموذج المحلي.",
+  "review.comment.contested": "مُعترَض عليه في النموذج المحلي.",
+  "review.comment.rejected": "مرفوض في النموذج المحلي.",
+  "review.comment.deferred": "مؤجّل في النموذج المحلي.",
+  "review.comment.escalated": "مُصعّد في النموذج المحلي.",
+  "review.comment.editedExplanation": "تم تعديل شرح الملاحظة في النموذج المحلي.",
   "eval.runSystemEval": "تشغيل تقييم النظام",
   "eval.evaluating": "جارٍ التقييم...",
 
