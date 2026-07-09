@@ -11,7 +11,7 @@ AssiniLang keeps all workspace data under the configured data directory (repo ch
 | `data/local-db.json` | Default JSON workspace (languages, sources, drafts, audit events, users). A path that does not end in `.json` selects the SQLite backend instead. |
 | `data/backups/` | Timestamped backups from `npm.cmd run db:backup` (CLI) or the desktop app's backup tools. |
 | `data/assets/<languageId>/` | Uploaded source files (images, audio, PDF, DOCX) referenced by `sourceAssets.filePath`. |
-| `data/ocr-cache/` | Cached tesseract.js trained data per `ASSINI_OCR_LANG` (first OCR run downloads once, then works offline). |
+| `data/ocr-cache/` | Cached tesseract.js trained data for the local OCR image fallback (`ASSINI_OCR_LANG`); scanned PDFs use the configured vision OCR model (`ASSINI_OCR_BASE_URL`) on page 1 only. |
 | `data/ingestion-uploads/` | Temporary multipart upload staging (ignored by Git). |
 
 **Desktop packaged app:** Settings → Desktop app tools shows the install folder, local data directory, backups folder, and latest backup path. Backups and data live under the per-user app data root (for example `%APPDATA%\AssiniLang\`), not necessarily the repo `data/` tree.

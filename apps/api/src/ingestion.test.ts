@@ -18,7 +18,7 @@ import {
 } from "./ingestion.js";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
-const pdfStub = vi.hoisted(() => ({ text: "mira = river" }));
+const pdfStub = vi.hoisted(() => ({ text: "mira = river", totalPages: 1 }));
 const pdfOcrStub = vi.hoisted(() => ({
   images: [] as Array<{
     data: Uint8ClampedArray;
@@ -49,7 +49,7 @@ const ocrStub = vi.hoisted(() => ({
 }));
 
 vi.mock("unpdf", () => ({
-  extractText: vi.fn(async () => ({ totalPages: 1, text: pdfStub.text })),
+  extractText: vi.fn(async () => ({ totalPages: pdfStub.totalPages, text: pdfStub.text })),
   extractImages: vi.fn(async () => pdfOcrStub.images)
 }));
 
@@ -786,6 +786,42 @@ describe("extractCandidatesForAsset document support", () => {
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.payload.form).toBe("mira");
     expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read scanned document (page 1)."))).toBe(true);
+  });
+
+  it("warns when a multi-page scanned PDF is OCR'd on page 1 only", async () => {
+    pdfStub.text = "   ";
+    pdfStub.totalPages = 4;
+    const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
+
+    const fetchStub = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "mira = river" } }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    pdfOcrStub.images = [{
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key: "page-image"
+    }];
+
+    const result = await extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.warnings.some((warning) => warning.includes("PDF has 4 pages; only page 1 was OCR'd."))).toBe(true);
+    pdfStub.totalPages = 1;
   });
 
   it("surfaces OCR failures for scanned PDFs when the model cannot read page 1", async () => {

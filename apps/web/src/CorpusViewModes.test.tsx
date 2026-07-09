@@ -95,6 +95,14 @@ beforeEach(() => {
 });
 
 describe("CorpusView display modes", () => {
+  it("shows a Build-oriented empty state when the corpus is empty", () => {
+    renderCorpusView([]);
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No saved examples yet. Process a source in Build and accept corpus drafts to populate this list."
+    );
+  });
+
   it("defaults to card mode and exposes an interlinear toggle", () => {
     renderCorpusView();
 

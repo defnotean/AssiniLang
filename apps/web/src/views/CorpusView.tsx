@@ -378,8 +378,12 @@ export function CorpusView({
             }}
           />
         ) : visible.length === 0 ? (
-          <p className="empty-state">
-            {morphFilter ? t("corpus.emptyMorpheme") : t("corpus.emptySearch")}
+          <p className="empty-state" role="status">
+            {morphFilter
+              ? t("corpus.emptyMorpheme")
+              : corpus.length === 0
+                ? t("corpus.emptyCorpus")
+                : t("corpus.emptySearch")}
           </p>
         ) : displayMode === "interlinear" ? (
           visible.map((passage) => (

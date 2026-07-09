@@ -294,7 +294,7 @@ export const en = {
   "reviewView.defer": "Defer",
   "reviewView.escalateNote": "Escalate {topic}",
   "reviewView.escalate": "Escalate",
-  "reviewView.noNotesForLanguage": "No notes for this language.",
+  "reviewView.noNotesForLanguage": "No notes for this language yet. Process a source in Build to propose grammar notes, then review them here.",
 
   // Corpus browser.
   "corpus.importSuccess": "Corpus passage imported.",
@@ -367,6 +367,7 @@ export const en = {
   "corpus.networkKind.record": "Record",
   "corpus.emptyMorpheme": "No passages contain the selected morpheme.",
   "corpus.emptySearch": "No passages match your search.",
+  "corpus.emptyCorpus": "No saved examples yet. Process a source in Build and accept corpus drafts to populate this list.",
 
   // Source intake.
   "ingest.errorTitleRequired": "Please provide a source title.",
@@ -433,6 +434,7 @@ export const en = {
   "ingest.addedByAt": "Added by {createdBy} at {createdAt}",
   "ingest.processingWarningsAria": "Processing warnings for {title}",
   "ingest.processing": "Processing...",
+  "ingest.processingDocument": "Extracting document (OCR may run on scanned PDFs, page 1 only)...",
   "ingest.processingAttempts": "Attempt {count}",
   "ingest.sourceMaxProcessingAttempts": "Processing stopped after {max} attempts. Review the source error or contact an operator.",
   "ingest.processingStaleWarning": "Processing has not reported progress since {age}. It may be stuck — wait for recovery on restart or try again later.",

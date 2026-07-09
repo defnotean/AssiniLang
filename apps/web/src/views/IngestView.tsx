@@ -296,7 +296,9 @@ export function IngestView({
                   onClick={() => handleProcessSource(source.id)}
                 >
                   {processingSourceId === source.id || source.status === "processing"
-                    ? t("ingest.processing")
+                    ? source.kind === "document"
+                      ? t("ingest.processingDocument")
+                      : t("ingest.processing")
                     : t("ingest.processSource", { title: source.title })}
                 </button>
               </article>

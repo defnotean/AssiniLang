@@ -59,6 +59,24 @@ describe("ReviewView", () => {
     expect(consoleError.mock.calls.some((call) => String(call[0]).includes("same key"))).toBe(false);
   });
 
+  it("shows a Build-oriented empty state when the language has no notes", () => {
+    render(
+      <ReviewView
+        notes={[]}
+        selectedNote={null}
+        isWorkflowBusy={false}
+        reviewingNoteId={null}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "No notes for this language yet. Process a source in Build to propose grammar notes, then review them here."
+    );
+  });
+
   it("shows a filter-specific empty state when no notes match", () => {
     const note = createReviewNote({ status: "approved" });
 

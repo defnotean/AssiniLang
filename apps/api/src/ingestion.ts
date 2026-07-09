@@ -773,7 +773,7 @@ async function resolveAssetText(
       const { extractText } = await import("unpdf");
       const data = await readFile(absolutePath);
       const pdfBytes = new Uint8Array(data);
-      const { text } = await extractText(pdfBytes, { mergePages: true });
+      const { text, totalPages } = await extractText(pdfBytes, { mergePages: true });
       if (text.trim().length === 0) {
         if (!ocrModelConfigured(env)) {
           throw new Error(
@@ -792,6 +792,11 @@ async function resolveAssetText(
           throw new Error(`Configured OCR model could not read the scanned PDF: ${reason}`);
         }
         warnings.push("Used configured OCR model to read scanned document (page 1).");
+        if (totalPages > 1) {
+          warnings.push(
+            `PDF has ${totalPages} pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them.`
+          );
+        }
         return { text: ocrText, warnings };
       }
       return { text, warnings };

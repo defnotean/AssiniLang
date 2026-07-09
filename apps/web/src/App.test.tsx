@@ -2440,7 +2440,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Export review snapshot" }));
 
     await waitFor(() => expect(apiMock.fetchLanguageSnapshot).toHaveBeenCalledWith("avenik"));
-    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 source asset, integrity sha256:0123456789ab.")).toBeInTheDocument();
+    expect(await screen.findByText("Snapshot ready: 1 corpus passage, 2 notes, 2 notes still need review, 2 exercises, 2 vocabulary items, 1 grammar rule, 1 source asset, integrity sha256:0123456789ab.")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Download snapshot JSON" });
     expect(link).toHaveAttribute("download", "assini-avenik-snapshot.json");
     expect(link.getAttribute("href")).toContain("data:application/json;charset=utf-8,");

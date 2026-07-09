@@ -63,4 +63,27 @@ describe("ConfirmDialog", () => {
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
+
+  it("returns focus to the trigger element when the dialog closes", () => {
+    const trigger = document.createElement("button");
+    trigger.type = "button";
+    trigger.textContent = "Restore backup";
+    document.body.append(trigger);
+    trigger.focus();
+
+    const view = render(
+      <ConfirmDialog
+        message="Restore the latest backup?"
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    );
+
+    expect(document.activeElement).not.toBe(trigger);
+
+    view.unmount();
+
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

@@ -112,17 +112,25 @@ export function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): 
   return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
 }
 
+export function formatSnapshotReviewAccountability(notes: LanguageSnapshot["notes"]): string | undefined {
+  const pendingReview = notes.filter((note) => note.status !== "approved").length;
+  if (pendingReview === 0) return undefined;
+  return formatCount(pendingReview, "note still needs review", "notes still need review");
+}
+
 export function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
   const safeLanguageId = snapshot.language.id.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "language";
+  const reviewAccountability = formatSnapshotReviewAccountability(snapshot.notes);
   const summary = [
     formatCount(snapshot.corpus.length, "corpus passage"),
     formatCount(snapshot.notes.length, "note"),
+    reviewAccountability,
     formatCount(snapshot.exercises.length, "exercise"),
     formatCount(snapshot.linguisticProfile.stats.vocabularyItems, "vocabulary item"),
     formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
     formatCount(snapshot.linguisticProfile.stats.sourceAssets, "source asset"),
     formatIntegrityLabel(snapshot.integrity)
-  ].join(", ");
+  ].filter(Boolean).join(", ");
 
   return {
     fileName: `assini-${safeLanguageId}-snapshot.json`,

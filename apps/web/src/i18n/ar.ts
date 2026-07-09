@@ -271,7 +271,7 @@ export const ar: Record<MessageKey, string> = {
   "reviewView.defer": "تأجيل",
   "reviewView.escalateNote": "تصعيد {topic}",
   "reviewView.escalate": "تصعيد",
-  "reviewView.noNotesForLanguage": "لا توجد ملاحظات لهذه اللغة.",
+  "reviewView.noNotesForLanguage": "لا توجد ملاحظات لهذه اللغة بعد. عالِج مصدرًا في البناء لاقتراح ملاحظات نحوية، ثم راجعها هنا.",
 
   // متصفّح المدوّنة.
   "corpus.importSuccess": "تم استيراد مقطع المدوّنة.",
@@ -344,6 +344,7 @@ export const ar: Record<MessageKey, string> = {
   "corpus.networkKind.record": "Record",
   "corpus.emptyMorpheme": "لا توجد مقاطع تحتوي على المورفيم المحدد.",
   "corpus.emptySearch": "لا توجد مقاطع تطابق بحثك.",
+  "corpus.emptyCorpus": "لا توجد أمثلة محفوظة بعد. عالِج مصدرًا في البناء واقبل مسودات المدوّنة لملء هذه القائمة.",
 
   // المصادر والإدخال.
   "ingest.errorTitleRequired": "يرجى إدخال عنوان المصدر.",
@@ -410,6 +411,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.addedByAt": "أضافه {createdBy} في {createdAt}",
   "ingest.processingWarningsAria": "تحذيرات معالجة {title}",
   "ingest.processing": "جارٍ المعالجة...",
+  "ingest.processingDocument": "جارٍ استخراج المستند (قد يُشغَّل OCR على ملفات PDF الممسوحة، الصفحة 1 فقط)...",
   "ingest.processingAttempts": "المحاولة {count}",
   "ingest.sourceMaxProcessingAttempts": "توقفت المعالجة بعد {max} محاولات. راجع خطأ المصدر أو تواصل مع المشغّل.",
   "ingest.processingStaleWarning": "لم تُبلِّغ المعالجة عن أي تقدّم منذ {age}. قد تكون عالقة — انتظر الاستعادة عند إعادة التشغيل أو أعد المحاولة لاحقًا.",
