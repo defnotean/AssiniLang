@@ -181,16 +181,28 @@ describe("bulk extraction draft review", () => {
 
     const badAction = await bulkReview(app, { action: "destroy", draftIds: ["bulk-draft-lexeme"] });
     expect(badAction.statusCode).toBe(400);
+    expect(badAction.json()).toEqual({
+      error: "Body must include action: \"accept\" or \"reject\".",
+      i18nKey: "errors.bulkReviewInvalidAction"
+    });
 
     const emptyIds = await bulkReview(app, { action: "accept", draftIds: [] });
     expect(emptyIds.statusCode).toBe(400);
+    expect(emptyIds.json()).toEqual({
+      error: "Body must include draftIds: a non-empty array of draft id strings.",
+      i18nKey: "errors.bulkReviewInvalidDraftIds"
+    });
 
     const tooMany = await bulkReview(app, {
       action: "accept",
       draftIds: Array.from({ length: 51 }, (_, index) => `draft-${index}`)
     });
     expect(tooMany.statusCode).toBe(400);
-    expect(tooMany.json().error).toContain("50");
+    expect(tooMany.json()).toEqual({
+      error: "Too many draftIds: at most 50 per request.",
+      i18nKey: "errors.bulkReviewTooManyDraftIds",
+      i18nParams: { max: 50 }
+    });
   });
 
   it("returns 404 for an unknown language", async () => {
@@ -199,7 +211,10 @@ describe("bulk extraction draft review", () => {
     const response = await bulkReview(app, { action: "accept", draftIds: ["bulk-draft-lexeme"] }, { languageId: "nope" });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: nope" });
+    expect(response.json()).toEqual({
+      error: "Language not found: nope",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("appends one audit event per successfully reviewed draft", async () => {

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { LanguageCreatePayload } from "../api";
-import { formatTypology } from "../lib/format";
+import { formatTypology, localizeApiError } from "../lib/format";
 import { LANGUAGE_TYPOLOGY_OPTIONS } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 import type { Language } from "../lib/types";
@@ -43,8 +43,7 @@ export function CreateLanguageForm({
       setTypology("unknown");
       setIsOpen(false);
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("createLang.creationFailed");
-      setCreateError(message);
+      setCreateError(localizeApiError(error, t, "createLang.creationFailed"));
     } finally {
       setIsCreating(false);
     }

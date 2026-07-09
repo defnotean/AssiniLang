@@ -131,7 +131,22 @@ export function sanitizeNeuralMapForActor(neuralMap: NeuralMap, actor: User): Ne
 
 export function getHeaderValue(request: FastifyRequest, name: string): string | undefined {
   const value = request.headers[name];
-  return typeof value === "string" ? value : undefined;
+  if (typeof value === "string") return value;
+  if (!Array.isArray(value)) return undefined;
+
+  // Node/Fastify may expose repeated headers as string[]. Cookie values must be
+  // joined so session parsing still sees every pair; other auth headers take the
+  // last non-empty value so tokens are never concatenated.
+  if (name === "cookie") {
+    const parts = value.filter((part): part is string => typeof part === "string" && part.length > 0);
+    return parts.length > 0 ? parts.join("; ") : undefined;
+  }
+
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    const part = value[index];
+    if (typeof part === "string" && part.length > 0) return part;
+  }
+  return undefined;
 }
 
 export function getBearerToken(request: FastifyRequest): string | undefined {

@@ -168,6 +168,13 @@ export const ar: Record<MessageKey, string> = {
   "errors.invalidReviewBody": "اختر حالة مراجعة صالحة قبل الحفظ.",
   "errors.reviewDispositionRequiresComment": "أضف تعليق مراجع قبل تسجيل هذا القرار.",
   "errors.payloadTooLarge": "الطلب كبير جدًا. قلّص الحمولة أو ارفع ملفًا أصغر، ثم أعد المحاولة.",
+  "errors.invalidLanguageBody": "الاسم والوصف والإملاء مطلوبة لإنشاء لغة.",
+  "errors.invalidLanguagePatchBody": "قدّم حقل لغة صالحًا واحدًا على الأقل للتحديث.",
+  "errors.languageCreateFailed": "تعذّر إنشاء اللغة. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
+  "errors.languageUpdateFailed": "تعذّر تحديث اللغة. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
+  "errors.bulkReviewInvalidAction": "اختر قبولًا أو رفضًا لمراجعة المسودات المجمّعة.",
+  "errors.bulkReviewInvalidDraftIds": "حدّد مسودة استخلاص واحدة على الأقل قبل المراجعة المجمّعة.",
+  "errors.bulkReviewTooManyDraftIds": "عدد المسودات المحددة كبير جدًا. راجع {max} كحد أقصى في المرة الواحدة.",
 
   "viewConfig.profile.label": "الملف اللغوي",
   "viewConfig.profile.title": "الملف اللغوي",

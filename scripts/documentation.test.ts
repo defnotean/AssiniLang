@@ -148,6 +148,11 @@ describe("project documentation", () => {
         "governance.errDispositionAlreadyResolved",
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
+        "errors.invalidLanguageBody",
+        "errors.invalidLanguagePatchBody",
+        "errors.bulkReviewInvalidAction",
+        "errors.bulkReviewInvalidDraftIds",
+        "errors.bulkReviewTooManyDraftIds",
         "errors.prototypeAuthDisabled",
         "errors.invalidPrototypeSessionBody",
         "errors.missingLanguageId",
@@ -155,7 +160,8 @@ describe("project documentation", () => {
         "app.rateLimitExceeded",
         "elderWs.errInvalidCorrectionBody",
         "elderWs.errCorrectionMustBeAccepted",
-        "elderWs.errCorrectionNotPending"
+        "elderWs.errCorrectionNotPending",
+        "joined before parsing"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -173,6 +179,7 @@ describe("project documentation", () => {
         "Empty or whitespace-only session cookie",
         "last matching pair wins",
         "trailing malformed percent-encoded",
+        "joined before parsing",
         "Relative segments"
       ],
       "docs/development.md": [

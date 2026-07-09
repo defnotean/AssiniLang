@@ -492,7 +492,9 @@ function vaultImportErrorI18n(error: string): { i18nKey: MessageKey } | undefine
 }
 
 /** Maps known elder/export/auth/study-loop API English errors when response metadata is absent. */
-function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefined {
+function operatorApiErrorI18n(
+  error: string
+): { i18nKey: MessageKey; i18nParams?: Record<string, string | number> } | undefined {
   const normalized = error.trim();
   if (!normalized) return undefined;
 
@@ -516,6 +518,31 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   }
   if (/Review dispositions require reviewerComment/i.test(normalized)) {
     return { i18nKey: "errors.reviewDispositionRequiresComment" };
+  }
+  if (/Invalid language body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidLanguageBody" };
+  }
+  if (/Invalid language patch body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidLanguagePatchBody" };
+  }
+  if (/Language could not be created/i.test(normalized)) {
+    return { i18nKey: "errors.languageCreateFailed" };
+  }
+  if (/Language could not be updated/i.test(normalized)) {
+    return { i18nKey: "errors.languageUpdateFailed" };
+  }
+  if (/Body must include action: "accept" or "reject"/i.test(normalized)) {
+    return { i18nKey: "errors.bulkReviewInvalidAction" };
+  }
+  if (/Body must include draftIds:/i.test(normalized)) {
+    return { i18nKey: "errors.bulkReviewInvalidDraftIds" };
+  }
+  if (/Too many draftIds:/i.test(normalized)) {
+    const maxMatch = normalized.match(/at most (\d+)/i);
+    return {
+      i18nKey: "errors.bulkReviewTooManyDraftIds",
+      ...(maxMatch?.[1] ? { i18nParams: { max: Number(maxMatch[1]) } } : {})
+    };
   }
   if (/Missing languageId/i.test(normalized)) {
     return { i18nKey: "errors.missingLanguageId" };
@@ -607,7 +634,7 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     }
     const operatorI18n = operatorApiErrorI18n(error.message);
     if (operatorI18n) {
-      return t(operatorI18n.i18nKey);
+      return t(operatorI18n.i18nKey, operatorI18n.i18nParams);
     }
     return error.message;
   }
@@ -619,7 +646,7 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     }
     const operatorI18n = operatorApiErrorI18n(error.message);
     if (operatorI18n) {
-      return t(operatorI18n.i18nKey);
+      return t(operatorI18n.i18nKey, operatorI18n.i18nParams);
     }
     return error.message;
   }

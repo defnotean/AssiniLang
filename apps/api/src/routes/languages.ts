@@ -43,7 +43,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     const body = parseLanguageCreateBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid language body: name, description, and orthography are required" };
+      return {
+        error: "Invalid language body: name, description, and orthography are required",
+        i18nKey: "errors.invalidLanguageBody"
+      };
     }
 
     const current = await readState();
@@ -111,7 +114,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (!created) {
       reply.code(500);
-      return { error: "Language could not be created" };
+      return {
+        error: "Language could not be created",
+        i18nKey: "errors.languageCreateFailed"
+      };
     }
 
     reply.code(201);
@@ -123,7 +129,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     const body = parseLanguagePatchBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid language patch body" };
+      return {
+        error: "Invalid language patch body",
+        i18nKey: "errors.invalidLanguagePatchBody"
+      };
     }
 
     const current = await readState();
@@ -168,12 +177,18 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (languageMissing) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (!updated) {
       reply.code(500);
-      return { error: "Language could not be updated" };
+      return {
+        error: "Language could not be updated",
+        i18nKey: "errors.languageUpdateFailed"
+      };
     }
 
     return updated;
@@ -190,7 +205,10 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
     const existing = current.languages.find((language) => language.id === languageId);
     if (!existing) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const deletedAt = new Date().toISOString();

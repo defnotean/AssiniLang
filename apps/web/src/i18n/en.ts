@@ -141,6 +141,13 @@ export const en = {
   "errors.invalidReviewBody": "Choose a valid review status before saving.",
   "errors.reviewDispositionRequiresComment": "Add a reviewer comment before recording this disposition.",
   "errors.payloadTooLarge": "That request is too large. Shrink the payload or upload a smaller file, then retry.",
+  "errors.invalidLanguageBody": "Name, description, and orthography are required to create a language.",
+  "errors.invalidLanguagePatchBody": "Provide at least one valid language field to update.",
+  "errors.languageCreateFailed": "The language could not be created. Retry, or check the API logs.",
+  "errors.languageUpdateFailed": "The language could not be updated. Retry, or check the API logs.",
+  "errors.bulkReviewInvalidAction": "Choose accept or reject for bulk draft review.",
+  "errors.bulkReviewInvalidDraftIds": "Select at least one extraction draft before bulk review.",
+  "errors.bulkReviewTooManyDraftIds": "Too many drafts selected. Review at most {max} at a time.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).
   "viewConfig.profile.label": "Start",

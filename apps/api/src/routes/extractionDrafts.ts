@@ -424,7 +424,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
     const action = body?.action;
     if (action !== "accept" && action !== "reject") {
       reply.code(400);
-      return { error: "Body must include action: \"accept\" or \"reject\"." };
+      return {
+        error: "Body must include action: \"accept\" or \"reject\".",
+        i18nKey: "errors.bulkReviewInvalidAction"
+      };
     }
 
     const rawDraftIds = body?.draftIds;
@@ -434,11 +437,18 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
       || rawDraftIds.some((id) => typeof id !== "string" || id.trim().length === 0)
     ) {
       reply.code(400);
-      return { error: "Body must include draftIds: a non-empty array of draft id strings." };
+      return {
+        error: "Body must include draftIds: a non-empty array of draft id strings.",
+        i18nKey: "errors.bulkReviewInvalidDraftIds"
+      };
     }
     if (rawDraftIds.length > BULK_REVIEW_MAX_IDS) {
       reply.code(400);
-      return { error: `Too many draftIds: at most ${BULK_REVIEW_MAX_IDS} per request.` };
+      return {
+        error: `Too many draftIds: at most ${BULK_REVIEW_MAX_IDS} per request.`,
+        i18nKey: "errors.bulkReviewTooManyDraftIds",
+        i18nParams: { max: BULK_REVIEW_MAX_IDS }
+      };
     }
     const draftIds = [...new Set(rawDraftIds as string[])];
 
@@ -450,7 +460,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     let results: BulkReviewItemResult[] = [];

@@ -363,6 +363,60 @@ describe("localizeApiError", () => {
     ).toBe("Add a reviewer comment before recording this disposition.");
   });
 
+  it("localizes language create/patch and bulk-review validation errors", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid language body: name, description, and orthography are required", {
+          status: 400,
+          i18nKey: "errors.invalidLanguageBody"
+        }),
+        t,
+        "createLang.creationFailed"
+      )
+    ).toBe("Name, description, and orthography are required to create a language.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages (400): Invalid language patch body", { status: 400 }),
+        t,
+        "createLang.creationFailed"
+      )
+    ).toBe("Provide at least one valid language field to update.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Body must include action: \"accept\" or \"reject\".", {
+          status: 400,
+          i18nKey: "errors.bulkReviewInvalidAction"
+        }),
+        t,
+        "ingest.bulkReviewFailed"
+      )
+    ).toBe("Choose accept or reject for bulk draft review.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Too many draftIds: at most 50 per request.", {
+          status: 400,
+          i18nKey: "errors.bulkReviewTooManyDraftIds",
+          i18nParams: { max: 50 }
+        }),
+        t,
+        "ingest.bulkReviewFailed"
+      )
+    ).toBe("Too many drafts selected. Review at most 50 at a time.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /bulk-review (400): Too many draftIds: at most 50 per request.", {
+          status: 400
+        }),
+        t,
+        "ingest.bulkReviewFailed"
+      )
+    ).toBe("Too many drafts selected. Review at most 50 at a time.");
+  });
+
   it("prefers rate-limit i18nParams seconds over Retry-After message parsing", () => {
     expect(
       localizeApiError(

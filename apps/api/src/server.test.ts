@@ -600,7 +600,7 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    expect(response.json()).toEqual({ error: "Language not found: not-a-language", i18nKey: "errors.languageNotFound" });
   });
 
   it("restricts browser CORS to configured local development origins", async () => {
