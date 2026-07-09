@@ -1,5 +1,5 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultSeedDbPath } from "./seedCli.js";
@@ -73,7 +73,7 @@ describe("runBackupCli", () => {
   }
 
   it("dry-runs without writing a backup file", async () => {
-    const { dbPath } = await createTempDb();
+    const { dbPath } = await createTempDb({ validWorkspace: true });
     const stdout = vi.fn();
     const now = new Date("2026-07-09T08:00:00.000Z");
 
@@ -89,6 +89,29 @@ describe("runBackupCli", () => {
     expect(result.written).toBeUndefined();
     expect(stdout).toHaveBeenCalledWith(`Dry run: would back up local database at ${resolve(dbPath)}`);
     expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${result.destination}`);
+  });
+
+  it("rejects backing up an invalid workspace before writing a copy", async () => {
+    const { dbPath } = await createTempDb({ validWorkspace: false });
+    const destination = join(dirname(dbPath), "should-not-write.json");
+
+    await expect(
+      runBackupCli({
+        argv: [destination],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/not a valid workspace/);
+  });
+
+  it("rejects backing up onto the live database path", async () => {
+    const { dbPath } = await createTempDb({ validWorkspace: true });
+
+    await expect(
+      runBackupCli({
+        argv: [dbPath],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/same as the live database/);
   });
 
   it("writes a validated backup copy to the requested destination", async () => {

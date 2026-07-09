@@ -91,6 +91,17 @@ it("json backup is a byte-for-byte copy of the live file", async () => {
   expect(await readFile(backupPath, "utf8")).toBe(await readFile(dbPath, "utf8"));
 });
 
+it("rejects backup and restore when the source and live paths are the same file", async () => {
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+
+  await expect(store.backupTo(dbPath)).rejects.toThrow(/destination must differ/);
+  await expect(store.restoreFrom(dbPath)).rejects.toThrow(/backup source must differ/);
+  expect(await store.read()).toEqual(before);
+});
+
 it("keeps the live json database readable when restore write fails after backup validation", async () => {
   const dbPath = join(dir, "db.json");
   const store = new JsonStore(dbPath);

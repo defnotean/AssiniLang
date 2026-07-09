@@ -1029,6 +1029,7 @@ export const ar: Record<MessageKey, string> = {
   "model.discoveredModels": "النماذج المكتشفة",
   "model.chooseDiscoveredModel": "اختر نموذجًا مكتشفًا",
   "model.noDiscoveredModels": "لم يُعثر على نماذج بعد",
+  "model.noDiscoveredModelsHint": "شغّل Ollama أو LM Studio أو llama.cpp، ثم اضغط تحديث النماذج. أو أدخل رابطًا أساسيًا أعلاه وامسح مجددًا.",
   "model.scanningModels": "جارٍ فحص النماذج...",
   "model.autoDiscoveryActive": "مراقبة نقاط نهاية النماذج المحلية تلقائيًا.",
   "model.autoRefreshingModels": "جارٍ التحقق من النماذج المحمّلة أو المُفرَّغة...",

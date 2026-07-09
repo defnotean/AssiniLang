@@ -233,6 +233,15 @@ describe("public language views", () => {
     };
     expect(verifyExportIntegrity(wrongGenerator)).toBe(false);
 
+    const wrongPolicy = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        redactionPolicy: snapshot!.integrity.redactionPolicy.filter((entry) => entry !== "ai-sessions-omitted")
+      }
+    };
+    expect(verifyExportIntegrity(wrongPolicy)).toBe(false);
+
     const mutatedPayload = {
       ...snapshot!,
       exportedAt: "2099-01-01T00:00:00.000Z"

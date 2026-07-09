@@ -123,6 +123,7 @@ describe("project documentation", () => {
       "docs/api.md": [
         "verifyExportIntegrity",
         "unexpected `algorithm`/`generatedBy`",
+        "mismatched `redactionPolicy`",
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
@@ -182,7 +183,9 @@ describe("project documentation", () => {
         "## Adding an API route",
         "## Documentation conventions",
         "publicLanguageViews.ts",
-        "--dry-run"
+        "--dry-run",
+        "same path",
+        "validates the live workspace"
       ],
       "docs/operator-recovery.md": [
         "## Local data paths",
@@ -190,6 +193,7 @@ describe("project documentation", () => {
         "data/ocr-cache/",
         "npm.cmd run db:backup",
         "--dry-run",
+        "refuses to archive an invalid workspace",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "npm.cmd run seed"

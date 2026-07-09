@@ -78,6 +78,8 @@ describe("locale catalogs", () => {
     expect(ar["model.hideToTrayOnClose"]).toBe("الإخفاء إلى شريط النظام عند الإغلاق");
     expect(ar["model.copyDiagnostics"]).toBe("نسخ التشخيص");
     expect(ar["model.discoveredModels"]).toBe("النماذج المكتشفة");
+    expect(ar["model.noDiscoveredModelsHint"]).toContain("Ollama");
+    expect(ar["model.noDiscoveredModelsHint"]).not.toBe(en["model.noDiscoveredModelsHint"]);
     expect(ar["model.applyLoadedModel"]).toBe("تطبيق النموذج المحمّل");
     expect(ar["model.clearSavedModel"]).toBe("استخدام الوضع دون اتصال");
     expect(ar["model.endpointConnected"]).toContain("{baseUrl}");

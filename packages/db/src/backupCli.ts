@@ -2,7 +2,7 @@ import { stat } from "node:fs/promises";
 import { basename, dirname, extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveSeedDbPath } from "./seedCli.js";
-import { JsonStore } from "./store.js";
+import { JsonStore, pathsReferToSameFile } from "./store.js";
 
 const currentFilePath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(dirname(currentFilePath), "..", "..", "..");
@@ -69,13 +69,31 @@ export async function runBackupCli({
     );
   }
 
+  if (pathsReferToSameFile(dbPath, destination)) {
+    throw new Error(
+      `Cannot back up: destination ${destination} is the same as the live database. Choose a different path under data/backups/ or pass an explicit backup file.`
+    );
+  }
+
+  // Validate the live database against the current schema before copying so
+  // operators never archive an unreadable/corrupt workspace as a "backup".
+  const store = new JsonStore(dbPath);
+  try {
+    await store.read();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Cannot back up: local database at ${dbPath} is not a valid workspace: ${message}`,
+      { cause: error }
+    );
+  }
+
   if (dryRun) {
     stdout(`Dry run: would back up local database at ${dbPath}`);
     stdout(`Dry run: backup destination would be ${destination}`);
     return { dryRun: true, dbPath, destination };
   }
 
-  const store = new JsonStore(dbPath);
   const written = await store.backupTo(destination);
 
   stdout(`Backed up local database at ${dbPath}`);

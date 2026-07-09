@@ -26,6 +26,16 @@ function inferBackend(dbPath: string): StoreBackend {
   return dbPath.endsWith(".json") ? "json" : "sqlite";
 }
 
+/** True when two filesystem paths resolve to the same location (case-insensitive on Windows). */
+export function pathsReferToSameFile(left: string, right: string): boolean {
+  const normalizedLeft = resolve(left);
+  const normalizedRight = resolve(right);
+  if (process.platform === "win32") {
+    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
+  }
+  return normalizedLeft === normalizedRight;
+}
+
 function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBackend {
   const backend = options?.backend;
   if (backend === undefined) {
@@ -627,6 +637,11 @@ export class JsonStore {
    */
   async backupTo(destinationPath: string): Promise<string> {
     const destination = resolve(destinationPath);
+    if (pathsReferToSameFile(this.dbPath, destination)) {
+      throw new Error(
+        `Failed to back up local database at ${this.dbPath}: destination must differ from the live database path`
+      );
+    }
     await mkdir(dirname(destination), { recursive: true });
 
     try {
@@ -662,6 +677,11 @@ export class JsonStore {
    */
   async restoreFrom(sourcePath: string): Promise<AppState> {
     const source = resolve(sourcePath);
+    if (pathsReferToSameFile(this.dbPath, source)) {
+      throw new Error(
+        `Failed to restore local database at ${this.dbPath}: backup source must differ from the live database path`
+      );
+    }
 
     try {
       await stat(source);

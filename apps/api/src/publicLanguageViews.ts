@@ -214,8 +214,8 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
 /**
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
- * manifest is missing, uses an unexpected algorithm or generator id, or the
- * hash does not match.
+ * manifest is missing, uses an unexpected algorithm or generator id, has a
+ * mismatched redaction policy list, or the hash does not match.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;
@@ -230,6 +230,13 @@ export function verifyExportIntegrity(exported: {
     return false;
   }
   if (typeof integrity.contentHash !== "string" || !/^[a-f0-9]{64}$/.test(integrity.contentHash)) {
+    return false;
+  }
+  if (
+    !Array.isArray(integrity.redactionPolicy)
+    || integrity.redactionPolicy.length !== EXPORT_REDACTION_POLICY.length
+    || integrity.redactionPolicy.some((entry, index) => entry !== EXPORT_REDACTION_POLICY[index])
+  ) {
     return false;
   }
 

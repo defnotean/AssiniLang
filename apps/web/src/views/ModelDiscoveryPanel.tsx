@@ -119,6 +119,11 @@ export function ModelDiscoveryPanel({
       {modelDiscoveryState.status === "error" && (
         <p className="inline-error" role="alert">{modelDiscoveryState.message}</p>
       )}
+      {modelDiscoveryState.status === "ready" && discoveredModels.length === 0 && !isScanningModels && (
+        <p className="muted empty-state" role="status">
+          {t("model.noDiscoveredModelsHint")}
+        </p>
+      )}
       {modelDiscoveryState.status === "ready" && (
         <p className="model-scan-meta" role="status" aria-live="polite">
           {isAutoRefreshingModels

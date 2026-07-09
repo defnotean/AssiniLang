@@ -1053,6 +1053,7 @@ export const en = {
   "model.discoveredModels": "Discovered models",
   "model.chooseDiscoveredModel": "Choose a discovered model",
   "model.noDiscoveredModels": "No models found yet",
+  "model.noDiscoveredModelsHint": "Start Ollama, LM Studio, or llama.cpp, then press Refresh models. Or enter a base URL above and scan again.",
   "model.scanningModels": "Scanning models...",
   "model.autoDiscoveryActive": "Watching local model endpoints automatically.",
   "model.autoRefreshingModels": "Checking for loaded or unloaded models...",
