@@ -4,8 +4,10 @@ import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
 import {
   buildSnapshotDownload,
+  formatOrthographyMeta,
   formatReachability,
   formatSnapshotReviewAccountability,
+  formatSubmissionStatus,
   latestAssistantMessage,
   localizeApiError,
   localizeSourceProcessingError,
@@ -14,6 +16,7 @@ import {
 } from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
+import type { PublicExerciseSubmission } from "../api";
 
 const t: Translate = (key, vars) => {
   let message: string = en[key];
@@ -282,6 +285,24 @@ describe("formatReachability", () => {
       detail: "connection refused"
     };
     expect(formatReachability(unreachable, t)).toBe("Unreachable: connection refused");
+  });
+});
+
+describe("formatSubmissionStatus", () => {
+  it("localizes accepted and needs-review submission labels", () => {
+    const accepted = { accepted: true } as PublicExerciseSubmission;
+    const needsReview = { accepted: false } as PublicExerciseSubmission;
+    expect(formatSubmissionStatus(accepted, t)).toBe("Accepted");
+    expect(formatSubmissionStatus(needsReview, t)).toBe("Needs review");
+    expect(formatSubmissionStatus(accepted)).toBe("Accepted");
+  });
+});
+
+describe("formatOrthographyMeta", () => {
+  it("localizes default, named, and truncated orthography labels", () => {
+    expect(formatOrthographyMeta(undefined, t)).toBe("Latin orthography");
+    expect(formatOrthographyMeta("Latin", t)).toBe("Latin orthography");
+    expect(formatOrthographyMeta("x".repeat(35), t)).toBe("Latin morphology hyphenation");
   });
 });
 

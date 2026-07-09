@@ -49,7 +49,7 @@ export function WorkspaceHeader({
         {view !== "elder" && (
           <div className="language-metadata" aria-label={t("header.metadataAria")}>
             <span>{selectedLanguage?.typology ?? t("common.unknown")}</span>
-            <span>{formatOrthographyMeta(selectedLanguage?.orthography)}</span>
+            <span>{formatOrthographyMeta(selectedLanguage?.orthography, t)}</span>
             <span>{t("header.statusWorkspace", { status: selectedLanguage?.status ?? t("common.draft") })}</span>
           </div>
         )}

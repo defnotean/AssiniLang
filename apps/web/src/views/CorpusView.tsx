@@ -289,11 +289,17 @@ export function CorpusView({
               aria-label={t("corpus.validatePassageAria")}
               aria-describedby="corpus-validate-dry-run-hint"
               disabled={!canValidatePassage}
+              aria-busy={isValidatingCorpus}
               onClick={() => void handleValidateCorpus()}
             >
               {isValidatingCorpus ? t("corpus.validating") : t("corpus.validatePassage")}
             </button>
-            <button type="submit" className="secondary" disabled={!canImportPassage}>
+            <button
+              type="submit"
+              className="secondary"
+              disabled={!canImportPassage}
+              aria-busy={isImportingCorpus}
+            >
               {isImportingCorpus ? t("corpus.importing") : t("corpus.importPassage")}
             </button>
           </div>

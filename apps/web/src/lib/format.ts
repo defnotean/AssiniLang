@@ -27,7 +27,12 @@ export function formatScore(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
 
-export function formatSubmissionStatus(submission: PublicExerciseSubmission): string {
+export function formatSubmissionStatus(submission: PublicExerciseSubmission, t?: Translate): string {
+  if (t) {
+    return submission.accepted
+      ? t("learner.submissionAccepted")
+      : t("learner.submissionNeedsReview");
+  }
   return submission.accepted ? "Accepted" : "Needs review";
 }
 
@@ -69,10 +74,14 @@ export function formatReachability(result: LlmReachability, t?: Translate): stri
   return t ? t("model.reachability.unreachable") : "Unreachable";
 }
 
-export function formatOrthographyMeta(value?: string): string {
-  if (!value) return "Latin orthography";
-  if (value.length > 34) return "Latin morphology hyphenation";
-  return `${value} orthography`;
+export function formatOrthographyMeta(value?: string, t?: Translate): string {
+  if (!value) {
+    return t ? t("header.orthographyDefault") : "Latin orthography";
+  }
+  if (value.length > 34) {
+    return t ? t("header.orthographyTruncated") : "Latin morphology hyphenation";
+  }
+  return t ? t("header.orthographyNamed", { value }) : `${value} orthography`;
 }
 
 export function formatStatus(value: string): string {

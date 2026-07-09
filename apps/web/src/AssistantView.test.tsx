@@ -96,6 +96,7 @@ describe("AssistantView", () => {
   it("renders the empty state explainer and disables start without a seed prompt", () => {
     render(<Harness />);
     expect(screen.getByText(/configured local model using only public workspace context/)).toBeInTheDocument();
+    expect(screen.getByText(/Add a seed prompt below to start/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start conversation" })).toBeDisabled();
   });
 
@@ -190,6 +191,7 @@ describe("AssistantView", () => {
     rejectCreate(new Error("AI session creation failed 502"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI session creation failed 502");
+    expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
     expect(screen.getByRole("button", { name: "Start conversation" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start conversation" })).not.toHaveAttribute("aria-busy", "true");
   });

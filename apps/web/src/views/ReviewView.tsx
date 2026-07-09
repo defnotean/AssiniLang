@@ -168,7 +168,12 @@ export function ReviewView({
                   }}
                 />
               </div>
-              <button type="submit" className="secondary" disabled={!canSaveExplanation}>
+              <button
+                type="submit"
+                className="secondary"
+                disabled={!canSaveExplanation}
+                aria-busy={reviewingNoteId === selectedNote.id}
+              >
                 {reviewingNoteId === selectedNote.id ? t("reviewView.saving") : t("reviewView.saveNoteExplanation")}
               </button>
               {noteEditMessage && (
@@ -262,7 +267,7 @@ export function ReviewView({
               )}
             </DetailBlock>
 
-            <div className="review-bar">
+            <div className="review-bar" aria-busy={reviewingNoteId === selectedNote.id}>
               <button
                 type="button"
                 className="approve"

@@ -282,7 +282,7 @@ export function LearnerView({
                 <div className="detail-list">
                   {submissionHistory.map((submission) => (
                     <div key={submission.id} className="detail-row">
-                      <strong>{formatSubmissionStatus(submission)}</strong>
+                      <strong>{formatSubmissionStatus(submission, t)}</strong>
                       <span>{submission.explanation}</span>
                       <span className="muted">{submission.submittedAt}</span>
                     </div>

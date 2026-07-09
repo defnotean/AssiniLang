@@ -120,6 +120,27 @@ describe("ReviewView", () => {
     expect(document.querySelector("button.note-row")).toBeDisabled();
   });
 
+  it("marks save and review actions busy while a note review is in flight", () => {
+    const note = createReviewNote();
+
+    render(
+      <ReviewView
+        notes={[note]}
+        selectedNote={note}
+        isWorkflowBusy={false}
+        reviewingNoteId={note.id}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "Saving..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Saving..." })).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByRole("button", { name: "Approve verb chains" })).toBeDisabled();
+    expect(document.querySelector(".review-bar")).toHaveAttribute("aria-busy", "true");
+  });
+
   it("surfaces review action errors in the detail panel", () => {
     const note = createReviewNote();
 
