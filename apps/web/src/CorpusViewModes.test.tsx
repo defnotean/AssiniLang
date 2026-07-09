@@ -262,7 +262,7 @@ describe("CorpusView import validation", () => {
       target: { value: "ghost|ghost|ghost|noun" }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+    fireEvent.click(screen.getByRole("button", { name: "Validate corpus passage import" }));
 
     await waitFor(() => {
       expect(validateCorpusImportMock).toHaveBeenCalledWith("avenik", expect.objectContaining({

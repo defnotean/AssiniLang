@@ -285,6 +285,7 @@ export function CorpusView({
             <button
               type="button"
               className="secondary"
+              aria-label={t("corpus.validatePassageAria")}
               disabled={!canValidatePassage}
               onClick={() => void handleValidateCorpus()}
             >

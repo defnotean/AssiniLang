@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import {
   assertObsidianVaultPathAllowed,
   isPathInsideRoot,
-  parseObsidianVaultRoots
+  parseObsidianVaultRoots,
+  stripWindowsExtendedPrefix
 } from "./vaultPathSafety.js";
 
 describe("Obsidian vault path safety", () => {
@@ -24,6 +25,24 @@ describe("Obsidian vault path safety", () => {
     expect(isPathInsideRoot(root, root)).toBe(true);
     expect(isPathInsideRoot(join(root, "notes"), root)).toBe(true);
     expect(isPathInsideRoot(join(root, "..", "outside"), root)).toBe(false);
+  });
+
+  it("strips Windows extended-length path prefixes before compare", () => {
+    expect(stripWindowsExtendedPrefix("\\\\?\\C:\\Users\\vault")).toBe("C:\\Users\\vault");
+    expect(stripWindowsExtendedPrefix("\\\\?\\UNC\\server\\share\\notes")).toBe(
+      "\\\\server\\share\\notes"
+    );
+    expect(stripWindowsExtendedPrefix("/posix/unchanged")).toBe("/posix/unchanged");
+  });
+
+  it("treats realpath-style \\?\\ prefixes as inside the same root", () => {
+    const root = "C:\\Users\\Demon\\Vaults";
+    const prefixedChild = "\\\\?\\C:\\Users\\Demon\\Vaults\\Language Vault";
+    const prefixedRoot = "\\\\?\\C:\\Users\\Demon\\Vaults";
+
+    expect(isPathInsideRoot(prefixedChild, root)).toBe(true);
+    expect(isPathInsideRoot(prefixedChild, prefixedRoot)).toBe(true);
+    expect(isPathInsideRoot("\\\\?\\C:\\Users\\Demon\\Outside", root)).toBe(false);
   });
 
   it("fails closed when ASSINI_OBSIDIAN_VAULT_ROOTS is unset", async () => {

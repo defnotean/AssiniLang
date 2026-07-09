@@ -513,6 +513,7 @@ export function App() {
                       languages={data.languages}
                       selectedLanguageId={selectedLanguageId}
                       isWorkflowBusy={isWorkflowBusy}
+                      isEvaluating={review.isEvaluating}
                       artifactDownload={governance.evaluationArtifactDownload}
                       artifactError={governance.evaluationArtifactError}
                       isExportingArtifact={governance.isExportingEvaluationArtifact}

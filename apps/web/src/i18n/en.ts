@@ -233,6 +233,7 @@ export const en = {
 
   // Evaluation dashboard.
   "eval.noRuns": "No evaluation runs yet.",
+  "eval.noRunsHint": "Use Run System Eval in the header to generate the first quality report.",
   "eval.languageScoreAria": "{name} evaluation score",
   "eval.exportAria": "Evaluation artifact export",
   "eval.exportLabel": "Evaluation export",
@@ -265,6 +266,7 @@ export const en = {
   "reviewView.status": "Status",
   "reviewView.evidence": "Evidence",
   "reviewView.noNotesInFilter": "No notes in this filter.",
+  "reviewView.noNotesInFilterNamed": "No {filter} notes.",
   "reviewView.noteDetailPanel": "Note detail panel",
   "reviewView.selectedNoteDetail": "Selected note detail",
   "reviewView.selectedNote": "Selected note",
@@ -323,6 +325,7 @@ export const en = {
   "corpus.importing": "Importing...",
   "corpus.importPassage": "Import passage",
   "corpus.validatePassage": "Validate",
+  "corpus.validatePassageAria": "Validate corpus passage import",
   "corpus.validating": "Validating...",
   "corpus.validateSuccess": "Validation passed: {morphemeCount} morphemes, {tagCount} tags ready to import.",
   "corpus.validateFailed": "Corpus validation failed",

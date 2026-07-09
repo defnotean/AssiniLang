@@ -15,8 +15,26 @@ const VAULT_ROOTS_UNSET_MESSAGE =
 const VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE =
   "Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.";
 
+/**
+ * Strips Windows extended-length path prefixes so realpath (\\?\...) and resolve(...) paths compare equal.
+ * \\?\UNC\server\share -> \\server\share; \\?\C:\foo -> C:\foo
+ */
+export function stripWindowsExtendedPrefix(pathValue: string): string {
+  if (process.platform !== "win32") {
+    return pathValue;
+  }
+  if (pathValue.startsWith("\\\\?\\UNC\\")) {
+    return `\\\\${pathValue.slice("\\\\?\\UNC\\".length)}`;
+  }
+  if (pathValue.startsWith("\\\\?\\")) {
+    return pathValue.slice("\\\\?\\".length);
+  }
+  return pathValue;
+}
+
 function normalizeForCompare(pathValue: string): string {
-  return process.platform === "win32" ? pathValue.toLowerCase() : pathValue;
+  const stripped = stripWindowsExtendedPrefix(pathValue);
+  return process.platform === "win32" ? stripped.toLowerCase() : stripped;
 }
 
 /** True when candidate equals root or is a descendant of root (after resolve). */

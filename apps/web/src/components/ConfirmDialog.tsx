@@ -1,4 +1,4 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useFocusTrap } from "../hooks/useFocusTrap";
 import { useI18n } from "../i18n";
 
@@ -21,7 +21,18 @@ export function ConfirmDialog({
     confirmRef.current?.focus();
   }, []);
 
-  function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onCancel();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (event.key === "Escape") {
       event.preventDefault();
       onCancel();

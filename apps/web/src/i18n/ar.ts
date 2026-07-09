@@ -210,6 +210,7 @@ export const ar: Record<MessageKey, string> = {
 
   // لوحة التقييم.
   "eval.noRuns": "لا توجد جولات تقييم بعد.",
+  "eval.noRunsHint": "استخدم «تشغيل تقييم النظام» في الرأس لإنشاء أول تقرير جودة.",
   "eval.languageScoreAria": "درجة تقييم {name}",
   "eval.exportAria": "تصدير مُخرَج التقييم",
   "eval.exportLabel": "تصدير التقييم",
@@ -242,6 +243,7 @@ export const ar: Record<MessageKey, string> = {
   "reviewView.status": "الحالة",
   "reviewView.evidence": "الأدلّة",
   "reviewView.noNotesInFilter": "لا توجد ملاحظات ضمن هذا المرشّح.",
+  "reviewView.noNotesInFilterNamed": "لا توجد ملاحظات {filter}.",
   "reviewView.noteDetailPanel": "لوحة تفاصيل الملاحظة",
   "reviewView.selectedNoteDetail": "تفاصيل الملاحظة المحددة",
   "reviewView.selectedNote": "الملاحظة المحددة",
@@ -300,6 +302,7 @@ export const ar: Record<MessageKey, string> = {
   "corpus.importing": "جارٍ الاستيراد...",
   "corpus.importPassage": "استيراد المقطع",
   "corpus.validatePassage": "تحقق",
+  "corpus.validatePassageAria": "التحقق من استيراد مقطع المدوّنة",
   "corpus.validating": "جارٍ التحقق...",
   "corpus.validateSuccess": "نجح التحقق: {morphemeCount} مورفيمات و{tagCount} وسومًا جاهزة للاستيراد.",
   "corpus.validateFailed": "فشل التحقق من المدوّنة",

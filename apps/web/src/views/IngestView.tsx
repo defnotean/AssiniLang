@@ -140,7 +140,7 @@ export function IngestView({
         </button>
       </form>
 
-      <form className="record-card form-panel compact" aria-label={t("ingest.obsidianVaultAria")} onSubmit={handleImportVault}>
+      <form className="record-card form-panel compact" aria-label={t("ingest.obsidianVaultAria")} onSubmit={handleImportVault} aria-busy={isImportingVault}>
         <div>
           <span className="detail-label">{t("ingest.obsidianVault")}</span>
           <h3>{t("ingest.importVault")}</h3>
@@ -152,6 +152,8 @@ export function IngestView({
           <input
             id="ingest-vault-path"
             value={vaultPath}
+            required
+            aria-required="true"
             onChange={(event) => setVaultPath(event.target.value)}
             placeholder={t("ingest.vaultPathPlaceholder")}
           />
@@ -178,7 +180,7 @@ export function IngestView({
             />
           </div>
         </div>
-        <button type="submit" className="secondary" disabled={isImportingVault}>
+        <button type="submit" className="secondary" disabled={isImportingVault} aria-busy={isImportingVault}>
           {isImportingVault ? t("ingest.importingVault") : t("ingest.importVaultSources")}
         </button>
       </form>

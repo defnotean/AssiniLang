@@ -59,11 +59,11 @@ export function ReviewView({
     setNoteEditError(null);
   }, [selectedNote?.id, selectedNote?.explanation]);
   const trimmedDraft = noteExplanationDraft.trim();
+  const reviewActionsDisabled = reviewingNoteId !== null || isWorkflowBusy;
   const canSaveExplanation = selectedNote !== null
     && trimmedDraft.length > 0
     && trimmedDraft !== selectedNote.explanation
-    && reviewingNoteId === null
-    && !isWorkflowBusy;
+    && !reviewActionsDisabled;
 
   async function handleSaveExplanation(event: FormEvent) {
     event.preventDefault();
@@ -88,6 +88,7 @@ export function ReviewView({
               type="button"
               key={item}
               className={filter === item ? "active" : ""}
+              aria-pressed={filter === item}
               onClick={() => setFilter(item)}
             >
               <span>{t(`reviewView.filter.${item}`)}</span>
@@ -104,7 +105,11 @@ export function ReviewView({
 
         <div className="note-table-body">
           {filteredNotes.length === 0 ? (
-            <p className="empty-state">{t("reviewView.noNotesInFilter")}</p>
+            <p className="empty-state" role="status">
+              {filter === "all"
+                ? t("reviewView.noNotesForLanguage")
+                : t("reviewView.noNotesInFilterNamed", { filter: t(`reviewView.filter.${filter}`) })}
+            </p>
           ) : (
             filteredNotes.map((note) => (
               <button
@@ -148,6 +153,7 @@ export function ReviewView({
                 <textarea
                   id="note-explanation-draft"
                   value={noteExplanationDraft}
+                  disabled={reviewActionsDisabled}
                   onChange={(event) => {
                     setNoteExplanationDraft(event.target.value);
                     setNoteEditMessage(null);
@@ -254,7 +260,7 @@ export function ReviewView({
                 type="button"
                 className="approve"
                 aria-label={t("reviewView.approveNote", { topic: selectedNote.topic })}
-                disabled={reviewingNoteId !== null}
+                disabled={reviewActionsDisabled}
                 onClick={() => onReview("approved")}
               >
                 {t("reviewView.approve")}
@@ -263,7 +269,7 @@ export function ReviewView({
                 type="button"
                 className="contest"
                 aria-label={t("reviewView.contestNote", { topic: selectedNote.topic })}
-                disabled={reviewingNoteId !== null}
+                disabled={reviewActionsDisabled}
                 onClick={() => onReview("contested")}
               >
                 {t("reviewView.contest")}
@@ -272,7 +278,7 @@ export function ReviewView({
                 type="button"
                 className="reject"
                 aria-label={t("reviewView.rejectNote", { topic: selectedNote.topic })}
-                disabled={reviewingNoteId !== null}
+                disabled={reviewActionsDisabled}
                 onClick={() => onReview("rejected")}
               >
                 {t("reviewView.reject")}
@@ -281,7 +287,7 @@ export function ReviewView({
                 type="button"
                 className="defer"
                 aria-label={t("reviewView.deferNote", { topic: selectedNote.topic })}
-                disabled={reviewingNoteId !== null}
+                disabled={reviewActionsDisabled}
                 onClick={() => onReview("deferred")}
               >
                 {t("reviewView.defer")}
@@ -290,7 +296,7 @@ export function ReviewView({
                 type="button"
                 className="escalate"
                 aria-label={t("reviewView.escalateNote", { topic: selectedNote.topic })}
-                disabled={reviewingNoteId !== null}
+                disabled={reviewActionsDisabled}
                 onClick={() => onReview("escalated")}
               >
                 {t("reviewView.escalate")}

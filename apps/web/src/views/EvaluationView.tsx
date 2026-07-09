@@ -24,6 +24,7 @@ export function EvaluationView({
   languages,
   selectedLanguageId,
   isWorkflowBusy,
+  isEvaluating,
   artifactDownload,
   artifactError,
   isExportingArtifact,
@@ -33,6 +34,7 @@ export function EvaluationView({
   languages: Language[];
   selectedLanguageId: string | null;
   isWorkflowBusy: boolean;
+  isEvaluating: boolean;
   artifactDownload: SnapshotDownload | null;
   artifactError: string | null;
   isExportingArtifact: boolean;
@@ -50,12 +52,30 @@ export function EvaluationView({
   const activeRun = (activeLanguageId ? latestByLanguage[activeLanguageId] : undefined) ?? evaluations[0] ?? null;
   const activeLanguage = languages.find((language) => language.id === (activeRun?.languageId ?? activeLanguageId));
 
+  if (isEvaluating && evaluations.length === 0) {
+    return (
+      <div className="panel-card" role="status" aria-live="polite">
+        {t("eval.evaluating")}
+      </div>
+    );
+  }
+
   if (evaluations.length === 0) {
-    return <p className="empty-state panel-card">{t("eval.noRuns")}</p>;
+    return (
+      <div className="panel-card empty-state" role="status">
+        <p>{t("eval.noRuns")}</p>
+        <p className="muted">{t("eval.noRunsHint")}</p>
+      </div>
+    );
   }
 
   return (
     <div className="evaluation-view">
+      {isEvaluating && (
+        <p className="result-notice" role="status" aria-live="polite">
+          {t("eval.evaluating")}
+        </p>
+      )}
       <div className="eval-language-grid">
         {languages.map((language) => {
           const latest = latestByLanguage[language.id];
@@ -99,7 +119,7 @@ export function EvaluationView({
             {artifactDownload.summary}
           </p>
         )}
-        {artifactError && <p className="result-notice error">{artifactError}</p>}
+        {artifactError && <p className="result-notice error" role="alert">{artifactError}</p>}
       </section>
 
       <section className="panel-card evaluation-trend-card" aria-label={t("eval.trendsAria")}>
