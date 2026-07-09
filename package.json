@@ -22,6 +22,7 @@
     "model:verify": "node scripts/verifyLocalModelLanguage.mjs",
     "verify": "node scripts/verify.mjs",
     "verify:beta": "node scripts/verifyBetaCli.mjs",
+    "ci:green": "node scripts/ciGreenSmoke.mjs",
     "smoke": "tsx scripts/smokeIngestion.mjs",
     "desktop": "node scripts/startDesktop.mjs",
     "desktop:package": "npm run build && node scripts/packageDesktop.mjs",

@@ -435,7 +435,7 @@ export const en = {
   "ingest.processing": "Processing...",
   "ingest.processingAttempts": "Attempt {count}",
   "ingest.sourceMaxProcessingAttempts": "Processing stopped after {max} attempts. Review the source error or contact an operator.",
-  "ingest.processingStaleWarning": "Processing has not reported progress in over 10 minutes. It may be stuck — wait for recovery on restart or try again later.",
+  "ingest.processingStaleWarning": "Processing has not reported progress since {age}. It may be stuck — wait for recovery on restart or try again later.",
   "ingest.processingHeartbeatAge": "Last progress {age}",
   "ingest.heartbeatAge.justNow": "just now",
   "ingest.heartbeatAge.minutes": "{count} min ago",

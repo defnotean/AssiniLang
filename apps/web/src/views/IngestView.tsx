@@ -271,9 +271,15 @@ export function IngestView({
                     })()}
                   </div>
                   <small className="muted">{t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}</small>
-                  {isProcessingStale(source) && (
-                    <p className="result-notice warning" role="status">{t("ingest.processingStaleWarning")}</p>
-                  )}
+                  {isProcessingStale(source) && (() => {
+                    const marker = processingHeartbeatMarker(source);
+                    const age = marker ? formatRelativeAgeLabel(relativeAge(marker), t) : "";
+                    return (
+                      <p className="result-notice warning" role="status">
+                        {t("ingest.processingStaleWarning", { age })}
+                      </p>
+                    );
+                  })()}
                   {source.error && <p className="result-notice error">{source.error}</p>}
                   {source.warnings && source.warnings.length > 0 && (
                     <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>

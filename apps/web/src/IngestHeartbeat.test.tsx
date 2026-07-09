@@ -37,6 +37,11 @@ const PROCESSING_SOURCE = {
   createdBy: "reviewer"
 };
 
+const STALE_PROCESSING_SOURCE = {
+  ...PROCESSING_SOURCE,
+  processingHeartbeatAt: "2026-06-10T11:42:00.000Z"
+};
+
 describe("IngestView processing heartbeat age", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,5 +54,14 @@ describe("IngestView processing heartbeat age", () => {
     render(<IngestView languageId={LANGUAGE_ID} />);
 
     expect(await screen.findByText("Last progress 6 min ago")).toBeInTheDocument();
+  });
+
+  it("shows a humanized stale warning with the last progress age", async () => {
+    apiMock.fetchSources.mockResolvedValue([STALE_PROCESSING_SOURCE]);
+
+    render(<IngestView languageId={LANGUAGE_ID} />);
+
+    expect(await screen.findByText(/Processing has not reported progress since 18 min ago/)).toBeInTheDocument();
+    expect(screen.getByText(/It may be stuck/)).toBeInTheDocument();
   });
 });

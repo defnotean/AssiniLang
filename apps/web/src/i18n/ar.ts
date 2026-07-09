@@ -412,7 +412,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.processing": "جارٍ المعالجة...",
   "ingest.processingAttempts": "المحاولة {count}",
   "ingest.sourceMaxProcessingAttempts": "توقفت المعالجة بعد {max} محاولات. راجع خطأ المصدر أو تواصل مع المشغّل.",
-  "ingest.processingStaleWarning": "لم تُبلِّغ المعالجة عن أي تقدّم منذ أكثر من 10 دقائق. قد تكون عالقة — انتظر الاستعادة عند إعادة التشغيل أو أعد المحاولة لاحقًا.",
+  "ingest.processingStaleWarning": "لم تُبلِّغ المعالجة عن أي تقدّم منذ {age}. قد تكون عالقة — انتظر الاستعادة عند إعادة التشغيل أو أعد المحاولة لاحقًا.",
   "ingest.processingHeartbeatAge": "آخر تقدّم {age}",
   "ingest.heartbeatAge.justNow": "الآن",
   "ingest.heartbeatAge.minutes": "منذ {count} د",

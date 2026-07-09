@@ -29,6 +29,12 @@ describe("repository production hygiene", () => {
     expect(script).toContain("--omit=dev");
   });
 
+  it("wires the local CI green smoke helper in package.json scripts", async () => {
+    const pkg = JSON.parse(await readProjectFile("package.json"));
+
+    expect(pkg.scripts["ci:green"]).toBe("node scripts/ciGreenSmoke.mjs");
+  });
+
   it("runs the production readiness gate in GitHub Actions", async () => {
     const workflow = await readProjectFile(".github/workflows/ci.yml");
 

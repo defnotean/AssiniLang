@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, getInitialTheme } from "./App";
+import { ApiError } from "./lib/apiClient";
 
 const apiMock = vi.hoisted(() => ({
   acceptExtractionDraft: vi.fn(),
@@ -49,7 +50,13 @@ const apiMock = vi.hoisted(() => ({
   validateExerciseAuthoring: vi.fn()
 }));
 
-vi.mock("./api", () => apiMock);
+vi.mock("./api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api")>();
+  return {
+    ...actual,
+    ...apiMock
+  };
+});
 
 const SNAPSHOT_HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const EVALUATION_ARTIFACT_HASH = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
@@ -1084,6 +1091,31 @@ describe("App", () => {
     expect(failureMessages.length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Process Field notebook page" })).toBeEnabled();
   }, 10000);
+
+  it("surfaces the localized max-attempt error through the App ingest flow", async () => {
+    const MAX_ATTEMPTS = 5;
+    apiMock.fetchSources.mockResolvedValue([{
+      ...createTextSource(),
+      status: "failed",
+      processingAttempts: MAX_ATTEMPTS
+    }]);
+    apiMock.fetchExtractionDrafts.mockResolvedValue([]);
+    apiMock.processSource.mockRejectedValue(
+      new ApiError(`Source processing attempt limit reached (${MAX_ATTEMPTS}).`, {
+        status: 409,
+        i18nKey: "ingest.sourceMaxProcessingAttempts",
+        i18nParams: { max: MAX_ATTEMPTS, count: MAX_ATTEMPTS }
+      })
+    );
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Process Field notebook page" }));
+
+    expect(await screen.findByText(
+      `Processing stopped after ${MAX_ATTEMPTS} attempts. Review the source error or contact an operator.`
+    )).toBeInTheDocument();
+  });
 
   it("shows a duplicate warning badge on flagged drafts and none on unflagged drafts", async () => {
     apiMock.fetchExtractionDrafts.mockResolvedValue([
