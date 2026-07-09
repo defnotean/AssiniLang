@@ -1416,7 +1416,6 @@ describe("App", () => {
       };
     });
     const writeText = vi.fn().mockResolvedValue(undefined);
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
     apiMock.fetchLlmStatus.mockResolvedValue(createRealLlmStatus());
     apiMock.fetchRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
     apiMock.fetchDiscoveredModels.mockResolvedValue(createModelDiscoveryResponse([
@@ -1600,16 +1599,17 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Prune old backups" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Prune old backups" }));
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Prune old desktop backups?"));
+    const pruneDialog = await screen.findByRole("dialog", { name: "Confirmation" });
+    fireEvent.click(within(pruneDialog).getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(pruneOldDataBackups).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Pruned 1 old backup.")).toBeInTheDocument();
     expect(await screen.findByText("5 backups")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Restore latest backup" }));
-    expect(confirmSpy).toHaveBeenCalledWith(expect.stringContaining("Restore the latest desktop backup?"));
+    const restoreDialog = await screen.findByRole("dialog", { name: "Confirmation" });
+    fireEvent.click(within(restoreDialog).getByRole("button", { name: "Confirm" }));
     await waitFor(() => expect(restoreLatestDataBackup).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("Restored latest backup. Reloading workspace...")).toBeInTheDocument();
-    confirmSpy.mockRestore();
 
     fireEvent.click(screen.getByRole("button", { name: "Open backups folder" }));
     await waitFor(() => expect(openBackupsFolder).toHaveBeenCalledTimes(1));

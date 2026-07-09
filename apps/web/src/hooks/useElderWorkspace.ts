@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import type { ElderCorrection } from "@assini/db";
 import type { ElderContext, ElderCorrectionPayload, ElderCorrectionReviewStatus } from "../api";
 import { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "../api";
@@ -29,6 +29,7 @@ export interface ElderWorkspaceState {
   handleSubmitCorrection: (event: FormEvent) => Promise<void>;
   handleReviewCorrection: (correctionId: string, status: ElderCorrectionReviewStatus) => Promise<void>;
   handleApplyCorrection: (correctionId: string, explanation: string) => Promise<void>;
+  reloadElderContext: () => void;
 }
 
 /**
@@ -57,6 +58,24 @@ export function useElderWorkspace(
   const [reviewingCorrectionId, setReviewingCorrectionId] = useState<string | null>(null);
   const [applyingCorrectionId, setApplyingCorrectionId] = useState<string | null>(null);
   const [correctionApplyDrafts, setCorrectionApplyDrafts] = useState<Record<string, string>>({});
+
+  const reloadElderContext = useCallback(() => {
+    if (!isElderMode || !selectedLanguageId) return;
+
+    setIsLoadingElder(true);
+    setCorrectionError(null);
+    fetchElderContext(selectedLanguageId)
+      .then((context) => {
+        setElderContext(context);
+      })
+      .catch((error: Error) => {
+        setElderContext(null);
+        setCorrectionError(error.message || t("elderWs.errContextLoadFailed"));
+      })
+      .finally(() => {
+        setIsLoadingElder(false);
+      });
+  }, [isElderMode, selectedLanguageId, t]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -87,7 +106,7 @@ export function useElderWorkspace(
     return () => {
       isCurrent = false;
     };
-  }, [selectedLanguageId, isElderMode]);
+  }, [selectedLanguageId, isElderMode, t]);
 
   useEffect(() => {
     setFormNoteId("");
@@ -227,6 +246,7 @@ export function useElderWorkspace(
     setCorrectionApplyDrafts,
     handleSubmitCorrection,
     handleReviewCorrection,
-    handleApplyCorrection
+    handleApplyCorrection,
+    reloadElderContext
   };
 }

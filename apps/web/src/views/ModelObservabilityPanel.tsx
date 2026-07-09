@@ -6,9 +6,10 @@ import type { AsyncState } from "../lib/types";
 
 type ModelObservabilityPanelProps = {
   observabilityState: AsyncState<ObservabilityData>;
+  onRetry?: () => void;
 };
 
-export function ModelObservabilityPanel({ observabilityState }: ModelObservabilityPanelProps) {
+export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelObservabilityPanelProps) {
   const { t } = useI18n();
   const observability = observabilityState.status === "ready" ? observabilityState.data : null;
   const recentSessions = observability?.sessions.slice(0, 5) ?? [];
@@ -30,7 +31,14 @@ export function ModelObservabilityPanel({ observabilityState }: ModelObservabili
         <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingObservability")}</p>
       )}
       {observabilityState.status === "error" && (
-        <p className="inline-error" role="alert">{observabilityState.message}</p>
+        <div className="inline-error" role="alert">
+          <p>{observabilityState.message}</p>
+          {onRetry && (
+            <button type="button" className="secondary" onClick={onRetry}>
+              {t("app.retryLoad")}
+            </button>
+          )}
+        </div>
       )}
       {observability && (
         <>

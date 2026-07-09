@@ -23,6 +23,7 @@ import { ModelDiscoveryPanel } from "./ModelDiscoveryPanel";
 import { ModelObservabilityPanel } from "./ModelObservabilityPanel";
 import { ModelSettingsFormFields } from "./ModelSettingsFormFields";
 import { ProviderReadinessPanel } from "./ProviderReadinessPanel";
+import { StatusScreen } from "../components/StatusScreen";
 
 export function ModelSetupView({ model }: { model: ModelWorkspace }) {
   const {
@@ -47,7 +48,9 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
     handleSaveSettings: onSaveSettings,
     handleSaveModelProfile: onSaveModelProfile,
     handleActivateModelProfile: onActivateModelProfile,
-    handleDeleteModelProfile: onDeleteModelProfile
+    handleDeleteModelProfile: onDeleteModelProfile,
+    reloadModelWorkspace: onReloadModelWorkspace,
+    refreshModelObservability: onRefreshModelObservability
   } = model;
   const { t } = useI18n();
   const [form, setForm] = useState<SettingsFormState>(DEFAULT_FORM);
@@ -75,26 +78,28 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
   const discoveredModels = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.models : [];
 
   if (llmState.status === "loading" || llmState.status === "idle") {
-    return (
-      <div className="panel-card" role="status" aria-live="polite">
-        {t("model.checkingConfiguration")}
-      </div>
-    );
+    return <StatusScreen kind="loading" message={t("model.checkingConfiguration")} />;
   }
 
   if (llmState.status === "error") {
     return (
-      <div className="panel-card error" role="alert">
-        {llmState.message}
-      </div>
+      <StatusScreen
+        kind="error"
+        message={llmState.message}
+        onRetry={onReloadModelWorkspace}
+        retryLabel={t("app.retryLoad")}
+      />
     );
   }
 
   if (settingsState.status === "error") {
     return (
-      <div className="panel-card error" role="alert">
-        {settingsState.message}
-      </div>
+      <StatusScreen
+        kind="error"
+        message={settingsState.message}
+        onRetry={onReloadModelWorkspace}
+        retryLabel={t("app.retryLoad")}
+      />
     );
   }
 
@@ -402,7 +407,10 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
         )}
       </section>
 
-      <ModelObservabilityPanel observabilityState={observabilityState} />
+      <ModelObservabilityPanel
+        observabilityState={observabilityState}
+        onRetry={onRefreshModelObservability}
+      />
 
       <section className="panel-card setup-card" aria-label={t("model.localSetupAria")}>
         <span className="detail-label">{t("model.localEndpoints")}</span>

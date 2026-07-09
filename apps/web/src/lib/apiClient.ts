@@ -134,6 +134,17 @@ function requestIdFromHeaders(response: Response): string | undefined {
   }
 }
 
+function retryAfterSecondsFromHeaders(response: Response): number | undefined {
+  try {
+    const raw = response.headers?.get("Retry-After") ?? response.headers?.get("retry-after");
+    if (!raw) return undefined;
+    const seconds = Number.parseInt(raw.trim(), 10);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function errorDetailsFromBody(body: unknown): ErrorDetails {
   if (typeof body === "string" && body.trim().length > 0) return { detail: body.trim() };
   if (!body || typeof body !== "object") return {};
@@ -171,9 +182,13 @@ async function errorFromResponse(response: Response, fallback: string): Promise<
   const details = await readErrorDetails(response);
   const requestId = requestIdFromHeaders(response) ?? details.requestId;
   const requestIdSuffix = requestId ? ` (request id: ${requestId})` : "";
+  const retryAfterSeconds = response.status === 429 ? retryAfterSecondsFromHeaders(response) : undefined;
+  const retryAfterSuffix = retryAfterSeconds
+    ? ` Retry after ${retryAfterSeconds} second${retryAfterSeconds === 1 ? "" : "s"}.`
+    : "";
   const message = details.detail
-    ? `${fallback}${status}: ${details.detail}${requestIdSuffix}`
-    : `${fallback}${status}${requestIdSuffix}`;
+    ? `${fallback}${status}: ${details.detail}${requestIdSuffix}${retryAfterSuffix}`
+    : `${fallback}${status}${requestIdSuffix}${retryAfterSuffix}`;
 
   return new ApiError(message, {
     status: response.status || undefined,

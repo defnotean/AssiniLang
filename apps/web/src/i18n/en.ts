@@ -12,6 +12,7 @@ export const en = {
   "common.draft": "draft",
   "common.loading": "Loading...",
   "common.cancel": "Cancel",
+  "common.confirm": "Confirm",
   "common.save": "Save",
   "common.close": "Close",
 
@@ -72,6 +73,7 @@ export const en = {
   "palette.placeholder": "Type a command...",
   "palette.empty": "No matching commands",
   "palette.aria": "Command palette",
+  "confirmDialog.aria": "Confirmation",
   "palette.searchLabel": "Search commands",
   "palette.listAria": "Commands",
   "palette.goTo": "Go to {name}",

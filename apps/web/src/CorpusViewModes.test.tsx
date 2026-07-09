@@ -1,8 +1,18 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { CorpusView } from "./views/CorpusView";
 import type { CorpusPassage } from "./lib/types";
+
+const fetchNeuralMapMock = vi.fn();
+
+vi.mock("./api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api")>();
+  return {
+    ...actual,
+    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args)
+  };
+});
 
 function createCorpus(): CorpusPassage[] {
   return [
@@ -68,9 +78,18 @@ function createCorpus(): CorpusPassage[] {
 
 function renderCorpusView(corpus = createCorpus()) {
   return render(
-    <CorpusView corpus={corpus} isWorkflowBusy={false} onImportCorpusPassage={vi.fn()} />
+    <CorpusView
+      languageId="avenik"
+      corpus={corpus}
+      isWorkflowBusy={false}
+      onImportCorpusPassage={vi.fn()}
+    />
   );
 }
+
+beforeEach(() => {
+  fetchNeuralMapMock.mockReset();
+});
 
 describe("CorpusView display modes", () => {
   it("defaults to card mode and exposes an interlinear toggle", () => {
@@ -168,5 +187,50 @@ describe("CorpusView concordance filter", () => {
 
     expect(screen.getByText("1 of 3 passages")).toBeInTheDocument();
     expect(screen.getByText("selu mira-ka")).toBeInTheDocument();
+  });
+});
+
+describe("CorpusView network graph mode", () => {
+  it("shows a loading state while the neural map is fetched", async () => {
+    fetchNeuralMapMock.mockReturnValue(new Promise(() => undefined));
+    renderCorpusView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+
+    expect(screen.getByText("Loading corpus graph...")).toBeInTheDocument();
+    expect(fetchNeuralMapMock).toHaveBeenCalledWith("avenik");
+  });
+
+  it("shows an empty state when the neural map has no nodes", async () => {
+    fetchNeuralMapMock.mockResolvedValue({ nodes: [], edges: [] });
+    renderCorpusView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("No graph records are available for this corpus.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows a retry action when the neural map request fails", async () => {
+    fetchNeuralMapMock.mockRejectedValueOnce(new Error("Request failed: /observability/neural-map (503): Offline"));
+    renderCorpusView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Offline");
+    });
+
+    fetchNeuralMapMock.mockResolvedValueOnce({
+      nodes: [{ id: "lang-1", type: "language", label: "Avenik" }],
+      edges: []
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Retry network" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("1 nodes")).toBeInTheDocument();
+    });
+    expect(fetchNeuralMapMock).toHaveBeenCalledTimes(2);
   });
 });

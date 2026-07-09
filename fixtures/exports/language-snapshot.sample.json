@@ -1,0 +1,623 @@
+{
+  "exportVersion": "language-snapshot-v2",
+  "exportedAt": "2026-06-06T00:00:00.000Z",
+  "language": {
+    "id": "testlang",
+    "name": "Testlang",
+    "typology": "agglutinative",
+    "description": "Small invented language used only by automated tests.",
+    "orthography": "Lowercase Latin with hyphenated suffix boundaries.",
+    "status": "active",
+    "phonology": {
+      "consonants": [
+        "t",
+        "k",
+        "s",
+        "m",
+        "n",
+        "l",
+        "r"
+      ],
+      "vowels": [
+        "a",
+        "e",
+        "i",
+        "o",
+        "u"
+      ],
+      "syllableTemplate": "CV",
+      "stress": "word-initial",
+      "notes": [
+        "No consonant clusters in native roots."
+      ]
+    },
+    "createdBy": "system-seed",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  "linguisticProfile": {
+    "phonology": {
+      "consonants": [
+        "t",
+        "k",
+        "s",
+        "m",
+        "n",
+        "l",
+        "r"
+      ],
+      "vowels": [
+        "a",
+        "e",
+        "i",
+        "o",
+        "u"
+      ],
+      "syllableTemplate": "CV",
+      "stress": "word-initial",
+      "notes": [
+        "No consonant clusters in native roots."
+      ]
+    },
+    "vocabulary": [
+      {
+        "id": "testlang-lex-006",
+        "form": "-ki",
+        "gloss": "third person singular",
+        "partOfSpeech": "suffix",
+        "tags": [
+          "person"
+        ]
+      },
+      {
+        "id": "testlang-lex-007",
+        "form": "-lo",
+        "gloss": "past tense",
+        "partOfSpeech": "suffix",
+        "tags": [
+          "tense"
+        ]
+      },
+      {
+        "id": "testlang-lex-005",
+        "form": "-na",
+        "gloss": "first person singular",
+        "partOfSpeech": "suffix",
+        "tags": [
+          "person"
+        ]
+      },
+      {
+        "id": "testlang-lex-001",
+        "form": "mira",
+        "gloss": "river",
+        "partOfSpeech": "noun",
+        "tags": [
+          "place"
+        ]
+      },
+      {
+        "id": "testlang-lex-004",
+        "form": "nemi",
+        "gloss": "teach",
+        "partOfSpeech": "verb",
+        "tags": [
+          "learning"
+        ]
+      },
+      {
+        "id": "testlang-lex-003",
+        "form": "saku",
+        "gloss": "child",
+        "partOfSpeech": "noun",
+        "tags": [
+          "person"
+        ]
+      },
+      {
+        "id": "testlang-lex-002",
+        "form": "talo",
+        "gloss": "walk",
+        "partOfSpeech": "verb",
+        "tags": [
+          "motion"
+        ]
+      }
+    ],
+    "morphemeInventory": [
+      {
+        "surface": "-ki",
+        "lemma": "-ki",
+        "glosses": [
+          "3sg"
+        ],
+        "features": [
+          "person"
+        ],
+        "occurrenceCount": 2,
+        "passageIds": [
+          "testlang-c002",
+          "testlang-c003"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-006",
+          "form": "-ki",
+          "gloss": "third person singular",
+          "partOfSpeech": "suffix",
+          "tags": [
+            "person"
+          ]
+        }
+      },
+      {
+        "surface": "-lo",
+        "lemma": "-lo",
+        "glosses": [
+          "past"
+        ],
+        "features": [
+          "tense"
+        ],
+        "occurrenceCount": 1,
+        "passageIds": [
+          "testlang-c002"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-007",
+          "form": "-lo",
+          "gloss": "past tense",
+          "partOfSpeech": "suffix",
+          "tags": [
+            "tense"
+          ]
+        }
+      },
+      {
+        "surface": "-na",
+        "lemma": "-na",
+        "glosses": [
+          "1sg"
+        ],
+        "features": [
+          "person"
+        ],
+        "occurrenceCount": 1,
+        "passageIds": [
+          "testlang-c001"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-005",
+          "form": "-na",
+          "gloss": "first person singular",
+          "partOfSpeech": "suffix",
+          "tags": [
+            "person"
+          ]
+        }
+      },
+      {
+        "surface": "mira",
+        "lemma": "mira",
+        "glosses": [
+          "river"
+        ],
+        "features": [
+          "noun"
+        ],
+        "occurrenceCount": 1,
+        "passageIds": [
+          "testlang-c001"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-001",
+          "form": "mira",
+          "gloss": "river",
+          "partOfSpeech": "noun",
+          "tags": [
+            "place"
+          ]
+        }
+      },
+      {
+        "surface": "nemi",
+        "lemma": "nemi",
+        "glosses": [
+          "teach"
+        ],
+        "features": [
+          "verb-root"
+        ],
+        "occurrenceCount": 1,
+        "passageIds": [
+          "testlang-c002"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-004",
+          "form": "nemi",
+          "gloss": "teach",
+          "partOfSpeech": "verb",
+          "tags": [
+            "learning"
+          ]
+        }
+      },
+      {
+        "surface": "saku",
+        "lemma": "saku",
+        "glosses": [
+          "child"
+        ],
+        "features": [
+          "noun"
+        ],
+        "occurrenceCount": 2,
+        "passageIds": [
+          "testlang-c002",
+          "testlang-c003"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-003",
+          "form": "saku",
+          "gloss": "child",
+          "partOfSpeech": "noun",
+          "tags": [
+            "person"
+          ]
+        }
+      },
+      {
+        "surface": "talo",
+        "lemma": "talo",
+        "glosses": [
+          "walk"
+        ],
+        "features": [
+          "verb-root"
+        ],
+        "occurrenceCount": 2,
+        "passageIds": [
+          "testlang-c001",
+          "testlang-c003"
+        ],
+        "vocabulary": {
+          "id": "testlang-lex-002",
+          "form": "talo",
+          "gloss": "walk",
+          "partOfSpeech": "verb",
+          "tags": [
+            "motion"
+          ]
+        }
+      }
+    ],
+    "grammarRules": [
+      {
+        "id": "testlang-note-basic-order",
+        "topic": "syntax/basic-order",
+        "explanation": "Subjects precede verbs in simple clauses, and person suffixes close the verb form.",
+        "evidencePassageIds": [
+          "testlang-c001",
+          "testlang-c002"
+        ],
+        "confidence": "high",
+        "status": "draft"
+      },
+      {
+        "id": "testlang-note-past-suffix",
+        "topic": "morphology/verb/past-suffix",
+        "explanation": "The suffix -lo marks past tense and precedes the person suffix.",
+        "evidencePassageIds": [
+          "testlang-c002"
+        ],
+        "confidence": "medium",
+        "status": "draft"
+      }
+    ],
+    "paradigmGaps": [],
+    "stats": {
+      "vocabularyItems": 7,
+      "grammarRules": 2,
+      "corpusPassages": 3,
+      "notes": 2,
+      "exercises": 3,
+      "sourceAssets": 0,
+      "pendingExtractionDrafts": 0,
+      "exerciseTypes": {
+        "choose_particle": 1,
+        "translate_to_target": 1,
+        "segment": 1
+      }
+    }
+  },
+  "corpus": [
+    {
+      "id": "testlang-c001",
+      "languageId": "testlang",
+      "source": "test corpus",
+      "sourceMetadata": {
+        "author": "Test fixture builder",
+        "year": 2026,
+        "license": "Internal test data",
+        "consentRecord": "test-fixture-consent"
+      },
+      "textTarget": "mira talo-na",
+      "textTranslation": "I walk by the river.",
+      "morphologicalSegmentation": [
+        {
+          "surface": "mira",
+          "lemma": "mira",
+          "gloss": "river",
+          "features": [
+            "noun"
+          ]
+        },
+        {
+          "surface": "talo",
+          "lemma": "talo",
+          "gloss": "walk",
+          "features": [
+            "verb-root"
+          ]
+        },
+        {
+          "surface": "-na",
+          "lemma": "-na",
+          "gloss": "1sg",
+          "features": [
+            "person"
+          ]
+        }
+      ],
+      "topicTags": [
+        "motion",
+        "first-person"
+      ],
+      "consentStatus": {
+        "use": "testing-only",
+        "restrictions": [
+          "test-fixture-only"
+        ]
+      }
+    },
+    {
+      "id": "testlang-c002",
+      "languageId": "testlang",
+      "source": "test corpus",
+      "sourceMetadata": {
+        "author": "Test fixture builder",
+        "year": 2026,
+        "license": "Internal test data",
+        "consentRecord": "test-fixture-consent"
+      },
+      "textTarget": "saku nemi-lo-ki",
+      "textTranslation": "The child taught.",
+      "morphologicalSegmentation": [
+        {
+          "surface": "saku",
+          "lemma": "saku",
+          "gloss": "child",
+          "features": [
+            "noun"
+          ]
+        },
+        {
+          "surface": "nemi",
+          "lemma": "nemi",
+          "gloss": "teach",
+          "features": [
+            "verb-root"
+          ]
+        },
+        {
+          "surface": "-lo",
+          "lemma": "-lo",
+          "gloss": "past",
+          "features": [
+            "tense"
+          ]
+        },
+        {
+          "surface": "-ki",
+          "lemma": "-ki",
+          "gloss": "3sg",
+          "features": [
+            "person"
+          ]
+        }
+      ],
+      "topicTags": [
+        "learning",
+        "past"
+      ],
+      "consentStatus": {
+        "use": "testing-only",
+        "restrictions": [
+          "test-fixture-only"
+        ]
+      }
+    },
+    {
+      "id": "testlang-c003",
+      "languageId": "testlang",
+      "source": "test corpus",
+      "sourceMetadata": {
+        "author": "Test fixture builder",
+        "year": 2026,
+        "license": "Internal test data",
+        "consentRecord": "test-fixture-consent"
+      },
+      "textTarget": "saku talo-ki",
+      "textTranslation": "The child walks.",
+      "morphologicalSegmentation": [
+        {
+          "surface": "saku",
+          "lemma": "saku",
+          "gloss": "child",
+          "features": [
+            "noun"
+          ]
+        },
+        {
+          "surface": "talo",
+          "lemma": "talo",
+          "gloss": "walk",
+          "features": [
+            "verb-root"
+          ]
+        },
+        {
+          "surface": "-ki",
+          "lemma": "-ki",
+          "gloss": "3sg",
+          "features": [
+            "person"
+          ]
+        }
+      ],
+      "topicTags": [
+        "motion",
+        "third-person"
+      ],
+      "consentStatus": {
+        "use": "testing-only",
+        "restrictions": [
+          "test-fixture-only"
+        ]
+      }
+    }
+  ],
+  "notes": [
+    {
+      "id": "testlang-note-basic-order",
+      "languageId": "testlang",
+      "topic": "syntax/basic-order",
+      "explanation": "Subjects precede verbs in simple clauses, and person suffixes close the verb form.",
+      "examples": [
+        {
+          "passageId": "testlang-c001",
+          "target": "mira talo-na",
+          "translation": "I walk by the river."
+        }
+      ],
+      "evidencePassageIds": [
+        "testlang-c001",
+        "testlang-c002"
+      ],
+      "evidenceCount": 2,
+      "confidence": "high",
+      "status": "draft",
+      "reviewer": {
+        "lastReviewedBy": null,
+        "lastReviewedAt": null,
+        "comments": []
+      },
+      "dialectScope": "general",
+      "editHistory": []
+    },
+    {
+      "id": "testlang-note-past-suffix",
+      "languageId": "testlang",
+      "topic": "morphology/verb/past-suffix",
+      "explanation": "The suffix -lo marks past tense and precedes the person suffix.",
+      "examples": [
+        {
+          "passageId": "testlang-c002",
+          "target": "saku nemi-lo-ki",
+          "translation": "The child taught."
+        }
+      ],
+      "evidencePassageIds": [
+        "testlang-c002"
+      ],
+      "evidenceCount": 1,
+      "confidence": "medium",
+      "status": "draft",
+      "reviewer": {
+        "lastReviewedBy": null,
+        "lastReviewedAt": null,
+        "comments": []
+      },
+      "dialectScope": "general",
+      "editHistory": []
+    }
+  ],
+  "exercises": [
+    {
+      "id": "testlang-ex-001",
+      "languageId": "testlang",
+      "type": "choose_particle",
+      "prompt": "Choose the first-person suffix that completes talo-___.",
+      "allowedVocabulary": [
+        "-na",
+        "-ki",
+        "-lo"
+      ],
+      "allowedRuleIds": [
+        "testlang-note-basic-order"
+      ]
+    },
+    {
+      "id": "testlang-ex-002",
+      "languageId": "testlang",
+      "type": "translate_to_target",
+      "prompt": "Translate to the target language: The child walks.",
+      "allowedVocabulary": [
+        "saku",
+        "talo",
+        "-ki"
+      ],
+      "allowedRuleIds": [
+        "testlang-note-basic-order"
+      ]
+    },
+    {
+      "id": "testlang-ex-003",
+      "languageId": "testlang",
+      "type": "segment",
+      "prompt": "Segment: nemi-lo-ki",
+      "allowedVocabulary": [
+        "nemi",
+        "-lo",
+        "-ki"
+      ],
+      "allowedRuleIds": [
+        "testlang-note-past-suffix"
+      ]
+    }
+  ],
+  "governance": [],
+  "evaluations": [
+    {
+      "id": "eval-testlang-latest",
+      "languageId": "testlang",
+      "createdAt": "2026-06-06T00:00:00.000Z",
+      "systemVersion": "deterministic-study-loop-v1",
+      "fixtureVersion": "workspace-corpus-v1",
+      "scores": {
+        "noteAccuracy": 1,
+        "corpusCoverage": 0.75
+      },
+      "failures": [
+        {
+          "category": "corpusCoverage",
+          "languageId": "testlang",
+          "itemId": "testlang-c999",
+          "message": "Missing passage coverage."
+        }
+      ],
+      "summary": "Testlang: 87.5% average score across 2 categories."
+    }
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "contentHash": "a74b47d05fdea226e28d0600d30dd301ed5392dc1ff901ab2d73b692d939ef9e",
+    "generatedBy": "assini-local-export-v1",
+    "redactionPolicy": [
+      "answer-keys-omitted",
+      "adversarial-exercise-probes-omitted",
+      "learner-submissions-omitted",
+      "learner-answers-omitted",
+      "ai-sessions-omitted",
+      "local-users-omitted"
+    ]
+  }
+}

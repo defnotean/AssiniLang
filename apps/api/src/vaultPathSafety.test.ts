@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, symlink } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -46,21 +46,24 @@ describe("Obsidian vault path safety", () => {
     const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
     const vaultPath = join(allowedRoot, "Language Vault");
     await mkdir(vaultPath, { recursive: true });
+    const canonicalRoot = await realpath(allowedRoot);
 
     const resolved = await assertObsidianVaultPathAllowed(vaultPath, {
       env: { ASSINI_OBSIDIAN_VAULT_ROOTS: allowedRoot }
     });
-    expect(isPathInsideRoot(resolved, allowedRoot)).toBe(true);
+    // Compare against the realpathed root: Windows may canonicalize short/long names.
+    expect(isPathInsideRoot(resolved, canonicalRoot)).toBe(true);
   });
 
   it("accepts a not-yet-created vault under an allowlisted root", async () => {
     const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
     const vaultPath = join(allowedRoot, "Language Vault", "nested");
+    const canonicalRoot = await realpath(allowedRoot);
 
     const resolved = await assertObsidianVaultPathAllowed(vaultPath, {
       env: { ASSINI_OBSIDIAN_VAULT_ROOTS: allowedRoot }
     });
-    expect(isPathInsideRoot(resolved, allowedRoot)).toBe(true);
+    expect(isPathInsideRoot(resolved, canonicalRoot)).toBe(true);
   });
 
   it("rejects symlink escapes that leave the allowlisted root", async () => {

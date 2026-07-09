@@ -7,6 +7,7 @@ import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDr
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 import { normalizeHttpBaseUrl } from "./llmEnvShared.js";
 import { parseModelJson } from "./modelJson.js";
+import { redactErrorSecrets } from "./secretRedaction.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 type Env = Record<string, string | undefined>;
@@ -787,7 +788,7 @@ async function resolveAssetText(
             fetchFn
           });
         } catch (error) {
-          const reason = error instanceof Error ? error.message : String(error);
+          const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
           throw new Error(`Configured OCR model could not read the scanned PDF: ${reason}`);
         }
         warnings.push("Used configured OCR model to read scanned document (page 1).");
@@ -849,7 +850,7 @@ export async function extractCandidatesForAsset(
           fetchFn
         });
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
+        const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
         throw new Error(`Configured OCR model could not read the image: ${reason}`);
       }
       warnings.push("Used configured OCR model to read the image.");
@@ -874,7 +875,7 @@ export async function extractCandidatesForAsset(
           cachePath: resolve(params.dataDir, "ocr-cache")
         });
       } catch (error) {
-        const reason = error instanceof Error ? error.message : String(error);
+        const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
         throw new Error(
           `Local OCR could not read the image: ${reason} Configure a vision-capable model via ASSINI_LLM_PROVIDER (for example llava via Ollama), or provide a clearer image.`
         );

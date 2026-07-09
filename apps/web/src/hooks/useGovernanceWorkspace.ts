@@ -1,4 +1,4 @@
-import { useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import type { AuditEvent, GovernanceRecord, ReviewDisposition, ReviewPolicy } from "@assini/db";
 import type { GovernancePayload, ReviewPolicyPayload } from "../api";
 import {
@@ -55,6 +55,7 @@ export interface GovernanceWorkspace {
   handleResolveReviewDisposition: (dispositionId: string) => Promise<void>;
   handleExportSnapshot: () => Promise<void>;
   handleExportEvaluationArtifact: () => Promise<void>;
+  reloadGovernanceData: () => void;
 }
 
 /**
@@ -95,65 +96,60 @@ export function useGovernanceWorkspace(
   const [evaluationArtifactError, setEvaluationArtifactError] = useState<string | null>(null);
   const [isExportingEvaluationArtifact, setIsExportingEvaluationArtifact] = useState(false);
 
-  useEffect(() => {
-    let isCurrent = true;
-    if ((view !== "governance" && view !== "model") || !selectedLanguageId) {
-      return () => {
-        isCurrent = false;
-      };
-    }
+  const reloadGovernanceData = useCallback(() => {
+    if (!selectedLanguageId) return;
 
     setGovernanceState({ status: "loading" });
     setAuditEventState({ status: "loading" });
     setReviewPolicyState({ status: "loading" });
     setReviewDispositionState({ status: "loading" });
-    setGovernanceSuccess(null);
-    setGovernanceError(null);
-    setReviewPolicySuccess(null);
-    setReviewPolicyError(null);
-    setReviewDispositionSuccess(null);
-    setReviewDispositionError(null);
     fetchGovernance()
       .then((records) => {
-        if (isCurrent) setGovernanceState({ status: "ready", data: records });
+        setGovernanceState({ status: "ready", data: records });
       })
       .catch((error: Error) => {
-        if (isCurrent) setGovernanceState({ status: "error", message: error.message });
+        setGovernanceState({ status: "error", message: error.message });
       });
     const reviewPolicyRequest = fetchReviewPolicy(selectedLanguageId)
       .then((policy) => {
-        if (!isCurrent) return;
         setReviewPolicyState({ status: "ready", data: policy });
         setReviewPolicyReviewerIds(policy.assignedReviewerIds.join(", "));
         setReviewPolicyApprovalThreshold(policy.approvalThreshold.toString());
         setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
       })
       .catch((error: Error) => {
-        if (isCurrent) setReviewPolicyState({ status: "error", message: error.message });
+        setReviewPolicyState({ status: "error", message: error.message });
       });
     const reviewDispositionRequest = fetchReviewDispositions(selectedLanguageId)
       .then((dispositions) => {
-        if (isCurrent) setReviewDispositionState({ status: "ready", data: dispositions });
+        setReviewDispositionState({ status: "ready", data: dispositions });
       })
       .catch((error: Error) => {
-        if (isCurrent) setReviewDispositionState({ status: "error", message: error.message });
+        setReviewDispositionState({ status: "error", message: error.message });
       });
-    Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest])
-      .then(() => {
-        if (!isCurrent) return undefined;
-        return fetchAuditEvents(selectedLanguageId)
-          .then((events) => {
-            if (isCurrent) setAuditEventState({ status: "ready", data: events });
-          })
-          .catch((error: Error) => {
-            if (isCurrent) setAuditEventState({ status: "error", message: error.message });
-          });
-      });
+    void Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest])
+      .then(() => fetchAuditEvents(selectedLanguageId)
+        .then((events) => {
+          setAuditEventState({ status: "ready", data: events });
+        })
+        .catch((error: Error) => {
+          setAuditEventState({ status: "error", message: error.message });
+        }));
+  }, [selectedLanguageId]);
 
-    return () => {
-      isCurrent = false;
-    };
-  }, [view, selectedLanguageId]);
+  useEffect(() => {
+    if ((view !== "governance" && view !== "model") || !selectedLanguageId) {
+      return undefined;
+    }
+
+    setGovernanceSuccess(null);
+    setGovernanceError(null);
+    setReviewPolicySuccess(null);
+    setReviewPolicyError(null);
+    setReviewDispositionSuccess(null);
+    setReviewDispositionError(null);
+    reloadGovernanceData();
+  }, [view, selectedLanguageId, reloadGovernanceData]);
 
   useEffect(() => {
     setPolicyType("generation");
@@ -383,6 +379,7 @@ export function useGovernanceWorkspace(
     handleSubmitReviewPolicy,
     handleResolveReviewDisposition,
     handleExportSnapshot,
-    handleExportEvaluationArtifact
+    handleExportEvaluationArtifact,
+    reloadGovernanceData
   };
 }

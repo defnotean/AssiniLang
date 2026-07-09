@@ -44,7 +44,8 @@ export function GovernanceView({
     handleSubmitReviewPolicy: onReviewPolicySubmit,
     setReviewDispositionDrafts,
     handleResolveReviewDisposition: onResolveReviewDisposition,
-    handleExportSnapshot: onExportSnapshot
+    handleExportSnapshot: onExportSnapshot,
+    reloadGovernanceData: onReloadGovernanceData
   } = governance;
   const { t } = useI18n();
   const records = governanceState.status === "ready"
@@ -135,9 +136,12 @@ export function GovernanceView({
             </p>
           )}
           {reviewPolicyState.status === "error" && (
-            <p className="inline-empty error" role="alert">
-              {reviewPolicyState.message}
-            </p>
+            <div className="inline-empty error" role="alert">
+              <p>{reviewPolicyState.message}</p>
+              <button type="button" className="secondary" onClick={onReloadGovernanceData}>
+                {t("app.retryLoad")}
+              </button>
+            </div>
           )}
           {reviewPolicySummary && (
             <p className="review-policy-summary">
@@ -201,9 +205,12 @@ export function GovernanceView({
         )}
 
         {reviewDispositionState.status === "error" && (
-          <p className="inline-empty error" role="alert">
-            {reviewDispositionState.message}
-          </p>
+          <div className="inline-empty error" role="alert">
+            <p>{reviewDispositionState.message}</p>
+            <button type="button" className="secondary" onClick={onReloadGovernanceData}>
+              {t("app.retryLoad")}
+            </button>
+          </div>
         )}
 
         {reviewDispositionState.status === "ready" && reviewDispositions.length === 0 && (
@@ -277,9 +284,12 @@ export function GovernanceView({
         )}
 
         {auditEventState.status === "error" && (
-          <p className="inline-empty error" role="alert">
-            {auditEventState.message}
-          </p>
+          <div className="inline-empty error" role="alert">
+            <p>{auditEventState.message}</p>
+            <button type="button" className="secondary" onClick={onReloadGovernanceData}>
+              {t("app.retryLoad")}
+            </button>
+          </div>
         )}
 
         {auditEventState.status === "ready" && auditEvents.length === 0 && (
@@ -342,9 +352,12 @@ export function GovernanceView({
         )}
 
         {governanceState.status === "error" && (
-          <p className="inline-empty error" role="alert">
-            {governanceState.message}
-          </p>
+          <div className="inline-empty error" role="alert">
+            <p>{governanceState.message}</p>
+            <button type="button" className="secondary" onClick={onReloadGovernanceData}>
+              {t("app.retryLoad")}
+            </button>
+          </div>
         )}
 
         {governanceState.status === "ready" && records.length === 0 && (

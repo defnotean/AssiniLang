@@ -77,6 +77,7 @@ export interface ModelWorkspace {
   handleDeleteModelProfile: (profileId: string) => Promise<void>;
   handleModelSmokeTest: () => Promise<void>;
   handleTestConnection: () => Promise<void>;
+  reloadModelWorkspace: () => void;
 }
 
 /**
@@ -162,6 +163,35 @@ export function useModelWorkspace(
       }
     }
   }, [t]);
+
+  const reloadModelWorkspace = useCallback(() => {
+    setLlmState({ status: "loading" });
+    setSettingsState({ status: "loading" });
+    setModelDiscoveryState({ status: "loading" });
+    setObservabilityState({ status: "loading" });
+    setModelTestResult(null);
+    setSettingsSaveResult(null);
+    setSettingsSaveError(null);
+    fetchRuntimeSettings()
+      .then((settings) => {
+        configuredDiscoveryBaseUrlRef.current = settings.settings.baseUrl.trim() || undefined;
+        setSettingsState({ status: "ready", data: settings });
+        setLlmState({ status: "ready", data: settings.status });
+      })
+      .catch((error: Error) => {
+        const message = error.message || t("model.errSettingsLoadFailed");
+        setSettingsState({ status: "error", message });
+        setLlmState({ status: "error", message });
+      });
+    void startModelDiscovery(undefined, { showLoading: true, includeCommonTargets: true, force: true });
+    fetchObservability()
+      .then((observability) => {
+        setObservabilityState({ status: "ready", data: observability });
+      })
+      .catch((error: Error) => {
+        setObservabilityState({ status: "error", message: error.message });
+      });
+  }, [startModelDiscovery, t]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -452,6 +482,7 @@ export function useModelWorkspace(
     handleActivateModelProfile,
     handleDeleteModelProfile,
     handleModelSmokeTest,
-    handleTestConnection
+    handleTestConnection,
+    reloadModelWorkspace
   };
 }

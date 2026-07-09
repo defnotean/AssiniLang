@@ -1033,4 +1033,31 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
       dataDir: tmpdir()
     })).rejects.toThrow(/OCR found no readable text in the image.*ASSINI_LLM_PROVIDER/s);
   });
+
+  it("redacts configured OCR API keys from model OCR failure messages", async () => {
+    const dataDir = await mkdtemp(join(tmpdir(), "assini-ingest-img-ocr-redact-"));
+    await mkdir(join(dataDir, "assets", language.id), { recursive: true });
+    await writeFile(join(dataDir, "assets", language.id, "photo.png"), Buffer.from([1, 2, 3, 4]));
+    const fetchStub = (async () => {
+      throw new Error("OCR model request failed for Bearer ocr-secret-value");
+    }) as typeof fetch;
+
+    const attempt = extractCandidatesForAsset({
+      asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_OCR_API_KEY: "ocr-secret-value",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    await expect(attempt).rejects.toThrow(/Configured OCR model could not read the image:.*\[redacted-secret\]/);
+    await attempt.catch((error: Error) => {
+      expect(error.message).not.toContain("ocr-secret-value");
+    });
+  });
 });

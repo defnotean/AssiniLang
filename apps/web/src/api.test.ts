@@ -484,6 +484,28 @@ describe("fetchDashboardData", () => {
     });
   });
 
+  it("includes Retry-After guidance when rate-limited responses carry the header", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return {
+        ok: false,
+        status: 429,
+        headers: new Headers({ "Retry-After": "12" }),
+        json: async () => ({ error: "Rate limit exceeded" })
+      };
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expectApiError(fetchLlmStatus(), {
+      message: "Request failed: /llm/status (429): Rate limit exceeded Retry after 12 seconds.",
+      status: 429,
+      requestId: undefined
+    });
+  });
+
   it("creates AI sessions with role-aware prototype auth and no browser API key", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,

@@ -21,12 +21,18 @@ import {
 import { buildDesktopDiagnosticsText } from "../lib/desktopDiagnostics";
 import type { AsyncState } from "../lib/types";
 import { useI18n, type MessageKey } from "../i18n";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { DesktopActionGroups, type DesktopActionGroup } from "./DesktopActionGroups";
 import { DesktopAppDetails } from "./DesktopAppDetails";
 import { DesktopPreferencesControls, type DesktopPreferenceKey } from "./DesktopPreferencesControls";
 
 type DesktopActionNotice = {
   kind: "success" | "error";
+  message: string;
+};
+
+type PendingDesktopConfirm = {
+  action: DesktopAction;
   message: string;
 };
 
@@ -67,6 +73,7 @@ export function DesktopToolsPanel({
   const { t } = useI18n();
   const [desktopActionBusy, setDesktopActionBusy] = useState<DesktopAction | null>(null);
   const [desktopActionNotice, setDesktopActionNotice] = useState<DesktopActionNotice | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingDesktopConfirm | null>(null);
   const [desktopPreferenceBusy, setDesktopPreferenceBusy] = useState<DesktopPreferenceKey | null>(null);
   const [isCopyingDiagnostics, setIsCopyingDiagnostics] = useState(false);
   const [isSavingDiagnostics, setIsSavingDiagnostics] = useState(false);
@@ -260,18 +267,16 @@ export function DesktopToolsPanel({
     }
   }
 
-  async function handleRestoreLatestBackup() {
-    if (typeof window !== "undefined" && !window.confirm(t("model.restoreBackupConfirm"))) {
-      return;
-    }
-    await handleDesktopAction("restoreLatestDataBackup");
+  function requestDesktopConfirm(action: DesktopAction, message: string) {
+    setPendingConfirm({ action, message });
   }
 
-  async function handlePruneOldBackups() {
-    if (typeof window !== "undefined" && !window.confirm(t("model.pruneBackupsConfirm"))) {
-      return;
-    }
-    await handleDesktopAction("pruneOldDataBackups");
+  function handleRestoreLatestBackup() {
+    requestDesktopConfirm("restoreLatestDataBackup", t("model.restoreBackupConfirm"));
+  }
+
+  function handlePruneOldBackups() {
+    requestDesktopConfirm("pruneOldDataBackups", t("model.pruneBackupsConfirm"));
   }
 
   function desktopButton({
@@ -417,6 +422,17 @@ export function DesktopToolsPanel({
         >
           {desktopActionNotice.message}
         </p>
+      )}
+      {pendingConfirm && (
+        <ConfirmDialog
+          message={pendingConfirm.message}
+          onCancel={() => setPendingConfirm(null)}
+          onConfirm={() => {
+            const action = pendingConfirm.action;
+            setPendingConfirm(null);
+            void handleDesktopAction(action);
+          }}
+        />
       )}
     </section>
   );

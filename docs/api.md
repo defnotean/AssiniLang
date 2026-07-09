@@ -233,6 +233,10 @@ Generates a single draft exercise grounded in the approved lexicon and notes. `a
 
 ## Exercise submissions
 
+`GET /exercises/:exerciseId/submissions` (roles: learner, reviewer, lead, admin)
+
+Returns sanitized submission history for one exercise. Learner answers and local actor IDs are omitted.
+
 `POST /exercises/:exerciseId/submissions`
 
 Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID.
@@ -295,9 +299,9 @@ The persisted app-state schema enforces the same ledger invariants during local 
 
 ## LLM status and sessions
 
-`GET /llm/status` returns provider readiness, transcription readiness, and OCR readiness without exposing API keys. Transcription readiness reports whether `ASSINI_TRANSCRIBE_BASE_URL` is configured for audio-source processing. OCR readiness reports whether `ASSINI_OCR_BASE_URL` is configured for image-source processing. These are static, no-network reads of the environment: they check configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
+`GET /llm/status` returns provider readiness plus nested `transcription` and `ocr` readiness objects without exposing API keys. Each nested object reports `configured`, optional sanitized `baseUrl` and `model`, and the backing env variable names (`baseUrlVariable`, `modelVariable`). Transcription readiness reflects `ASSINI_TRANSCRIBE_BASE_URL` / `ASSINI_TRANSCRIBE_MODEL`; OCR readiness reflects `ASSINI_OCR_BASE_URL` / `ASSINI_OCR_MODEL`. These are static, no-network reads of the environment: they check configuration shape only, not whether the endpoint is actually reachable. See the [Configuration Reference](configuration.md) for every variable.
 
-`GET /llm/settings` and `PUT /llm/settings` are programmer/lead/admin routes for the local settings screen. They expose non-secret runtime values such as provider, base URL, model, timeout, max tokens, JSON mode, transcription endpoint, OCR model endpoint, OCR language (tesseract fallback), and the private-URL fetch toggle. API keys are write-only: clients can submit replacements or clear them, but responses only report whether a key is configured. `PUT /llm/settings` writes the repo-root `.env`, updates the running API process environment, and refreshes the active provider for future ingestion, generation, and AI-session calls. Port, host, CORS, and body-limit changes still require restarting the dev launcher.
+`GET /llm/settings` and `PUT /llm/settings` are programmer/lead/admin routes for the local settings screen. They expose non-secret runtime values such as provider, base URL, model, timeout, max tokens, JSON mode, transcription endpoint/model, OCR model endpoint, OCR language (tesseract fallback), and the private-URL fetch toggle. API keys are write-only: clients can submit replacements or clear them, but responses only report whether keys are configured via `apiKeyConfigured`, `transcriptionApiKeyConfigured`, and `ocrApiKeyConfigured`. `PUT /llm/settings` writes the repo-root `.env`, updates the running API process environment, and refreshes the active provider for future ingestion, generation, and AI-session calls. Port, host, CORS, and body-limit changes still require restarting the dev launcher.
 
 `POST /llm/model-profiles`, `PUT /llm/model-profiles/:profileId/activate`, and `DELETE /llm/model-profiles/:profileId` manage named runtime model profiles. Profiles store provider/base URL/model and related runtime knobs; API keys are still write-only in responses. Activating a profile materializes its settings into the active runtime env and reloads the provider, so users can switch between loaded local or remote models without restarting the app.
 

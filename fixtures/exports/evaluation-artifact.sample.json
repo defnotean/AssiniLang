@@ -1,0 +1,84 @@
+{
+  "exportVersion": "evaluation-artifact-v2",
+  "exportedAt": "2026-06-06T00:00:00.000Z",
+  "summary": {
+    "languages": 1,
+    "totalRuns": 1,
+    "latestRuns": 1,
+    "failedLatestRuns": 1,
+    "regressedLatestRuns": 0,
+    "improvedLatestRuns": 0,
+    "stableLatestRuns": 0,
+    "singleRunLanguages": 1,
+    "averageLatestScore": 0.875,
+    "passed": false,
+    "failureCount": 2
+  },
+  "latestRuns": [
+    {
+      "id": "eval-testlang-latest",
+      "languageId": "testlang",
+      "createdAt": "2026-06-06T00:00:00.000Z",
+      "systemVersion": "deterministic-study-loop-v1",
+      "fixtureVersion": "workspace-corpus-v1",
+      "scores": {
+        "noteAccuracy": 1,
+        "corpusCoverage": 0.75
+      },
+      "failures": [
+        {
+          "category": "corpusCoverage",
+          "languageId": "testlang",
+          "itemId": "testlang-c999",
+          "message": "Missing passage coverage."
+        }
+      ],
+      "summary": "Testlang: 87.5% average score across 2 categories."
+    }
+  ],
+  "runsByLanguage": {
+    "testlang": [
+      "eval-testlang-latest"
+    ]
+  },
+  "trends": [
+    {
+      "languageId": "testlang",
+      "latestRunId": "eval-testlang-latest",
+      "previousRunId": null,
+      "latestAverageScore": 0.875,
+      "previousAverageScore": null,
+      "averageDelta": null,
+      "status": "single-run",
+      "categoryDeltas": {
+        "corpusCoverage": {
+          "latestScore": 0.75,
+          "previousScore": null,
+          "delta": null
+        },
+        "noteAccuracy": {
+          "latestScore": 1,
+          "previousScore": null,
+          "delta": null
+        }
+      }
+    }
+  ],
+  "failureLines": [
+    "Testlang corpusCoverage testlang-c999: Missing passage coverage.",
+    "Testlang corpusCoverage threshold: score 75.0% is below required 96.0%."
+  ],
+  "integrity": {
+    "algorithm": "sha256",
+    "contentHash": "9a17d7b9855eceb48b24a16fcb4e17be11a4810d6c8a1f6f5bec6301498cb5b8",
+    "generatedBy": "assini-local-export-v1",
+    "redactionPolicy": [
+      "answer-keys-omitted",
+      "adversarial-exercise-probes-omitted",
+      "learner-submissions-omitted",
+      "learner-answers-omitted",
+      "ai-sessions-omitted",
+      "local-users-omitted"
+    ]
+  }
+}

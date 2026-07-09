@@ -48,6 +48,7 @@ export function ElderPage({
     return (
       <div className="elder-page">
         <div className="elder-card" role="status" aria-live="polite">
+          <span className="loading-spinner" aria-hidden="true" />
           {t("elderPage.loading")}
         </div>
       </div>
@@ -92,9 +93,12 @@ export function ElderPage({
     <div className="elder-page">
       <p className="elder-intro">{t("elderPage.intro")}</p>
       {!elder.elderContext && elder.correctionError && (
-        <p className="result-notice error" role="alert">
-          {elder.correctionError}
-        </p>
+        <div className="result-notice error" role="alert">
+          <p>{elder.correctionError}</p>
+          <button type="button" className="secondary" onClick={elder.reloadElderContext}>
+            {t("app.retryLoad")}
+          </button>
+        </div>
       )}
 
       <section className="elder-card elder-suggest" aria-label={t("elderPage.suggestHeading")}>
