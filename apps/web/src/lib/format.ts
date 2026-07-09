@@ -561,6 +561,15 @@ function operatorApiErrorI18n(
   if (/Corpus passage could not be imported/i.test(normalized)) {
     return { i18nKey: "errors.corpusImportFailed" };
   }
+  if (/Extraction draft not found:/i.test(normalized)) {
+    return { i18nKey: "errors.extractionDraftNotFound" };
+  }
+  if (/Extraction draft could not be accepted/i.test(normalized)) {
+    return { i18nKey: "errors.extractionDraftAcceptFailed" };
+  }
+  if (/Extraction draft could not be rejected/i.test(normalized)) {
+    return { i18nKey: "errors.extractionDraftRejectFailed" };
+  }
   if (/Exercise not found:/i.test(normalized)) {
     return { i18nKey: "errors.exerciseNotFound" };
   }

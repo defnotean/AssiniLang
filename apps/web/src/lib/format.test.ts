@@ -770,6 +770,40 @@ describe("localizeApiError", () => {
     ).toBe("The corpus passage could not be imported. Retry, or check the API logs.");
   });
 
+  it("localizes extraction-draft not-found and accept failures via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Extraction draft not found: missing-draft", {
+          status: 404,
+          i18nKey: "errors.extractionDraftNotFound"
+        }),
+        t,
+        "ingest.draftReviewFailed"
+      )
+    ).toBe("That extraction draft was not found. Refresh Build and try again.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /extraction-drafts/missing/accept (404): Extraction draft not found: missing", {
+          status: 404
+        }),
+        t,
+        "ingest.draftReviewFailed"
+      )
+    ).toBe("That extraction draft was not found. Refresh Build and try again.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Extraction draft could not be accepted", {
+          status: 500,
+          i18nKey: "errors.extractionDraftAcceptFailed"
+        }),
+        t,
+        "ingest.draftReviewFailed"
+      )
+    ).toBe("The extraction draft could not be accepted. Retry, or check the API logs.");
+  });
+
   it("localizes exercise authoring and submission validation errors via i18nKey or English message", () => {
     expect(
       localizeApiError(

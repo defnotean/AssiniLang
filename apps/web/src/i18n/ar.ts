@@ -188,6 +188,9 @@ export const ar: Record<MessageKey, string> = {
   "errors.exerciseSubmissionCreateFailed": "تعذّر حفظ إجابة التمرين. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
   "errors.invalidCorpusImportBody": "قدّم مقطع مدوّنة كاملًا: المصدر والنصوص والتجزئة والوسوم والموافقة.",
   "errors.corpusImportFailed": "تعذّر استيراد مقطع المدوّنة. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
+  "errors.extractionDraftNotFound": "لم يُعثر على مسودة الاستخلاص تلك. حدّث البناء ثم أعد المحاولة.",
+  "errors.extractionDraftAcceptFailed": "تعذّر قبول مسودة الاستخلاص. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
+  "errors.extractionDraftRejectFailed": "تعذّر رفض مسودة الاستخلاص. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
 
   "viewConfig.profile.label": "الملف اللغوي",
   "viewConfig.profile.title": "الملف اللغوي",
@@ -738,6 +741,7 @@ export const ar: Record<MessageKey, string> = {
   "governance.policyRecords": "سجلات السياسات",
   "governance.loadingGovernanceRecords": "جارٍ تحميل سجلات الحوكمة.",
   "governance.noGovernancePolicyRecords": "لا توجد سجلات سياسات حوكمة لهذه اللغة بعد.",
+  "governance.noGovernancePolicyHint": "أضِف سياسة موافقة أو وصول أو توليد أعلاه لتوثيق كيفية استخدام مواد هذه اللغة ومراجعتها.",
   "governance.noConsentPolicyHint": "سجّل سياسة موافقة أعلاه قبل ترقية مواد المدوّنة. اربط سجلات الموافقة في البناء عند استيراد المقاطع.",
   "governance.noConsentPolicyRecords": "لا توجد سياسة موافقة مُسجَّلة بعد. أضِف واحدة أعلاه لتوثيق كيفية استخدام مواد المدوّنة.",
   "governance.tableType": "النوع",

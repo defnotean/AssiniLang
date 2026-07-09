@@ -18,10 +18,16 @@ function resolveBackupDbFile(backupDir, manifest = null) {
   }
 
   if (parsed && typeof parsed.dbPath === "string" && parsed.dbPath.trim()) {
-    const candidate = path.join(dataDir, path.basename(parsed.dbPath));
+    const basename = path.basename(parsed.dbPath);
+    const candidate = path.join(dataDir, basename);
     if (existsSync(candidate)) {
       return candidate;
     }
+    // Manifest named a database file that is missing — do not silently fall back
+    // to local-db.* (that could restore the wrong workspace).
+    throw new Error(
+      `Backup at ${root} lists database ${basename} in backup-manifest.json, but that file is missing under data/.`
+    );
   }
 
   for (const name of ["local-db.json", "local-db.sqlite"]) {

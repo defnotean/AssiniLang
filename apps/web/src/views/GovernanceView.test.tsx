@@ -59,7 +59,11 @@ describe("GovernanceView consent empty states", () => {
     );
 
     expect(screen.getByText("No governance policy records for this language yet.")).toBeInTheDocument();
-    expect(screen.getByText("Record a consent policy above before promoting corpus material. Link consent records in Build when importing passages.")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Add a consent, access, or generation policy above to document how this language's material may be used and reviewed."
+      )
+    ).toBeInTheDocument();
   });
 
   it("flags a missing consent policy when other policy types already exist", () => {

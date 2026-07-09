@@ -55,6 +55,15 @@ describe("desktop backup restore validation", () => {
     expect(resolveBackupDbFile(dir)).toBe(dbPath);
   });
 
+  it("refuses to fall back when the manifest names a missing database file", () => {
+    const { dir } = createBackupFixture({
+      dbName: "local-db.json",
+      manifestDbPath: "/tmp/workspace-custom.json"
+    });
+
+    expect(() => resolveBackupDbFile(dir)).toThrow(/lists database workspace-custom\.json/);
+  });
+
   it("validates a readable backup before restore", async () => {
     const { dir, dbPath } = createBackupFixture();
     const readWorkspace = vi.fn(async () => ({ languages: [] }));

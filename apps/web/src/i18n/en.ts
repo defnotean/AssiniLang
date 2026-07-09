@@ -161,6 +161,9 @@ export const en = {
   "errors.exerciseSubmissionCreateFailed": "The exercise submission could not be saved. Retry, or check the API logs.",
   "errors.invalidCorpusImportBody": "Provide a complete corpus passage: source, texts, segmentation, tags, and consent.",
   "errors.corpusImportFailed": "The corpus passage could not be imported. Retry, or check the API logs.",
+  "errors.extractionDraftNotFound": "That extraction draft was not found. Refresh Build and try again.",
+  "errors.extractionDraftAcceptFailed": "The extraction draft could not be accepted. Retry, or check the API logs.",
+  "errors.extractionDraftRejectFailed": "The extraction draft could not be rejected. Retry, or check the API logs.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).
   "viewConfig.profile.label": "Start",
@@ -762,6 +765,7 @@ export const en = {
   "governance.policyRecords": "Policy Records",
   "governance.loadingGovernanceRecords": "Loading governance records.",
   "governance.noGovernancePolicyRecords": "No governance policy records for this language yet.",
+  "governance.noGovernancePolicyHint": "Add a consent, access, or generation policy above to document how this language's material may be used and reviewed.",
   "governance.noConsentPolicyHint": "Record a consent policy above before promoting corpus material. Link consent records in Build when importing passages.",
   "governance.noConsentPolicyRecords": "No consent policy recorded yet. Add one above to document how corpus material may be used.",
   "governance.tableType": "Type",

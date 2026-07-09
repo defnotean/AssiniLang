@@ -116,6 +116,19 @@ describe("locale catalogs", () => {
     expect(ar["errors.corpusImportFailed"]).not.toBe(en["errors.corpusImportFailed"]);
   });
 
+  it("localizes extraction-draft not-found errors in Arabic", () => {
+    expect(en["errors.extractionDraftNotFound"]).toContain("Refresh Build");
+    expect(ar["errors.extractionDraftNotFound"]).toContain("البناء");
+    expect(ar["errors.extractionDraftNotFound"]).not.toBe(en["errors.extractionDraftNotFound"]);
+    expect(ar["errors.extractionDraftAcceptFailed"]).not.toBe(en["errors.extractionDraftAcceptFailed"]);
+  });
+
+  it("localizes governance empty-policy next-step guidance", () => {
+    expect(en["governance.noGovernancePolicyHint"]).toContain("consent, access, or generation");
+    expect(ar["governance.noGovernancePolicyHint"]).toContain("موافقة");
+    expect(ar["governance.noGovernancePolicyHint"]).not.toBe(en["governance.noGovernancePolicyHint"]);
+  });
+
   it("keeps paradigm-gap empty-state next-step guidance localized", () => {
     expect(en["profile.paradigmGapsEmptyState"]).toContain("Build or Corpus");
     expect(ar["profile.paradigmGapsEmptyState"]).toContain("البناء أو المدوّنة");

@@ -157,6 +157,7 @@ describe("project documentation", () => {
         "errors.invalidExerciseSubmissionBody",
         "errors.exerciseNotFound",
         "errors.invalidCorpusImportBody",
+        "errors.extractionDraftNotFound",
         "errors.invalidReviewBody",
         "errors.noteExplanationTooShort",
         "errors.noteNotFound",
@@ -241,7 +242,9 @@ describe("project documentation", () => {
         "npm.cmd run seed",
         "existing directory is rejected",
         "refuses when the backup path is a directory",
-        "Desktop's restore-latest"
+        "Desktop's restore-latest",
+        "backup-manifest.json",
+        "no silent fallback"
       ],
       "docs/product-guide.md": [
         "leadless",

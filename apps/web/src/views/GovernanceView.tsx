@@ -387,7 +387,7 @@ export function GovernanceView({
         {governanceState.status === "ready" && records.length === 0 && (
           <div className="inline-empty" role="status">
             <p>{t("governance.noGovernancePolicyRecords")}</p>
-            <p className="muted">{t("governance.noConsentPolicyHint")}</p>
+            <p className="muted">{t("governance.noGovernancePolicyHint")}</p>
           </div>
         )}
 

@@ -32,9 +32,9 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/languages/:languageId/sources/obsidian-vault` | reviewer, lead, admin | Import Markdown files from a local Obsidian vault path as pending text sources. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/sources/:sourceId/process` | reviewer, lead, admin | Run extraction; `{ "async": true }` for background mode. |
-| GET | `/languages/:languageId/extraction-drafts` | reviewer, lead, admin | List drafts with read-time duplicate flags; `?status=` filters. |
-| POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
-| POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
+| GET | `/languages/:languageId/extraction-drafts` | reviewer, lead, admin | List drafts with read-time duplicate flags; `?status=` filters. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. Unknown draft ids return `404` with `i18nKey: "errors.extractionDraftNotFound"`. |
+| POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. Unknown draft ids return `404` with `i18nKey: "errors.extractionDraftNotFound"`. |
 | POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. Invalid `action` returns `400` with `i18nKey: "errors.bulkReviewInvalidAction"`; missing/empty `draftIds` returns `400` with `i18nKey: "errors.bulkReviewInvalidDraftIds"`; more than 50 ids returns `400` with `i18nKey: "errors.bulkReviewTooManyDraftIds"` and `i18nParams.max`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. Invalid bodies return `400` with `i18nKey: "errors.invalidCorpusImportBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
@@ -143,13 +143,13 @@ The route also supports background processing for long sources: send a JSON body
 
 ## Extraction drafts
 
-`GET /languages/:languageId/extraction-drafts` (roles: reviewer, lead, admin) lists drafts; `?status=proposed|accepted|rejected` filters.
+`GET /languages/:languageId/extraction-drafts` (roles: reviewer, lead, admin) lists drafts; `?status=proposed|accepted|rejected` filters. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`.
 
 Listed proposed drafts may carry a read-time `duplicate` flag, computed per request and never persisted. Existing-workspace matches produce `{ kind, entityId }`: `exact` for a case-insensitive lexeme form+gloss match or a case/whitespace-insensitive corpus target-text match, `form` for a lexeme form that already exists with a different gloss (a possible homonym or gloss refinement), and `topic` for a grammar note repeating an existing note topic. The lexeme `exact` flag requires the draft to carry both a form and a gloss; a form match on a glossless draft yields the `form` flag instead. Topic matching is case- and whitespace-insensitive, like the lexeme and corpus comparisons. When two pending drafts propose the same thing, the later draft gets `{ kind: "pending", draftId }` pointing at the earlier one. Each draft gets at most one flag (existing-entity matches win over pending matches); the flag is advisory and does not block accept or reject.
 
 `POST /extraction-drafts/:draftId/accept` and `POST /extraction-drafts/:draftId/reject`
 
-Only `proposed` drafts can be reviewed; re-reviewing returns `400`.
+Only `proposed` drafts can be reviewed; re-reviewing returns `400`. Unknown draft ids return `404` with `{ "error": "Extraction draft not found: …", "i18nKey": "errors.extractionDraftNotFound" }`.
 
 Accepting commits by draft kind:
 

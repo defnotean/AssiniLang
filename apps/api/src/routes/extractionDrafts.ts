@@ -339,7 +339,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const drafts = state.extractionDrafts.filter((draft) => draft.languageId === languageId);
@@ -367,7 +370,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (outcome?.draftMissing) {
       reply.code(404);
-      return { error: `Extraction draft not found: ${draftId}` };
+      return {
+        error: `Extraction draft not found: ${draftId}`,
+        i18nKey: "errors.extractionDraftNotFound"
+      };
     }
 
     if (outcome?.validationError) {
@@ -377,7 +383,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (!outcome?.committed) {
       reply.code(500);
-      return { error: "Extraction draft could not be accepted" };
+      return {
+        error: "Extraction draft could not be accepted",
+        i18nKey: "errors.extractionDraftAcceptFailed"
+      };
     }
 
     return outcome.committed;
@@ -401,7 +410,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (outcome?.draftMissing) {
       reply.code(404);
-      return { error: `Extraction draft not found: ${draftId}` };
+      return {
+        error: `Extraction draft not found: ${draftId}`,
+        i18nKey: "errors.extractionDraftNotFound"
+      };
     }
 
     if (outcome?.validationError) {
@@ -411,7 +423,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     if (!outcome?.rejected) {
       reply.code(500);
-      return { error: "Extraction draft could not be rejected" };
+      return {
+        error: "Extraction draft could not be rejected",
+        i18nKey: "errors.extractionDraftRejectFailed"
+      };
     }
 
     return outcome.rejected;

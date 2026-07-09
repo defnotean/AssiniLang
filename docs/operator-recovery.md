@@ -39,7 +39,7 @@ node --input-type=module -e "import { JsonStore } from '@assini/db'; await new J
 In Settings → Desktop app tools:
 
 - **Create backup** — timestamped copy before experiments.
-- **Restore latest backup** — confirms, then replaces live data from the newest backup (a safety backup is created first when possible).
+- **Restore latest backup** — confirms, then replaces live data from the newest backup (a safety backup is created first when possible). Restore validates the backup database first and refuses when `backup-manifest.json` names a database file that is missing under `data/` (no silent fallback to `local-db.*`).
 - **Open backups folder** / **Prune old backups** — keeps the newest five routine backups; safety restore backups are left alone.
 
 Run a backup before bulk imports, model experiments, or manual JSON edits.
