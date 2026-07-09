@@ -16,6 +16,7 @@ import {
   parseOpenAiChatCompletionContent,
   type OpenAiChatCompletionResponse
 } from "./llmResponseParsing.js";
+import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 export type { LlmProviderReadiness, LlmReachability } from "@assini/api-contract";
 
@@ -111,6 +112,7 @@ export type OpenAiCompatibleConfig = {
   timeoutMs?: number;
   maxTokens?: number;
   jsonMode?: boolean;
+  env?: Env;
 };
 
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
@@ -553,6 +555,7 @@ export function createOpenAiCompatibleLlmProvider(
     ? config.maxTokens as number
     : DEFAULT_LLM_MAX_TOKENS;
   const jsonModeEnabled = config.jsonMode === true;
+  const env = config.env ?? process.env;
 
   async function requestCompletion(
     messages: LlmChatMessage[],
@@ -581,6 +584,8 @@ export function createOpenAiCompatibleLlmProvider(
       if (options.jsonMode) {
         body.response_format = { type: "json_object" };
       }
+
+      await assertOutboundHttpUrlAllowed(resolvedBaseUrl, { env });
 
       const response = await fetchFn(completionUrl(resolvedBaseUrl), {
         method: "POST",
@@ -661,7 +666,8 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
       apiKey: remoteApiKey,
       timeoutMs,
       maxTokens,
-      jsonMode
+      jsonMode,
+      env
     });
   }
 
@@ -673,7 +679,8 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
       apiKey: explicitApiKey,
       timeoutMs,
       maxTokens,
-      jsonMode
+      jsonMode,
+      env
     });
   }
 
@@ -683,7 +690,7 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
   }
 
   if (baseUrl && model) {
-    return buildOrFallback({ baseUrl, model, apiKey: explicitApiKey, timeoutMs, maxTokens, jsonMode });
+    return buildOrFallback({ baseUrl, model, apiKey: explicitApiKey, timeoutMs, maxTokens, jsonMode, env });
   }
 
   if (remoteApiKey) {
@@ -693,7 +700,8 @@ export function createLlmProviderFromEnv(env: Env = process.env, fetchFn: FetchF
       apiKey: remoteApiKey,
       timeoutMs,
       maxTokens,
-      jsonMode
+      jsonMode,
+      env
     });
   }
 
@@ -809,6 +817,8 @@ export async function probeLlmProviderReachability(
   const startedAt = Date.now();
 
   try {
+    await assertOutboundHttpUrlAllowed(baseUrl, { env });
+
     const response = await fetchFn(completionUrl(baseUrl), {
       method: "POST",
       headers: { ...headers, "Content-Type": "application/json" },

@@ -42,7 +42,7 @@ Before treating AssiniLang as a stable local beta for non-sensitive synthetic or
 2. **Model operations pack:** `npm.cmd run model:verify` report for at least one local model, one saved-profile switch test, one unloaded-model stale-state test, and documented timeout/max-token recommendations for slow local models.
 3. **Corpus intake pack:** Obsidian vault import fixture, bulk source processing fixture, graph rendering fixture, and failure examples for bad vault paths, unreadable notes, and oversized imports.
 4. **Review accountability pack:** audit/export sample, review-policy quorum test, elder-correction apply/reject test, and a redaction check showing no answer keys, prompts, or API keys in public/exported shapes.
-5. **Operator recovery pack:** backup/restore drill, interrupted-processing recovery drill, corrupted-database loud-failure example, and a short runbook for local data location, logs, diagnostics, and reset steps.
+5. **Operator recovery pack (partial — runbook shipped):** [Operator Recovery Runbook](operator-recovery.md) covers local data paths, backup/restore, interrupted-processing recovery, corrupt-database handling, diagnostics, and reset steps. Remaining drill artifacts: timed backup/restore exercise, interrupted-processing drill log, and corrupted-database loud-failure screenshot for the acceptance pack.
 
 ## Remaining blockers before real community data
 

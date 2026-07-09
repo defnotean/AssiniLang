@@ -14,6 +14,7 @@ const DOC_FILES = [
   "docs/development.md",
   "docs/ingestion.md",
   "docs/maintenance.md",
+  "docs/operator-recovery.md",
   "docs/product-guide.md",
   "docs/roadmap.md",
   "docs/troubleshooting.md",
@@ -139,6 +140,14 @@ describe("project documentation", () => {
       "docs/development.md": ["npm.cmd run verify", "Building a language from raw sources"],
       "docs/ingestion.md": ["## Source kinds", "## SSRF guard", "## Error catalogue", "## Duplicate flags on drafts", "```mermaid"],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
+      "docs/operator-recovery.md": [
+        "## Local data paths",
+        "data/local-db.json",
+        "data/ocr-cache/",
+        "npm.cmd run db:backup",
+        "source_asset.processing_recovered",
+        "npm.cmd run seed"
+      ],
       "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
       "docs/roadmap.md": ["Non-negotiable gate", "First Nations"],
       "docs/troubleshooting.md": ["## Startup and ports", "ASSINI_TRANSCRIBE_BASE_URL", "ASSINI_ALLOW_PRIVATE_URLS", "data/local-db.json"],

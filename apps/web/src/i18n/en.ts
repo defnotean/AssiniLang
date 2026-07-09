@@ -382,6 +382,7 @@ export const en = {
   "ingest.errorVaultMaxFiles": "Max Markdown files must be a whole number from 1 to 500.",
   "ingest.processingFailed": "Processing {title} failed.",
   "ingest.processingFinished": "Processing {title} finished.",
+  "ingest.processingTimedOut": "Processing is taking too long for \"{title}\". Restart the API if it is stuck, then try again.",
   "ingest.sourceProcessingFailed": "Source processing failed",
   "ingest.draftAccepted": "Draft accepted: {label} committed.",
   "ingest.draftRejected": "Draft rejected: {label}.",

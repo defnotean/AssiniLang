@@ -1,4 +1,4 @@
-import { mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -45,7 +45,17 @@ describe("Obsidian vault path safety", () => {
   it("accepts a vault under an allowlisted root", async () => {
     const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
     const vaultPath = join(allowedRoot, "Language Vault");
-    await writeFile(join(allowedRoot, ".keep"), "", "utf8");
+    await mkdir(vaultPath, { recursive: true });
+
+    const resolved = await assertObsidianVaultPathAllowed(vaultPath, {
+      env: { ASSINI_OBSIDIAN_VAULT_ROOTS: allowedRoot }
+    });
+    expect(isPathInsideRoot(resolved, allowedRoot)).toBe(true);
+  });
+
+  it("accepts a not-yet-created vault under an allowlisted root", async () => {
+    const allowedRoot = await mkdtemp(join(tmpdir(), "assini-allowed-"));
+    const vaultPath = join(allowedRoot, "Language Vault", "nested");
 
     const resolved = await assertObsidianVaultPathAllowed(vaultPath, {
       env: { ASSINI_OBSIDIAN_VAULT_ROOTS: allowedRoot }

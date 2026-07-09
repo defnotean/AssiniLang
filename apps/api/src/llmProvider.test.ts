@@ -10,6 +10,8 @@ import {
 } from "./llmProvider.js";
 
 describe("llm provider", () => {
+  const allowPrivateEnv = { ASSINI_ALLOW_PRIVATE_URLS: "1" };
+
   afterEach(() => {
     vi.useRealTimers();
   });
@@ -36,7 +38,8 @@ describe("llm provider", () => {
     const provider = createLlmProviderFromEnv({
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1/",
-      ASSINI_LLM_MODEL: "llama3.1"
+      ASSINI_LLM_MODEL: "llama3.1",
+      ...allowPrivateEnv
     }, fetchFn);
 
     const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -109,7 +112,8 @@ describe("llm provider", () => {
     const { calls, fetchFn } = captureFetch('{"summary":"extracted"}');
     const provider = createOpenAiCompatibleLlmProvider({
       baseUrl: "http://127.0.0.1:11434/v1",
-      model: "llama3.1"
+      model: "llama3.1",
+      env: allowPrivateEnv
     }, fetchFn);
 
     const content = await provider.completeChat?.([
@@ -302,7 +306,8 @@ describe("llm provider", () => {
     const provider = createOpenAiCompatibleLlmProvider({
       baseUrl: "http://127.0.0.1:11434/v1",
       model: "llama3.1",
-      timeoutMs: 25
+      timeoutMs: 25,
+      env: allowPrivateEnv
     }, fetchFn);
 
     const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -330,7 +335,7 @@ describe("llm provider", () => {
       });
 
     const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "https://api.example.invalid/v1",
+      baseUrl: "https://203.0.113.1/v1",
       model: "gpt-test",
       apiKey: "sk-provider-secret"
     }, fetchFn);
@@ -354,7 +359,8 @@ describe("llm provider", () => {
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
       ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_JSON_MODE: "true"
+      ASSINI_LLM_JSON_MODE: "true",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -377,7 +383,8 @@ describe("llm provider", () => {
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
       ASSINI_LLM_MODEL: "llama3.1",
       ASSINI_LLM_MAX_TOKENS: "256",
-      ASSINI_LLM_JSON_MODE: "1"
+      ASSINI_LLM_JSON_MODE: "1",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.completeChat?.([{ role: "user", content: "mira = river" }]);
@@ -394,7 +401,8 @@ describe("llm provider", () => {
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
       ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_MAX_TOKENS: "not-a-number"
+      ASSINI_LLM_MAX_TOKENS: "not-a-number",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -414,7 +422,8 @@ describe("llm provider", () => {
     const provider = createLlmProviderFromEnv({
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1"
+      ASSINI_LLM_MODEL: "llama3.1",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.completeChat?.([{ role: "user", content: "extract" }]);
@@ -428,7 +437,8 @@ describe("llm provider", () => {
     const provider = createLlmProviderFromEnv({
       ASSINI_LLM_PROVIDER: "ollama",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434",
-      ASSINI_LLM_MODEL: "llama3.1"
+      ASSINI_LLM_MODEL: "llama3.1",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -447,7 +457,8 @@ describe("llm provider", () => {
     const provider = createLlmProviderFromEnv({
       ASSINI_LLM_PROVIDER: "ollama",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1"
+      ASSINI_LLM_MODEL: "llama3.1",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -467,7 +478,8 @@ describe("llm provider", () => {
       ASSINI_LLM_PROVIDER: "ollama",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
       ASSINI_LLM_MODEL: "llama3.1",
-      OPENAI_API_KEY: "sk-remote-secret"
+      OPENAI_API_KEY: "sk-remote-secret",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -487,7 +499,8 @@ describe("llm provider", () => {
       ASSINI_LLM_PROVIDER: "openai-compatible",
       ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
       ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_API_KEY: "explicit-local-key"
+      ASSINI_LLM_API_KEY: "explicit-local-key",
+      ...allowPrivateEnv
     }, fetchFn);
 
     await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
@@ -554,7 +567,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-        ASSINI_LLM_MODEL: "llama3.1"
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -591,7 +605,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
-        ASSINI_LLM_MODEL: "local-model"
+        ASSINI_LLM_MODEL: "local-model",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -626,7 +641,8 @@ describe("llm provider", () => {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
         ASSINI_LLM_MODEL: "llama3.1",
-        ASSINI_LLM_TIMEOUT_MS: "120"
+        ASSINI_LLM_TIMEOUT_MS: "120",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -645,7 +661,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
-        ASSINI_LLM_MODEL: "local-model"
+        ASSINI_LLM_MODEL: "local-model",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -671,7 +688,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
-        ASSINI_LLM_MODEL: "local-model"
+        ASSINI_LLM_MODEL: "local-model",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -696,7 +714,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
-        ASSINI_LLM_MODEL: "local-model"
+        ASSINI_LLM_MODEL: "local-model",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -722,7 +741,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:1234/v1",
-        ASSINI_LLM_MODEL: "local-model"
+        ASSINI_LLM_MODEL: "local-model",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -739,7 +759,8 @@ describe("llm provider", () => {
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-        ASSINI_LLM_MODEL: "llama3.1"
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
       },
       fetchFn
     });
@@ -765,5 +786,89 @@ describe("llm provider", () => {
     expect(result.reachable).toBe(false);
     expect(result.detail).not.toContain("sk-super-secret-token");
     expect(result.detail).toContain("[redacted-secret]");
+  });
+
+  it("blocks private LLM base URLs before chat completions when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
+    const fetchStub = vi.fn() as unknown as typeof fetch;
+    const provider = createOpenAiCompatibleLlmProvider({
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "llama3.1",
+      env: {}
+    }, fetchStub);
+
+    await expect(provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }))).rejects.toThrow(/private or local network/);
+    expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("allows private LLM base URLs when ASSINI_ALLOW_PRIVATE_URLS=1", async () => {
+    const { calls, fetchFn } = captureFetch("Allowed local response");
+    const provider = createOpenAiCompatibleLlmProvider({
+      baseUrl: "http://127.0.0.1:11434/v1",
+      model: "llama3.1",
+      env: allowPrivateEnv
+    }, fetchFn);
+
+    const result = await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+      languageId: TEST_LANGUAGE_ID,
+      mode: "learner_practice",
+      prompt: "Practice safely.",
+      contextNoteIds: [],
+      contextPassageIds: []
+    }));
+
+    expect(result.content).toBe("Allowed local response");
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
+  });
+
+  it("blocks private LLM base URLs in reachability probes when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
+    const fetchStub = vi.fn() as unknown as typeof fetch;
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(fetchStub).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: false,
+      mode: "local-openai-compatible"
+    });
+    expect(result.detail).toMatch(/private or local network/);
+  });
+
+  it("allows private LLM base URLs in reachability probes when ASSINI_ALLOW_PRIVATE_URLS=1", async () => {
+    const fetchFn: typeof fetch = async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      });
+
+    const result = await probeLlmProviderReachability({
+      env: {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    });
+
+    expect(result).toMatchObject({
+      checked: true,
+      reachable: true,
+      mode: "local-openai-compatible",
+      status: 200
+    });
   });
 });

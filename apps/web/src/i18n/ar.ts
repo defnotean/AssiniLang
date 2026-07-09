@@ -359,6 +359,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.errorVaultMaxFiles": "يجب أن يكون الحد الأقصى لملفات Markdown عددًا صحيحًا من 1 إلى 500.",
   "ingest.processingFailed": "فشلت معالجة {title}.",
   "ingest.processingFinished": "اكتملت معالجة {title}.",
+  "ingest.processingTimedOut": "تستغرق معالجة \"{title}\" وقتًا طويلاً جدًا. أعد تشغيل واجهة برمجة التطبيقات إذا كانت عالقة، ثم حاول مرة أخرى.",
   "ingest.sourceProcessingFailed": "فشلت معالجة المصدر",
   "ingest.draftAccepted": "تم قبول المسودة: اعتُمد {label}.",
   "ingest.draftRejected": "تم رفض المسودة: {label}.",

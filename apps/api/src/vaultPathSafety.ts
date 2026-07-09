@@ -1,5 +1,5 @@
 import { realpath as fsRealpath } from "node:fs/promises";
-import { resolve as resolvePath, sep } from "node:path";
+import { join, relative, resolve as resolvePath, sep } from "node:path";
 
 type Env = Record<string, string | undefined>;
 type RealpathFn = (path: string) => Promise<string>;
@@ -46,7 +46,26 @@ async function resolveExistingPath(pathValue: string, realpathFn: RealpathFn): P
   try {
     return await realpathFn(resolved);
   } catch {
-    return resolved;
+    const trailingSegments: string[] = [];
+    let current = resolved;
+
+    while (true) {
+      try {
+        const canonical = await realpathFn(current);
+        return trailingSegments.length === 0 ? canonical : join(canonical, ...trailingSegments.reverse());
+      } catch {
+        const parent = resolvePath(current, "..");
+        if (parent === current) {
+          return resolved;
+        }
+        const segment = relative(parent, current);
+        if (segment === "" || segment === ".") {
+          return resolved;
+        }
+        trailingSegments.push(segment);
+        current = parent;
+      }
+    }
   }
 }
 

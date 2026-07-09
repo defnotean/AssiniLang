@@ -44,3 +44,7 @@ tmp-session.json
 delete-body.txt
 tmp-*.txt
 tmp-*.json
+
+# Local continuous-improvement wake / verify scratch
+_loop_wake.ps1
+_verify_*.txt

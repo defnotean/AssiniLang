@@ -9,7 +9,7 @@ Pick the path that matches what you are doing:
 - Using the app: [Product Guide](product-guide.md), then the "Building a language from raw sources" walkthrough in the [Development Guide](development.md), with the [Ingestion Deep Dive](ingestion.md) when a source, Obsidian vault import, or corpus graph looks wrong.
 - Configuring models: [Configuration Reference](configuration.md) for variables, saved model profiles, discovery URLs, and recipes; [Troubleshooting](troubleshooting.md) when readiness warnings appear; [Ingestion Deep Dive](ingestion.md) for which model each source kind needs.
 - Developing: [Development Guide](development.md) for setup and the quality gate, [Architecture And Data](architecture.md) for how the pieces fit, [API Reference](api.md) for route behavior.
-- Maintaining and extending: [Maintenance Guide](maintenance.md) for change recipes and documentation conventions, plus [Architecture And Data](architecture.md) for the data model you are changing.
+- Maintaining and extending: [Maintenance Guide](maintenance.md) for change recipes and documentation conventions, [Operator Recovery Runbook](operator-recovery.md) for local backup/restore and stuck-processing drills, plus [Architecture And Data](architecture.md) for the data model you are changing.
 
 ## Doc index
 
@@ -22,6 +22,7 @@ Pick the path that matches what you are doing:
 | [Architecture And Data](architecture.md) | Component diagram, data model, persistence, validation, projection, evaluation. |
 | [Development Guide](development.md) | Setup, commands, quality gate, browser verification, and the build-a-language walkthrough. |
 | [Maintenance Guide](maintenance.md) | Recipes for adding routes, views, source kinds, schema changes, and keeping docs honest. |
+| [Operator Recovery Runbook](operator-recovery.md) | Local data paths, backup/restore, interrupted processing, corrupt DB handling, diagnostics, and reset steps. |
 | [Troubleshooting](troubleshooting.md) | Symptom-cause-fix tables for ports, models, sources, and data problems. |
 | [UI Design Guide](ui-design.md) | How the `AssiniLang.html` design handoff maps to the real React app. |
 | [Roadmap](roadmap.md) | What must happen before real community language material can be used. |

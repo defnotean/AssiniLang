@@ -234,11 +234,13 @@ describe("api server", () => {
       const previous = {
         provider: process.env.ASSINI_LLM_PROVIDER,
         baseUrl: process.env.ASSINI_LLM_BASE_URL,
-        model: process.env.ASSINI_LLM_MODEL
+        model: process.env.ASSINI_LLM_MODEL,
+        allowPrivate: process.env.ASSINI_ALLOW_PRIVATE_URLS
       };
       process.env.ASSINI_LLM_PROVIDER = "openai-compatible";
       process.env.ASSINI_LLM_BASE_URL = "http://127.0.0.1:11434/v1";
       process.env.ASSINI_LLM_MODEL = "test-model";
+      process.env.ASSINI_ALLOW_PRIVATE_URLS = "1";
 
       let fetchCalls = 0;
       const fetchStub: typeof fetch = async () => {
@@ -269,6 +271,7 @@ describe("api server", () => {
         restoreEnv("ASSINI_LLM_PROVIDER", previous.provider);
         restoreEnv("ASSINI_LLM_BASE_URL", previous.baseUrl);
         restoreEnv("ASSINI_LLM_MODEL", previous.model);
+        restoreEnv("ASSINI_ALLOW_PRIVATE_URLS", previous.allowPrivate);
       }
     });
 
@@ -338,7 +341,8 @@ describe("api server", () => {
         apiKey: process.env.ASSINI_LLM_API_KEY,
         timeout: process.env.ASSINI_LLM_TIMEOUT_MS,
         maxTokens: process.env.ASSINI_LLM_MAX_TOKENS,
-        jsonMode: process.env.ASSINI_LLM_JSON_MODE
+        jsonMode: process.env.ASSINI_LLM_JSON_MODE,
+        allowPrivate: process.env.ASSINI_ALLOW_PRIVATE_URLS
       };
       delete process.env.ASSINI_LLM_PROVIDER;
       delete process.env.ASSINI_LLM_BASE_URL;
@@ -347,6 +351,7 @@ describe("api server", () => {
       delete process.env.ASSINI_LLM_TIMEOUT_MS;
       delete process.env.ASSINI_LLM_MAX_TOKENS;
       delete process.env.ASSINI_LLM_JSON_MODE;
+      process.env.ASSINI_ALLOW_PRIVATE_URLS = "1";
 
       const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
       const settingsPath = join(dir, ".env");
@@ -441,6 +446,7 @@ describe("api server", () => {
         restoreEnv("ASSINI_LLM_TIMEOUT_MS", previous.timeout);
         restoreEnv("ASSINI_LLM_MAX_TOKENS", previous.maxTokens);
         restoreEnv("ASSINI_LLM_JSON_MODE", previous.jsonMode);
+        restoreEnv("ASSINI_ALLOW_PRIVATE_URLS", previous.allowPrivate);
       }
     });
 

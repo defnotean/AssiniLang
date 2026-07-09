@@ -13,6 +13,9 @@ import {
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
 import type { Translate } from "../i18n";
 
+export const INGEST_POLL_INTERVAL_MS = 2500;
+export const INGEST_POLL_MAX_DURATION_MS = 10 * 60 * 1000;
+
 export function useIngestExtraction(
   languageId: string,
   t: Translate,
@@ -220,45 +223,70 @@ export function useIngestExtraction(
 
   // Poll the source list while a background extraction is running. The
   // first poll fires immediately, then every 2.5s until the asset leaves
-  // "processing"; cleanup cancels the loop on unmount or language change.
+  // "processing" or the max duration elapses; cleanup cancels the loop on
+  // unmount or language change.
   useEffect(() => {
     if (!pollingSource) return;
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const startedAt = Date.now();
+    const sourceTitle = pollingSource.title;
+    const sourceId = pollingSource.id;
+
+    const isTimedOut = () => Date.now() - startedAt >= INGEST_POLL_MAX_DURATION_MS;
+
+    const stopDueToTimeout = () => {
+      setPollingSource(null);
+      setProcessingSourceId(null);
+      setProcessError(t("ingest.processingTimedOut", { title: sourceTitle }));
+      setProcessWarnings([]);
+    };
+
+    const scheduleNextPoll = () => {
+      if (cancelled || isTimedOut()) {
+        if (!cancelled && isTimedOut()) stopDueToTimeout();
+        return;
+      }
+      timer = setTimeout(() => { void poll(); }, INGEST_POLL_INTERVAL_MS);
+    };
 
     const poll = async () => {
+      if (cancelled) return;
+      if (isTimedOut()) {
+        stopDueToTimeout();
+        return;
+      }
+
       try {
         const loadedSources = await fetchSources(languageId);
         if (cancelled) return;
         setSources(loadedSources);
 
-        const asset = loadedSources.find((item) => item.id === pollingSource.id);
+        const asset = loadedSources.find((item) => item.id === sourceId);
         if (asset && asset.status === "processing") {
-          timer = setTimeout(() => { void poll(); }, 2500);
+          scheduleNextPoll();
           return;
         }
 
         setPollingSource(null);
         setProcessingSourceId(null);
         if (!asset) {
-          setProcessError(t("ingest.processingFailed", { title: pollingSource.title }));
+          setProcessError(t("ingest.processingFailed", { title: sourceTitle }));
           setProcessWarnings([]);
         } else if (asset.status === "failed") {
-          setProcessError(asset.error ?? t("ingest.processingFailed", { title: pollingSource.title }));
+          setProcessError(asset.error ?? t("ingest.processingFailed", { title: sourceTitle }));
           setProcessWarnings(asset.warnings ?? []);
         } else {
-          setProcessNotice(t("ingest.processingFinished", { title: pollingSource.title }));
+          setProcessNotice(t("ingest.processingFinished", { title: sourceTitle }));
           setProcessWarnings(asset.warnings ?? []);
         }
 
         const loadedDrafts = await fetchExtractionDrafts(languageId, "proposed");
         if (!cancelled) setDrafts(loadedDrafts);
       } catch {
-        // Transient fetch failure: keep polling instead of giving up.
-        if (!cancelled) {
-          timer = setTimeout(() => { void poll(); }, 2500);
-        }
+        // Transient fetch failure: keep polling until timeout.
+        scheduleNextPoll();
       }
     };
 
@@ -268,7 +296,7 @@ export function useIngestExtraction(
       cancelled = true;
       if (timer !== undefined) clearTimeout(timer);
     };
-  }, [pollingSource, languageId]);
+  }, [pollingSource, languageId, t]);
 
   async function handleProcessSource(sourceId: string) {
     setProcessingSourceId(sourceId);
