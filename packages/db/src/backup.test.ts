@@ -1,4 +1,4 @@
-import { link, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +100,16 @@ it("rejects backup and restore when the source and live paths are the same file"
   await expect(store.backupTo(dbPath)).rejects.toThrow(/destination must differ/);
   await expect(store.restoreFrom(dbPath)).rejects.toThrow(/backup source must differ/);
   expect(await store.read()).toEqual(before);
+});
+
+it("rejects backup when the destination is an existing directory", async () => {
+  const dbPath = join(dir, "db.json");
+  const destinationDir = join(dir, "backup-folder");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  await mkdir(destinationDir, { recursive: true });
+
+  await expect(store.backupTo(destinationDir)).rejects.toThrow(/must be a file path, not a directory/);
 });
 
 it("treats a symlink alias of the live database as the same file", async () => {

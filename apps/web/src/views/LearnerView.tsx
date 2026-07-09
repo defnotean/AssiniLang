@@ -6,7 +6,7 @@ import {
   type RecommendedExercises
 } from "../api";
 import type { LearnerWorkspace } from "../hooks/useLearnerWorkspace";
-import { formatSubmissionStatus, parseAuthoringList } from "../lib/format";
+import { formatSubmissionExplanation, formatSubmissionStatus, parseAuthoringList } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { AsyncState, PublicExercise } from "../lib/types";
 import { LearnerPracticeNextPanel } from "./LearnerPracticeNextPanel";
@@ -292,7 +292,7 @@ export function LearnerView({
                   {submissionHistory.map((submission) => (
                     <div key={submission.id} className="detail-row">
                       <strong>{formatSubmissionStatus(submission, t)}</strong>
-                      <span>{submission.explanation}</span>
+                      <span>{formatSubmissionExplanation(submission, t)}</span>
                       <span className="muted">{submission.submittedAt}</span>
                     </div>
                   ))}

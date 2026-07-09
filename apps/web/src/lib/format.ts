@@ -36,6 +36,18 @@ export function formatSubmissionStatus(submission: PublicExerciseSubmission, t?:
   return submission.accepted ? "Accepted" : "Needs review";
 }
 
+/** Localize canned public submission explanations (API still returns English for logs/compat). */
+export function formatSubmissionExplanation(submission: PublicExerciseSubmission, t?: Translate): string {
+  if (t) {
+    return submission.accepted
+      ? t("learner.submissionExplanationAccepted")
+      : t("learner.submissionExplanationRejected");
+  }
+  return submission.accepted
+    ? "Submission accepted."
+    : "Answer did not match the exercise answer key.";
+}
+
 const MODE_MESSAGE_KEYS: Record<LlmStatus["mode"], MessageKey> = {
   deterministic: "format.mode.deterministic",
   "local-openai-compatible": "format.mode.localOpenaiCompatible",

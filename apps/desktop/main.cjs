@@ -556,6 +556,23 @@ async function restoreLatestDataBackup() {
   const sourceDataDir = assertChildPathInside(latest.path, path.join(latest.path, "data"), "Backup data folder");
   const sourceSettingsPath = assertChildPathInside(latest.path, path.join(latest.path, ".env"), "Backup settings file");
 
+  // Validate the backup database before touching live data (matches CLI restoreFrom).
+  try {
+    const { assertDesktopBackupReadable } = require("./backupRestore.cjs");
+    const { JsonStore } = await import("@assini/db");
+    await assertDesktopBackupReadable(latest.path, {
+      readWorkspace: async (dbPath) => {
+        await new JsonStore(dbPath).read();
+      }
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      backupSummary: desktopBackupSummary()
+    };
+  }
+
   await createDataBackup({ prefix: "safety-before-restore" });
   rmSync(targetDataDir, { recursive: true, force: true });
   cpSync(sourceDataDir, targetDataDir, {

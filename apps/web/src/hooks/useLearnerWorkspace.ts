@@ -6,6 +6,7 @@ import type {
   PublicExerciseSubmission
 } from "../api";
 import { createExercise, fetchExerciseSubmissions, generateModelExercise, submitExerciseAnswer } from "../api";
+import { formatSubmissionExplanation } from "../lib/format";
 import type { PublicExercise, ViewMode } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -87,7 +88,7 @@ export function useLearnerWorkspace(
     setExerciseResult(null);
     try {
       const submission = await submitExerciseAnswer(selectedExercise.id, submittedAnswer);
-      setExerciseResult(submission.explanation);
+      setExerciseResult(formatSubmissionExplanation(submission, t));
       setSubmissionHistory(await fetchExerciseSubmissions(selectedExercise.id));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("learner.errSubmissionFailed");

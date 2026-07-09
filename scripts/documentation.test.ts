@@ -205,7 +205,9 @@ describe("project documentation", () => {
         "same path",
         "symlink alias",
         "hard-link alias",
-        "validates the live workspace"
+        "validates the live workspace",
+        "not an existing directory",
+        "Desktop restore validates"
       ],
       "docs/operator-recovery.md": [
         "## Local data paths",
@@ -218,7 +220,9 @@ describe("project documentation", () => {
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "processingStartedAt",
-        "npm.cmd run seed"
+        "npm.cmd run seed",
+        "existing directory is rejected",
+        "Desktop's restore-latest"
       ],
       "docs/product-guide.md": [
         "leadless",

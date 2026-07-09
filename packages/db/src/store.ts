@@ -686,6 +686,20 @@ export class JsonStore {
         `Failed to back up local database at ${this.dbPath}: destination must differ from the live database path`
       );
     }
+
+    try {
+      const destinationStat = await stat(destination);
+      if (destinationStat.isDirectory()) {
+        throw new Error(
+          `Failed to back up local database at ${this.dbPath}: destination must be a file path, not a directory (${destination})`
+        );
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
+    }
+
     await mkdir(dirname(destination), { recursive: true });
 
     try {

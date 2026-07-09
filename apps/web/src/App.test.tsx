@@ -2962,7 +2962,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Grade" }));
 
     await waitFor(() => expect(apiMock.submitExerciseAnswer).toHaveBeenCalledWith("avn-ex001", "mira talo-mi-na"));
-    expect(await screen.findByText("Accepted exercise submission.")).toBeInTheDocument();
+    expect(await screen.findByText("Submission accepted.")).toBeInTheDocument();
   });
 
   it("shows sanitized exercise submission history and refreshes it after grading", async () => {
@@ -2998,14 +2998,14 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Practice" }));
 
     const history = await screen.findByRole("region", { name: "Exercise submission history" });
-    expect(await within(history).findByText("Answer did not match the exercise key.")).toBeInTheDocument();
+    expect(await within(history).findByText("Answer did not match the exercise answer key.")).toBeInTheDocument();
     expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
 
     fireEvent.change(await screen.findByLabelText("Exercise answer"), { target: { value: "mira talo-mi-na" } });
     fireEvent.click(screen.getByRole("button", { name: "Grade" }));
 
     await waitFor(() => expect(apiMock.fetchExerciseSubmissions).toHaveBeenLastCalledWith("avn-ex001"));
-    expect(await within(history).findByText("Accepted exercise submission.")).toBeInTheDocument();
+    expect(await within(history).findByText("Submission accepted.")).toBeInTheDocument();
     expect(within(history).queryByText("mira talo-mi-na")).not.toBeInTheDocument();
   });
 

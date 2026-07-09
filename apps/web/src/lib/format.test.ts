@@ -15,6 +15,7 @@ import {
   formatSnapshotReviewAccountability,
   formatStatus,
   formatSubmissionStatus,
+  formatSubmissionExplanation,
   formatTrendPoints,
   formatTypology,
   latestAssistantMessage,
@@ -725,6 +726,41 @@ describe("formatSubmissionStatus", () => {
     expect(formatSubmissionStatus(accepted, t)).toBe("Accepted");
     expect(formatSubmissionStatus(needsReview, t)).toBe("Needs review");
     expect(formatSubmissionStatus(accepted)).toBe("Accepted");
+  });
+});
+
+describe("formatSubmissionExplanation", () => {
+  it("localizes canned accepted and rejected submission explanations", () => {
+    const accepted = { accepted: true, explanation: "Submission accepted." } as PublicExerciseSubmission;
+    const rejected = {
+      accepted: false,
+      explanation: "Answer did not match the exercise answer key."
+    } as PublicExerciseSubmission;
+
+    expect(formatSubmissionExplanation(accepted, t)).toBe("Submission accepted.");
+    expect(formatSubmissionExplanation(rejected, t)).toBe(
+      "Answer did not match the exercise answer key."
+    );
+    expect(formatSubmissionExplanation(accepted)).toBe("Submission accepted.");
+    expect(formatSubmissionExplanation(rejected)).toBe(
+      "Answer did not match the exercise answer key."
+    );
+  });
+
+  it("maps from accepted flag even when the API explanation string differs", () => {
+    const accepted = {
+      accepted: true,
+      explanation: "Accepted exercise submission."
+    } as PublicExerciseSubmission;
+    const rejected = {
+      accepted: false,
+      explanation: "Answer did not match the exercise key."
+    } as PublicExerciseSubmission;
+
+    expect(formatSubmissionExplanation(accepted, t)).toBe("Submission accepted.");
+    expect(formatSubmissionExplanation(rejected, t)).toBe(
+      "Answer did not match the exercise answer key."
+    );
   });
 });
 

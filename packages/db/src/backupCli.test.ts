@@ -1,4 +1,4 @@
-import { link, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -125,6 +125,25 @@ describe("runBackupCli", () => {
         env: { ASSINI_DB_PATH: dbPath }
       })
     ).rejects.toThrow(/same as the live database/);
+  });
+
+  it("rejects backing up onto a directory destination with a clear file-path hint", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const destinationDir = join(dir, "backups-dir");
+    await mkdir(destinationDir, { recursive: true });
+
+    await expect(
+      runBackupCli({
+        argv: [destinationDir],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/is a directory/);
+    await expect(
+      runBackupCli({
+        argv: [destinationDir],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/Pass a file path/);
   });
 
   it("writes a validated backup copy to the requested destination", async () => {

@@ -625,6 +625,8 @@ export const ar: Record<MessageKey, string> = {
   "learner.noSubmissionsHint": "صحّح إجابة أعلاه لبدء هذا السجل.",
   "learner.submissionAccepted": "مقبولة",
   "learner.submissionNeedsReview": "تحتاج مراجعة",
+  "learner.submissionExplanationAccepted": "تم قبول الإجابة.",
+  "learner.submissionExplanationRejected": "الإجابة لم تطابق مفتاح إجابات التمرين.",
   "learner.exerciseAuthoring": "تأليف التمارين",
   "learner.createLearnerTask": "إنشاء مهمة للمتعلّم",
   "learner.exerciseType": "نوع التمرين",

@@ -1,5 +1,5 @@
 import { stat } from "node:fs/promises";
-import { basename, dirname, extname, resolve } from "node:path";
+import { basename, dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveSeedDbPath } from "./seedCli.js";
 import { JsonStore, pathsReferToSameFile } from "./store.js";
@@ -73,6 +73,19 @@ export async function runBackupCli({
     throw new Error(
       `Cannot back up: destination ${destination} is the same as the live database. Choose a different path under data/backups/ or pass an explicit backup file.`
     );
+  }
+
+  try {
+    const destinationStat = await stat(destination);
+    if (destinationStat.isDirectory()) {
+      throw new Error(
+        `Cannot back up: destination ${destination} is a directory. Pass a file path (for example ${join(destination, basename(dbPath))}) or omit the path to use data/backups/.`
+      );
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw error;
+    }
   }
 
   // Validate the live database against the current schema before copying so

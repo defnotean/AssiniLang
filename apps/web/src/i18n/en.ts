@@ -649,6 +649,8 @@ export const en = {
   "learner.noSubmissionsHint": "Grade an answer above to start this history.",
   "learner.submissionAccepted": "Accepted",
   "learner.submissionNeedsReview": "Needs review",
+  "learner.submissionExplanationAccepted": "Submission accepted.",
+  "learner.submissionExplanationRejected": "Answer did not match the exercise answer key.",
   "learner.exerciseAuthoring": "Exercise authoring",
   "learner.createLearnerTask": "Create learner task",
   "learner.exerciseType": "Exercise type",
