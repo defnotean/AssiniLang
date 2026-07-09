@@ -1114,13 +1114,20 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
-  it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
+  it.each(["corpus", "notes", "exercises"] as const)("returns 404 for unknown language %s requests", async (resource) => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({ method: "GET", url: `/languages/not-a-language/${resource}` });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    if (resource === "exercises") {
+      expect(response.json()).toEqual({
+        error: "Language not found: not-a-language",
+        i18nKey: "errors.languageNotFound"
+      });
+    } else {
+      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    }
   });
 
   it("runs evaluations and appends them to state", async () => {
@@ -2521,10 +2528,28 @@ describe("api server", () => {
   });
 
   it.each([
-    ["missing exercise", "/exercises/missing-exercise/submissions", { answer: "saku talo-ki" }, 404],
-    ["empty answer", `/exercises/${submissionExerciseId}/submissions`, { answer: " " }, 400],
-    ["missing payload", `/exercises/${submissionExerciseId}/submissions`, undefined, 400]
-  ])("returns a client error for %s submissions", async (_, url, payload, statusCode) => {
+    [
+      "missing exercise",
+      "/exercises/missing-exercise/submissions",
+      { answer: "saku talo-ki" },
+      404,
+      { error: "Exercise not found: missing-exercise", i18nKey: "errors.exerciseNotFound" }
+    ],
+    [
+      "empty answer",
+      `/exercises/${submissionExerciseId}/submissions`,
+      { answer: " " },
+      400,
+      { error: "Invalid exercise submission body", i18nKey: "errors.invalidExerciseSubmissionBody" }
+    ],
+    [
+      "missing payload",
+      `/exercises/${submissionExerciseId}/submissions`,
+      undefined,
+      400,
+      { error: "Invalid exercise submission body", i18nKey: "errors.invalidExerciseSubmissionBody" }
+    ]
+  ])("returns a client error for %s submissions", async (_, url, payload, statusCode, body) => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
     const response = await app.inject({
@@ -2535,6 +2560,7 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(statusCode);
+    expect(response.json()).toEqual(body);
   });
 
   it.each([
@@ -2894,7 +2920,10 @@ describe("api server", () => {
       });
 
       expect(response.statusCode).toBe(404);
-      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+      expect(response.json()).toEqual({
+        error: "Language not found: not-a-language",
+        i18nKey: "errors.languageNotFound"
+      });
     });
 
     it("forbids learners from generating exercises", async () => {

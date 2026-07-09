@@ -143,4 +143,13 @@ describe("ModelSetupView settings save status", () => {
     expect(saveError).toHaveAttribute("role", "alert");
     expect(saveError).toHaveAttribute("aria-live", "assertive");
   });
+
+  it("shows a next-step hint when no model profiles are saved yet", () => {
+    render(<ModelSetupView model={createModelWorkspace({ settingsSaveResult: null })} />);
+
+    const emptyHint = screen.getByText(/Enter a profile name below, then Save profile/i);
+    expect(emptyHint).toHaveAttribute("role", "status");
+    expect(emptyHint).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("option", { name: "No saved profiles" })).toBeInTheDocument();
+  });
 });

@@ -350,6 +350,11 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
                   />
                 </div>
               </div>
+              {modelProfiles.length === 0 ? (
+                <p className="muted empty-state" role="status" aria-live="polite">
+                  {t("model.noProfilesHint")}
+                </p>
+              ) : null}
               <div className="settings-actions">
                 <button
                   type="button"

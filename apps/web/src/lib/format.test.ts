@@ -656,6 +656,61 @@ describe("localizeApiError", () => {
     ).toBe("Choose accept or reject before reviewing this correction.");
   });
 
+  it("localizes exercise authoring and submission validation errors via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid exercise authoring body", {
+          status: 400,
+          i18nKey: "errors.invalidExerciseAuthoringBody"
+        }),
+        t,
+        "learner.exerciseAuthoringFailed"
+      )
+    ).toBe("Fill every required exercise field before creating or validating.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages/avenik/exercises (400): Invalid exercise authoring body", {
+          status: 400
+        }),
+        t,
+        "learner.exerciseAuthoringFailed"
+      )
+    ).toBe("Fill every required exercise field before creating or validating.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Invalid exercise submission body", {
+          status: 400,
+          i18nKey: "errors.invalidExerciseSubmissionBody"
+        }),
+        t,
+        "learner.errSubmissionFailed"
+      )
+    ).toBe("Enter a non-empty answer before grading.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Exercise not found: missing-exercise", {
+          status: 404,
+          i18nKey: "errors.exerciseNotFound"
+        }),
+        t,
+        "learner.errSubmissionFailed"
+      )
+    ).toBe("That exercise was not found. Select another exercise or author a new one.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /exercises/missing/submissions (404): Exercise not found: missing", {
+          status: 404
+        }),
+        t,
+        "learner.errSubmissionFailed"
+      )
+    ).toBe("That exercise was not found. Select another exercise or author a new one.");
+  });
+
   it("localizes already-processing conflicts from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /sources/src-1/process (409): Source is already processing: src-1", {

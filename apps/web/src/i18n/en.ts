@@ -148,6 +148,11 @@ export const en = {
   "errors.bulkReviewInvalidAction": "Choose accept or reject for bulk draft review.",
   "errors.bulkReviewInvalidDraftIds": "Select at least one extraction draft before bulk review.",
   "errors.bulkReviewTooManyDraftIds": "Too many drafts selected. Review at most {max} at a time.",
+  "errors.invalidExerciseAuthoringBody": "Fill every required exercise field before creating or validating.",
+  "errors.invalidExerciseSubmissionBody": "Enter a non-empty answer before grading.",
+  "errors.exerciseNotFound": "That exercise was not found. Select another exercise or author a new one.",
+  "errors.exerciseCreateFailed": "The exercise could not be created. Retry, or check the API logs.",
+  "errors.exerciseSubmissionCreateFailed": "The exercise submission could not be saved. Retry, or check the API logs.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).
   "viewConfig.profile.label": "Start",
@@ -993,6 +998,7 @@ export const en = {
   "model.savedProfiles": "Saved profiles",
   "model.chooseProfile": "Choose a saved profile",
   "model.noProfiles": "No saved profiles",
+  "model.noProfilesHint": "Enter a profile name below, then Save profile to keep these runtime settings for later switches.",
   "model.profileName": "Profile name",
   "model.profileNamePlaceholder": "Irene local, Studio small, Remote fallback",
   "model.profileNameRequired": "Profile name is required.",

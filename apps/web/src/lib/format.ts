@@ -531,6 +531,21 @@ function operatorApiErrorI18n(
   if (/Language could not be updated/i.test(normalized)) {
     return { i18nKey: "errors.languageUpdateFailed" };
   }
+  if (/Invalid exercise authoring body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidExerciseAuthoringBody" };
+  }
+  if (/Invalid exercise submission body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidExerciseSubmissionBody" };
+  }
+  if (/Exercise not found:/i.test(normalized)) {
+    return { i18nKey: "errors.exerciseNotFound" };
+  }
+  if (/Exercise could not be created/i.test(normalized)) {
+    return { i18nKey: "errors.exerciseCreateFailed" };
+  }
+  if (/Exercise submission could not be created/i.test(normalized)) {
+    return { i18nKey: "errors.exerciseSubmissionCreateFailed" };
+  }
   if (/Body must include action: "accept" or "reject"/i.test(normalized)) {
     return { i18nKey: "errors.bulkReviewInvalidAction" };
   }

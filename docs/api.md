@@ -42,12 +42,12 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. Invalid bodies return `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
-| GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
+| GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
-| POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
-| POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
-| GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. |
-| POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
+| POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. Invalid bodies return `400` with `i18nKey: "errors.invalidExerciseAuthoringBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. Unknown exercise ids return `404` with `i18nKey: "errors.exerciseNotFound"`. |
+| POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. Invalid bodies return `400` with `i18nKey: "errors.invalidExerciseSubmissionBody"`; unknown exercise ids return `404` with `i18nKey: "errors.exerciseNotFound"`. |
 | GET | `/evaluations` | lead, admin, programmer, reviewer (not elder/learner) | Previous evaluation runs. |
 | POST | `/evaluations/run` | lead, admin, programmer, reviewer (not elder/learner) | Run evaluation for all languages. |
 | GET | `/exports/languages/:languageId/snapshot` | reviewer, elder, lead, admin | Sanitized language snapshot with integrity metadata. |
@@ -211,7 +211,7 @@ Dry-run validation previews the same checks without persisting. Add `?dryRun=1` 
 
 `POST /languages/:languageId/exercises`
 
-The route stores private answer-key fields server-side and returns only the public exercise shape.
+The route stores private answer-key fields server-side and returns only the public exercise shape. Bodies that fail schema parsing return `400` with `{ "error": "Invalid exercise authoring body", "i18nKey": "errors.invalidExerciseAuthoringBody" }`. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`.
 
 Important validation:
 
@@ -236,17 +236,17 @@ Generates draft grammar notes from the language's approved corpus, lexicon, and 
 
 `POST /languages/:languageId/exercises/generate` (roles: reviewer, lead, admin)
 
-Generates a single draft exercise grounded in the approved lexicon and notes. `allowedVocabulary` is filtered to real lexeme forms, `allowedRuleIds` is filtered to existing note ids, and the draft is rejected (`422`) if grounding leaves it unusable (no expected answers, no grounded vocabulary, or no prompt). The optional body `{ type? }` requests one of the four exercise types; an unrecognized type falls back to a default with a warning. This route does not persist anything: it returns `{ exercise, warnings }` as a preview that the author reviews and edits, then saves through `POST /languages/:languageId/exercises`. Answer keys stay human-controlled - the model draft is reviewed before save, never auto-committed.
+Generates a single draft exercise grounded in the approved lexicon and notes. Unknown language ids return `404` with `{ "error": "Language not found: …", "i18nKey": "errors.languageNotFound" }`. `allowedVocabulary` is filtered to real lexeme forms, `allowedRuleIds` is filtered to existing note ids, and the draft is rejected (`422`) if grounding leaves it unusable (no expected answers, no grounded vocabulary, or no prompt). The optional body `{ type? }` requests one of the four exercise types; an unrecognized type falls back to a default with a warning. This route does not persist anything: it returns `{ exercise, warnings }` as a preview that the author reviews and edits, then saves through `POST /languages/:languageId/exercises`. Answer keys stay human-controlled - the model draft is reviewed before save, never auto-committed.
 
 ## Exercise submissions
 
 `GET /exercises/:exerciseId/submissions` (roles: learner, reviewer, lead, admin)
 
-Returns sanitized submission history for one exercise. Learner answers and local actor IDs are omitted.
+Returns sanitized submission history for one exercise. Learner answers and local actor IDs are omitted. Unknown exercise ids return `404` with `{ "error": "Exercise not found: …", "i18nKey": "errors.exerciseNotFound" }`.
 
 `POST /exercises/:exerciseId/submissions`
 
-Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID.
+Submissions are graded server-side against the private exercise answer key. The response and submission-history route omit the learner answer and local actor ID. Invalid bodies return `400` with `i18nKey: "errors.invalidExerciseSubmissionBody"`; unknown exercise ids return `404` with `i18nKey: "errors.exerciseNotFound"`.
 
 The persisted app-state schema validates restored submission records before the API serves them: each submission must reference an existing exercise, keep the same `languageId`, keep nonblank private answer and grading-explanation text, keep a parseable `submittedAt`, and use a known local actor whose role is allowed to submit answers.
 

@@ -45,6 +45,12 @@ describe("locale catalogs", () => {
     expect(ar["model.restoreLatestBackup"]).toBe("استعادة أحدث نسخة احتياطية");
   });
 
+  it("localizes model-profile empty-state next-step guidance", () => {
+    expect(en["model.noProfilesHint"]).toContain("Save profile");
+    expect(ar["model.noProfilesHint"]).toContain("احفظ");
+    expect(ar["model.noProfilesHint"]).not.toBe(en["model.noProfilesHint"]);
+  });
+
   it("localizes integrity and extraction-draft placeholder strings in Arabic", () => {
     expect(ar["format.integrityLabel"]).toContain("{algorithm}");
     expect(ar["format.integrityLabel"]).toContain("{hash}");

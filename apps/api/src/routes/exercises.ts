@@ -59,7 +59,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     const state = await readState();
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return state.exercises.filter((exercise) => exercise.languageId === languageId).map(toPublicExercise);
   });
@@ -108,7 +111,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
         } satisfies ExerciseAuthoringDryRunResponse;
       }
       reply.code(400);
-      return { error: "Invalid exercise authoring body" };
+      return {
+        error: "Invalid exercise authoring body",
+        i18nKey: "errors.invalidExerciseAuthoringBody"
+      };
     }
 
     const current = await readState();
@@ -119,7 +125,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (dryRun) {
@@ -177,7 +186,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (languageMissing) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (validationError) {
@@ -187,7 +199,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (!exercise) {
       reply.code(500);
-      return { error: "Exercise could not be created" };
+      return {
+        error: "Exercise could not be created",
+        i18nKey: "errors.exerciseCreateFailed"
+      };
     }
 
     reply.code(201);
@@ -209,7 +224,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (!exercise) {
       reply.code(404);
-      return { error: `Exercise not found: ${exerciseId}` };
+      return {
+        error: `Exercise not found: ${exerciseId}`,
+        i18nKey: "errors.exerciseNotFound"
+      };
     }
 
     return state.exerciseSubmissions
@@ -222,7 +240,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     const body = parseExerciseSubmissionBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid exercise submission body" };
+      return {
+        error: "Invalid exercise submission body",
+        i18nKey: "errors.invalidExerciseSubmissionBody"
+      };
     }
 
     const current = await readState();
@@ -276,12 +297,18 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (exerciseMissing) {
       reply.code(404);
-      return { error: `Exercise not found: ${exerciseId}` };
+      return {
+        error: `Exercise not found: ${exerciseId}`,
+        i18nKey: "errors.exerciseNotFound"
+      };
     }
 
     if (!submission) {
       reply.code(500);
-      return { error: "Exercise submission could not be created" };
+      return {
+        error: "Exercise submission could not be created",
+        i18nKey: "errors.exerciseSubmissionCreateFailed"
+      };
     }
 
     return toPublicExerciseSubmission(submission);
@@ -299,7 +326,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     const language = current.languages.find((item) => item.id === languageId);
     if (!language) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const requestedType = parseExerciseGenerationType(request.body);
