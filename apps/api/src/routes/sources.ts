@@ -60,7 +60,9 @@ function applySourceProcessCompletion(
       ...stored,
       status: "failed",
       error: extractionError ?? "Source processing failed.",
-      processedAt
+      processedAt,
+      processingStartedAt: undefined,
+      processingHeartbeatAt: undefined
     };
     output.updatedAsset = failedAsset;
     return appendAuditEvent({
@@ -97,7 +99,9 @@ function applySourceProcessCompletion(
     summary: extraction.summary,
     transcript: extraction.transcript ?? stored.transcript,
     warnings: extraction.warnings.length > 0 ? extraction.warnings : undefined,
-    processedAt
+    processedAt,
+    processingStartedAt: undefined,
+    processingHeartbeatAt: undefined
   };
   output.updatedAsset = updatedAsset;
 

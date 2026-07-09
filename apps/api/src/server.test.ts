@@ -4594,7 +4594,7 @@ describe("api server", () => {
       expect(Array.isArray(processed.json().warnings)).toBe(true);
     });
 
-    it("increments processingAttempts and sets processingStartedAt when a source is claimed", async () => {
+    it("increments processingAttempts and clears in-flight markers after completion", async () => {
       const app = createServer({ initialState: buildTestWorkspaceState() });
       const sourceId = await registerWordlistSource(app, "Attempt-tracked word list");
 
@@ -4609,8 +4609,9 @@ describe("api server", () => {
         status: "processed",
         processingAttempts: 1
       });
-      expect(typeof first.json().asset.processingStartedAt).toBe("string");
-      expect(typeof first.json().asset.processingHeartbeatAt).toBe("string");
+      // In-flight markers are cleared once processing finishes; attempts remain.
+      expect(first.json().asset.processingStartedAt).toBeUndefined();
+      expect(first.json().asset.processingHeartbeatAt).toBeUndefined();
 
       const second = await app.inject({
         method: "POST",
@@ -4623,8 +4624,8 @@ describe("api server", () => {
         status: "processed",
         processingAttempts: 2
       });
-      expect(typeof second.json().asset.processingStartedAt).toBe("string");
-      expect(typeof second.json().asset.processingHeartbeatAt).toBe("string");
+      expect(second.json().asset.processingStartedAt).toBeUndefined();
+      expect(second.json().asset.processingHeartbeatAt).toBeUndefined();
     });
 
     it("returns 409 with i18n metadata when processingAttempts reaches the max", async () => {

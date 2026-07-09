@@ -463,6 +463,9 @@ function vaultImportErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/ASSINI_OBSIDIAN_VAULT_ROOTS is set/i.test(normalized) && /disabled until/i.test(normalized)) {
     return { i18nKey: "ingest.errorVaultRootsUnset" };
   }
+  if (/must be absolute directory paths/i.test(normalized)) {
+    return { i18nKey: "ingest.errorVaultRootsMustBeAbsolute" };
+  }
   if (/outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/i.test(normalized)) {
     return { i18nKey: "ingest.errorVaultOutsideAllowlist" };
   }

@@ -54,7 +54,16 @@ export function recoverInterruptedSourcesState(state: AppState, recoveredAt = ne
     ...state,
     sourceAssets: state.sourceAssets.map((asset) => (
       interruptedIds.has(asset.id)
-        ? { ...asset, status: "failed" as const, error: INTERRUPTED_PROCESSING_ERROR, processedAt: recoveredAt }
+        ? {
+            ...asset,
+            status: "failed" as const,
+            error: INTERRUPTED_PROCESSING_ERROR,
+            processedAt: recoveredAt,
+            // Drop in-flight markers so a recovered asset does not look mid-run
+            // to operators or to any tooling that inspects heartbeat fields.
+            processingStartedAt: undefined,
+            processingHeartbeatAt: undefined
+          }
         : asset
     ))
   }, drafts);

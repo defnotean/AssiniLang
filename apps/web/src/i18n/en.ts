@@ -509,6 +509,7 @@ export const en = {
   "ingest.errorVaultPathRequired": "Enter the local Obsidian vault folder path.",
   "ingest.errorVaultMaxFiles": "Max Markdown files must be a whole number from 1 to 500.",
   "ingest.errorVaultRootsUnset": "Obsidian vault import is disabled. Set ASSINI_OBSIDIAN_VAULT_ROOTS in the API environment to one or more allowed folder roots.",
+  "ingest.errorVaultRootsMustBeAbsolute": "ASSINI_OBSIDIAN_VAULT_ROOTS must use absolute folder paths. Relative roots like ./vaults are ignored; set one or more absolute directories, then retry.",
   "ingest.errorVaultOutsideAllowlist": "That folder is outside the allowed vault roots. Update ASSINI_OBSIDIAN_VAULT_ROOTS or choose a folder under an allowed root.",
   "ingest.errorVaultNotDirectory": "That path is not a folder. Choose the Obsidian vault directory, not a file inside it.",
   "ingest.errorVaultUnreadable": "That folder could not be read. Check the path exists and AssiniLang can access it.",

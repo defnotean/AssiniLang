@@ -20,6 +20,15 @@ describe("Obsidian vault path safety", () => {
     expect(roots.every((root) => root.length > 0)).toBe(true);
   });
 
+  it("drops relative root segments so CWD cannot widen the allowlist", () => {
+    expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "./vaults;vaults" })).toEqual([]);
+    expect(parseObsidianVaultRoots({
+      ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;./relative;D:\\Notes"
+    })).toEqual(
+      parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;D:\\Notes" })
+    );
+  });
+
   it("treats a path as inside a root only when equal or a descendant", () => {
     const root = join(tmpdir(), "assini-vault-root");
     expect(isPathInsideRoot(root, root)).toBe(true);
@@ -47,7 +56,23 @@ describe("Obsidian vault path safety", () => {
 
   it("fails closed when ASSINI_OBSIDIAN_VAULT_ROOTS is unset", async () => {
     await expect(assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), { env: {} }))
-      .rejects.toThrow(/ASSINI_OBSIDIAN_VAULT_ROOTS/);
+      .rejects.toThrow(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/);
+  });
+
+  it("treats blank-only ASSINI_OBSIDIAN_VAULT_ROOTS as unset", async () => {
+    await expect(
+      assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), {
+        env: { ASSINI_OBSIDIAN_VAULT_ROOTS: "  ; ; " }
+      })
+    ).rejects.toThrow(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/);
+  });
+
+  it("fails closed with an absolute-path message when only relative roots are configured", async () => {
+    await expect(
+      assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), {
+        env: { ASSINI_OBSIDIAN_VAULT_ROOTS: "./vaults;relative-root" }
+      })
+    ).rejects.toThrow(/must be absolute directory paths/);
   });
 
   it("rejects paths outside the allowlist after resolve", async () => {

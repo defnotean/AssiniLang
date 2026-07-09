@@ -485,6 +485,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.errorVaultPathRequired": "أدخل مسار مجلد خزنة Obsidian المحلي.",
   "ingest.errorVaultMaxFiles": "يجب أن يكون الحد الأقصى لملفات Markdown عددًا صحيحًا من 1 إلى 500.",
   "ingest.errorVaultRootsUnset": "استيراد خزنة Obsidian معطّل. عيّن ASSINI_OBSIDIAN_VAULT_ROOTS في بيئة واجهة برمجة التطبيقات إلى جذر مجلد واحد أو أكثر مسموح به.",
+  "ingest.errorVaultRootsMustBeAbsolute": "يجب أن تستخدم ASSINI_OBSIDIAN_VAULT_ROOTS مسارات مجلدات مطلقة. تُتجاهل الجذور النسبية مثل ./vaults؛ عيّن مجلدًا مطلقًا واحدًا أو أكثر ثم أعد المحاولة.",
   "ingest.errorVaultOutsideAllowlist": "هذا المجلد خارج جذور الخزنة المسموح بها. حدّث ASSINI_OBSIDIAN_VAULT_ROOTS أو اختر مجلدًا ضمن جذر مسموح.",
   "ingest.errorVaultNotDirectory": "هذا المسار ليس مجلدًا. اختر مجلد خزنة Obsidian نفسه، وليس ملفًا بداخله.",
   "ingest.errorVaultUnreadable": "تعذّر قراءة هذا المجلد. تحقق من وجود المسار وأن AssiniLang يمكنه الوصول إليه.",

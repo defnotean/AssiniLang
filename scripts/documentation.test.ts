@@ -125,6 +125,8 @@ describe("project documentation", () => {
         "unexpected `algorithm`/`generatedBy`",
         "mismatched `redactionPolicy`",
         "case-insensitive",
+        "Relative root segments",
+        "in-flight markers are cleared",
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
@@ -163,7 +165,8 @@ describe("project documentation", () => {
         "ASSINI_LLM_PROVIDER",
         "Deterministic / no-model mode",
         "Empty or whitespace-only session cookie",
-        "last matching pair wins"
+        "last matching pair wins",
+        "Relative segments"
       ],
       "docs/development.md": [
         "npm.cmd run verify",
@@ -181,6 +184,7 @@ describe("project documentation", () => {
         "Source processing attempt limit reached",
         "ingest.sourceAlreadyProcessing",
         "ingest.processingInterruptedByRestart",
+        "processingStartedAt",
         "ingest.transcribeNotConfigured",
         "ingest.warningOfflineHeuristicFallback",
         "ingest.warningModelExtractionFailed",
@@ -207,6 +211,7 @@ describe("project documentation", () => {
         "symlink or hard-link aliases",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
+        "processingStartedAt",
         "npm.cmd run seed"
       ],
       "docs/product-guide.md": [
@@ -222,6 +227,7 @@ describe("project documentation", () => {
         "ASSINI_ALLOW_PRIVATE_URLS",
         "data/local-db.json",
         "ingest.processingInterruptedByRestart",
+        "relative roots were set",
         "errors.prototypeAuthDisabled",
         "app.rateLimitExceeded"
       ],

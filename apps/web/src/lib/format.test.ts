@@ -515,6 +515,20 @@ describe("localizeApiError", () => {
     );
   });
 
+  it("localizes relative vault-root configuration failures", () => {
+    const message = localizeVaultImportError(
+      new Error(
+        "Obsidian vault import failed (400): ASSINI_OBSIDIAN_VAULT_ROOTS entries must be absolute directory paths; relative roots are ignored."
+      ),
+      t,
+      "ingest.vaultImportFailed"
+    );
+
+    expect(message).toBe(
+      "ASSINI_OBSIDIAN_VAULT_ROOTS must use absolute folder paths. Relative roots like ./vaults are ignored; set one or more absolute directories, then retry."
+    );
+  });
+
   it("localizes unreadable vault paths", () => {
     const message = localizeVaultImportError(
       new Error("Obsidian vault import failed (400): Obsidian vault path could not be read."),

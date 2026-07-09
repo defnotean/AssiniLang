@@ -76,7 +76,7 @@ Because chunked extraction through a slow local model can take minutes, the rout
 2. Extraction runs in a background task and persists exactly what the synchronous path would: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset.
 3. Clients poll `GET /languages/:languageId/sources` until the asset leaves `processing`. The web console polls every 2.5 seconds.
 
-A source that is already `processing` returns `409` in both modes. There is no in-process resume, but a startup recovery sweep (`apps/api/src/jobRecovery.ts`, run from the server's ready hook) resets every asset left in `processing` by a crash to `failed` with the operator-visible error `Processing interrupted by a server restart. Re-run processing.` and a `source_asset.processing_recovered` audit event; the source can then be reprocessed normally (see [troubleshooting](troubleshooting.md)).
+A source that is already `processing` returns `409` in both modes. There is no in-process resume, but a startup recovery sweep (`apps/api/src/jobRecovery.ts`, run from the server's ready hook) resets every asset left in `processing` by a crash to `failed` with the operator-visible error `Processing interrupted by a server restart. Re-run processing.` and a `source_asset.processing_recovered` audit event; the source can then be reprocessed normally (see [troubleshooting](troubleshooting.md)). Recovery and normal process completion both clear `processingStartedAt` / `processingHeartbeatAt` while keeping `processingAttempts`.
 
 ## SSRF guard
 

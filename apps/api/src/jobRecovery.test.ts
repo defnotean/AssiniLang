@@ -38,6 +38,28 @@ describe("recoverInterruptedSourcesState", () => {
     expect(recovered.sourceAssets.find((asset) => asset.id === "source-processed")?.status).toBe("processed");
   });
 
+  it("clears in-flight processing markers when recovering an interrupted source", () => {
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "source-interrupted",
+      processingStartedAt: "2026-06-06T00:00:30.000Z",
+      processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
+      processingAttempts: 2
+    }));
+
+    const recovered = recoverInterruptedSourcesState(state, "2026-06-06T00:01:00.000Z");
+    const interrupted = recovered.sourceAssets.find((asset) => asset.id === "source-interrupted");
+
+    expect(interrupted).toMatchObject({
+      status: "failed",
+      error: INTERRUPTED_PROCESSING_ERROR,
+      processedAt: "2026-06-06T00:01:00.000Z",
+      processingAttempts: 2
+    });
+    expect(interrupted?.processingStartedAt).toBeUndefined();
+    expect(interrupted?.processingHeartbeatAt).toBeUndefined();
+  });
+
   it("appends a recovery audit event attributed to the local admin with minimal metadata", () => {
     const state = buildTestWorkspaceState();
     state.sourceAssets.push(buildSource({ id: "source-interrupted" }));
