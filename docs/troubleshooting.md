@@ -8,6 +8,7 @@ Symptom-cause-fix tables for the problems you are most likely to hit locally. Co
 | --- | --- | --- |
 | `npm.cmd run dev` fails with `EADDRINUSE` or the web app cannot reach the API | Ports `4321` (API) or `5173` (web) are already in use | Set `$env:ASSINI_DEV_API_PORT="44321"` and `$env:ASSINI_DEV_WEB_PORT="55173"`, then rerun `npm.cmd run dev`. The launcher rewires the Vite proxy automatically. |
 | Browser shows the app but every action returns `Prototype auth is disabled` | The API was started directly without `ASSINI_ENABLE_PROTOTYPE_AUTH=true` | Start through `npm.cmd run dev` (which sets it), or set the variable yourself. |
+| Driver scripts (`setupKelevi.mjs`, `verifyLocalModelLanguage.mjs`, …) return `401 Unauthorized` | `ASSINI_DEV_AUTH_TOKEN` is unset on the API while scripts send `dev-local` by default | Set `ASSINI_DEV_AUTH_TOKEN=dev-local` in `.env` (see `.env.example`), or pass the same token the API expects to the script. |
 
 ## Models and extraction
 

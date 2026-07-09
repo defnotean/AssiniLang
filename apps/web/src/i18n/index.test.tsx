@@ -70,4 +70,23 @@ describe("locale catalogs", () => {
     expect(ar["corpus.networkInsights"]).not.toBe(en["corpus.networkInsights"]);
     expect(ar["corpus.networkLegend"]).not.toBe(en["corpus.networkLegend"]);
   });
+
+  it("localizes Settings desktop tools and model discovery chrome in Arabic", () => {
+    expect(ar["model.maxTokens"]).toBe("الحد الأقصى للرموز");
+    expect(ar["model.desktopApp"]).toBe("تطبيق سطح المكتب");
+    expect(ar["model.launchAtSignIn"]).toBe("التشغيل عند تسجيل الدخول");
+    expect(ar["model.hideToTrayOnClose"]).toBe("الإخفاء إلى شريط النظام عند الإغلاق");
+    expect(ar["model.copyDiagnostics"]).toBe("نسخ التشخيص");
+    expect(ar["model.discoveredModels"]).toBe("النماذج المكتشفة");
+    expect(ar["model.applyLoadedModel"]).toBe("تطبيق النموذج المحمّل");
+    expect(ar["model.clearSavedModel"]).toBe("استخدام الوضع دون اتصال");
+    expect(ar["model.endpointConnected"]).toContain("{baseUrl}");
+    expect(ar["model.endpointConnected"]).toContain("{count}");
+    // Guard against the previous English Settings leftovers leaking back into AR.
+    expect(ar["model.desktopToolsAria"]).not.toBe(en["model.desktopToolsAria"]);
+    expect(ar["model.discoveredModels"]).not.toBe(en["model.discoveredModels"]);
+    expect(ar["model.applyLoadedModel"]).not.toBe(en["model.applyLoadedModel"]);
+    expect(ar["model.clearSavedModel"]).not.toBe(en["model.clearSavedModel"]);
+    expect(ar["model.maxTokens"]).not.toBe(en["model.maxTokens"]);
+  });
 });

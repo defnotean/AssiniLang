@@ -89,6 +89,10 @@ describe("repository production hygiene", () => {
     expect(example).toMatch(/ASSINI_LLM_TIMEOUT_MS=180000\b/);
     expect(example).not.toMatch(/ASSINI_LLM_TIMEOUT_MS=30000\b/);
 
+    // Driver scripts default x-assini-dev-token to dev-local; the template must match.
+    expect(example).toMatch(/^ASSINI_DEV_AUTH_TOKEN=dev-local$/m);
+    expect(configuration).toMatch(/ASSINI_DEV_AUTH_TOKEN[\s\S]*dev-local/);
+
     expect(example).not.toMatch(/\bsk-[A-Za-z0-9._-]+/);
     expect(example).not.toMatch(/Bearer\s+\S+/i);
     expect(example).not.toMatch(/OPENAI_API_KEY=.*[A-Za-z0-9]{12,}/);

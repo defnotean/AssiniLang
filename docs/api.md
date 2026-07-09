@@ -52,7 +52,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/evaluations/run` | lead, admin, programmer, reviewer (not elder/learner) | Run evaluation for all languages. |
 | GET | `/exports/languages/:languageId/snapshot` | reviewer, elder, lead, admin | Sanitized language snapshot with integrity metadata. |
 | GET | `/exports/evaluations/artifact` | reviewer, lead, admin, programmer | Sanitized evaluation artifact. |
-| GET | `/governance` | lead, admin, programmer, reviewer | List governance records. |
+| GET | `/governance` | reviewer, elder, lead, admin (not programmer) | List governance records. |
 | POST | `/governance` | elder, lead, admin | Create a consent, access, or generation policy record. |
 | GET | `/languages/:languageId/review-policy` | reviewer, elder, lead, admin | Review policy for one language. |
 | PUT | `/languages/:languageId/review-policy` | lead, admin (prototype-session reviewer exception) | Update assigned reviewers and threshold. |

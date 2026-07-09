@@ -1185,6 +1185,39 @@ describe("api server", () => {
     expect(governance.json()).toEqual([response.json()]);
   });
 
+  it.each([
+    ["elders", "elder-1", 200],
+    ["reviewers", "reviewer-1", 200]
+  ])("lets %s list governance records", async (_, userId, statusCode) => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/governance",
+      headers: authHeaders(userId)
+    });
+
+    expect(response.statusCode).toBe(statusCode);
+    expect(response.json()).toEqual([]);
+  });
+
+  it.each([
+    ["programmers", "programmer-1", 403, "Forbidden"],
+    ["learners", "learner-1", 403, "Forbidden"],
+    ["unknown users", "missing-user", 401, "Unauthorized"]
+  ])("rejects governance list reads from %s", async (_, userId, statusCode, error) => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/governance",
+      headers: authHeaders(userId)
+    });
+
+    expect(response.statusCode).toBe(statusCode);
+    expect(response.json()).toEqual({ error });
+  });
+
   it("records protected data mutations in a role-gated audit trail", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
@@ -1826,6 +1859,7 @@ describe("api server", () => {
 
   it.each([
     ["learners", "learner-1", 403, "Forbidden"],
+    ["programmers", "programmer-1", 403, "Forbidden"],
     ["unknown users", "missing-user", 401, "Unauthorized"]
   ])("rejects language snapshot exports from %s", async (_, userId, statusCode, error) => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
