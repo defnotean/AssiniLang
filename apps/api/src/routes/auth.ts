@@ -8,8 +8,10 @@ import {
   cookieValue,
   PROTOTYPE_SESSION_COOKIE,
   pruneExpiredPrototypeSessions,
+  revokePrototypeSessionsForUser,
   serializeExpiredPrototypeSessionCookie,
-  serializePrototypeSessionCookie
+  serializePrototypeSessionCookie,
+  usersForState
 } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 import { parseSchemaBody } from "./requestBody.js";
@@ -27,7 +29,14 @@ function parsePrototypeSessionBody(input: unknown): PrototypeSessionBody | undef
 }
 
 export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, enablePrototypeAuth, prototypeSessions, prototypeSessionTtlMs, now } = ctx;
+  const {
+    readState,
+    enablePrototypeAuth,
+    prototypeSessions,
+    prototypeSessionTtlMs,
+    prototypeSessionAbsoluteMaxMs,
+    now
+  } = ctx;
 
   app.post("/auth/prototype-session", async (request, reply) => {
     if (!enablePrototypeAuth) {
@@ -48,8 +57,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
     }
 
     const state = await readState();
-    // Opportunistic eviction sweep: keeps the map bounded without a timer.
-    pruneExpiredPrototypeSessions(prototypeSessions, now());
+    // Opportunistic eviction sweep: expired + orphan (missing userId) records.
+    // Keeps the map bounded without a timer; matches documented create-path sweep.
+    const knownUserIds = new Set(usersForState(state).map((user) => user.id));
+    pruneExpiredPrototypeSessions(prototypeSessions, now(), knownUserIds);
     const actor = actorById(state, body.userId);
     if (!actor || !actorCan(actor, PROTOTYPE_AUTH_ROLES)) {
       reply.code(403);
@@ -61,11 +72,14 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
 
     const sessionId = randomUUID();
     const createdAt = now();
+    // One active session per user: minting replaces prior ids (multi-tab / remint).
+    revokePrototypeSessionsForUser(prototypeSessions, actor.id);
     prototypeSessions.set(sessionId, {
       userId: actor.id,
       createdAt,
       expiresAt: createdAt + prototypeSessionTtlMs,
-      ttlMs: prototypeSessionTtlMs
+      ttlMs: prototypeSessionTtlMs,
+      absoluteMaxMs: prototypeSessionAbsoluteMaxMs
     });
     reply.header("Set-Cookie", serializePrototypeSessionCookie(sessionId, Math.ceil(prototypeSessionTtlMs / 1000)));
     return actor;
@@ -82,7 +96,13 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
 
     const sessionId = cookieValue(request, PROTOTYPE_SESSION_COOKIE);
     if (sessionId) {
-      prototypeSessions.delete(sessionId);
+      const session = prototypeSessions.get(sessionId);
+      if (session) {
+        // Logout invalidates every session for this user (sibling tabs / remints).
+        revokePrototypeSessionsForUser(prototypeSessions, session.userId);
+      } else {
+        prototypeSessions.delete(sessionId);
+      }
     }
 
     reply.header("Set-Cookie", serializeExpiredPrototypeSessionCookie());

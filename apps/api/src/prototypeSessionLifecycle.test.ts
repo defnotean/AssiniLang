@@ -5,9 +5,12 @@ import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, JsonStore } from "@assini/db";
 import { createServer } from "./server.js";
 import {
+  DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS,
   DEFAULT_PROTOTYPE_SESSION_TTL_MS,
   prototypeSessionCookieSecure,
-  readPrototypeSessionTtlMs
+  readPrototypeSessionAbsoluteMaxMs,
+  readPrototypeSessionTtlMs,
+  type PrototypeSessionMap
 } from "./routeHelpers.js";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -24,13 +27,20 @@ function createClock(start = 1_750_000_000_000): TestClock {
   };
 }
 
-function createSessionServer(clock: TestClock, prototypeSessionTtlMs?: number) {
+function createSessionServer(
+  clock: TestClock,
+  options: {
+    prototypeSessionTtlMs?: number;
+    prototypeSessionAbsoluteMaxMs?: number;
+    prototypeSessions?: PrototypeSessionMap;
+  } = {}
+) {
   return createServer({
     initialState: buildTestWorkspaceState(),
     enablePrototypeAuth: true,
     rateLimit: false,
     now: clock.now,
-    prototypeSessionTtlMs
+    ...options
   });
 }
 
@@ -152,29 +162,128 @@ describe("prototype session lifecycle", () => {
     expect(response.headers["set-cookie"]).toBeUndefined();
   });
 
-  it("slides the session expiry forward on each successful use (documented sliding renewal)", async () => {
+  it("slides the session expiry forward on each successful use until the absolute max", async () => {
     const clock = createClock();
-    const app = createSessionServer(clock);
+    const ttlMs = 8 * HOUR_MS;
+    const absoluteMaxMs = 24 * HOUR_MS;
+    const app = createSessionServer(clock, {
+      prototypeSessionTtlMs: ttlMs,
+      prototypeSessionAbsoluteMaxMs: absoluteMaxMs
+    });
     const cookie = await openSession(app);
 
     // Use the session every 6 hours: each use renews expiresAt to now + TTL,
-    // so total lifetime exceeds the 8h TTL as long as use keeps occurring.
-    for (let i = 0; i < 4; i += 1) {
+    // so total lifetime exceeds the sliding TTL as long as use keeps occurring.
+    for (let i = 0; i < 3; i += 1) {
       clock.advance(6 * HOUR_MS);
       const response = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
       expect(response.statusCode).toBe(200);
     }
 
-    // 24 hours since the last renewal exceeds the TTL: the session is gone.
-    clock.advance(24 * HOUR_MS);
+    // Past absolute max (24h from createdAt): sliding cannot keep the session alive.
+    clock.advance(6 * HOUR_MS + 1);
     const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(expired.statusCode).toBe(401);
+  });
+
+  it("rejects a session that reaches the absolute max even when sliding would still renew", async () => {
+    const clock = createClock();
+    const ttlMs = 60_000;
+    const absoluteMaxMs = 90_000;
+    const app = createSessionServer(clock, {
+      prototypeSessionTtlMs: ttlMs,
+      prototypeSessionAbsoluteMaxMs: absoluteMaxMs
+    });
+    const cookie = await openSession(app);
+
+    clock.advance(50_000);
+    const mid = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(mid.statusCode).toBe(200);
+    const midSetCookie = mid.headers["set-cookie"];
+    const midCookieHeader = Array.isArray(midSetCookie) ? midSetCookie[0] : midSetCookie;
+    // Remaining lifetime is absoluteMax - elapsed (40s), not a full TTL reset.
+    expect(midCookieHeader).toContain("Max-Age=40");
+
+    clock.advance(40_001);
+    const pastAbsolute = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(pastAbsolute.statusCode).toBe(401);
+  });
+
+  it("revokes prior sessions for the same user when a new session is minted", async () => {
+    const clock = createClock();
+    const app = createSessionServer(clock);
+    const firstCookie = await openSession(app, "learner-1");
+    const secondCookie = await openSession(app, "learner-1");
+
+    const first = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: firstCookie } });
+    expect(first.statusCode).toBe(401);
+    const second = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: secondCookie } });
+    expect(second.statusCode).toBe(200);
+  });
+
+  it("logout revokes every session for the cookie user, not only the presented id", async () => {
+    const clock = createClock();
+    const start = clock.now();
+    const sessions: PrototypeSessionMap = new Map([
+      [
+        "sibling-a",
+        {
+          userId: "learner-1",
+          createdAt: start,
+          expiresAt: start + DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          ttlMs: DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          absoluteMaxMs: DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS
+        }
+      ],
+      [
+        "sibling-b",
+        {
+          userId: "learner-1",
+          createdAt: start,
+          expiresAt: start + DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          ttlMs: DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          absoluteMaxMs: DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS
+        }
+      ],
+      [
+        "other-user",
+        {
+          userId: "elder-1",
+          createdAt: start,
+          expiresAt: start + DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          ttlMs: DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+          absoluteMaxMs: DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS
+        }
+      ]
+    ]);
+    const app = createSessionServer(clock, { prototypeSessions: sessions });
+
+    const logout = await app.inject({
+      method: "DELETE",
+      url: "/auth/prototype-session",
+      headers: { cookie: "assini_prototype_session=sibling-a" }
+    });
+    expect(logout.statusCode).toBe(204);
+
+    const sibling = await app.inject({
+      method: "GET",
+      url: "/users/me",
+      headers: { cookie: "assini_prototype_session=sibling-b" }
+    });
+    expect(sibling.statusCode).toBe(401);
+
+    const other = await app.inject({
+      method: "GET",
+      url: "/users/me",
+      headers: { cookie: "assini_prototype_session=other-user" }
+    });
+    expect(other.statusCode).toBe(200);
   });
 
   it("refreshes Set-Cookie Max-Age on successful prototype-session use so browsers track sliding renewal", async () => {
     const clock = createClock();
     const ttlMs = 90_000;
-    const app = createSessionServer(clock, ttlMs);
+    const app = createSessionServer(clock, { prototypeSessionTtlMs: ttlMs });
     const cookie = await openSession(app);
 
     clock.advance(30_000);
@@ -272,10 +381,44 @@ describe("prototype session lifecycle", () => {
     expect(fresh.statusCode).toBe(200);
   });
 
+  it("sweeps orphan sessions during session creation without requiring a prior GET", async () => {
+    const clock = createClock();
+    const dir = await mkdtemp(join(tmpdir(), "assini-orphan-create-sweep-"));
+    const dbPath = join(dir, "local-db.json");
+    const store = new JsonStore(dbPath);
+    await store.write(buildTestWorkspaceState());
+
+    const app = createServer({
+      store,
+      enablePrototypeAuth: true,
+      rateLimit: false,
+      now: clock.now
+    });
+    const orphanCookie = await openSession(app, "learner-1");
+
+    // Drop the session's user while the cookie remains (reseed / manual edit).
+    await store.update((state) => ({
+      ...state,
+      users: state.users.filter((user) => user.id !== "learner-1")
+    }));
+
+    // Creating any new session should sweep the orphan from the map.
+    const freshCookie = await openSession(app, "elder-1");
+
+    const orphaned = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: orphanCookie } });
+    expect(orphaned.statusCode).toBe(401);
+    const orphanSetCookie = orphaned.headers["set-cookie"];
+    const orphanCookieHeader = Array.isArray(orphanSetCookie) ? orphanSetCookie[0] : orphanSetCookie;
+    expect(orphanCookieHeader).toContain("Max-Age=0");
+
+    const fresh = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: freshCookie } });
+    expect(fresh.statusCode).toBe(200);
+  });
+
   it("honors a short TTL override and expires sessions accordingly", async () => {
     const clock = createClock();
     const ttlMs = 1_000;
-    const app = createSessionServer(clock, ttlMs);
+    const app = createSessionServer(clock, { prototypeSessionTtlMs: ttlMs });
     const cookie = await openSession(app);
 
     clock.advance(ttlMs - 1);
@@ -287,7 +430,7 @@ describe("prototype session lifecycle", () => {
     expect(expired.statusCode).toBe(401);
   });
 
-  it("reads ASSINI_PROTOTYPE_SESSION_TTL_MS and rejects invalid values", () => {
+  it("reads ASSINI_PROTOTYPE_SESSION_TTL_MS and ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS", () => {
     expect(readPrototypeSessionTtlMs({})).toBe(DEFAULT_PROTOTYPE_SESSION_TTL_MS);
     expect(readPrototypeSessionTtlMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: " " })).toBe(DEFAULT_PROTOTYPE_SESSION_TTL_MS);
     expect(readPrototypeSessionTtlMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: "60000" })).toBe(60_000);
@@ -297,11 +440,29 @@ describe("prototype session lifecycle", () => {
         /ASSINI_PROTOTYPE_SESSION_TTL_MS must be an integer/
       );
     }
+
+    expect(readPrototypeSessionAbsoluteMaxMs({})).toBe(DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS);
+    expect(readPrototypeSessionAbsoluteMaxMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: "60000" }, 60_000)).toBe(180_000);
+    expect(
+      readPrototypeSessionAbsoluteMaxMs(
+        { ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS: "120000" },
+        60_000
+      )
+    ).toBe(120_000);
+
+    for (const invalid of ["0", "-1", "1.5", "abc"]) {
+      expect(() =>
+        readPrototypeSessionAbsoluteMaxMs({ ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS: invalid }, 60_000)
+      ).toThrow(/ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS must be an integer/);
+    }
+    expect(() =>
+      readPrototypeSessionAbsoluteMaxMs({ ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS: "1000" }, 60_000)
+    ).toThrow(/must be >= ASSINI_PROTOTYPE_SESSION_TTL_MS/);
   });
 
   it("issues a session cookie whose Max-Age matches the configured TTL", async () => {
     const clock = createClock();
-    const app = createSessionServer(clock, 90_000);
+    const app = createSessionServer(clock, { prototypeSessionTtlMs: 90_000 });
 
     const response = await app.inject({
       method: "POST",

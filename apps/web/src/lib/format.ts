@@ -75,7 +75,9 @@ export function isRealModelProvider(status: LlmStatus): boolean {
 
 export function formatReachability(result: LlmReachability, t?: Translate): string {
   if (!result.checked) {
-    return t ? t("model.reachability.notConfigured") : "No external provider configured.";
+    return t
+      ? t("model.reachability.notConfigured")
+      : "No external provider configured. Choose a discovered model or enter a base URL and model name in Runtime settings, then Save settings and test again.";
   }
   const modeLabel = formatMode(result.mode, t);
   if (result.reachable) {
@@ -728,6 +730,56 @@ export function localizeSourceProcessingWarning(warning: string, t: Translate): 
   const mapped = sourceProcessingWarningI18n(warning);
   if (mapped) {
     return t(mapped.i18nKey as MessageKey, mapped.i18nParams);
+  }
+  return warning;
+}
+
+const LLM_PROVIDER_OPTION_KEYS = new Set<MessageKey>([
+  "model.providerOption.deterministic",
+  "model.providerOption.off",
+  "model.providerOption.mock",
+  "model.providerOption.openai-compatible",
+  "model.providerOption.local",
+  "model.providerOption.ollama",
+  "model.providerOption.lm-studio",
+  "model.providerOption.openai",
+  "model.providerOption.remote"
+]);
+
+/** Localizes LLM provider option labels shown in Settings and readiness. */
+export function formatLlmProvider(provider: string, t?: Translate): string {
+  const key = `model.providerOption.${provider}` as MessageKey;
+  if (t && LLM_PROVIDER_OPTION_KEYS.has(key)) {
+    return t(key);
+  }
+  return provider;
+}
+
+function llmStatusWarningI18n(
+  warning: string
+): { i18nKey: MessageKey; i18nParams?: Record<string, string | number> } | undefined {
+  if (warning === "No LLM provider configured; using deterministic fallback for safe local development.") {
+    return { i18nKey: "model.warning.noProviderConfigured" };
+  }
+  if (warning === "Using deterministic fallback; no external LLM calls will be made.") {
+    return { i18nKey: "model.warning.deterministicFallback" };
+  }
+  const timeoutMatch = /^ASSINI_LLM_TIMEOUT_MS must be a positive integer; using (\d+)\.$/.exec(warning);
+  if (timeoutMatch) {
+    return { i18nKey: "model.warning.invalidTimeout", i18nParams: { ms: timeoutMatch[1] } };
+  }
+  const unknownMatch = /^Unknown ASSINI_LLM_PROVIDER: (.+)$/.exec(warning);
+  if (unknownMatch) {
+    return { i18nKey: "model.warning.unknownProvider", i18nParams: { provider: unknownMatch[1] } };
+  }
+  return undefined;
+}
+
+/** Localizes known LLM status warnings; leaves unrecognized API warnings unchanged. */
+export function localizeLlmStatusWarning(warning: string, t: Translate): string {
+  const mapped = llmStatusWarningI18n(warning);
+  if (mapped) {
+    return t(mapped.i18nKey, mapped.i18nParams);
   }
   return warning;
 }

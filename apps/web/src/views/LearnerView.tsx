@@ -301,7 +301,16 @@ export function LearnerView({
             </section>
           </article>
         ) : (
-          <p className="empty-state">{t("learner.noExercisesAuthorOrSelect")}</p>
+          <div className="empty-state" role="status" aria-live="polite">
+            {exercises.length === 0 ? (
+              <>
+                <p>{t("learner.noExercisesDetailEmpty")}</p>
+                <p className="muted">{t("learner.noExercisesDetailEmptyHint")}</p>
+              </>
+            ) : (
+              <p>{t("learner.noExercisesAuthorOrSelect")}</p>
+            )}
+          </div>
         )}
 
         <form className="record-card form-panel compact exercise-authoring-form" aria-label={t("learner.exerciseAuthoring")} onSubmit={handleCreateExercise}>

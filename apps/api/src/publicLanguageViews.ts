@@ -214,9 +214,10 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
 /**
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
- * manifest is missing, uses an unexpected algorithm or generator id, has a
- * mismatched redaction policy list, or the hash does not match. Hex digests are
- * compared case-insensitively so uppercase `contentHash` values still verify.
+ * manifest is missing or null, uses an unexpected algorithm or generator id, has
+ * a mismatched or reordered redaction policy list, has a contentHash that is not
+ * exactly 64 hex digits, or the hash does not match. Hex digests are compared
+ * case-insensitively so uppercase `contentHash` values still verify.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;

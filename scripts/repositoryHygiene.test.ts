@@ -36,6 +36,21 @@ describe("repository production hygiene", () => {
     const pkg = JSON.parse(await readProjectFile("package.json"));
 
     expect(pkg.scripts["ci:green"]).toBe("node scripts/ciGreenSmoke.mjs");
+    expect(pkg.scripts["smoke:backup"]).toBe("tsx scripts/smokeBackupRestore.mjs");
+  });
+
+  it("documents the backup/restore smoke gate for CI", async () => {
+    const script = await readProjectFile("scripts/smokeBackupRestore.mjs");
+    const developmentDocs = await readProjectFile("docs/development.md");
+    const ciGreen = await readProjectFile("scripts/ciGreenSmoke.mjs");
+
+    expect(script).toContain("backupTo");
+    expect(script).toContain("restoreFrom");
+    expect(script).toContain("runBackupCli");
+    expect(script).toContain("--force");
+    expect(script).toContain("force: true");
+    expect(developmentDocs).toContain("npm.cmd run smoke:backup");
+    expect(ciGreen).toContain("npm run smoke:backup");
   });
 
   it("runs the production readiness gate in GitHub Actions", async () => {
@@ -48,6 +63,7 @@ describe("repository production hygiene", () => {
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("npm run verify");
     expect(workflow).toContain("npm run smoke");
+    expect(workflow).toContain("npm run smoke:backup");
     expect(workflow).toContain("Built-dist startup smoke (/health + /ready)");
     expect(workflow).toContain('body.checks?.storage?.ok');
     expect(workflow).toContain('body.checks?.jobQueue?.ok');
@@ -81,6 +97,7 @@ describe("repository production hygiene", () => {
       "ASSINI_DB_PATH",
       "ASSINI_ENABLE_PROTOTYPE_AUTH",
       "ASSINI_PROTOTYPE_SESSION_TTL_MS",
+      "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
       "ASSINI_COOKIE_SECURE",
       "ASSINI_DEV_AUTH_TOKEN",
       "ASSINI_ALLOWED_ORIGINS",

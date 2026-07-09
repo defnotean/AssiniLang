@@ -714,6 +714,17 @@ export class JsonStore {
         return destination;
       }
 
+      // better-sqlite3's backup() does not reliably overwrite an existing file;
+      // when --force / force:true cleared the existence gate, remove the stale
+      // destination first so SQLite backup matches JSON copyFile overwrite.
+      try {
+        await unlink(destination);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+          throw error;
+        }
+      }
+
       const { Database } = await loadSqliteRuntime();
       const db = new Database(this.dbPath);
       try {

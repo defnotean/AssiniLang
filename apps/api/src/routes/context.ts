@@ -34,8 +34,10 @@ export type RouteContext = {
   authToken: string | undefined;
   prototypeSessions: PrototypeSessionMap;
   enablePrototypeAuth: boolean;
-  /** Session lifetime in milliseconds; default 8 hours, overridable via ASSINI_PROTOTYPE_SESSION_TTL_MS. */
+  /** Session sliding TTL in milliseconds; default 8 hours, overridable via ASSINI_PROTOTYPE_SESSION_TTL_MS. */
   prototypeSessionTtlMs: number;
+  /** Absolute max age from createdAt; sliding renewal cannot exceed this. */
+  prototypeSessionAbsoluteMaxMs: number;
   /** Injectable clock for session lifecycle tests; defaults to Date.now. */
   now: () => number;
   llmProvider: LlmProvider;

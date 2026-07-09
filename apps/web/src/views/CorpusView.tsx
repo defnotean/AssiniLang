@@ -11,7 +11,7 @@ import {
 import { MorphChips } from "../components/MorphChips";
 import { localizeApiError } from "../lib/format";
 import type { CorpusPassage } from "../lib/types";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey, type Translate } from "../i18n";
 
 export function CorpusView({
   languageId,
@@ -476,6 +476,24 @@ function graphNodeClass(type: string): string {
   return "record";
 }
 
+const GRAPH_NODE_KIND_KEYS: Record<string, MessageKey> = {
+  language: "corpus.networkKind.language",
+  corpus: "corpus.networkKind.corpus",
+  source_asset: "corpus.networkKind.source",
+  morpheme: "corpus.networkKind.morpheme",
+  topic_tag: "corpus.networkKind.topic",
+  note: "corpus.networkKind.note",
+  exercise: "corpus.networkKind.exercise",
+  ai_session: "corpus.networkKind.session",
+  elder_correction: "corpus.networkKind.correction",
+  output: "corpus.networkKind.output"
+};
+
+function formatGraphNodeKind(type: string, t: Translate): string {
+  const key = GRAPH_NODE_KIND_KEYS[type];
+  return key ? t(key) : t("corpus.networkKind.record");
+}
+
 function truncateGraphLabel(value: string): string {
   return value.length > 28 ? `${value.slice(0, 25)}...` : value;
 }
@@ -637,7 +655,7 @@ function CorpusGraph({
               <g key={node.id} className={`network-node ${graphNodeClass(node.type)}`} transform={`translate(${point.x} ${point.y})`}>
                 <circle r={node.type === "language" ? 18 : node.type === "corpus" ? 12 : 9} />
                 <text y={node.type === "language" ? -24 : -15}>{truncateGraphLabel(node.label)}</text>
-                <title>{`${node.type}: ${node.label}`}</title>
+                <title>{t("corpus.networkNodeTitle", { type: formatGraphNodeKind(node.type, t), label: node.label })}</title>
               </g>
             );
           })}

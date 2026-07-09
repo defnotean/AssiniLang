@@ -1,9 +1,10 @@
 /**
  * Local CI green smoke — quick checks before push that complement `.github/workflows/ci.yml`.
  *
- * CI also runs `npm ci`, `npm run verify`, `npm run smoke`, built-dist /health+/ready probes,
- * and `npm audit --audit-level=moderate` (includes devDependencies). This helper focuses on
- * production dependency health only so it stays fast for day-to-day use.
+ * CI also runs `npm ci`, `npm run verify`, `npm run smoke`, `npm run smoke:backup`,
+ * built-dist /health+/ready probes, and `npm audit --audit-level=moderate`
+ * (includes devDependencies). This helper focuses on production dependency health
+ * only so it stays fast for day-to-day use.
  *
  * Usage: node scripts/ciGreenSmoke.mjs
  */

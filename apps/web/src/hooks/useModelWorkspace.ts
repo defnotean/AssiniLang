@@ -147,8 +147,8 @@ export function useModelWorkspace(
             models: [],
             endpoints: [],
             errors: [{
-              source: "Automatic refresh",
-              baseUrl: baseUrl ?? "configured discovery targets",
+              source: t("model.automaticRefresh"),
+              baseUrl: baseUrl ?? t("model.configuredDiscoveryTargets"),
               detail: message
             }]
           }

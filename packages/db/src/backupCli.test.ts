@@ -131,6 +131,37 @@ describe("runBackupCli", () => {
     ).rejects.toThrow(/not a valid workspace/);
   });
 
+  it("rejects dry-run when the live workspace is invalid and writes nothing", async () => {
+    const { dbPath } = await createTempDb({ validWorkspace: false });
+    const destination = join(dirname(dbPath), "should-not-write.json");
+    const stdout = vi.fn();
+
+    await expect(
+      runBackupCli({
+        argv: ["--dry-run", destination],
+        env: { ASSINI_DB_PATH: dbPath },
+        stdout
+      })
+    ).rejects.toThrow(/not a valid workspace/);
+    await expect(readFile(destination, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(stdout).not.toHaveBeenCalled();
+  });
+
+  it("rejects backing up onto a Windows case-fold alias of the live database", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const caseAlias = join(dir, "LOCAL-DB.JSON");
+
+    await expect(
+      runBackupCli({
+        argv: [caseAlias],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/same as the live database/);
+  });
+
   it("rejects backing up onto the live database path", async () => {
     const { dbPath } = await createTempDb({ validWorkspace: true });
 

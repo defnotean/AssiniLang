@@ -83,6 +83,26 @@ type ErrorDetails = {
 };
 
 let actorFetchQueue: Promise<void> = Promise.resolve();
+/** Last actor that successfully opened a browser prototype session in this tab. */
+let cachedPrototypeActor: LocalActor | undefined;
+
+/** Test helper: clears the in-memory prototype-session reuse cache. */
+export function resetPrototypeSessionCache(): void {
+  cachedPrototypeActor = undefined;
+}
+
+function invalidatePrototypeSessionCache(): void {
+  cachedPrototypeActor = undefined;
+}
+
+async function runSerialized<T>(operation: () => Promise<T>): Promise<T> {
+  const result = actorFetchQueue.then(operation, operation);
+  actorFetchQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+}
 
 export class ApiError extends Error {
   readonly status?: number;
@@ -230,6 +250,11 @@ async function errorFromResponse(response: Response, fallback: string): Promise<
 
 export async function assertOk(response: Response, fallback: string): Promise<void> {
   if (!response.ok) {
+    // Stale/unknown/expired cookie → server 401 + Max-Age=0; drop local reuse so
+    // the next actor call POSTs a fresh prototype session instead of assuming the cookie is live.
+    if (response.status === 401) {
+      invalidatePrototypeSessionCache();
+    }
     throw await errorFromResponse(response, fallback);
   }
 }
@@ -251,16 +276,7 @@ function prototypeActorId(actor: LocalActor): string {
   }
 }
 
-async function openPrototypeSession(actor: LocalActor): Promise<void> {
-  if (desktopBridge()?.prototypeAuth) {
-    prototypeActorId(actor);
-    return;
-  }
-
-  if (!import.meta.env.DEV) {
-    throw prototypeAuthUnavailable();
-  }
-
+async function postPrototypeSession(actor: LocalActor): Promise<void> {
   const response = await fetch("/api/auth/prototype-session", {
     method: "POST",
     credentials: "include",
@@ -271,8 +287,32 @@ async function openPrototypeSession(actor: LocalActor): Promise<void> {
   await assertOk(response, `Prototype session failed for ${actor}`);
 }
 
+/**
+ * Opens a prototype session only when the actor changed, after sign-out, or after a 401.
+ * Serialized with actorRequest/fetchAsActor so concurrent calls cannot race two POSTs.
+ */
+async function ensurePrototypeSession(actor: LocalActor): Promise<void> {
+  if (desktopBridge()?.prototypeAuth) {
+    prototypeActorId(actor);
+    return;
+  }
+
+  if (!import.meta.env.DEV) {
+    throw prototypeAuthUnavailable();
+  }
+
+  if (cachedPrototypeActor === actor) {
+    return;
+  }
+
+  await postPrototypeSession(actor);
+  cachedPrototypeActor = actor;
+}
+
 /** Logs out of the local prototype session: clears the server record and expires the HttpOnly cookie. */
 export async function closePrototypeSession(): Promise<void> {
+  invalidatePrototypeSessionCache();
+
   if (desktopBridge()?.prototypeAuth) {
     return;
   }
@@ -295,7 +335,7 @@ export async function actorRequest(actor: LocalActor, json = false): Promise<Req
     return { headers: desktopHeaders };
   }
 
-  await openPrototypeSession(actor);
+  await runSerialized(() => ensurePrototypeSession(actor));
   return {
     credentials: "include",
     headers: jsonHeaders(json)
@@ -319,8 +359,8 @@ export async function fetchAsActor(
     });
   }
 
-  const operation = actorFetchQueue.then(async () => {
-    await openPrototypeSession(actor);
+  return runSerialized(async () => {
+    await ensurePrototypeSession(actor);
     return fetch(input, {
       ...init,
       credentials: "include",
@@ -330,11 +370,6 @@ export async function fetchAsActor(
       }
     });
   });
-  actorFetchQueue = operation.then(
-    () => undefined,
-    () => undefined
-  );
-  return operation;
 }
 
 export async function getJson<T>(path: string, actor?: LocalActor, init?: RequestInit): Promise<T> {

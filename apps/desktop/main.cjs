@@ -299,7 +299,8 @@ async function saveDesktopDiagnosticsReport(text) {
 }
 
 async function openLatestBackupFolder() {
-  const latest = restorableBackups()[0];
+  const { pickPreferredRestoreBackup } = require("./backupRestore.cjs");
+  const latest = pickPreferredRestoreBackup(restorableBackups());
   if (!latest) {
     return {
       ok: false,
@@ -488,12 +489,13 @@ async function createDataBackup(options = {}) {
 }
 
 function restorableBackups() {
+  const { isRestorableBackupName } = require("./backupRestore.cjs");
   const backupRoot = backupRootPath();
   mkdirSync(backupRoot, { recursive: true });
   const resolvedBackupRoot = path.resolve(backupRoot);
 
   return readdirSync(backupRoot, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith("backup-"))
+    .filter((entry) => entry.isDirectory() && isRestorableBackupName(entry.name))
     .map((entry) => {
       const backupPath = assertChildPathInside(resolvedBackupRoot, path.join(backupRoot, entry.name), "Backup folder");
       let manifest = {};
@@ -516,8 +518,10 @@ function restorableBackups() {
 }
 
 function desktopBackupSummary() {
+  const { pickPreferredRestoreBackup } = require("./backupRestore.cjs");
   const backups = restorableBackups();
-  const latest = backups[0];
+  // Surface the same preferred target restore-latest would use (routine first).
+  const latest = pickPreferredRestoreBackup(backups);
   return {
     backupsDir: backupRootPath(),
     count: backups.length,
@@ -528,7 +532,9 @@ function desktopBackupSummary() {
 }
 
 async function pruneOldDataBackups() {
-  const backups = restorableBackups().filter((entry) => !entry.name.startsWith("safety-before-restore-"));
+  const { isSafetyBackupName } = require("./backupRestore.cjs");
+  // Keep safety-before-restore copies outside the routine retention window.
+  const backups = restorableBackups().filter((entry) => !isSafetyBackupName(entry.name));
   const prunable = backups.slice(BACKUP_RETENTION_COUNT);
   if (prunable.length === 0) {
     return {
@@ -556,7 +562,9 @@ async function restoreLatestDataBackup() {
     throw new Error("Desktop runtime paths are not ready yet.");
   }
 
-  const latest = restorableBackups()[0];
+  const { pickPreferredRestoreBackup } = require("./backupRestore.cjs");
+  // Prefer newest routine backup so a just-created safety copy is not the default.
+  const latest = pickPreferredRestoreBackup(restorableBackups());
   if (!latest) {
     return {
       ok: false,
@@ -590,7 +598,17 @@ async function restoreLatestDataBackup() {
     };
   }
 
-  await createDataBackup({ prefix: "safety-before-restore" });
+  const { SAFETY_BACKUP_PREFIX, assertSafetyBackupBeforeRestore } = require("./backupRestore.cjs");
+  try {
+    await assertSafetyBackupBeforeRestore(() => createDataBackup({ prefix: SAFETY_BACKUP_PREFIX }));
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      backupSummary: desktopBackupSummary()
+    };
+  }
+
   rmSync(targetDataDir, { recursive: true, force: true });
   cpSync(sourceDataDir, targetDataDir, {
     recursive: true,

@@ -19,7 +19,9 @@ import {
   formatTrendPoints,
   formatTypology,
   latestAssistantMessage,
+  formatLlmProvider,
   localizeApiError,
+  localizeLlmStatusWarning,
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
   localizeVaultImportError,
@@ -1048,6 +1050,46 @@ describe("localizeApiError", () => {
   });
 });
 
+describe("formatLlmProvider", () => {
+  it("localizes known provider option labels and leaves unknown values unchanged", () => {
+    expect(formatLlmProvider("openai-compatible", t)).toBe("OpenAI-compatible");
+    expect(formatLlmProvider("deterministic", createTranslator("ar"))).toBe("حتمي");
+    expect(formatLlmProvider("lm-studio", createTranslator("ar"))).toBe("LM Studio");
+    expect(formatLlmProvider("totally-made-up", t)).toBe("totally-made-up");
+    expect(formatLlmProvider("ollama")).toBe("ollama");
+  });
+});
+
+describe("localizeLlmStatusWarning", () => {
+  it("localizes known LLM status warnings and leaves unrecognized copy unchanged", () => {
+    expect(
+      localizeLlmStatusWarning(
+        "No LLM provider configured; using deterministic fallback for safe local development.",
+        t
+      )
+    ).toBe("No LLM provider configured; using deterministic fallback for safe local development.");
+    expect(
+      localizeLlmStatusWarning(
+        "No LLM provider configured; using deterministic fallback for safe local development.",
+        createTranslator("ar")
+      )
+    ).toContain("البديل الحتمي");
+    expect(
+      localizeLlmStatusWarning("Using deterministic fallback; no external LLM calls will be made.", createTranslator("ar"))
+    ).toContain("البديل الحتمي");
+    expect(localizeLlmStatusWarning("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000.", t)).toBe(
+      "ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000."
+    );
+    expect(
+      localizeLlmStatusWarning("ASSINI_LLM_TIMEOUT_MS must be a positive integer; using 180000.", createTranslator("ar"))
+    ).toContain("180000");
+    expect(localizeLlmStatusWarning("Unknown ASSINI_LLM_PROVIDER: totally-made-up", createTranslator("ar"))).toContain(
+      "totally-made-up"
+    );
+    expect(localizeLlmStatusWarning("Some future warning from the API", t)).toBe("Some future warning from the API");
+  });
+});
+
 describe("formatReachability", () => {
   it("localizes unchecked, reachable, and unreachable connection results", () => {
     const unchecked: LlmReachability = {
@@ -1055,7 +1097,11 @@ describe("formatReachability", () => {
       reachable: false,
       mode: "deterministic"
     };
-    expect(formatReachability(unchecked, t)).toBe("No external provider configured.");
+    expect(formatReachability(unchecked, t)).toBe(
+      "No external provider configured. Choose a discovered model or enter a base URL and model name in Runtime settings, then Save settings and test again."
+    );
+    expect(formatReachability(unchecked, createTranslator("ar"))).toContain("مزوّد خارجي");
+    expect(formatReachability(unchecked, createTranslator("ar"))).toContain("إعدادات التشغيل");
 
     const reachable: LlmReachability = {
       checked: true,

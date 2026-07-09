@@ -10,6 +10,7 @@ import { createMutableLlmProvider, type LlmProvider } from "./llmProvider.js";
 import { resolveRuntimeSettingsPath } from "./runtimePath.js";
 import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
 import {
+  readPrototypeSessionAbsoluteMaxMs,
   readPrototypeSessionTtlMs,
   type PrototypeSessionMap,
   type PrototypeSessionRecord
@@ -47,8 +48,12 @@ type ServerOptions = {
   /** Server-only token used by tests or explicitly configured internal tools. Never bundle this into the browser. */
   authToken?: string;
   enablePrototypeAuth?: boolean;
-  /** Prototype-session lifetime in ms. Defaults to ASSINI_PROTOTYPE_SESSION_TTL_MS or 8 hours. */
+  /** Prototype-session sliding TTL in ms. Defaults to ASSINI_PROTOTYPE_SESSION_TTL_MS or 8 hours. */
   prototypeSessionTtlMs?: number;
+  /** Absolute max age from createdAt. Defaults to ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS or 3× TTL. */
+  prototypeSessionAbsoluteMaxMs?: number;
+  /** Optional pre-seeded session map (tests). */
+  prototypeSessions?: PrototypeSessionMap;
   /** Injectable clock for session lifecycle tests. */
   now?: () => number;
   llmProvider?: LlmProvider;
@@ -117,8 +122,11 @@ export function createServer(options: ServerOptions = {}) {
   const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? DEFAULT_RATE_LIMIT;
   const authToken = options.authToken ?? process.env.ASSINI_DEV_AUTH_TOKEN ?? (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
-  const prototypeSessions: PrototypeSessionMap = new Map<string, PrototypeSessionRecord>();
+  const prototypeSessions: PrototypeSessionMap = options.prototypeSessions ?? new Map<string, PrototypeSessionRecord>();
   const prototypeSessionTtlMs = options.prototypeSessionTtlMs ?? readPrototypeSessionTtlMs(process.env);
+  const prototypeSessionAbsoluteMaxMs =
+    options.prototypeSessionAbsoluteMaxMs
+    ?? readPrototypeSessionAbsoluteMaxMs(process.env, prototypeSessionTtlMs);
   const now = options.now ?? Date.now;
   prototypeSessions.now = now;
   const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
@@ -253,6 +261,7 @@ export function createServer(options: ServerOptions = {}) {
     prototypeSessions,
     enablePrototypeAuth,
     prototypeSessionTtlMs,
+    prototypeSessionAbsoluteMaxMs,
     now,
     llmProvider,
     dataDir,

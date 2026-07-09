@@ -6,10 +6,16 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
+  SAFETY_BACKUP_PREFIX,
   assertDesktopBackupReadable,
   assertDesktopLiveDbReadable,
+  assertSafetyBackupBeforeRestore,
+  isRestorableBackupName,
+  isSafetyBackupName,
+  pickPreferredRestoreBackup,
   resolveBackupDbFile
 } = require("./backupRestore.cjs") as {
+  SAFETY_BACKUP_PREFIX: string;
   assertDesktopBackupReadable: (
     backupDir: string,
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
@@ -18,6 +24,12 @@ const {
     dbPath: string,
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
   ) => Promise<string>;
+  assertSafetyBackupBeforeRestore: (
+    createSafetyBackup: () => Promise<{ ok?: boolean; message?: string } | null | undefined>
+  ) => Promise<{ ok?: boolean; message?: string }>;
+  isRestorableBackupName: (name: string) => boolean;
+  isSafetyBackupName: (name: string) => boolean;
+  pickPreferredRestoreBackup: <T extends { name: string }>(backups: T[]) => T | null;
   resolveBackupDbFile: (backupDir: string, manifest?: Record<string, unknown> | null) => string;
 };
 
@@ -136,5 +148,47 @@ describe("desktop backup restore validation", () => {
         }
       })
     ).rejects.toThrow(/not a valid workspace/);
+  });
+
+  it("treats safety backups as restorable and excludes them from routine prune", () => {
+    expect(SAFETY_BACKUP_PREFIX).toBe("backup-safety-before-restore");
+    expect(isRestorableBackupName(`${SAFETY_BACKUP_PREFIX}-2026-07-09`)).toBe(true);
+    expect(isRestorableBackupName("backup-2026-07-09")).toBe(true);
+    expect(isRestorableBackupName("safety-before-restore-2026-07-09")).toBe(false);
+    expect(isSafetyBackupName(`${SAFETY_BACKUP_PREFIX}-2026-07-09`)).toBe(true);
+    expect(isSafetyBackupName("safety-before-restore-legacy")).toBe(true);
+    expect(isSafetyBackupName("backup-2026-07-09")).toBe(false);
+  });
+
+  it("prefers the newest routine backup over a newer safety-before-restore copy", () => {
+    const safety = { name: `${SAFETY_BACKUP_PREFIX}-2026-07-09T12-00-00` };
+    const routine = { name: "backup-2026-07-09T11-00-00" };
+    // Newest-first list as restorableBackups() returns after a restore.
+    expect(pickPreferredRestoreBackup([safety, routine])).toEqual(routine);
+    expect(pickPreferredRestoreBackup([routine, safety])).toEqual(routine);
+    expect(pickPreferredRestoreBackup([safety])).toEqual(safety);
+    expect(pickPreferredRestoreBackup([])).toBeNull();
+  });
+
+  it("refuses restore when the safety backup fails, before live data would be wiped", async () => {
+    const createSafetyBackup = vi.fn(async () => ({
+      ok: false,
+      message: "live database is missing"
+    }));
+
+    await expect(assertSafetyBackupBeforeRestore(createSafetyBackup)).rejects.toThrow(
+      /Refusing restore: could not create a safety backup/
+    );
+    expect(createSafetyBackup).toHaveBeenCalledOnce();
+  });
+
+  it("allows restore to proceed only after a successful safety backup", async () => {
+    const createSafetyBackup = vi.fn(async () => ({ ok: true, message: "Created safety backup" }));
+
+    await expect(assertSafetyBackupBeforeRestore(createSafetyBackup)).resolves.toEqual({
+      ok: true,
+      message: "Created safety backup"
+    });
+    expect(createSafetyBackup).toHaveBeenCalledOnce();
   });
 });

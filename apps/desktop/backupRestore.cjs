@@ -1,6 +1,42 @@
 const { existsSync, readFileSync } = require("node:fs");
 const path = require("node:path");
 
+/** Prefix for pre-restore safety copies; must start with `backup-` so restore/prune can see them. */
+const SAFETY_BACKUP_PREFIX = "backup-safety-before-restore";
+
+/**
+ * Routine and safety desktop backups both use a `backup-` folder name so they
+ * appear in the restorable set. Safety copies are retained longer by prune.
+ */
+function isRestorableBackupName(name) {
+  return typeof name === "string" && name.startsWith("backup-");
+}
+
+function isSafetyBackupName(name) {
+  return typeof name === "string" && (
+    name.startsWith(`${SAFETY_BACKUP_PREFIX}-`) ||
+    // Legacy prefix from before safety copies were restorable.
+    name.startsWith("safety-before-restore-")
+  );
+}
+
+/**
+ * Prefer the newest routine backup for "restore latest" / "open latest".
+ * Safety-before-restore copies stay restorable (and are kept by prune) but must
+ * not become the default target after a successful restore — otherwise a second
+ * "Restore latest" would undo the restore by applying the pre-restore snapshot.
+ * Falls back to a safety backup only when no routine backup exists.
+ *
+ * @param {Array<{ name: string }>} backups Newest-first restorable list.
+ */
+function pickPreferredRestoreBackup(backups) {
+  if (!Array.isArray(backups) || backups.length === 0) {
+    return null;
+  }
+  const routine = backups.find((entry) => entry && !isSafetyBackupName(entry.name));
+  return routine ?? backups[0] ?? null;
+}
+
 /**
  * Resolve the database file inside a desktop backup folder.
  * Prefers the basename recorded in backup-manifest.json when present.
@@ -86,8 +122,33 @@ async function assertDesktopBackupReadable(backupDir, { readWorkspace } = {}) {
   return dbPath;
 }
 
+/**
+ * Gate desktop restore on a successful safety backup.
+ * `createSafetyBackup` should return `{ ok: true }` or `{ ok: false, message? }`.
+ */
+async function assertSafetyBackupBeforeRestore(createSafetyBackup) {
+  if (typeof createSafetyBackup !== "function") {
+    throw new Error("createSafetyBackup is required before replacing live desktop data.");
+  }
+  const safety = await createSafetyBackup();
+  if (!safety || safety.ok !== true) {
+    const detail = safety && typeof safety.message === "string" && safety.message.trim()
+      ? ` ${safety.message.trim()}`
+      : "";
+    throw new Error(
+      `Refusing restore: could not create a safety backup before replacing live data.${detail}`
+    );
+  }
+  return safety;
+}
+
 module.exports = {
+  SAFETY_BACKUP_PREFIX,
   assertDesktopBackupReadable,
   assertDesktopLiveDbReadable,
+  assertSafetyBackupBeforeRestore,
+  isRestorableBackupName,
+  isSafetyBackupName,
+  pickPreferredRestoreBackup,
   resolveBackupDbFile
 };

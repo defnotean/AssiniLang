@@ -122,8 +122,10 @@ describe("project documentation", () => {
       "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
       "docs/api.md": [
         "verifyExportIntegrity",
+        "missing or null `integrity`",
         "unexpected `algorithm`/`generatedBy`",
-        "mismatched `redactionPolicy`",
+        "mismatched or reordered `redactionPolicy`",
+        "exactly 64 hex digits",
         "case-insensitive",
         "Relative root segments",
         "ingest.errorVaultOutsideAllowlist",
@@ -202,6 +204,9 @@ describe("project documentation", () => {
         "fixtures/eval/testlang-baseline.json",
         "verify:beta",
         "model:verify",
+        "npm.cmd run smoke:backup",
+        "CLI refusal checks",
+        "SQLite force-overwrite",
         "Building a language from raw sources"
       ],
       "docs/ingestion.md": [
@@ -228,14 +233,20 @@ describe("project documentation", () => {
         "same path",
         "symlink alias",
         "hard-link alias",
+        "case-only path alias",
         "validates the live workspace",
         "not an existing directory",
         "is also refused unless",
         "--force",
+        "JSON and SQLite both overwrite",
         "backup source is an existing directory",
         "same clear file-path error as backup",
         "Desktop create validates",
         "Desktop restore validates",
+        "prefers the newest routine backup",
+        "database file only",
+        "not `data/assets/`",
+        "refuses to replace live data if that safety backup fails",
         "dry-run still succeeds and prints a warning"
       ],
       "docs/operator-recovery.md": [
@@ -248,6 +259,7 @@ describe("project documentation", () => {
         "--force",
         "refuses to archive an invalid workspace",
         "symlink or hard-link aliases",
+        "case-only path aliases",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "processingStartedAt",
@@ -256,8 +268,13 @@ describe("project documentation", () => {
         "refuses when the backup path is a directory",
         "Create validates the live workspace",
         "Desktop's restore-latest",
+        "newest **routine** restorable backup",
         "backup-manifest.json",
         "no silent fallback",
+        "database file only",
+        "data/assets/",
+        "backup-safety-before-restore-",
+        "refuses to wipe live data if that safety backup fails",
         "dry-run still succeeds and warns"
       ],
       "docs/roadmap.md": [
@@ -285,7 +302,12 @@ describe("project documentation", () => {
         "app.rateLimitExceeded",
         "destination is a directory",
         "destination already exists",
-        "backup source is a directory"
+        "same as the live database",
+        "case-only alias",
+        "backup source is a directory",
+        "database file only",
+        "could not create a safety backup",
+        "newest **routine** backup"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

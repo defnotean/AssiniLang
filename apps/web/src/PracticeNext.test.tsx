@@ -201,7 +201,13 @@ describe("LearnerView practice next panel", () => {
     expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
 
     const detailPanel = screen.getByRole("region", { name: "Exercise detail panel" });
-    expect(within(detailPanel).getByText("Select an exercise from the list or author one below.")).toBeInTheDocument();
+    const detailEmpty = within(detailPanel).getByRole("status");
+    expect(detailEmpty).toHaveAttribute("aria-live", "polite");
+    expect(detailEmpty).toHaveTextContent("No exercise to practice yet.");
+    expect(detailEmpty).toHaveTextContent(
+      "Fill the authoring form below to create the first task, or open Build to accept grammar drafts that can become practice."
+    );
+    expect(within(detailPanel).queryByText("Select an exercise from the list or author one below.")).not.toBeInTheDocument();
     expect(within(detailPanel).getByText("No learner tasks yet. Fill the form below, validate without saving, then create the exercise.")).toBeInTheDocument();
     expect(within(detailPanel).getByText("Validate checks rules and answer keys without creating an exercise.")).toBeInTheDocument();
   });

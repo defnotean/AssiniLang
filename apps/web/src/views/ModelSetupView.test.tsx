@@ -152,4 +152,13 @@ describe("ModelSetupView settings save status", () => {
     expect(emptyHint).toHaveAttribute("aria-live", "polite");
     expect(screen.getByRole("option", { name: "No saved profiles" })).toBeInTheDocument();
   });
+
+  it("renders localized provider option labels in the settings select", () => {
+    render(<ModelSetupView model={createModelWorkspace({ settingsSaveResult: null })} />);
+
+    expect(screen.getByRole("option", { name: "OpenAI-compatible" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Deterministic" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Remote OpenAI" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "LM Studio" })).toBeInTheDocument();
+  });
 });

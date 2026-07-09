@@ -51,6 +51,15 @@ describe("locale catalogs", () => {
     expect(ar["model.noProfilesHint"]).not.toBe(en["model.noProfilesHint"]);
   });
 
+  it("localizes provider-readiness empty-state next-step guidance", () => {
+    expect(en["model.needsConfigurationHint"]).toContain("Save settings");
+    expect(en["model.reachability.notConfigured"]).toContain("Runtime settings");
+    expect(ar["model.needsConfigurationHint"]).toContain("احفظ");
+    expect(ar["model.reachability.notConfigured"]).toContain("إعدادات التشغيل");
+    expect(ar["model.needsConfigurationHint"]).not.toBe(en["model.needsConfigurationHint"]);
+    expect(ar["model.reachability.notConfigured"]).not.toBe(en["model.reachability.notConfigured"]);
+  });
+
   it("localizes integrity and extraction-draft placeholder strings in Arabic", () => {
     expect(ar["format.integrityLabel"]).toContain("{algorithm}");
     expect(ar["format.integrityLabel"]).toContain("{hash}");
@@ -71,10 +80,16 @@ describe("locale catalogs", () => {
     );
     expect(ar["corpus.networkInsight.sessions"]).toBe("جلسات الذكاء الاصطناعي");
     expect(ar["corpus.networkKind.corpus"]).toBe("مقطع");
+    expect(ar["corpus.networkKind.note"]).toBe("ملاحظة");
+    expect(ar["corpus.networkKind.session"]).toBe("جلسة ذكاء اصطناعي");
+    expect(ar["corpus.networkNodeTitle"]).toContain("{type}");
+    expect(ar["corpus.networkNodeTitle"]).toContain("{label}");
+    expect(ar["eval.failureRow"]).toContain("{category}");
     // Guard against the previous English copy leaking back into AR.
     expect(ar["corpus.networkLabel"]).not.toBe(en["corpus.networkLabel"]);
     expect(ar["corpus.networkInsights"]).not.toBe(en["corpus.networkInsights"]);
     expect(ar["corpus.networkLegend"]).not.toBe(en["corpus.networkLegend"]);
+    expect(ar["corpus.networkKind.note"]).not.toBe(en["corpus.networkKind.note"]);
   });
 
   it("localizes Settings desktop tools and model discovery chrome in Arabic", () => {
@@ -102,6 +117,21 @@ describe("locale catalogs", () => {
     expect(ar["model.applyLoadedModel"]).not.toBe(en["model.applyLoadedModel"]);
     expect(ar["model.clearSavedModel"]).not.toBe(en["model.clearSavedModel"]);
     expect(ar["model.maxTokens"]).not.toBe(en["model.maxTokens"]);
+  });
+
+  it("localizes provider option labels and LLM status warnings in Arabic", () => {
+    expect(en["model.providerOption.openai-compatible"]).toBe("OpenAI-compatible");
+    expect(ar["model.providerOption.openai-compatible"]).toBe("متوافق مع OpenAI");
+    expect(ar["model.providerOption.deterministic"]).toBe("حتمي");
+    expect(ar["model.providerOption.openai"]).toBe("OpenAI عن بُعد");
+    expect(ar["model.warning.noProviderConfigured"]).toContain("البديل الحتمي");
+    expect(ar["model.warning.invalidTimeout"]).toContain("{ms}");
+    expect(ar["model.warning.unknownProvider"]).toContain("{provider}");
+    expect(ar["model.automaticRefresh"]).toBe("تحديث تلقائي");
+    expect(ar["model.configuredDiscoveryTargets"]).toBe("أهداف الاكتشاف المُهيَّأة");
+    expect(ar["model.providerOption.openai-compatible"]).not.toBe(en["model.providerOption.openai-compatible"]);
+    expect(ar["model.warning.noProviderConfigured"]).not.toBe(en["model.warning.noProviderConfigured"]);
+    expect(ar["model.configuredDiscoveryTargets"]).not.toBe(en["model.configuredDiscoveryTargets"]);
   });
 
   it("localizes empty-workspace evaluation errors in Arabic", () => {
@@ -135,6 +165,12 @@ describe("locale catalogs", () => {
     expect(en["profile.paradigmGapsEmptyState"]).toContain("Build or Corpus");
     expect(ar["profile.paradigmGapsEmptyState"]).toContain("البناء أو المدوّنة");
     expect(ar["profile.paradigmGapsEmptyState"]).not.toBe(en["profile.paradigmGapsEmptyState"]);
+  });
+
+  it("localizes Practice detail empty-state next-step guidance when no exercises exist", () => {
+    expect(en["learner.noExercisesDetailEmptyHint"]).toContain("authoring form");
+    expect(ar["learner.noExercisesDetailEmptyHint"]).toContain("التأليف");
+    expect(ar["learner.noExercisesDetailEmptyHint"]).not.toBe(en["learner.noExercisesDetailEmptyHint"]);
   });
 
   it("localizes elder apply negatives and desktop-only bridge notices in Arabic", () => {

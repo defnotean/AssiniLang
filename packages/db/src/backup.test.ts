@@ -130,6 +130,42 @@ it("rejects backup when the destination file already exists unless force is set"
   expect(await readFile(destination, "utf8")).toBe(await readFile(dbPath, "utf8"));
 });
 
+it("force-overwrites an existing SQLite backup destination and remains restorable", async () => {
+  const dbPath = join(dir, "db.sqlite");
+  const destination = join(dir, "existing-backup.sqlite");
+  const store = new JsonStore(dbPath);
+  const fixture = buildTestWorkspaceState();
+  await store.write(fixture);
+  await writeFile(destination, "stale-not-sqlite", "utf8");
+
+  await expect(store.backupTo(destination)).rejects.toThrow(/destination already exists/);
+  expect(await readFile(destination, "utf8")).toBe("stale-not-sqlite");
+
+  await expect(store.backupTo(destination, { force: true })).resolves.toBe(resolve(destination));
+  const restored = await new JsonStore(join(dir, "restored-from-force.sqlite")).restoreFrom(destination);
+  expect(restored.languages).toEqual(fixture.languages);
+});
+
+it("treats Windows case-only path aliases as the same file for backup and restore", async () => {
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+  const caseAlias = join(dir, "DB.JSON");
+
+  if (process.platform === "win32") {
+    expect(pathsReferToSameFile(dbPath, caseAlias)).toBe(true);
+    await expect(store.backupTo(caseAlias)).rejects.toThrow(/destination must differ/);
+    await expect(store.restoreFrom(caseAlias)).rejects.toThrow(/backup source must differ/);
+    expect(await store.read()).toEqual(before);
+    return;
+  }
+
+  // On POSIX, case-distinct paths are different files; the win32 branch is the
+  // operator-relevant identity check. Still assert the helper stays case-sensitive.
+  expect(pathsReferToSameFile(dbPath, caseAlias)).toBe(false);
+});
+
 it("rejects restore when the backup source is an existing directory", async () => {
   const dbPath = join(dir, "db.json");
   const sourceDir = join(dir, "restore-folder");

@@ -41,9 +41,11 @@ import {
   uploadSourceFile,
   updateRuntimeSettings
 } from "./api";
+import { fetchAsActor, resetPrototypeSessionCache, actorRequest as buildActorRequest } from "./lib/apiClient";
 
 describe("fetchDashboardData", () => {
   afterEach(() => {
+    resetPrototypeSessionCache();
     vi.unstubAllGlobals();
   });
 
@@ -54,6 +56,12 @@ describe("fetchDashboardData", () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ userId })
     });
+  }
+
+  function prototypeSessionPostCount(fetchMock: ReturnType<typeof vi.fn>): number {
+    return fetchMock.mock.calls.filter((call) =>
+      String((call as unknown as [unknown])[0]).includes("/auth/prototype-session")
+    ).length;
   }
 
   const jsonRequest = {
@@ -672,12 +680,13 @@ describe("fetchDashboardData", () => {
       requiresAssignedReviewer: true
     };
     await updateReviewPolicy("avenik/test language", payload);
-    expectPrototypeSession(fetchMock, "reviewer-1", 2);
-    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/languages/avenik%2Ftest%20language/review-policy", {
+    // Same actor reuses the open prototype session (no second POST).
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/languages/avenik%2Ftest%20language/review-policy", {
       method: "PUT",
       ...jsonRequest,
       body: JSON.stringify(payload)
     });
+    expect(prototypeSessionPostCount(fetchMock)).toBe(1);
   });
 
   it("fetches encoded audit events through programmer prototype auth", async () => {
@@ -715,8 +724,7 @@ describe("fetchDashboardData", () => {
     );
 
     await resolveReviewDisposition("review/disposition 1", "Resolved after Elder review.");
-    expectPrototypeSession(fetchMock, "reviewer-1", 2);
-    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/review-dispositions/resolve", {
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/review-dispositions/resolve", {
       method: "PATCH",
       ...jsonRequest,
       body: JSON.stringify({
@@ -724,6 +732,7 @@ describe("fetchDashboardData", () => {
         resolutionSummary: "Resolved after Elder review."
       })
     });
+    expect(prototypeSessionPostCount(fetchMock)).toBe(1);
   });
 
   it("opens an elder prototype session before reviewing encoded elder corrections", async () => {
@@ -972,11 +981,11 @@ describe("fetchDashboardData", () => {
     });
 
     await rejectExtractionDraft("draft/2");
-    expectPrototypeSession(fetchMock, "reviewer-1", 2);
-    expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/extraction-drafts/draft%2F2/reject", {
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "/api/extraction-drafts/draft%2F2/reject", {
       method: "POST",
       ...actorRequest
     });
+    expect(prototypeSessionPostCount(fetchMock)).toBe(1);
   });
 
   it("posts bulk extraction draft reviews as a reviewer", async () => {
@@ -1056,6 +1065,101 @@ describe("fetchDashboardData", () => {
       method: "DELETE",
       credentials: "include"
     });
+  });
+
+  it("reuses one prototype session for repeated same-actor calls", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({ id: "reviewer-1" }) };
+      }
+      return { ok: true, json: async () => ({ id: "me" }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchCurrentUser();
+    await fetchCurrentUser();
+
+    expect(prototypeSessionPostCount(fetchMock)).toBe(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/users/me", actorRequest);
+  });
+
+  it("opens a new prototype session after a 401 and after sign-out", async () => {
+    let sessionPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/auth/prototype-session") && init?.method === "POST") {
+        sessionPosts += 1;
+        return { ok: true, json: async () => ({ id: "reviewer-1" }) };
+      }
+      if (url.includes("/auth/prototype-session") && init?.method === "DELETE") {
+        return { ok: true, status: 204, json: async () => undefined };
+      }
+      if (sessionPosts === 1) {
+        return {
+          ok: false,
+          status: 401,
+          json: async () => ({ error: "Unauthorized" })
+        };
+      }
+      return { ok: true, json: async () => ({ id: "me" }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchCurrentUser()).rejects.toBeInstanceOf(ApiError);
+    expect(sessionPosts).toBe(1);
+
+    // 401 cleared the reuse cache, so the next same-actor call opens again.
+    await fetchCurrentUser();
+    expect(sessionPosts).toBe(2);
+
+    await closePrototypeSession();
+    await fetchCurrentUser();
+    expect(sessionPosts).toBe(3);
+  });
+
+  it("serializes concurrent actorRequest opens so overlapping actors do not race", async () => {
+    let inFlightPosts = 0;
+    let maxInFlightPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        inFlightPosts += 1;
+        maxInFlightPosts = Math.max(maxInFlightPosts, inFlightPosts);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlightPosts -= 1;
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await Promise.all([buildActorRequest("learner"), buildActorRequest("reviewer")]);
+
+    expect(maxInFlightPosts).toBe(1);
+    expect(prototypeSessionPostCount(fetchMock)).toBe(2);
+  });
+
+  it("serializes fetchAsActor the same way as actorRequest", async () => {
+    let inFlightPosts = 0;
+    let maxInFlightPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        inFlightPosts += 1;
+        maxInFlightPosts = Math.max(maxInFlightPosts, inFlightPosts);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlightPosts -= 1;
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await Promise.all([
+      fetchAsActor("learner", "/api/users/me"),
+      fetchAsActor("reviewer", "/api/users/me")
+    ]);
+
+    expect(maxInFlightPosts).toBe(1);
+    expect(prototypeSessionPostCount(fetchMock)).toBe(2);
   });
 
   it("includes server error details when prototype sign-out fails", async () => {

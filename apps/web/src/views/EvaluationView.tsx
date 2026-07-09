@@ -191,7 +191,11 @@ export function EvaluationView({
             <div className="failure-list">
               {activeRun.failures.map((failure) => (
                 <p key={`${failure.category}-${failure.itemId}`}>
-                  <strong>{failure.category}</strong> {failure.itemId}: {failure.message}
+                  {t("eval.failureRow", {
+                    category: formatMetric(failure.category, t),
+                    itemId: failure.itemId,
+                    message: failure.message
+                  })}
                 </p>
               ))}
             </div>

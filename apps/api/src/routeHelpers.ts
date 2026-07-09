@@ -3,6 +3,8 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   PROTOTYPE_SESSION_COOKIE,
   isPrototypeSessionActive,
+  remainingPrototypeSessionMs,
+  renewPrototypeSessionExpiry,
   serializeExpiredPrototypeSessionCookie,
   serializePrototypeSessionCookie,
   type PrototypeSessionMap,
@@ -23,14 +25,21 @@ export const MODEL_REQUIRED_MESSAGE =
 
 export { parseStringArray } from "./parseArrays.js";
 export {
+  DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS,
   DEFAULT_PROTOTYPE_SESSION_TTL_MS,
+  PROTOTYPE_SESSION_ABSOLUTE_MAX_ENV_NAME,
   PROTOTYPE_SESSION_COOKIE,
   PROTOTYPE_SESSION_MAX_AGE_SECONDS,
   PROTOTYPE_SESSION_TTL_ENV_NAME,
   isPrototypeSessionActive,
+  prototypeSessionAbsoluteDeadline,
   prototypeSessionCookieSecure,
   pruneExpiredPrototypeSessions,
+  readPrototypeSessionAbsoluteMaxMs,
   readPrototypeSessionTtlMs,
+  remainingPrototypeSessionMs,
+  renewPrototypeSessionExpiry,
+  revokePrototypeSessionsForUser,
   serializeExpiredPrototypeSessionCookie,
   serializePrototypeSessionCookie
 } from "./prototypeSessions.js";
@@ -58,7 +67,7 @@ export type ResolvedActor = {
   actor: User;
   authMethod: "prototype-session" | "server-token";
   /** Present when authMethod is prototype-session; used to refresh cookie Max-Age on sliding renewal. */
-  prototypeSession?: { sessionId: string; ttlMs: number };
+  prototypeSession?: { sessionId: string; ttlMs: number; maxAgeSeconds: number };
 };
 
 export type NeuralMapResponse = NeuralMap & {
@@ -206,12 +215,18 @@ export function resolveActorContext(
     } else {
       const sessionActor = actorById(state, prototypeSession.userId);
       if (sessionActor) {
-        // Sliding renewal: each successful use within the TTL extends the deadline.
-        prototypeSession.expiresAt = currentTime + prototypeSession.ttlMs;
+        // Sliding renewal capped by absoluteMaxMs from createdAt.
+        prototypeSession.expiresAt = renewPrototypeSessionExpiry(prototypeSession, currentTime);
+        const remainingMs = remainingPrototypeSessionMs(prototypeSession, currentTime);
         return {
           actor: sessionActor,
           authMethod: "prototype-session",
-          prototypeSession: { sessionId, ttlMs: prototypeSession.ttlMs }
+          prototypeSession: {
+            sessionId,
+            ttlMs: prototypeSession.ttlMs,
+            // Browser Max-Age tracks remaining lifetime (sliding ∩ absolute), not a full TTL reset.
+            maxAgeSeconds: Math.max(1, Math.ceil(remainingMs / 1000))
+          }
         };
       }
       // Orphan eviction: user removed (reseed/edit) while the cookie remains.
@@ -252,7 +267,7 @@ export function refreshPrototypeSessionCookie(
     "Set-Cookie",
     serializePrototypeSessionCookie(
       resolved.prototypeSession.sessionId,
-      Math.ceil(resolved.prototypeSession.ttlMs / 1000)
+      resolved.prototypeSession.maxAgeSeconds
     )
   );
 }

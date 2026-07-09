@@ -140,4 +140,24 @@ describe("EvaluationView", () => {
     expect(screen.getByRole("progressbar", { name: "Note quality" })).toBeInTheDocument();
     expect(screen.getByRole("progressbar", { name: "Corpus coverage" })).toBeInTheDocument();
   });
+
+  it("localizes failure category labels in the latest-run breakdown", () => {
+    renderEvaluationView({
+      evaluations: [
+        createRun({
+          failures: [
+            {
+              category: "noteAccuracy",
+              languageId: "avenik",
+              itemId: "note-1",
+              message: "Missing note content for verb chains"
+            }
+          ]
+        })
+      ]
+    });
+
+    expect(screen.getByText("Note accuracy note-1: Missing note content for verb chains")).toBeInTheDocument();
+    expect(screen.queryByText(/noteAccuracy/)).not.toBeInTheDocument();
+  });
 });

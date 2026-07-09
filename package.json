@@ -24,6 +24,7 @@
     "verify:beta": "node scripts/verifyBetaCli.mjs",
     "ci:green": "node scripts/ciGreenSmoke.mjs",
     "smoke": "tsx scripts/smokeIngestion.mjs",
+    "smoke:backup": "tsx scripts/smokeBackupRestore.mjs",
     "desktop": "node scripts/startDesktop.mjs",
     "desktop:package": "npm run build && node scripts/packageDesktop.mjs",
     "desktop:smoke": "node scripts/smokeDesktopPackage.mjs",

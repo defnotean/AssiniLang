@@ -1,5 +1,5 @@
 import type { Dispatch, ReactNode, SetStateAction } from "react";
-import { useI18n } from "../i18n";
+import { useI18n, type MessageKey } from "../i18n";
 import { LLM_PROVIDER_OPTIONS } from "../lib/llmProviders";
 import type { SettingsFormState } from "../lib/modelSettings";
 
@@ -31,7 +31,9 @@ export function ModelSettingsFormFields({
             onChange={(event) => setForm((current) => ({ ...current, provider: event.target.value }))}
           >
             {LLM_PROVIDER_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {t(`model.providerOption.${option.value}` as MessageKey)}
+              </option>
             ))}
           </select>
         </div>

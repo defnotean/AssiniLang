@@ -282,6 +282,31 @@ describe("public language views", () => {
     delete (missingIntegrity as { integrity?: unknown }).integrity;
     expect(verifyExportIntegrity(missingIntegrity)).toBe(false);
 
+    const nullIntegrity = {
+      ...snapshot!,
+      integrity: null
+    };
+    expect(verifyExportIntegrity(nullIntegrity)).toBe(false);
+
+    const reorderedPolicy = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        redactionPolicy: [...snapshot!.integrity.redactionPolicy].reverse()
+      }
+    };
+    expect(reorderedPolicy.integrity.redactionPolicy).not.toEqual(EXPORT_REDACTION_POLICY);
+    expect(verifyExportIntegrity(reorderedPolicy)).toBe(false);
+
+    const overlongHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: `${snapshot!.integrity.contentHash}0`
+      }
+    };
+    expect(verifyExportIntegrity(overlongHash)).toBe(false);
+
     const mutatedPayload = {
       ...snapshot!,
       exportedAt: "2099-01-01T00:00:00.000Z"

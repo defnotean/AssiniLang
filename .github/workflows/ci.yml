@@ -40,6 +40,9 @@ jobs:
       - name: Run ingestion smoke test
         run: npm run smoke
 
+      - name: Run backup/restore smoke test
+        run: npm run smoke:backup
+
       - name: Built-dist startup smoke (/health + /ready)
         shell: bash
         env:

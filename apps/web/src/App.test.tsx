@@ -2250,7 +2250,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Test connection" }));
 
     await waitFor(() => expect(apiMock.checkLlmReachability).toHaveBeenCalledTimes(1));
-    expect(await screen.findByText("No external provider configured.")).toBeInTheDocument();
+    expect(await screen.findByText(/No external provider configured/)).toBeInTheDocument();
   });
 
   it("checks LLM reachability and reports a reachable provider with mode and latency", async () => {

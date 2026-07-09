@@ -1,6 +1,6 @@
 import type { LlmReachability, LlmStatus } from "../api";
 import { useI18n } from "../i18n";
-import { formatMode, formatReachability } from "../lib/format";
+import { formatLlmProvider, formatMode, formatReachability, localizeLlmStatusWarning } from "../lib/format";
 import { modelDisplayName } from "../lib/modelFormatting";
 
 type ProviderReadinessPanelProps = {
@@ -41,6 +41,11 @@ export function ProviderReadinessPanel({
           {status.configured ? t("model.configured") : t("model.incomplete")}
         </span>
       </div>
+      {!status.configured && (
+        <p className="muted empty-state" role="status" aria-live="polite">
+          {t("model.needsConfigurationHint")}
+        </p>
+      )}
       <dl className="detail-grid">
         <div>
           <dt>{t("model.mode")}</dt>
@@ -48,7 +53,7 @@ export function ProviderReadinessPanel({
         </div>
         <div>
           <dt>{t("model.provider")}</dt>
-          <dd>{status.provider}</dd>
+          <dd>{formatLlmProvider(status.provider, t)}</dd>
         </div>
         <div>
           <dt>{t("model.model")}</dt>
@@ -73,7 +78,7 @@ export function ProviderReadinessPanel({
       {status.warnings.length > 0 && (
         <div className="warning-list">
           {status.warnings.map((warning, index) => (
-            <p key={`${index}:${warning}`}>{warning}</p>
+            <p key={`${index}:${warning}`}>{localizeLlmStatusWarning(warning, t)}</p>
           ))}
         </div>
       )}

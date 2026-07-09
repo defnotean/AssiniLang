@@ -41,12 +41,15 @@ npm.cmd run seed
 npm.cmd run eval
 npm.cmd run build
 npm.cmd run smoke
+npm.cmd run smoke:backup
 npm.cmd run ci:green
 ```
 
 `npm.cmd run smoke` exercises the ingestion workflow end to end against an in-memory server.
 
-`npm.cmd run ci:green` is a fast pre-push helper that audits production dependencies only (`npm audit --omit=dev --audit-level=moderate`). It complements CI’s full `npm audit` (which includes devDependencies) and does **not** replace `verify` or `smoke`.
+`npm.cmd run smoke:backup` runs a JsonStore backup → corrupt live → restore round-trip, plus CLI refusal checks (directory / same-path / existing without `--force`), SQLite force-overwrite restore, and dry-run validation of an invalid workspace (CI also runs this after ingestion smoke).
+
+`npm.cmd run ci:green` is a fast pre-push helper that audits production dependencies only (`npm audit --omit=dev --audit-level=moderate`). It complements CI’s full `npm audit` (which includes devDependencies) and does **not** replace `verify`, `smoke`, or `smoke:backup`.
 
 ### Deterministic evaluation baseline
 
