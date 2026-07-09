@@ -499,6 +499,9 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/Prototype auth is disabled/i.test(normalized)) {
     return { i18nKey: "errors.prototypeAuthDisabled" };
   }
+  if (/Invalid prototype session body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidPrototypeSessionBody" };
+  }
   if (/Missing languageId/i.test(normalized)) {
     return { i18nKey: "errors.missingLanguageId" };
   }

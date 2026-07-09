@@ -149,6 +149,7 @@ describe("project documentation", () => {
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
+        "errors.invalidPrototypeSessionBody",
         "errors.missingLanguageId",
         "errors.payloadTooLarge",
         "app.rateLimitExceeded",
@@ -207,6 +208,8 @@ describe("project documentation", () => {
         "hard-link alias",
         "validates the live workspace",
         "not an existing directory",
+        "backup source is an existing directory",
+        "same clear file-path error as backup",
         "Desktop restore validates"
       ],
       "docs/operator-recovery.md": [
@@ -222,6 +225,7 @@ describe("project documentation", () => {
         "processingStartedAt",
         "npm.cmd run seed",
         "existing directory is rejected",
+        "refuses when the backup path is a directory",
         "Desktop's restore-latest"
       ],
       "docs/product-guide.md": [
@@ -239,7 +243,9 @@ describe("project documentation", () => {
         "ingest.processingInterruptedByRestart",
         "relative roots were set",
         "errors.prototypeAuthDisabled",
-        "app.rateLimitExceeded"
+        "app.rateLimitExceeded",
+        "destination is a directory",
+        "backup source is a directory"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

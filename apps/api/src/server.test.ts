@@ -636,6 +636,17 @@ describe("api server", () => {
     });
 
     const enabled = createServer({ initialState: buildTestWorkspaceState(), enablePrototypeAuth: true });
+    const invalidBody = await enabled.inject({
+      method: "POST",
+      url: "/auth/prototype-session",
+      payload: { userId: "   " }
+    });
+    expect(invalidBody.statusCode).toBe(400);
+    expect(invalidBody.json()).toEqual({
+      error: "Invalid prototype session body",
+      i18nKey: "errors.invalidPrototypeSessionBody"
+    });
+
     const session = await enabled.inject({
       method: "POST",
       url: "/auth/prototype-session",

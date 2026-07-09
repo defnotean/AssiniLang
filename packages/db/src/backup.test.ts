@@ -112,6 +112,18 @@ it("rejects backup when the destination is an existing directory", async () => {
   await expect(store.backupTo(destinationDir)).rejects.toThrow(/must be a file path, not a directory/);
 });
 
+it("rejects restore when the backup source is an existing directory", async () => {
+  const dbPath = join(dir, "db.json");
+  const sourceDir = join(dir, "restore-folder");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+  await mkdir(sourceDir, { recursive: true });
+
+  await expect(store.restoreFrom(sourceDir)).rejects.toThrow(/must be a file path, not a directory/);
+  expect(await store.read()).toEqual(before);
+});
+
 it("treats a symlink alias of the live database as the same file", async () => {
   if (process.platform === "win32") {
     // Creating file symlinks on Windows often needs elevated privileges.

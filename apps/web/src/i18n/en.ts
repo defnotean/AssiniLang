@@ -133,6 +133,7 @@ export const en = {
   "errors.languageNotFound": "That language was not found. Select another language or create one first.",
   "errors.missingLanguageId": "Choose a language before generating draft notes.",
   "errors.prototypeAuthDisabled": "Local prototype sign-in is disabled on this API. Start with npm run dev, or set ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
+  "errors.invalidPrototypeSessionBody": "Choose a valid local prototype user before signing in.",
   "errors.payloadTooLarge": "That request is too large. Shrink the payload or upload a smaller file, then retry.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).

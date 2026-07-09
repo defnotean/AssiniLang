@@ -278,6 +278,29 @@ describe("localizeApiError", () => {
     ).toBe("That request is too large. Shrink the payload or upload a smaller file, then retry.");
   });
 
+  it("localizes invalid prototype session bodies via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /auth/prototype-session (400): Invalid prototype session body", {
+          status: 400,
+          i18nKey: "errors.invalidPrototypeSessionBody"
+        }),
+        t,
+        "learner.errSubmissionFailed"
+      )
+    ).toBe("Choose a valid local prototype user before signing in.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /auth/prototype-session (400): Invalid prototype session body", {
+          status: 400
+        }),
+        t,
+        "learner.errSubmissionFailed"
+      )
+    ).toBe("Choose a valid local prototype user before signing in.");
+  });
+
   it("prefers rate-limit i18nParams seconds over Retry-After message parsing", () => {
     expect(
       localizeApiError(

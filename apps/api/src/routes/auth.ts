@@ -41,7 +41,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const body = parsePrototypeSessionBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid prototype session body" };
+      return {
+        error: "Invalid prototype session body",
+        i18nKey: "errors.invalidPrototypeSessionBody"
+      };
     }
 
     const state = await readState();

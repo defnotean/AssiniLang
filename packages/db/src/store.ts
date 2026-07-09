@@ -742,8 +742,16 @@ export class JsonStore {
     }
 
     try {
-      await stat(source);
+      const sourceStat = await stat(source);
+      if (sourceStat.isDirectory()) {
+        throw new Error(
+          `Failed to restore local database at ${this.dbPath}: backup source must be a file path, not a directory (${source})`
+        );
+      }
     } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        throw error;
+      }
       throw new Error(`Failed to restore local database at ${this.dbPath}: backup not found at ${source}`, {
         cause: error
       });
