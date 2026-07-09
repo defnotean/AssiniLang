@@ -31,6 +31,7 @@
     "desktop:package:smoke": "npm run desktop:package && npm run desktop:smoke",
     "desktop:package:smoke:built": "node scripts/packageDesktop.mjs && npm run desktop:smoke",
     "smoke:web": "electron scripts/smokeWeb.cjs",
+    "smoke:web:linux-ci": "electron --no-sandbox scripts/smokeWeb.cjs",
     "dev": "node scripts/dev.mjs",
     "demo": "npm run seed && npm run eval && npm run dev"
   },
