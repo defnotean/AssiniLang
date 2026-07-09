@@ -310,6 +310,7 @@ export function App() {
               type="button"
               className="theme-toggle"
               aria-label={theme === "dark" ? t("theme.switchToLight") : t("theme.switchToDark")}
+              aria-pressed={theme === "dark"}
               onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
             >
               {theme === "dark" ? t("theme.light") : t("theme.dark")}

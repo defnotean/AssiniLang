@@ -125,7 +125,10 @@ describe("project documentation", () => {
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
         "\"async\": true",
-        "duplicate"
+        "duplicate",
+        "processingAttempts",
+        "ingest.sourceMaxProcessingAttempts",
+        "ExerciseAuthoringBody"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -144,7 +147,14 @@ describe("project documentation", () => {
         "model:verify",
         "Building a language from raw sources"
       ],
-      "docs/ingestion.md": ["## Source kinds", "## SSRF guard", "## Error catalogue", "## Duplicate flags on drafts", "```mermaid"],
+      "docs/ingestion.md": [
+        "## Source kinds",
+        "## SSRF guard",
+        "## Error catalogue",
+        "## Duplicate flags on drafts",
+        "```mermaid",
+        "Source processing attempt limit reached"
+      ],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
       "docs/operator-recovery.md": [
         "## Local data paths",

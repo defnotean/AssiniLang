@@ -151,6 +151,7 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Upload requires a multipart file field` / `Uploaded file is empty` | 400 | Bad multipart upload | Send one non-empty file field. |
 | `Source not found: ...` / `Language not found: ...` | 404 | Unknown IDs | Check the source/language ID. |
 | `Source is already processing: ...` | 409 | A sync or async run is in flight (or a crash left the asset stuck) | Wait for polling to finish; after a crash, see [troubleshooting](troubleshooting.md). |
+| `Source processing attempt limit reached (5).` (`i18nKey: ingest.sourceMaxProcessingAttempts`) | 409 | `processingAttempts` already reached the max of 5 | Inspect the asset error/history, fix the underlying failure, or register a fresh source; do not keep retrying the same asset. |
 | `Source URL is not a valid URL: ...` / `Source URLs must use http or https.` | 422 | Unparseable URL or wrong scheme | Use a full http(s) URL. |
 | `Source URL points at a private or local network ... and was blocked.` | 422 | SSRF guard blocked the hostname/IP | Use a public URL, or set `ASSINI_ALLOW_PRIVATE_URLS=1` in a trusted local setup. |
 | `Obsidian vault import is disabled until ASSINI_OBSIDIAN_VAULT_ROOTS is set ...` / `Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.` | 400 | Vault roots unset, or path outside allowlist (`..` / symlink escapes included) | Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to semicolon-separated absolute roots and import a path under one of them. |

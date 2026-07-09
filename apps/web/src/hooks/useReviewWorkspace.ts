@@ -2,6 +2,7 @@ import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import type { DashboardData } from "../api";
 import { generateDraftNotes, generateModelDraftNotes, reviewNote, runEvaluation } from "../api";
 import type { PublicNote, ReviewStatus, ViewMode } from "../lib/types";
+import { localizeApiError } from "../lib/format";
 import { REVIEWER_COMMENTS } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 
@@ -62,8 +63,7 @@ export function useReviewWorkspace(
       await runEvaluation();
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.evaluationRunFailed");
-      setWorkspaceActionError(message);
+      setWorkspaceActionError(localizeApiError(error, t, "errors.evaluationRunFailed"));
     } finally {
       setIsEvaluating(false);
     }
@@ -77,8 +77,7 @@ export function useReviewWorkspace(
       await generateDraftNotes(selectedLanguageId);
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.draftGenerationFailed");
-      setWorkspaceActionError(message);
+      setWorkspaceActionError(localizeApiError(error, t, "errors.draftGenerationFailed"));
     } finally {
       setIsDrafting(false);
     }
@@ -106,8 +105,7 @@ export function useReviewWorkspace(
         warnings.length > 0 ? `${summary}${groundingSummary} ${warnings.join(" ")}` : `${summary}${groundingSummary}`
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.modelDraftGenerationFailed");
-      setModelDraftError(message);
+      setModelDraftError(localizeApiError(error, t, "errors.modelDraftGenerationFailed"));
     } finally {
       setIsModelDrafting(false);
     }
@@ -124,10 +122,9 @@ export function useReviewWorkspace(
       });
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.noteReviewFailed");
       // Keep the workspace mounted; surface the failure in ReviewView instead of
       // replacing the whole app with a fatal load-state screen.
-      setReviewActionError(message);
+      setReviewActionError(localizeApiError(error, t, "errors.noteReviewFailed"));
     } finally {
       setReviewingNoteId(null);
     }
@@ -144,8 +141,7 @@ export function useReviewWorkspace(
       });
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("errors.noteExplanationUpdateFailed");
-      setReviewActionError(message);
+      setReviewActionError(localizeApiError(error, t, "errors.noteExplanationUpdateFailed"));
       throw error;
     } finally {
       setReviewingNoteId(null);

@@ -730,6 +730,27 @@ describe("App", () => {
     expect(getInitialTheme()).toBe("dark");
   });
 
+  it("exposes theme toggle pressed state and flips the document theme", async () => {
+    await renderReady();
+
+    const toggle = screen.getByRole("button", { name: "Switch to light theme" });
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+
+    fireEvent.click(toggle);
+
+    const lightToggle = screen.getByRole("button", { name: "Switch to dark theme" });
+    expect(lightToggle).toHaveAttribute("aria-pressed", "false");
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(lightToggle).toHaveTextContent("Dark");
+
+    fireEvent.click(lightToggle);
+
+    const darkToggle = screen.getByRole("button", { name: "Switch to light theme" });
+    expect(darkToggle).toHaveAttribute("aria-pressed", "true");
+    expect(document.documentElement.dataset.theme).toBe("dark");
+  });
+
   it("filters corpus passages and renders morpheme chips from API data", async () => {
     await renderReady();
 
@@ -2833,6 +2854,23 @@ describe("App", () => {
       })
     );
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
+  });
+
+  it("localizes expired-session errors from note review instead of raw API text", async () => {
+    apiMock.reviewNote.mockRejectedValue(
+      new ApiError("Request failed: /notes/avn-rule-verb-chain-note/review (401): Unauthorized", { status: 401 })
+    );
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Approve verb chains" }));
+
+    expect(
+      await screen.findByText(
+        "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Unauthorized/i)).not.toBeInTheDocument();
   });
 
   it("edits the selected note explanation from the review queue", async () => {

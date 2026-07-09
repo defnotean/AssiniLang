@@ -136,6 +136,8 @@ Permanently removes the language and all workspace records scoped to it (corpus,
 
 Successful processing marks the source `processed`, stores a summary (and transcript for audio), and returns the new `proposed` drafts plus warnings. Failures mark the source `failed` with a sanitized error and return `422`; the source can be reprocessed.
 
+Each claim increments `processingAttempts` and stamps `processingStartedAt` / `processingHeartbeatAt` on the asset (heartbeats continue while the job runs). After 5 failed or abandoned claims, further `POST /sources/:sourceId/process` calls return `409` with `i18nKey: "ingest.sourceMaxProcessingAttempts"` so operators can stop retry loops and inspect the asset instead of spinning forever.
+
 The route also supports background processing for long sources: send a JSON body of `{ "async": true }` and the server validates the same preconditions, marks the source `processing`, and returns `202` with the updated asset (and empty `drafts`/`warnings`). Extraction then runs in the background and persists the same results as the synchronous path: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset. Poll `GET /languages/:languageId/sources` until the asset leaves `processing`. A source that is already `processing` returns `409` in both modes.
 
 ## Extraction drafts
@@ -220,6 +222,8 @@ Important validation:
 - At least two adversarial answers are required.
 - Adversarial answers and reasons must be nonblank, and adversarial answers must not duplicate accepted answers or another adversarial probe.
 - Translate-to-target expected answers must be present in same-language corpus text; choose-particle answers must be inside the exercise's allowed vocabulary.
+
+Dry-run validation previews the same checks without persisting. Add `?dryRun=1` to the POST URL or include `"dryRun": true` in the JSON body (alongside the normal authoring fields). The response is `{ "ok": boolean, "errors": string[], "warnings": string[], "preview": ExerciseAuthoringBody | null }`. When `ok` is true, `preview` echoes the validated exercise fields that would be stored. Dry-run requests still require reviewer, lead, or admin auth but do not append audit events or mutate exercise state.
 
 ## Model-backed generation
 

@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "./lib/apiClient";
 import { IngestView } from "./views/IngestView";
 
 const apiMock = vi.hoisted(() => ({
@@ -169,5 +170,37 @@ describe("IngestView bulk draft review", () => {
       expect(apiMock.rejectExtractionDraft).toHaveBeenCalledWith("draft-2");
     });
     expect(apiMock.bulkReviewExtractionDrafts).not.toHaveBeenCalled();
+  });
+
+  it("localizes expired-session errors from bulk draft review instead of raw API text", async () => {
+    apiMock.bulkReviewExtractionDrafts.mockRejectedValue(
+      new ApiError("Request failed: /extraction-drafts/bulk-review (401): Unauthorized", { status: 401 })
+    );
+
+    await renderIngestView();
+
+    fireEvent.click(screen.getByLabelText("Select draft draft-1"));
+    fireEvent.click(screen.getByRole("button", { name: "Accept selected" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm accept selected" }));
+
+    await screen.findByText(
+      "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+    );
+    expect(screen.queryByText(/Unauthorized/i)).not.toBeInTheDocument();
+  });
+
+  it("localizes expired-session errors from single-draft accept", async () => {
+    apiMock.acceptExtractionDraft.mockRejectedValue(
+      new ApiError("Request failed: /extraction-drafts/draft-1/accept (401): Unauthorized", { status: 401 })
+    );
+
+    await renderIngestView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept draft draft-1" }));
+
+    await screen.findByText(
+      "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+    );
+    expect(screen.queryByText(/Unauthorized/i)).not.toBeInTheDocument();
   });
 });

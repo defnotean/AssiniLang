@@ -4,10 +4,20 @@ import { useI18n } from "../i18n";
 
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useI18n();
-  return <span className={`status-badge ${status}`}>{formatStatus(status, t)}</span>;
+  const label = formatStatus(status, t);
+  return (
+    <span className={`status-badge ${status}`} role="status" aria-label={label}>
+      {label}
+    </span>
+  );
 }
 
 export function ConfidenceBadge({ confidence }: { confidence: Note["confidence"] }) {
   const { t } = useI18n();
-  return <span className={`confidence-badge ${confidence}`}>{t(`confidence.${confidence}`)}</span>;
+  const label = t(`confidence.${confidence}`);
+  return (
+    <span className={`confidence-badge ${confidence}`} role="status" aria-label={label}>
+      {label}
+    </span>
+  );
 }

@@ -333,8 +333,7 @@ export function useIngestExtraction(
       await refreshIntake();
       await onIntakeCommitted?.();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.draftReviewFailed");
-      setDraftError(message);
+      setDraftError(localizeApiError(error, t, "ingest.draftReviewFailed"));
     } finally {
       setReviewingDraftId(null);
     }
@@ -384,8 +383,7 @@ export function useIngestExtraction(
         await onIntakeCommitted?.();
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.bulkReviewFailed");
-      setDraftError(message);
+      setDraftError(localizeApiError(error, t, "ingest.bulkReviewFailed"));
     } finally {
       setIsBulkReviewing(false);
     }
