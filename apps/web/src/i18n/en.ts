@@ -134,6 +134,12 @@ export const en = {
   "errors.missingLanguageId": "Choose a language before generating draft notes.",
   "errors.prototypeAuthDisabled": "Local prototype sign-in is disabled on this API. Start with npm run dev, or set ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
   "errors.invalidPrototypeSessionBody": "Choose a valid local prototype user before signing in.",
+  "errors.prototypeAuthForbidden": "That local prototype user cannot sign in. Choose learner, elder, programmer, or reviewer.",
+  "errors.invalidAiSessionBody": "Provide a valid chat session: language, mode, and seed prompt.",
+  "errors.invalidAiMessageBody": "Enter a non-empty message before sending.",
+  "errors.aiSessionNotFound": "That chat session was not found. Start a new conversation.",
+  "errors.invalidReviewBody": "Choose a valid review status before saving.",
+  "errors.reviewDispositionRequiresComment": "Add a reviewer comment before recording this disposition.",
   "errors.payloadTooLarge": "That request is too large. Shrink the payload or upload a smaller file, then retry.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).

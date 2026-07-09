@@ -136,12 +136,18 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const body = parseReviewBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid review body" };
+      return {
+        error: "Invalid review body",
+        i18nKey: "errors.invalidReviewBody"
+      };
     }
 
     if (isReviewDispositionStatus(body.status) && !body.reviewerComment) {
       reply.code(400);
-      return { error: "Review dispositions require reviewerComment" };
+      return {
+        error: "Review dispositions require reviewerComment",
+        i18nKey: "errors.reviewDispositionRequiresComment"
+      };
     }
 
     const explanationValidationError = noteExplanationValidationError(body.explanation);

@@ -676,6 +676,10 @@ describe("api server", () => {
       payload: { userId: "lead-1" }
     });
     expect(leadSession.statusCode).toBe(403);
+    expect(leadSession.json()).toEqual({
+      error: "Forbidden",
+      i18nKey: "errors.prototypeAuthForbidden"
+    });
 
     const adminSession = await enabled.inject({
       method: "POST",
@@ -683,6 +687,21 @@ describe("api server", () => {
       payload: { userId: "admin-1" }
     });
     expect(adminSession.statusCode).toBe(403);
+    expect(adminSession.json()).toEqual({
+      error: "Forbidden",
+      i18nKey: "errors.prototypeAuthForbidden"
+    });
+
+    const unknownUser = await enabled.inject({
+      method: "POST",
+      url: "/auth/prototype-session",
+      payload: { userId: "not-a-user" }
+    });
+    expect(unknownUser.statusCode).toBe(403);
+    expect(unknownUser.json()).toEqual({
+      error: "Forbidden",
+      i18nKey: "errors.prototypeAuthForbidden"
+    });
   });
 
   it("returns languages and corpus", async () => {
@@ -3217,7 +3236,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Review dispositions require reviewerComment" });
+    expect(response.json()).toEqual({
+      error: "Review dispositions require reviewerComment",
+      i18nKey: "errors.reviewDispositionRequiresComment"
+    });
 
     const after = await fetchReviewedNote(app);
     expect(after.status).toBe(before.status);
@@ -3240,7 +3262,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Invalid review body" });
+    expect(response.json()).toEqual({
+      error: "Invalid review body",
+      i18nKey: "errors.invalidReviewBody"
+    });
 
     const note = await fetchReviewedNote(app);
     expect(note.status).toBe("draft");
@@ -3264,7 +3289,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Invalid review body" });
+    expect(response.json()).toEqual({
+      error: "Invalid review body",
+      i18nKey: "errors.invalidReviewBody"
+    });
 
     const after = await fetchReviewedNote(app);
     expect(after.status).toBe(before.status);
@@ -3573,6 +3601,63 @@ describe("api server", () => {
     expect(JSON.stringify(providerInputs)).not.toContain("expectedAnswers");
     expect(JSON.stringify(followUp.json())).not.toContain("ASSINI_LLM_API_KEY");
     expect(JSON.stringify(followUp.json())).not.toContain("OPENAI_API_KEY");
+  });
+
+  it("returns i18nKey for invalid AI session and message bodies", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const invalidSession = await app.inject({
+      method: "POST",
+      url: "/ai/sessions",
+      headers: authHeaders("learner-1"),
+      payload: { languageId: "   ", mode: "learner_practice", seedPrompt: "Hello" }
+    });
+    expect(invalidSession.statusCode).toBe(400);
+    expect(invalidSession.json()).toEqual({
+      error: "Invalid AI session body",
+      i18nKey: "errors.invalidAiSessionBody"
+    });
+
+    const missingLanguage = await app.inject({
+      method: "POST",
+      url: "/ai/sessions",
+      headers: authHeaders("learner-1"),
+      payload: {
+        languageId: "not-a-language",
+        mode: "learner_practice",
+        seedPrompt: "Hello",
+        contextNoteIds: [],
+        contextPassageIds: []
+      }
+    });
+    expect(missingLanguage.statusCode).toBe(404);
+    expect(missingLanguage.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
+
+    const missingSession = await app.inject({
+      method: "GET",
+      url: "/ai/sessions/missing-session",
+      headers: authHeaders("learner-1")
+    });
+    expect(missingSession.statusCode).toBe(404);
+    expect(missingSession.json()).toEqual({
+      error: "AI session not found: missing-session",
+      i18nKey: "errors.aiSessionNotFound"
+    });
+
+    const invalidMessage = await app.inject({
+      method: "POST",
+      url: "/ai/sessions/missing-session/messages",
+      headers: authHeaders("learner-1"),
+      payload: { content: "   " }
+    });
+    expect(invalidMessage.statusCode).toBe(400);
+    expect(invalidMessage.json()).toEqual({
+      error: "Invalid AI message body",
+      i18nKey: "errors.invalidAiMessageBody"
+    });
   });
 
   it("returns sanitized LLM provider failure details for AI session creation", async () => {

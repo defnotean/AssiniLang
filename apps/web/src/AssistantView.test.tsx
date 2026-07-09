@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiSession } from "@assini/db";
 import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
+import { ApiError } from "./lib/apiClient";
 import { AssistantView } from "./views/AssistantView";
 
 const apiMock = vi.hoisted(() => ({
@@ -196,6 +197,23 @@ describe("AssistantView", () => {
     expect(screen.getByRole("button", { name: "Start conversation" })).not.toHaveAttribute("aria-busy", "true");
   });
 
+  it("localizes invalid AI session create bodies through localizeApiError", async () => {
+    apiMock.createAiSession.mockRejectedValueOnce(
+      new ApiError("Invalid AI session body", {
+        status: 400,
+        i18nKey: "errors.invalidAiSessionBody"
+      })
+    );
+
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("Seed prompt"), { target: { value: "Hello" } });
+    fireEvent.click(screen.getByRole("button", { name: "Start conversation" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Provide a valid chat session: language, mode, and seed prompt."
+    );
+  });
+
   it("renders a send error while keeping the conversation visible", async () => {
     render(<Harness />);
     await startConversation();
@@ -206,6 +224,23 @@ describe("AssistantView", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("AI session message failed 502");
     expect(screen.getByRole("alert")).toHaveAttribute("aria-live", "assertive");
+    expect(screen.getByText("Avenik verbs stack transparent suffix chains.")).toBeInTheDocument();
+  });
+
+  it("localizes invalid AI message bodies on send", async () => {
+    render(<Harness />);
+    await startConversation();
+
+    apiMock.continueAiSession.mockRejectedValueOnce(
+      new ApiError("Invalid AI message body", {
+        status: 400,
+        i18nKey: "errors.invalidAiMessageBody"
+      })
+    );
+    fireEvent.change(screen.getByLabelText("Message the assistant"), { target: { value: "Again?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Enter a non-empty message before sending.");
     expect(screen.getByText("Avenik verbs stack transparent suffix chains.")).toBeInTheDocument();
   });
 

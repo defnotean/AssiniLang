@@ -502,6 +502,21 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/Invalid prototype session body/i.test(normalized)) {
     return { i18nKey: "errors.invalidPrototypeSessionBody" };
   }
+  if (/Invalid AI session body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidAiSessionBody" };
+  }
+  if (/Invalid AI message body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidAiMessageBody" };
+  }
+  if (/^AI session not found:/i.test(normalized)) {
+    return { i18nKey: "errors.aiSessionNotFound" };
+  }
+  if (/Invalid review body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidReviewBody" };
+  }
+  if (/Review dispositions require reviewerComment/i.test(normalized)) {
+    return { i18nKey: "errors.reviewDispositionRequiresComment" };
+  }
   if (/Missing languageId/i.test(normalized)) {
     return { i18nKey: "errors.missingLanguageId" };
   }

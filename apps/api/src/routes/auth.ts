@@ -53,7 +53,10 @@ export function registerAuthRoutes(app: FastifyInstance, ctx: RouteContext): voi
     const actor = actorById(state, body.userId);
     if (!actor || !actorCan(actor, PROTOTYPE_AUTH_ROLES)) {
       reply.code(403);
-      return { error: "Forbidden" };
+      return {
+        error: "Forbidden",
+        i18nKey: "errors.prototypeAuthForbidden"
+      };
     }
 
     const sessionId = randomUUID();

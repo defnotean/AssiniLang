@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { AiSession } from "@assini/db";
 import { continueAiSession, createAiSession, fetchAiSession } from "../api";
 import { useI18n } from "../i18n";
+import { localizeApiError } from "../lib/format";
 import { getBrowserThemeStorage } from "../lib/theme";
 import type { AsyncState } from "../lib/types";
 
@@ -137,8 +138,10 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       rememberSessionId(languageId, session.id);
       setInput("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("assistant.errSessionCreateFailed");
-      setSessionState({ status: "error", message });
+      setSessionState({
+        status: "error",
+        message: localizeApiError(error, t, "assistant.errSessionCreateFailed")
+      });
     }
   }
 
@@ -155,8 +158,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
       rememberSessionId(session.languageId, session.id);
       setInput("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("assistant.errSessionMessageFailed");
-      setSendError(message);
+      setSendError(localizeApiError(error, t, "assistant.errSessionMessageFailed"));
     } finally {
       setIsSending(false);
     }

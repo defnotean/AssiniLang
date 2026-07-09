@@ -161,6 +161,12 @@ export const ar: Record<MessageKey, string> = {
   "errors.missingLanguageId": "اختر لغة قبل توليد مسودات الملاحظات.",
   "errors.prototypeAuthDisabled": "تسجيل الدخول المحلي معطّل على واجهة البرمجة هذه. شغّل عبر npm run dev، أو عيّن ASSINI_ENABLE_PROTOTYPE_AUTH=true.",
   "errors.invalidPrototypeSessionBody": "اختر مستخدمًا محليًا صالحًا قبل تسجيل الدخول.",
+  "errors.prototypeAuthForbidden": "لا يمكن لهذا المستخدم المحلي تسجيل الدخول. اختر متعلّمًا أو كبيرًا أو مبرمجًا أو مراجعًا.",
+  "errors.invalidAiSessionBody": "قدّم جلسة محادثة صالحة: اللغة والوضع وسؤال الافتتاح.",
+  "errors.invalidAiMessageBody": "أدخل رسالة غير فارغة قبل الإرسال.",
+  "errors.aiSessionNotFound": "لم يُعثر على جلسة المحادثة تلك. ابدأ محادثة جديدة.",
+  "errors.invalidReviewBody": "اختر حالة مراجعة صالحة قبل الحفظ.",
+  "errors.reviewDispositionRequiresComment": "أضف تعليق مراجع قبل تسجيل هذا القرار.",
   "errors.payloadTooLarge": "الطلب كبير جدًا. قلّص الحمولة أو ارفع ملفًا أصغر، ثم أعد المحاولة.",
 
   "viewConfig.profile.label": "الملف اللغوي",

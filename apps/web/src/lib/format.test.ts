@@ -301,6 +301,68 @@ describe("localizeApiError", () => {
     ).toBe("Choose a valid local prototype user before signing in.");
   });
 
+  it("localizes AI session and review validation errors via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid AI session body", {
+          status: 400,
+          i18nKey: "errors.invalidAiSessionBody"
+        }),
+        t,
+        "assistant.errSessionCreateFailed"
+      )
+    ).toBe("Provide a valid chat session: language, mode, and seed prompt.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /ai/sessions (400): Invalid AI session body", { status: 400 }),
+        t,
+        "assistant.errSessionCreateFailed"
+      )
+    ).toBe("Provide a valid chat session: language, mode, and seed prompt.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Invalid AI message body", {
+          status: 400,
+          i18nKey: "errors.invalidAiMessageBody"
+        }),
+        t,
+        "assistant.errSessionMessageFailed"
+      )
+    ).toBe("Enter a non-empty message before sending.");
+
+    expect(
+      localizeApiError(
+        new ApiError("AI session not found: missing-session", {
+          status: 404,
+          i18nKey: "errors.aiSessionNotFound"
+        }),
+        t,
+        "assistant.errSessionMessageFailed"
+      )
+    ).toBe("That chat session was not found. Start a new conversation.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Invalid review body", {
+          status: 400,
+          i18nKey: "errors.invalidReviewBody"
+        }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("Choose a valid review status before saving.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Review dispositions require reviewerComment", { status: 400 }),
+        t,
+        "errors.noteReviewFailed"
+      )
+    ).toBe("Add a reviewer comment before recording this disposition.");
+  });
+
   it("prefers rate-limit i18nParams seconds over Retry-After message parsing", () => {
     expect(
       localizeApiError(

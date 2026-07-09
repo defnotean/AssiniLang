@@ -23,10 +23,13 @@ describe("repository production hygiene", () => {
 
   it("documents the local CI green smoke helper for production audits", async () => {
     const script = await readProjectFile("scripts/ciGreenSmoke.mjs");
+    const developmentDocs = await readProjectFile("docs/development.md");
 
     expect(script).toContain(".github/workflows/ci.yml");
     expect(script).toContain("npm audit");
     expect(script).toContain("--omit=dev");
+    expect(developmentDocs).toContain("npm.cmd run ci:green");
+    expect(developmentDocs).toContain("--omit=dev");
   });
 
   it("wires the local CI green smoke helper in package.json scripts", async () => {

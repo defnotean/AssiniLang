@@ -50,7 +50,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const body = parseAiSessionBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid AI session body" };
+      return {
+        error: "Invalid AI session body",
+        i18nKey: "errors.invalidAiSessionBody"
+      };
     }
 
     const current = await readState();
@@ -61,7 +64,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
 
     if (!current.languages.some((language) => language.id === body.languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${body.languageId}` };
+      return {
+        error: `Language not found: ${body.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const contextError = validateAiSessionContext(current, body);
@@ -143,7 +149,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const session = state.aiSessions.find((item) => item.id === sessionId);
     if (!session) {
       reply.code(404);
-      return { error: `AI session not found: ${sessionId}` };
+      return {
+        error: `AI session not found: ${sessionId}`,
+        i18nKey: "errors.aiSessionNotFound"
+      };
     }
 
     if (!canReadAiSession(session, actor)) {
@@ -159,7 +168,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const body = parseAiMessageBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid AI message body" };
+      return {
+        error: "Invalid AI message body",
+        i18nKey: "errors.invalidAiMessageBody"
+      };
     }
 
     const current = await readState();
@@ -171,7 +183,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const currentSession = current.aiSessions.find((item) => item.id === sessionId);
     if (!currentSession) {
       reply.code(404);
-      return { error: `AI session not found: ${sessionId}` };
+      return {
+        error: `AI session not found: ${sessionId}`,
+        i18nKey: "errors.aiSessionNotFound"
+      };
     }
 
     if (!canWriteAiSessionMessage(currentSession, actor)) {
