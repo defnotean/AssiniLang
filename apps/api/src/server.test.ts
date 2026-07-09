@@ -3202,6 +3202,101 @@ describe("api server", () => {
     expect(JSON.stringify(observability.json())).not.toContain("Trace what the AI knows");
   });
 
+  it("enforces canReadAiSession on GET /ai/sessions/:sessionId", async () => {
+    const llmProvider: LlmProvider = {
+      name: "test-provider",
+      async generateAssistantMessage(input) {
+        return { content: `Safe response: ${input.prompt}`, warnings: [] };
+      }
+    };
+    const app = createServer({ initialState: buildTestWorkspaceState(), llmProvider });
+    const sessionPayload = {
+      languageId: TEST_LANGUAGE_ID,
+      seedPrompt: "Trace learner practice safely.",
+      contextNoteIds: [reviewedNoteId],
+      contextPassageIds: ["testlang-c001"]
+    };
+
+    async function createSession(mode: "learner_practice" | "elder_review" | "programmer_debug", userId: string) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/ai/sessions",
+        headers: authHeaders(userId),
+        payload: { ...sessionPayload, mode }
+      });
+      expect(response.statusCode).toBe(201);
+      return response.json().id as string;
+    }
+
+    async function readSession(sessionId: string, userId: string) {
+      return app.inject({
+        method: "GET",
+        url: `/ai/sessions/${encodeURIComponent(sessionId)}`,
+        headers: authHeaders(userId)
+      });
+    }
+
+    const learnerPracticeId = await createSession("learner_practice", "learner-1");
+    const elderReviewId = await createSession("elder_review", "elder-1");
+    const programmerDebugId = await createSession("programmer_debug", "programmer-1");
+
+    const anonymous = await app.inject({
+      method: "GET",
+      url: `/ai/sessions/${encodeURIComponent(learnerPracticeId)}`
+    });
+    expect(anonymous.statusCode).toBe(401);
+    expect(anonymous.json()).toEqual({ error: "Unauthorized" });
+
+    const learnerPracticeAccess = [
+      ["learner-1", 200],
+      ["elder-1", 200],
+      ["reviewer-1", 200],
+      ["lead-1", 200],
+      ["admin-1", 200],
+      ["programmer-1", 403]
+    ] as const;
+    for (const [userId, statusCode] of learnerPracticeAccess) {
+      const response = await readSession(learnerPracticeId, userId);
+      expect(response.statusCode).toBe(statusCode);
+      if (statusCode === 403) {
+        expect(response.json()).toEqual({ error: "Forbidden" });
+      }
+    }
+
+    const elderReviewAccess = [
+      ["elder-1", 200],
+      ["lead-1", 200],
+      ["reviewer-1", 403],
+      ["learner-1", 403]
+    ] as const;
+    for (const [userId, statusCode] of elderReviewAccess) {
+      const response = await readSession(elderReviewId, userId);
+      expect(response.statusCode).toBe(statusCode);
+    }
+
+    const programmerDebugAccess = [
+      ["programmer-1", 200],
+      ["lead-1", 200],
+      ["learner-1", 403],
+      ["elder-1", 403],
+      ["reviewer-1", 403]
+    ] as const;
+    for (const [userId, statusCode] of programmerDebugAccess) {
+      const response = await readSession(programmerDebugId, userId);
+      expect(response.statusCode).toBe(statusCode);
+    }
+
+    const reviewerView = await readSession(learnerPracticeId, "reviewer-1");
+    expect(reviewerView.statusCode).toBe(200);
+    expect(reviewerView.json()).toMatchObject({
+      createdBy: "redacted",
+      messages: [
+        expect.objectContaining({ role: "user", content: "[redacted user input]", createdBy: "redacted" }),
+        expect.objectContaining({ role: "assistant", content: expect.stringContaining("Safe response:") })
+      ]
+    });
+  });
+
   it("uses an injected LLM provider for AI sessions without exposing provider secrets or answer-key fields", async () => {
     const providerInputs: unknown[] = [];
     const llmProvider: LlmProvider = {

@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, getInitialTheme } from "./App";
 
@@ -689,6 +689,7 @@ describe("App", () => {
   });
 
   afterEach(() => {
+    cleanup();
     delete (window as any).assiniDesktop;
     delete (window.navigator as any).clipboard;
     vi.restoreAllMocks();
@@ -1979,7 +1980,9 @@ describe("App", () => {
     expect(await screen.findByRole("option", { name: /old-loaded-model/ })).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("Discovered models")).toHaveValue(oldModelId));
 
-    window.dispatchEvent(new Event("focus"));
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+    });
 
     expect(await screen.findByRole("option", { name: /new-loaded-model/ })).toBeInTheDocument();
     await waitFor(() => {

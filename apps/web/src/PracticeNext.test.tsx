@@ -29,20 +29,27 @@ const fixtureExercises = [
   createExercise("avn-ex-004", "Translate: I see the river.")
 ];
 
-function renderLearnerView(overrides: { onSelectExercise?: (exerciseId: string) => void; languageId?: string | null } = {}) {
+function renderLearnerView(overrides: {
+  onSelectExercise?: (exerciseId: string) => void;
+  languageId?: string | null;
+  exercises?: PublicExercise[];
+  selectedExercise?: PublicExercise | null;
+} = {}) {
+  const exercises = overrides.exercises ?? fixtureExercises;
+  const selectedExercise = overrides.selectedExercise === undefined ? exercises[0] ?? null : overrides.selectedExercise;
   const setSelectedExerciseId: Dispatch<SetStateAction<string | null>> = (value) => {
-    const next = typeof value === "function" ? value(fixtureExercises[0].id) : value;
+    const next = typeof value === "function" ? value(selectedExercise?.id ?? null) : value;
     overrides.onSelectExercise?.(next ?? "");
   };
 
   return render(
     <LearnerView
       languageId={overrides.languageId === undefined ? "avenik" : overrides.languageId}
-      exercises={fixtureExercises}
+      exercises={exercises}
       isWorkflowBusy={false}
       learner={{
-        selectedExercise: fixtureExercises[0],
-        selectedExerciseId: fixtureExercises[0].id,
+        selectedExercise,
+        selectedExerciseId: selectedExercise?.id ?? null,
         setSelectedExerciseId: overrides.onSelectExercise ? setSelectedExerciseId : vi.fn(),
         exerciseAnswer: "",
         setExerciseAnswer: vi.fn(),
@@ -138,5 +145,16 @@ describe("LearnerView practice next panel", () => {
     renderLearnerView({ languageId: null });
 
     expect(apiMock.fetchRecommendedExercises).not.toHaveBeenCalled();
+  });
+
+  it("shows empty exercise list and detail states when the language has no exercises", () => {
+    renderLearnerView({ exercises: [], selectedExercise: null });
+
+    const exerciseList = screen.getByRole("region", { name: "Exercise selector" });
+    expect(within(exerciseList).getByText("No exercises available.")).toBeInTheDocument();
+    expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
+
+    const detailPanel = screen.getByRole("region", { name: "Exercise detail panel" });
+    expect(within(detailPanel).getAllByText("No exercises available.")).toHaveLength(1);
   });
 });
