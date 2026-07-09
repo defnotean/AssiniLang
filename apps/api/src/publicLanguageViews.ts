@@ -211,6 +211,28 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
   };
 }
 
+/**
+ * Recomputes the SHA-256 content hash over the export payload with `integrity`
+ * stripped (same stable key order used at export time). Returns false when the
+ * manifest is missing, uses an unexpected algorithm, or the hash does not match.
+ */
+export function verifyExportIntegrity(exported: {
+  integrity?: PublicExportIntegrity | null;
+  [key: string]: unknown;
+}): boolean {
+  const integrity = exported.integrity;
+  if (!integrity || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM) {
+    return false;
+  }
+  if (typeof integrity.contentHash !== "string" || !/^[a-f0-9]{64}$/.test(integrity.contentHash)) {
+    return false;
+  }
+
+  const { integrity: _omit, ...payload } = exported;
+  const expected = createHash(EXPORT_INTEGRITY_ALGORITHM).update(stableStringify(payload)).digest("hex");
+  return expected === integrity.contentHash;
+}
+
 function cloneEvaluationFailure(failure: EvaluationFailure): EvaluationFailure {
   return { ...failure };
 }

@@ -57,7 +57,7 @@ npm.cmd run db:backup -- path\to\backup.json
 npm.cmd run db:backup -- --dry-run          # resolves source/destination paths without writing
 ```
 
-`--dry-run` prints the database path and backup destination that would be used, then exits without copying. Restoring is deliberate (no one-shot script): use `restoreFrom` from a Node REPL or a small script so a bad backup cannot silently replace live data.
+`--dry-run` prints the database path and backup destination that would be used, then exits without copying. A successful backup prints a pasteable `new JsonStore("<dbPath>").restoreFrom("<backupPath>")` hint with both paths filled in. Restoring is deliberate (no `db:restore` npm script): run that recipe from a Node REPL or a small script so a bad backup cannot silently replace live data.
 
 ## Editing public response shapes safely
 

@@ -121,6 +121,7 @@ describe("project documentation", () => {
       "README.md": ["[Documentation Hub](docs/README.md)", "```mermaid", "First Nations"],
       "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
       "docs/api.md": [
+        "verifyExportIntegrity",
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
@@ -187,6 +188,7 @@ describe("project documentation", () => {
         "data/ocr-cache/",
         "npm.cmd run db:backup",
         "--dry-run",
+        "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "npm.cmd run seed"
       ],

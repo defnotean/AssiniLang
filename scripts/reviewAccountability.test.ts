@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
 import {
   toPublicEvaluationArtifact,
-  toPublicLanguageSnapshot
+  toPublicLanguageSnapshot,
+  verifyExportIntegrity
 } from "../apps/api/src/publicLanguageViews.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,6 +64,7 @@ function assertIntegrity(artifact: AccountabilityExport): void {
     redactionPolicy: EXPORT_REDACTION_POLICY
   });
   expect(artifact.integrity?.contentHash).toMatch(SHA_256_HEX);
+  expect(verifyExportIntegrity(artifact)).toBe(true);
 }
 
 function buildAccountabilityWorkspace() {

@@ -18,6 +18,16 @@ export function defaultBackupPath(sourcePath: string, now = new Date()): string 
   return resolve(repoRoot, "data", "backups", `${stem}-${timestamp}${extension}`);
 }
 
+/** Escape a filesystem path for embedding in a double-quoted JS string literal. */
+export function escapePathForJsString(path: string): string {
+  return path.replaceAll("\\", "\\\\").replaceAll('"', '\\"');
+}
+
+/** Operator-facing restore recipe printed after a successful backup. */
+export function formatBackupRestoreHint(dbPath: string, backupPath: string): string {
+  return `Restore with: new JsonStore("${escapePathForJsString(dbPath)}").restoreFrom("${escapePathForJsString(backupPath)}")`;
+}
+
 export type BackupCliArgs = {
   dryRun: boolean;
   destinationArg?: string;
@@ -70,7 +80,7 @@ export async function runBackupCli({
 
   stdout(`Backed up local database at ${dbPath}`);
   stdout(`Backup written to ${written}`);
-  stdout(`Restore with: new JsonStore(dbPath).restoreFrom("${written.replaceAll("\\", "\\\\")}")`);
+  stdout(formatBackupRestoreHint(dbPath, written));
   return { dryRun: false, dbPath, destination, written };
 }
 

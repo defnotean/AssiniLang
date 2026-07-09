@@ -481,8 +481,8 @@ export const en = {
   "corpus.networkKind.morpheme": "Morpheme",
   "corpus.networkKind.topic": "Topic",
   "corpus.networkKind.record": "Record",
-  "corpus.emptyMorpheme": "No passages contain the selected morpheme.",
-  "corpus.emptySearch": "No passages match your search.",
+  "corpus.emptyMorpheme": "No passages contain the selected morpheme. Clear the morpheme filter above to show the full corpus again.",
+  "corpus.emptySearch": "No passages match your search. Clear the search box, or clear any active morpheme filter, to widen results.",
   "corpus.emptyCorpus": "No saved examples yet. Process a source in Build and accept corpus drafts to populate this list.",
 
   // Source intake.

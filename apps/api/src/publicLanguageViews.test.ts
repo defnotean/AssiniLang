@@ -6,7 +6,8 @@ import {
   toPublicEvaluationArtifact,
   toPublicExerciseSubmission,
   toPublicLanguageSnapshot,
-  toPublicNote
+  toPublicNote,
+  verifyExportIntegrity
 } from "./publicLanguageViews.js";
 
 const SHA_256_HEX = /^[a-f0-9]{64}$/;
@@ -198,6 +199,7 @@ describe("public language views", () => {
       redactionPolicy: EXPORT_REDACTION_POLICY
     });
     expect(snapshot?.integrity.contentHash).toMatch(SHA_256_HEX);
+    expect(verifyExportIntegrity(snapshot!)).toBe(true);
     expect(snapshot?.corpus).toHaveLength(3);
     expect(snapshot?.notes).toHaveLength(2);
     expect(snapshot?.exercises[0]).not.toHaveProperty("expectedAnswers");
@@ -205,6 +207,28 @@ describe("public language views", () => {
     expect(snapshot?.exercises[0]).not.toHaveProperty("adversarialAnswers");
     expect(JSON.stringify(snapshot)).not.toContain("answer key");
     expect(JSON.stringify(snapshot)).not.toContain("test-generator");
+  });
+
+  it("rejects language snapshots whose integrity hash was tampered with", () => {
+    const state = buildTestWorkspaceState();
+    const snapshot = toPublicLanguageSnapshot(state, TEST_LANGUAGE_ID, "2026-06-06T00:00:00.000Z");
+    expect(snapshot).toBeDefined();
+    expect(verifyExportIntegrity(snapshot!)).toBe(true);
+
+    const tampered = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: "0".repeat(64)
+      }
+    };
+    expect(verifyExportIntegrity(tampered)).toBe(false);
+
+    const mutatedPayload = {
+      ...snapshot!,
+      exportedAt: "2099-01-01T00:00:00.000Z"
+    };
+    expect(verifyExportIntegrity(mutatedPayload)).toBe(false);
   });
 
   it("returns undefined snapshots for unknown languages", () => {
@@ -309,6 +333,7 @@ describe("public language views", () => {
       redactionPolicy: EXPORT_REDACTION_POLICY
     });
     expect(artifact.integrity.contentHash).toMatch(SHA_256_HEX);
+    expect(verifyExportIntegrity(artifact)).toBe(true);
     expect(artifact.latestRuns.map((run) => run.id)).toEqual(["eval-otherlang-latest", "eval-testlang-latest"]);
     expect(artifact.failureLines).toEqual([
       "Testlang corpusCoverage testlang-c999: Missing passage coverage.",

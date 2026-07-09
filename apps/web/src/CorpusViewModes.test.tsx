@@ -199,6 +199,32 @@ describe("CorpusView concordance filter", () => {
     expect(screen.getByText("1 of 3 passages")).toBeInTheDocument();
     expect(screen.getByText("selu mira-ka")).toBeInTheDocument();
   });
+
+  it("shows a next-step empty state when search matches nothing", () => {
+    renderCorpusView();
+
+    fireEvent.change(screen.getByLabelText("Search corpus"), { target: { value: "zzzz-no-match" } });
+
+    const emptyState = screen.getByRole("status");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveTextContent(
+      "No passages match your search. Clear the search box, or clear any active morpheme filter, to widen results."
+    );
+  });
+
+  it("shows a next-step empty state when morpheme filter and search leave no passages", () => {
+    renderCorpusView();
+
+    // talo appears in two passages; "cold" only in the third (no talo) → empty intersection.
+    fireEvent.click(screen.getAllByRole("button", { name: /talo\s+walk/ })[0]);
+    fireEvent.change(screen.getByLabelText("Search corpus"), { target: { value: "cold" } });
+
+    const emptyState = screen.getByText(/No passages contain the selected morpheme/);
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveTextContent(
+      "No passages contain the selected morpheme. Clear the morpheme filter above to show the full corpus again."
+    );
+  });
 });
 
 describe("CorpusView network graph mode", () => {

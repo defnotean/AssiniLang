@@ -26,7 +26,13 @@ npm.cmd run db:backup -- path\to\my-backup.json
 npm.cmd run db:backup -- --dry-run
 ```
 
-Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). `--dry-run` resolves the source and destination paths and prints them without writing a file. Restore is deliberate: use `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database.
+Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). `--dry-run` resolves the source and destination paths and prints them without writing a file. After a successful write, the CLI prints a pasteable restore recipe with the live database path and backup path filled in (there is no `npm run db:restore` script). Restore is deliberate: call `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database.
+
+Example (paths from the CLI restore hint):
+
+```powershell
+node --input-type=module -e "import { JsonStore } from '@assini/db'; await new JsonStore('data/local-db.json').restoreFrom('data/backups/local-db-TIMESTAMP.json');"
+```
 
 ### Desktop app
 
@@ -90,7 +96,7 @@ When filing an issue, include the sanitized diagnostics text, the source kind an
 Use the shallowest reset that fixes the problem:
 
 1. **Single stuck source:** restart API → confirm `failed` + recovery message → re-process.
-2. **Bad import or experiment:** restore latest backup (desktop) or `restoreFrom` (CLI).
+2. **Bad import or experiment:** restore latest backup (desktop) or `JsonStore.restoreFrom` from a Node REPL/script (use the pasteable hint printed by `db:backup`).
 3. **Broken model config:** fix Settings / `.env`, test connection; no data reset needed.
 4. **Corrupt or unrecoverable DB:** restore backup; if none, `npm.cmd run seed` for empty workspace.
 5. **Full local wipe (dev checkout):** stop API and web, delete or rename `data/local-db.json`, optional `data/assets/`, `data/ocr-cache/`, `data/backups/` as needed, then `npm.cmd run seed` and restart `npm.cmd run dev`.

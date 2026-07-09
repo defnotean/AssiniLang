@@ -457,8 +457,8 @@ export const ar: Record<MessageKey, string> = {
   "corpus.networkKind.morpheme": "مورفيم",
   "corpus.networkKind.topic": "موضوع",
   "corpus.networkKind.record": "سجل",
-  "corpus.emptyMorpheme": "لا توجد مقاطع تحتوي على المورفيم المحدد.",
-  "corpus.emptySearch": "لا توجد مقاطع تطابق بحثك.",
+  "corpus.emptyMorpheme": "لا توجد مقاطع تحتوي على المورفيم المحدد. امسح مرشّح المورفيم أعلاه لإظهار المدوّنة كاملة مرة أخرى.",
+  "corpus.emptySearch": "لا توجد مقاطع تطابق بحثك. امسح مربع البحث، أو أي مرشّح مورفيم نشط، لتوسيع النتائج.",
   "corpus.emptyCorpus": "لا توجد أمثلة محفوظة بعد. عالِج مصدرًا في البناء واقبل مسودات المدوّنة لملء هذه القائمة.",
 
   // المصادر والإدخال.
