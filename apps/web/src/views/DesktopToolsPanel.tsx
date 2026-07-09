@@ -359,6 +359,7 @@ export function DesktopToolsPanel({
           labelKey: "model.restoreLatestBackup",
           busyLabelKey: "model.restoringBackup",
           isBusy: desktopActionBusy === "restoreLatestDataBackup",
+          disabled: desktopControlsBusy || !desktopBackupSummary?.latestName,
           onClick: () => void handleRestoreLatestBackup()
         }),
         desktopActionButton("openBackupsFolder", "model.openBackupsFolder", "model.openingDesktopPath"),

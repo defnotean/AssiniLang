@@ -51,6 +51,7 @@ export function GovernanceView({
   const records = governanceState.status === "ready"
     ? governanceState.data.filter((record) => record.languageId === selectedLanguageId)
     : [];
+  const consentRecords = records.filter((record) => record.policyType === "consent");
   const reviewDispositions = reviewDispositionState.status === "ready"
     ? reviewDispositionState.data.filter((disposition) => disposition.languageId === selectedLanguageId)
     : [];
@@ -361,7 +362,14 @@ export function GovernanceView({
         )}
 
         {governanceState.status === "ready" && records.length === 0 && (
-          <p className="inline-empty">{t("governance.noGovernancePolicyRecords")}</p>
+          <div className="inline-empty" role="status">
+            <p>{t("governance.noGovernancePolicyRecords")}</p>
+            <p className="muted">{t("governance.noConsentPolicyHint")}</p>
+          </div>
+        )}
+
+        {governanceState.status === "ready" && records.length > 0 && consentRecords.length === 0 && (
+          <p className="inline-empty consent-gap" role="status">{t("governance.noConsentPolicyRecords")}</p>
         )}
 
         {records.length > 0 && (

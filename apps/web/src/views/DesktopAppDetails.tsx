@@ -62,7 +62,17 @@ export function DesktopAppDetails({
         {desktopBackupSummary && (
           <div data-desktop-backup-summary="count">
             <dt>{t("model.desktopBackupCount")}</dt>
-            <dd>{t("model.desktopBackupCountValue", { count: desktopBackupSummary.count })}</dd>
+            <dd>
+              {desktopBackupSummary.count > 0
+                ? t("model.desktopBackupCountValue", { count: desktopBackupSummary.count })
+                : t("model.desktopNoBackupsYet")}
+            </dd>
+          </div>
+        )}
+        {desktopBackupSummary && desktopBackupSummary.count === 0 && (
+          <div data-desktop-backup-summary="empty">
+            <dt>{t("model.desktopLatestBackup")}</dt>
+            <dd className="inline-empty">{t("model.desktopNoBackupsHint")}</dd>
           </div>
         )}
         {desktopBackupSummary?.latestName && (

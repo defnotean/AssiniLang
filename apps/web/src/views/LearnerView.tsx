@@ -133,10 +133,11 @@ export function LearnerView({
       if (validation.ok) {
         const probeCount = validation.preview?.adversarialAnswers.length ?? 0;
         const answerCount = validation.preview?.expectedAnswers.length ?? 0;
-        const message = validation.warnings.length > 0
+        const dryRunPrefix = t("learner.validateExerciseDryRunNote");
+        const success = validation.warnings.length > 0
           ? `${t("learner.validateExerciseSuccess", { probeCount, answerCount })} ${validation.warnings.join(" ")}`
           : t("learner.validateExerciseSuccess", { probeCount, answerCount });
-        setAuthoringMessage(message);
+        setAuthoringMessage(`${dryRunPrefix} ${success}`);
       } else {
         setAuthoringError(validation.errors.join(" "));
       }
@@ -291,13 +292,16 @@ export function LearnerView({
             </section>
           </article>
         ) : (
-          <p className="empty-state">{t("learner.noExercisesAvailable")}</p>
+          <p className="empty-state">{t("learner.noExercisesAuthorOrSelect")}</p>
         )}
 
         <form className="record-card form-panel compact exercise-authoring-form" aria-label={t("learner.exerciseAuthoring")} onSubmit={handleCreateExercise}>
           <div>
             <span className="detail-label">{t("learner.exerciseAuthoring")}</span>
             <h3>{t("learner.createLearnerTask")}</h3>
+            {exercises.length === 0 && (
+              <p className="inline-empty muted">{t("learner.exerciseAuthoringEmptyHint")}</p>
+            )}
           </div>
           <div className="form-group">
             <label htmlFor="exercise-author-type">{t("learner.exerciseType")}</label>
@@ -426,6 +430,7 @@ export function LearnerView({
               type="button"
               className="secondary"
               aria-label={t("learner.validateExerciseAria")}
+              aria-describedby="exercise-validate-dry-run-hint"
               disabled={!canValidateExercise}
               onClick={() => void handleValidateExercise()}
             >
@@ -435,6 +440,9 @@ export function LearnerView({
               {isCreatingExercise ? t("learner.creating") : t("learner.createExercise")}
             </button>
           </div>
+          <p id="exercise-validate-dry-run-hint" className="inline-empty muted">
+            {t("learner.validateExerciseDryRunHint")}
+          </p>
           {authoringMessage && <p className="result-notice" role="status" aria-live="polite">{authoringMessage}</p>}
           {authoringError && <p className="result-notice error" role="alert">{authoringError}</p>}
         </form>

@@ -6,7 +6,8 @@ import { LearnerView } from "./views/LearnerView";
 import type { PublicExercise } from "./lib/types";
 
 const apiMock = vi.hoisted(() => ({
-  fetchRecommendedExercises: vi.fn()
+  fetchRecommendedExercises: vi.fn(),
+  validateExerciseAuthoring: vi.fn()
 }));
 
 vi.mock("./api", () => apiMock);
@@ -155,6 +156,59 @@ describe("LearnerView practice next panel", () => {
     expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
 
     const detailPanel = screen.getByRole("region", { name: "Exercise detail panel" });
-    expect(within(detailPanel).getAllByText("No exercises available.")).toHaveLength(1);
+    expect(within(detailPanel).getByText("Select an exercise from the list or author one below.")).toBeInTheDocument();
+    expect(within(detailPanel).getByText("No learner tasks yet. Fill the form below, validate without saving, then create the exercise.")).toBeInTheDocument();
+    expect(within(detailPanel).getByText("Validate checks rules and answer keys without creating an exercise.")).toBeInTheDocument();
+  });
+
+  it("shows a dry-run success notice without creating an exercise", async () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
+    apiMock.validateExerciseAuthoring.mockResolvedValue({
+      ok: true,
+      errors: [],
+      warnings: [],
+      preview: {
+        expectedAnswers: ["mira talo-mi-na"],
+        adversarialAnswers: [
+          { answer: "talo-mi-na mira", reason: "Verb-first order." }
+        ]
+      }
+    });
+
+    renderLearnerView({ exercises: [], selectedExercise: null });
+
+    fireEvent.change(screen.getByLabelText("Exercise prompt"), {
+      target: { value: "Translate into Avenik: I walk by the river." }
+    });
+    fireEvent.change(screen.getByLabelText("Allowed vocabulary"), {
+      target: { value: "mira, talo, -mi, -na" }
+    });
+    fireEvent.change(screen.getByLabelText("Allowed rule IDs"), {
+      target: { value: "avn-rule-verb-chain" }
+    });
+    fireEvent.change(screen.getByLabelText("Expected answers"), {
+      target: { value: "mira talo-mi-na" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial answer 1"), {
+      target: { value: "talo-mi-na mira" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 1"), {
+      target: { value: "Verb-first order." }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial answer 2"), {
+      target: { value: "mira talo-na-mi" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 2"), {
+      target: { value: "Suffix order drift." }
+    });
+    fireEvent.change(screen.getByLabelText("Grading explanation"), {
+      target: { value: "Use mira for river and talo for walk." }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate exercise authoring" }));
+
+    await waitFor(() => expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole("status")).toHaveTextContent("Dry-run only — nothing saved yet.");
+    expect(screen.getByRole("status")).toHaveTextContent("Validation passed: 1 expected answers and 1 adversarial probes ready to save.");
   });
 });
