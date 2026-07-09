@@ -273,9 +273,10 @@ export function ElderPage({
       <section className="elder-card" aria-label={t("elderPage.suggestionsHeading")}>
         <h2>{t("elderPage.suggestionsHeading")}</h2>
         {corrections.length === 0 ? (
-          <p className="elder-empty empty-state" role="status" aria-live="polite">
-            {t("elderPage.noSuggestions")}
-          </p>
+          <div className="elder-empty empty-state" role="status" aria-live="polite">
+            <p>{t("elderPage.noSuggestions")}</p>
+            <p className="muted">{t("elderPage.noSuggestionsHint")}</p>
+          </div>
         ) : (
           <ul className="elder-suggestions">
             {corrections.map((correction) => {

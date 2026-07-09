@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AiSession } from "@assini/db";
 import { continueAiSession, createAiSession, fetchAiSession } from "../api";
-import { useI18n } from "../i18n";
+import { useI18n, type Translate } from "../i18n";
 import { localizeApiError } from "../lib/format";
 import { getBrowserThemeStorage } from "../lib/theme";
 import type { AsyncState } from "../lib/types";
@@ -62,13 +62,17 @@ function storedSessionId(languageId: string): string | null {
  * conversation history to the model, the instructions keep applying for the
  * whole session - including after the user corrects the assistant.
  */
-export function composeSeedPrompt(seedPrompt: string, setupInstructions?: string): string {
+export function composeSeedPrompt(
+  seedPrompt: string,
+  setupInstructions?: string,
+  t?: Translate
+): string {
   const instructions = setupInstructions?.trim();
   if (!instructions) return seedPrompt.trim();
-  return [
-    `Conversation setup - follow these instructions for every reply in this session: ${instructions}`,
-    seedPrompt.trim()
-  ].join("\n\n");
+  const prefix = t
+    ? t("assistant.conversationSetupSeedPrefix", { instructions })
+    : `Conversation setup - follow these instructions for every reply in this session: ${instructions}`;
+  return [prefix, seedPrompt.trim()].join("\n\n");
 }
 
 /**
@@ -120,7 +124,7 @@ export function useAssistantWorkspace(): AssistantWorkspace {
     contextPassageIds: string[],
     setupInstructions?: string
   ): Promise<void> {
-    const prompt = composeSeedPrompt(seedPrompt, setupInstructions);
+    const prompt = composeSeedPrompt(seedPrompt, setupInstructions, t);
     if (!prompt) return;
     setSessionState({ status: "loading" });
     setSendError(null);

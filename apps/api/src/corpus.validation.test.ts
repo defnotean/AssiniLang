@@ -74,4 +74,39 @@ describe("corpus route validation i18nKeys", () => {
       i18nKey: "errors.languageNotFound"
     });
   });
+
+  it("returns corpusImportValidationFailed i18nKey for semantic import failures", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        source: "local-import",
+        sourceMetadata: {
+          author: "Local Reviewer",
+          year: 2026,
+          license: "local-test-data",
+          consentRecord: "local import consent"
+        },
+        textTarget: "saku nemi-na",
+        textTranslation: "The child teaches me.",
+        morphologicalSegmentation: [
+          { surface: "ghost", lemma: "ghost", gloss: "ghost", features: ["noun"] }
+        ],
+        topicTags: ["learning"],
+        consentStatus: {
+          use: "testing-only",
+          restrictions: []
+        }
+      }
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toEqual({
+      error: "Corpus segmentation surface is not present in target text: ghost",
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
+  });
 });

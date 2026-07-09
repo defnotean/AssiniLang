@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { createEmptyState, type AppState } from "@assini/db";
+import { buildObservabilityMetricsSnapshot } from "../observabilityMetrics.js";
 import { buildNeuralMap, requireActor, sanitizeNeuralMapForActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
 const PRIVILEGED_OBSERVABILITY_ROLES = ["programmer", "admin", "lead"] as const;
-const STORAGE_READ_FAILED = "Storage read failed";
 
 export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, authToken, prototypeSessions, jobQueue, requestMetrics, now } = ctx;
@@ -29,23 +29,12 @@ export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteCont
     );
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
-    const snapshotTime = now();
-    const queuedJobs = jobQueue.getPendingAndActiveIds();
-    return {
-      uptimeMs: Math.max(0, snapshotTime - requestMetrics.startedAtMs),
-      serverTime: new Date(snapshotTime).toISOString(),
-      requests: {
-        total: requestMetrics.requests.total,
-        byStatusClass: { ...requestMetrics.requests.byStatusClass }
-      },
-      jobQueue: {
-        pending: queuedJobs.pending.length,
-        active: queuedJobs.active.length
-      },
-      storage: state
-        ? { ok: true, schemaVersion: state.schemaVersion }
-        : { ok: false, error: STORAGE_READ_FAILED }
-    };
+    return buildObservabilityMetricsSnapshot({
+      nowMs: now(),
+      requestMetrics,
+      readJobQueueStatus: () => jobQueue.getStatus(),
+      state
+    });
   });
 
   app.get("/observability/ai-sessions", async (request, reply) => {

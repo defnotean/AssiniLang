@@ -95,7 +95,7 @@ describe("paradigm gaps panel", () => {
     const grammarPanel = screen.getByRole("region", { name: "Grammar inventory" });
     expect(
       within(grammarPanel).getByText(
-        "No grammar rules recorded yet. Accept grammar-note drafts from Build or author notes in Review."
+        "No grammar notes recorded yet. Process a source in Build, accept grammar-note drafts, then approve them in the Build notes queue."
       )
     ).toBeInTheDocument();
 

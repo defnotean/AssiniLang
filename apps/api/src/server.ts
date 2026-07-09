@@ -4,7 +4,12 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { JobQueue } from "./jobQueue.js";
-import { recoverInterruptedSources } from "./jobRecovery.js";
+import {
+  DEFAULT_PROCESSING_STALE_MS,
+  DEFAULT_STALE_RECOVERY_INTERVAL_MS,
+  recoverInterruptedSources,
+  recoverStaleProcessingSources
+} from "./jobRecovery.js";
 import { JsonStore, type AppState, type User } from "@assini/db";
 import { createMutableLlmProvider, type LlmProvider } from "./llmProvider.js";
 import { resolveRuntimeSettingsPath } from "./runtimePath.js";
@@ -195,7 +200,7 @@ export function createServer(options: ServerOptions = {}) {
     request: FastifyRequest,
     reply: FastifyReply,
     actor: User | undefined
-  ): { error: string; i18nKey: string; i18nParams?: Record<string, number> } | undefined => {
+  ): { error: string; i18nKey: string; i18nParams?: Record<string, number>; requestId?: string } | undefined => {
     if (!rateLimit || !RATE_LIMITED_METHODS.has(request.method)) {
       return undefined;
     }
@@ -208,12 +213,15 @@ export function createServer(options: ServerOptions = {}) {
     if (hits.length >= rateLimit.max) {
       const retryAfterMs = Math.max(1, hits[0] + rateLimit.windowMs - now);
       const seconds = Math.ceil(retryAfterMs / 1000);
+      const requestId = requestIdForResponse(request);
+      reply.header(REQUEST_ID_HEADER, requestId);
       reply.header("Retry-After", seconds.toString());
       reply.code(429);
       return {
         error: "Rate limit exceeded",
         i18nKey: "app.rateLimitExceeded",
-        i18nParams: { seconds }
+        i18nParams: { seconds },
+        requestId
       };
     }
 
@@ -291,6 +299,8 @@ export function createServer(options: ServerOptions = {}) {
   registerElderRoutes(app, ctx);
   registerObservabilityRoutes(app, ctx);
 
+  let staleRecoveryTimer: ReturnType<typeof setInterval> | undefined;
+
   app.addHook("onReady", async () => {
     try {
       const recoveredCount = await recoverInterruptedSources({ update: updateState });
@@ -299,6 +309,34 @@ export function createServer(options: ServerOptions = {}) {
       }
     } catch (error) {
       app.log.error({ err: error }, "Failed to clean up stuck processing source assets on startup");
+    }
+
+    // Live reclaim for orphaned processing rows (queue slot already freed after
+    // a failed completion persist, etc.). Skip ids still queued or active so a
+    // slow live job is not failed while its worker is still running.
+    staleRecoveryTimer = setInterval(() => {
+      const { pending, active } = jobQueue.getPendingAndActiveIds();
+      void recoverStaleProcessingSources(
+        { update: updateState },
+        {
+          staleMs: DEFAULT_PROCESSING_STALE_MS,
+          skipIds: new Set([...pending, ...active])
+        }
+      ).then((count) => {
+        if (count > 0) {
+          app.log.info({ count }, "Reset stale-heartbeat processing source assets to failed");
+        }
+      }).catch((error) => {
+        app.log.error({ err: error }, "Failed to recover stale-heartbeat processing source assets");
+      });
+    }, DEFAULT_STALE_RECOVERY_INTERVAL_MS);
+    staleRecoveryTimer.unref?.();
+  });
+
+  app.addHook("onClose", async () => {
+    if (staleRecoveryTimer !== undefined) {
+      clearInterval(staleRecoveryTimer);
+      staleRecoveryTimer = undefined;
     }
   });
 

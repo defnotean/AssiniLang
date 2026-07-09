@@ -36,11 +36,35 @@ describe("repository production hygiene", () => {
     const pkg = JSON.parse(await readProjectFile("package.json"));
 
     expect(pkg.scripts["ci:green"]).toBe("node scripts/ciGreenSmoke.mjs");
+    expect(pkg.scripts["verify:beta"]).toBe("node scripts/verifyBetaCli.mjs");
+    expect(pkg.scripts["smoke"]).toBe("tsx scripts/smokeIngestion.mjs");
     expect(pkg.scripts["smoke:backup"]).toBe("tsx scripts/smokeBackupRestore.mjs");
+  });
+
+  it("documents the optional verify:beta live-model gate", async () => {
+    const pkg = JSON.parse(await readProjectFile("package.json"));
+    const verifyBeta = await readProjectFile("scripts/verifyBeta.mjs");
+    const verifyBetaCli = await readProjectFile("scripts/verifyBetaCli.mjs");
+    const developmentDocs = await readProjectFile("docs/development.md");
+    const readme = await readProjectFile("README.md");
+    const configuration = await readProjectFile("docs/configuration.md");
+
+    expect(pkg.scripts["model:verify"]).toBe("node scripts/verifyLocalModelLanguage.mjs");
+    expect(verifyBetaCli).toContain("runVerifyBeta");
+    expect(verifyBeta).toContain("modelVerifyRequested");
+    expect(verifyBeta).toContain("ASSINI_VERIFY_MODEL");
+    expect(verifyBeta).toContain("skipping model:verify");
+    expect(developmentDocs).toContain("npm.cmd run verify:beta");
+    expect(developmentDocs).toContain('ASSINI_VERIFY_MODEL="1"');
+    expect(readme).toContain("npm.cmd run verify:beta");
+    expect(readme).toContain("npm.cmd run ci:green");
+    expect(configuration).toContain("ASSINI_VERIFY_MODEL");
+    expect(configuration).toContain("ASSINI_VERIFY_MODEL_NAME");
   });
 
   it("documents the backup/restore smoke gate for CI", async () => {
     const script = await readProjectFile("scripts/smokeBackupRestore.mjs");
+    const ingestionSmoke = await readProjectFile("scripts/smokeIngestion.mjs");
     const developmentDocs = await readProjectFile("docs/development.md");
     const ciGreen = await readProjectFile("scripts/ciGreenSmoke.mjs");
 
@@ -49,6 +73,12 @@ describe("repository production hygiene", () => {
     expect(script).toContain("runBackupCli");
     expect(script).toContain("--force");
     expect(script).toContain("force: true");
+    expect(script).toContain("--dry-run");
+    expect(script).toContain("dryRun");
+    expect(script).toContain("CLI --dry-run valid workspace: no write");
+    expect(ingestionSmoke).toContain('url: "/ready"');
+    expect(ingestionSmoke).toContain("checks?.storage?.ok");
+    expect(ingestionSmoke).toContain("checks?.jobQueue?.ok");
     expect(developmentDocs).toContain("npm.cmd run smoke:backup");
     expect(ciGreen).toContain("npm run smoke:backup");
   });
@@ -65,9 +95,12 @@ describe("repository production hygiene", () => {
     expect(workflow).toContain("npm run smoke");
     expect(workflow).toContain("npm run smoke:backup");
     expect(workflow).toContain("Built-dist startup smoke (/health + /ready)");
-    expect(workflow).toContain('body.checks?.storage?.ok');
-    expect(workflow).toContain('body.checks?.jobQueue?.ok');
+    expect(workflow).toContain("body.checks?.storage?.ok");
+    expect(workflow).toContain("body.checks?.jobQueue?.ok");
     expect(workflow).toContain("npm audit --audit-level=moderate");
+    // Live-model verify stays opt-in; default CI must not require a reachable model.
+    expect(workflow).not.toContain("npm run verify:beta");
+    expect(workflow).not.toContain("ASSINI_VERIFY_MODEL");
   });
 
   it("keeps a non-secret environment template aligned with documented configuration", async () => {
@@ -102,7 +135,9 @@ describe("repository production hygiene", () => {
       "ASSINI_DEV_AUTH_TOKEN",
       "ASSINI_ALLOWED_ORIGINS",
       "ASSINI_BODY_LIMIT_BYTES",
-      "ASSINI_API_LOGGER"
+      "ASSINI_API_LOGGER",
+      "ASSINI_VERIFY_MODEL",
+      "ASSINI_VERIFY_MODEL_NAME"
     ]) {
       expect(example, `.env.example should include ${variable}`).toContain(variable);
     }
@@ -115,6 +150,11 @@ describe("repository production hygiene", () => {
     // Driver scripts default x-assini-dev-token to dev-local; the template must match.
     expect(example).toMatch(/^ASSINI_DEV_AUTH_TOKEN=dev-local$/m);
     expect(configuration).toMatch(/ASSINI_DEV_AUTH_TOKEN[\s\S]*dev-local/);
+
+    // verify:beta stays opt-in; the template must document the gate without enabling it.
+    expect(example).toMatch(/#\s*ASSINI_VERIFY_MODEL=1\b/);
+    expect(example).toMatch(/#\s*ASSINI_VERIFY_MODEL_NAME=Irene\b/);
+    expect(example).not.toMatch(/^ASSINI_VERIFY_MODEL=/m);
 
     expect(example).not.toMatch(/\bsk-[A-Za-z0-9._-]+/);
     expect(example).not.toMatch(/Bearer\s+\S+/i);

@@ -160,4 +160,33 @@ describe("JobQueue", () => {
     expect(ranAgain).toBe(true);
     expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
   });
+
+  it("keeps reporting pending ids while concurrency is saturated", async () => {
+    const queue = new JobQueue(1);
+    let resolveFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      resolveFirst = resolve;
+    });
+
+    queue.add("active-job", async () => {
+      await firstGate;
+    });
+    queue.add("pending-job", async () => {});
+
+    await sleep(10);
+
+    expect(queue.getPendingAndActiveIds()).toEqual({
+      pending: ["pending-job"],
+      active: ["active-job"]
+    });
+    expect(queue.isQueuedOrActive("pending-job")).toBe(true);
+
+    resolveFirst();
+    await sleep(20);
+
+    expect(queue.getPendingAndActiveIds()).toEqual({
+      pending: [],
+      active: []
+    });
+  });
 });

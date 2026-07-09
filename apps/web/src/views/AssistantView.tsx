@@ -81,7 +81,10 @@ export function AssistantView({
         <p className="assistant-explainer">
           {t("assistant.explainer")}
         </p>
-        <p className="muted assistant-empty-hint">{t("assistant.emptyStateHint")}</p>
+        <div className="empty-state assistant-empty-hint" role="status" aria-live="polite">
+          <p>{t("assistant.emptyState")}</p>
+          <p className="muted">{t("assistant.emptyStateHint")}</p>
+        </div>
         {sessionState.status === "error" && (
           <p className="result-notice error" role="alert" aria-live="assertive">
             {sessionState.message}

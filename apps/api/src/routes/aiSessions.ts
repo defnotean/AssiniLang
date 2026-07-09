@@ -73,7 +73,12 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     const contextError = validateAiSessionContext(current, body);
     if (contextError) {
       reply.code(400);
-      return { error: contextError };
+      return {
+        error: contextError,
+        i18nKey: contextError.startsWith("Context note")
+          ? "errors.aiSessionContextNoteNotFound"
+          : "errors.aiSessionContextPassageNotFound"
+      };
     }
 
     let generation: LlmGenerationResult;
@@ -109,7 +114,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
         });
       });
       reply.code(502);
-      return { error: failureMessage };
+      return {
+        error: failureMessage,
+        i18nKey: "errors.llmGenerationFailed"
+      };
     }
 
     let session: AiSession | undefined;
@@ -233,7 +241,10 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
         });
       });
       reply.code(502);
-      return { error: failureMessage };
+      return {
+        error: failureMessage,
+        i18nKey: "errors.llmGenerationFailed"
+      };
     }
 
     let updatedSession: AiSession | undefined;

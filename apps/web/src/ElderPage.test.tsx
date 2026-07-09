@@ -134,10 +134,27 @@ describe("ElderPage loading and empty states", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Could not load elder suggestions.");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(reloadElderContext).toHaveBeenCalledTimes(1);
-    const emptyState = screen.getByText("No suggestions yet. Use the steps above to send your first one.");
-    expect(emptyState).toBeInTheDocument();
-    expect(emptyState).toHaveAttribute("role", "status");
+    const emptyState = screen.getByText("No suggestions yet.").closest("[role='status']");
+    expect(emptyState).toBeTruthy();
     expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(
+      "Use the three steps above to point at a lesson or sentence, write the fix and reason, then send your first correction."
+    );
+  });
+
+  it("shows next-step guidance when the suggestions list is empty", () => {
+    render(
+      <ElderPage
+        elder={createElderState()}
+        data={createDashboardData()}
+        isWorkflowBusy={false}
+      />
+    );
+
+    const emptyState = screen.getByText("No suggestions yet.").closest("[role='status']");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(/three steps above/);
   });
 });
 

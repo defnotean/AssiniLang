@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { localizeApiError } from "../lib/format";
 import type { Language } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -54,8 +55,7 @@ export function DeleteLanguageForm({
       setIsOpen(false);
       setConfirmName("");
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("deleteLang.deletionFailed");
-      setDeleteError(message);
+      setDeleteError(localizeApiError(error, t, "deleteLang.deletionFailed"));
     } finally {
       setIsDeleting(false);
     }

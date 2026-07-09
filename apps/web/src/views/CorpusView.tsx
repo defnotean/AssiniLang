@@ -83,14 +83,19 @@ export function CorpusView({
       .then((data) => {
         if (isCurrent) setGraphState({ status: "ready", data });
       })
-      .catch((error: Error) => {
-        if (isCurrent) setGraphState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setGraphState({
+            status: "error",
+            message: localizeApiError(error, t, "corpus.retryNetwork")
+          });
+        }
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [displayMode, graphLanguageId]);
+  }, [displayMode, graphLanguageId, t]);
 
   function toggleMorphFilter(surface: string) {
     setMorphFilter((current) => (current === surface ? null : surface));
@@ -385,8 +390,10 @@ export function CorpusView({
               fetchNeuralMap(graphLanguageId)
                 .then((data) => setGraphState({ status: "ready", data }))
                 .catch((error: unknown) => {
-                  const message = error instanceof Error ? error.message : t("corpus.retryNetwork");
-                  setGraphState({ status: "error", message });
+                  setGraphState({
+                    status: "error",
+                    message: localizeApiError(error, t, "corpus.retryNetwork")
+                  });
                 });
             }}
           />
@@ -575,7 +582,11 @@ function CorpusGraph({
   }
 
   if (!visibleGraph || !graphData || visibleGraph.nodes.length === 0) {
-    return <p className="empty-state">{t("corpus.emptyNetwork")}</p>;
+    return (
+      <p className="empty-state" role="status" aria-live="polite">
+        {t("corpus.emptyNetwork")}
+      </p>
+    );
   }
 
   const nodeCounts = visibleGraph.nodes.reduce<Record<string, number>>((counts, node) => {

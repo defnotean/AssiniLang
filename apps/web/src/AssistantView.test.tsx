@@ -2,7 +2,8 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AiSession } from "@assini/db";
-import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
+import { composeSeedPrompt, useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
+import { createTranslator, I18nProvider } from "./i18n";
 import { ApiError } from "./lib/apiClient";
 import { AssistantView } from "./views/AssistantView";
 
@@ -97,7 +98,11 @@ describe("AssistantView", () => {
   it("renders the empty state explainer and disables start without a seed prompt", () => {
     render(<Harness />);
     expect(screen.getByText(/configured local model using only public workspace context/)).toBeInTheDocument();
-    expect(screen.getByText(/Add a seed prompt below to start/)).toBeInTheDocument();
+    const emptyState = screen.getByText("No conversation yet.").closest("[role='status']");
+    expect(emptyState).toHaveClass("empty-state");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(/Add a seed prompt below to start/);
+    expect(emptyState).toHaveTextContent(/confirm a local model is connected/);
     expect(screen.getByRole("button", { name: "Start conversation" })).toBeDisabled();
   });
 
@@ -130,6 +135,36 @@ describe("AssistantView", () => {
         seedPrompt:
           "Conversation setup - follow these instructions for every reply in this session: "
           + "Always gloss morphemes with Leipzig abbreviations.\n\nWhat does ka mean?"
+      })
+    );
+  });
+
+  it("localizes the conversation-setup seed-prompt prefix for Arabic", () => {
+    const t = createTranslator("ar");
+    expect(composeSeedPrompt("ما معنى ka؟", "اشرح المورفيمات دائمًا.", t)).toBe(
+      "إعداد المحادثة - اتبع هذه التعليمات في كل رد خلال هذه الجلسة: اشرح المورفيمات دائمًا.\n\nما معنى ka؟"
+    );
+  });
+
+  it("sends an Arabic conversation-setup seed prefix when the UI locale is Arabic", async () => {
+    render(
+      <I18nProvider initialLocale="ar">
+        <Harness />
+      </I18nProvider>
+    );
+    fireEvent.change(screen.getByLabelText("تعليمات إعداد المحادثة"), {
+      target: { value: "اشرح المورفيمات دائمًا." }
+    });
+    fireEvent.change(screen.getByLabelText("السؤال الافتتاحي"), {
+      target: { value: "ما معنى ka؟" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "بدء المحادثة" }));
+    await screen.findByLabelText("رسائل المحادثة");
+
+    expect(apiMock.createAiSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        seedPrompt:
+          "إعداد المحادثة - اتبع هذه التعليمات في كل رد خلال هذه الجلسة: اشرح المورفيمات دائمًا.\n\nما معنى ka؟"
       })
     );
   });

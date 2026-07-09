@@ -42,6 +42,10 @@ function isSafeCount(value: number): boolean {
   return Number.isSafeInteger(value) && value >= 0;
 }
 
+function isSafeSchemaVersion(value: unknown): value is AppState["schemaVersion"] {
+  return Number.isSafeInteger(value) && (value as number) >= 1;
+}
+
 function readJobQueueCheck(readJobQueueStatus: () => JobQueueStatus): JobQueueReadinessCheck {
   try {
     const status = readJobQueueStatus();
@@ -59,6 +63,17 @@ function readJobQueueCheck(readJobQueueStatus: () => JobQueueStatus): JobQueueRe
   }
 }
 
+function readStorageCheck(state: AppState): StorageReadinessCheck {
+  if (!isSafeSchemaVersion(state.schemaVersion)) {
+    return { ok: false, error: "Storage read failed" };
+  }
+
+  return {
+    ok: true,
+    schemaVersion: state.schemaVersion
+  };
+}
+
 export async function createReadinessReport(
   readState: () => Promise<AppState>,
   readJobQueueStatus: () => JobQueueStatus = () => ({ pending: 0, active: 0 })
@@ -66,12 +81,8 @@ export async function createReadinessReport(
   const jobQueue = readJobQueueCheck(readJobQueueStatus);
 
   try {
-    const state = await readState();
-    const storage: StorageReadinessCheck = {
-      ok: true,
-      schemaVersion: state.schemaVersion
-    };
-    if (!jobQueue.ok) {
+    const storage = readStorageCheck(await readState());
+    if (!storage.ok || !jobQueue.ok) {
       return {
         ok: false,
         checks: {

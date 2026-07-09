@@ -79,7 +79,7 @@ docs/                  The handbook, plus dated history under docs/specs and doc
 5. Reviewers accept or reject each draft. Accepted drafts commit lexemes, corpus passages with private answer keys, or grammar notes.
 6. The Fastify API reads and mutates the JSON-backed state through `JsonStore`; public projection helpers strip private fields before data reaches the web app.
 7. The React app drives ingestion, review, corpus import, exercise submission, governance, exports, and observability workflows through API calls.
-8. `npm.cmd run eval` compares drafted and mutable state against immutable answer keys.
+8. `npm.cmd run eval` scores languages against immutable answer keys when the workspace has languages; on an empty workspace it exits `0` with guidance unless `ASSINI_EVAL_REQUIRE_LANGUAGES` is set (verify sets this so an empty seed cannot green-pass).
 
 ## Data model
 

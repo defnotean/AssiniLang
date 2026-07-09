@@ -34,6 +34,10 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.ocrModelFailed" };
   }
 
+  if (/Local OCR could not read the image/i.test(normalized)) {
+    return { i18nKey: "ingest.ocrNoReadableText" };
+  }
+
   if (/OCR is not supported yet/i.test(normalized) && /no extractable text/i.test(normalized)) {
     return { i18nKey: "ingest.ocrDocxUnsupported" };
   }
@@ -67,6 +71,7 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
   if (
     /Transcription request failed/i.test(normalized)
     || /Transcription endpoint returned no text/i.test(normalized)
+    || /Transcription endpoint returned invalid JSON/i.test(normalized)
   ) {
     return { i18nKey: "ingest.transcribeFailed" };
   }

@@ -98,6 +98,24 @@ async function smokeCliRefusalsAndForce() {
     /already exists/
   );
 
+  const dryRunOk = await runBackupCli({
+    argv: ["--dry-run", join(dir, "dry-run-ok.json")],
+    env,
+    stdout: () => undefined
+  });
+  if (!dryRunOk.dryRun) {
+    fail("CLI --dry-run on a valid workspace should report dryRun without writing");
+  }
+  try {
+    await readFile(join(dir, "dry-run-ok.json"), "utf8");
+    fail("CLI --dry-run on a valid workspace wrote a destination file");
+  } catch (error) {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code !== "ENOENT") {
+      throw error;
+    }
+  }
+  console.log("CLI --dry-run valid workspace: no write");
+
   const forced = await runBackupCli({
     argv: ["--force", existing],
     env,
@@ -113,7 +131,7 @@ async function smokeCliRefusalsAndForce() {
   }
   console.log("CLI --force overwrite OK");
 
-  // Windows case-fold identity (also assert helper on all platforms via string form).
+  // Windows case-fold + \\?\ extended-prefix identity.
   if (process.platform === "win32") {
     const caseAlias = join(dir, "LOCAL-DB.JSON");
     if (!pathsReferToSameFile(dbPath, caseAlias)) {
@@ -122,6 +140,20 @@ async function smokeCliRefusalsAndForce() {
     await expectReject(
       "CLI Windows case-fold same-path",
       () => runBackupCli({ argv: [caseAlias], env, stdout: () => undefined }),
+      /same as the live database/
+    );
+    await expectReject(
+      "CLI Windows case-fold same-path with --force",
+      () => runBackupCli({ argv: ["--force", caseAlias], env, stdout: () => undefined }),
+      /same as the live database/
+    );
+    const extendedAlias = `\\\\?\\${resolve(dbPath)}`;
+    if (!pathsReferToSameFile(dbPath, extendedAlias)) {
+      fail("pathsReferToSameFile should treat \\\\?\\ extended-prefix aliases as the same file");
+    }
+    await expectReject(
+      "CLI Windows extended-prefix same-path",
+      () => runBackupCli({ argv: [extendedAlias], env, stdout: () => undefined }),
       /same as the live database/
     );
   } else {
@@ -189,7 +221,9 @@ try {
   await smokeCliRefusalsAndForce();
   await smokeSqliteForceOverwrite();
   await smokeCliDryRunInvalidWorkspace();
-  console.log("smoke:backup passed (JSON round-trip, CLI refusals, SQLite force, dry-run validate)");
+  console.log(
+    "smoke:backup passed (JSON round-trip, CLI refusals, dry-run valid, SQLite force, dry-run invalid)"
+  );
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
 } finally {

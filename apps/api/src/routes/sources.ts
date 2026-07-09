@@ -51,7 +51,7 @@ function vaultAuditLabel(rootPath: string): string {
  * new extraction drafts, and the audit event. Shared by the synchronous and
  * background processing paths so both persist identically.
  */
-function applySourceProcessCompletion(
+export function applySourceProcessCompletion(
   state: AppState,
   input: SourceProcessCompletionInput,
   output: SourceProcessCompletionOutput
@@ -59,6 +59,12 @@ function applySourceProcessCompletion(
   const { sourceId, actor, processedAt, extraction, extractionError } = input;
   const stored = state.sourceAssets.find((item) => item.id === sourceId);
   if (!stored) return state;
+  // Ignore late completions after stale/interrupted recovery already moved the
+  // asset out of "processing" so a hung job cannot overwrite the recovered state.
+  if (stored.status !== "processing") {
+    output.updatedAsset = stored;
+    return state;
+  }
 
   if (!extraction) {
     const failedAsset: SourceAsset = {
@@ -241,7 +247,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const body = parseSourceRegistrationBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid source body: provide kind (text|wordlist|url), title, and rawText or url" };
+      return {
+        error: "Invalid source body: provide kind (text|wordlist|url), title, and rawText or url",
+        i18nKey: "errors.invalidSourceBody"
+      };
     }
 
     const current = await readState();
@@ -301,7 +310,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!asset) {
       reply.code(500);
-      return { error: "Source could not be registered" };
+      return {
+        error: "Source could not be registered",
+        i18nKey: "errors.sourceRegisterFailed"
+      };
     }
 
     reply.code(201);
@@ -313,7 +325,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const body = parseObsidianVaultImportBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid Obsidian vault import body: provide vaultPath, includeSubfolders, and maxFiles" };
+      return {
+        error: "Invalid Obsidian vault import body: provide vaultPath, includeSubfolders, and maxFiles",
+        i18nKey: "errors.invalidObsidianVaultImportBody"
+      };
     }
 
     const current = await readState();
@@ -465,13 +480,19 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const file = await request.file();
     if (!file) {
       reply.code(400);
-      return { error: "Upload requires a multipart file field" };
+      return {
+        error: "Upload requires a multipart file field",
+        i18nKey: "errors.sourceUploadRequiresFile"
+      };
     }
 
     const buffer = await file.toBuffer();
     if (buffer.length === 0) {
       reply.code(400);
-      return { error: "Uploaded file is empty" };
+      return {
+        error: "Uploaded file is empty",
+        i18nKey: "errors.sourceUploadEmpty"
+      };
     }
 
     const originalName = sanitizeStoredFileName(file.filename ?? "upload");
@@ -526,7 +547,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!asset) {
       reply.code(500);
-      return { error: "Source could not be stored" };
+      return {
+        error: "Source could not be stored",
+        i18nKey: "errors.sourceStoreFailed"
+      };
     }
 
     reply.code(201);
@@ -545,7 +569,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const asset = current.sourceAssets.find((item) => item.id === sourceId);
     if (!asset) {
       reply.code(404);
-      return { error: `Source not found: ${sourceId}` };
+      return {
+        error: `Source not found: ${sourceId}`,
+        i18nKey: "errors.sourceNotFound"
+      };
     }
 
     const language = current.languages.find((item) => item.id === asset.languageId);
@@ -623,7 +650,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!claimed) {
       reply.code(404);
-      return { error: `Source not found: ${sourceId}` };
+      return {
+        error: `Source not found: ${sourceId}`,
+        i18nKey: "errors.sourceNotFound"
+      };
     }
 
     const claimedAsset = claimed;
@@ -658,13 +688,32 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         }
 
         const output: SourceProcessCompletionOutput = { drafts: [] };
-        await updateState((state) => applySourceProcessCompletion(state, {
-          sourceId,
-          actor,
-          processedAt: new Date().toISOString(),
-          extraction,
-          extractionError
-        }, output));
+        try {
+          await updateState((state) => applySourceProcessCompletion(state, {
+            sourceId,
+            actor,
+            processedAt: new Date().toISOString(),
+            extraction,
+            extractionError
+          }, output));
+        } catch (error) {
+          // Persistence failed after extraction: mark failed so the asset is not
+          // left stuck in "processing" until restart or the stale-heartbeat sweep.
+          const persistError = redactErrorSecrets(
+            error instanceof Error ? error.message : "Source processing failed."
+          );
+          try {
+            await updateState((state) => applySourceProcessCompletion(state, {
+              sourceId,
+              actor,
+              processedAt: new Date().toISOString(),
+              extraction: undefined,
+              extractionError: persistError
+            }, { drafts: [] }));
+          } catch {
+            // Stale-heartbeat recovery will reclaim if this also fails.
+          }
+        }
       });
 
       reply.code(202);
@@ -698,7 +747,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!output.updatedAsset) {
       reply.code(500);
-      return { error: "Source could not be processed" };
+      return {
+        error: "Source could not be processed",
+        i18nKey: "errors.sourceProcessFailed"
+      };
     }
 
     if (!extraction) {

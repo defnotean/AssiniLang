@@ -6,16 +6,26 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const {
+  LEGACY_SAFETY_BACKUP_PREFIX,
   SAFETY_BACKUP_PREFIX,
+  assertBackupDistinctFromLive,
   assertDesktopBackupReadable,
   assertDesktopLiveDbReadable,
   assertSafetyBackupBeforeRestore,
+  createDesktopRestoreLock,
+  isPathInsideOrSame,
   isRestorableBackupName,
   isSafetyBackupName,
   pickPreferredRestoreBackup,
+  replaceLiveDesktopDataFromBackup,
   resolveBackupDbFile
 } = require("./backupRestore.cjs") as {
+  LEGACY_SAFETY_BACKUP_PREFIX: string;
   SAFETY_BACKUP_PREFIX: string;
+  assertBackupDistinctFromLive: (
+    backupDir: string,
+    liveDataDir: string
+  ) => { backupRoot: string; liveRoot: string };
   assertDesktopBackupReadable: (
     backupDir: string,
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
@@ -25,11 +35,23 @@ const {
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
   ) => Promise<string>;
   assertSafetyBackupBeforeRestore: (
-    createSafetyBackup: () => Promise<{ ok?: boolean; message?: string } | null | undefined>
-  ) => Promise<{ ok?: boolean; message?: string }>;
+    createSafetyBackup: () => Promise<{ ok?: boolean; message?: string; backupPath?: string } | null | undefined>
+  ) => Promise<{ ok?: boolean; message?: string; backupPath?: string }>;
+  createDesktopRestoreLock: () => {
+    inFlight: boolean;
+    run: <T>(work: () => Promise<T> | T) => Promise<T>;
+  };
+  isPathInsideOrSame: (parentPath: string, candidatePath: string) => boolean;
   isRestorableBackupName: (name: string) => boolean;
   isSafetyBackupName: (name: string) => boolean;
   pickPreferredRestoreBackup: <T extends { name: string }>(backups: T[]) => T | null;
+  replaceLiveDesktopDataFromBackup: (options: {
+    sourceBackupDir: string;
+    targetDataDir: string;
+    targetSettingsPath?: string | null;
+    safetyBackupDir?: string | null;
+    copyTree: (sourcePath: string, targetPath: string) => void;
+  }) => { recoveredFromSafety: boolean };
   resolveBackupDbFile: (backupDir: string, manifest?: Record<string, unknown> | null) => string;
 };
 
@@ -152,21 +174,25 @@ describe("desktop backup restore validation", () => {
 
   it("treats safety backups as restorable and excludes them from routine prune", () => {
     expect(SAFETY_BACKUP_PREFIX).toBe("backup-safety-before-restore");
+    expect(LEGACY_SAFETY_BACKUP_PREFIX).toBe("safety-before-restore");
     expect(isRestorableBackupName(`${SAFETY_BACKUP_PREFIX}-2026-07-09`)).toBe(true);
     expect(isRestorableBackupName("backup-2026-07-09")).toBe(true);
-    expect(isRestorableBackupName("safety-before-restore-2026-07-09")).toBe(false);
+    expect(isRestorableBackupName(`${LEGACY_SAFETY_BACKUP_PREFIX}-2026-07-09`)).toBe(true);
     expect(isSafetyBackupName(`${SAFETY_BACKUP_PREFIX}-2026-07-09`)).toBe(true);
-    expect(isSafetyBackupName("safety-before-restore-legacy")).toBe(true);
+    expect(isSafetyBackupName(`${LEGACY_SAFETY_BACKUP_PREFIX}-legacy`)).toBe(true);
     expect(isSafetyBackupName("backup-2026-07-09")).toBe(false);
   });
 
   it("prefers the newest routine backup over a newer safety-before-restore copy", () => {
     const safety = { name: `${SAFETY_BACKUP_PREFIX}-2026-07-09T12-00-00` };
+    const legacySafety = { name: `${LEGACY_SAFETY_BACKUP_PREFIX}-2026-07-09T12-30-00` };
     const routine = { name: "backup-2026-07-09T11-00-00" };
     // Newest-first list as restorableBackups() returns after a restore.
     expect(pickPreferredRestoreBackup([safety, routine])).toEqual(routine);
     expect(pickPreferredRestoreBackup([routine, safety])).toEqual(routine);
+    expect(pickPreferredRestoreBackup([legacySafety, routine])).toEqual(routine);
     expect(pickPreferredRestoreBackup([safety])).toEqual(safety);
+    expect(pickPreferredRestoreBackup([legacySafety])).toEqual(legacySafety);
     expect(pickPreferredRestoreBackup([])).toBeNull();
   });
 
@@ -183,12 +209,104 @@ describe("desktop backup restore validation", () => {
   });
 
   it("allows restore to proceed only after a successful safety backup", async () => {
-    const createSafetyBackup = vi.fn(async () => ({ ok: true, message: "Created safety backup" }));
+    const createSafetyBackup = vi.fn(async () => ({
+      ok: true,
+      message: "Created safety backup",
+      backupPath: "C:\\Backups\\backup-safety-before-restore-1"
+    }));
 
     await expect(assertSafetyBackupBeforeRestore(createSafetyBackup)).resolves.toEqual({
       ok: true,
-      message: "Created safety backup"
+      message: "Created safety backup",
+      backupPath: "C:\\Backups\\backup-safety-before-restore-1"
     });
     expect(createSafetyBackup).toHaveBeenCalledOnce();
+  });
+
+  it("refuses restore when the backup folder overlaps the live data directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "assini-desktop-overlap-"));
+    tempDirs.push(root);
+    const live = join(root, "data");
+    const nestedBackup = join(live, "backups", "backup-nested");
+    mkdirSync(nestedBackup, { recursive: true });
+
+    expect(() => assertBackupDistinctFromLive(nestedBackup, live)).toThrow(/overlaps the live data directory/);
+    expect(() => assertBackupDistinctFromLive(live, live)).toThrow(/overlaps the live data directory/);
+    expect(isPathInsideOrSame(live, nestedBackup)).toBe(true);
+
+    const sibling = join(root, "backups", "backup-ok");
+    mkdirSync(sibling, { recursive: true });
+    expect(assertBackupDistinctFromLive(sibling, live)).toEqual({
+      backupRoot: expect.any(String),
+      liveRoot: expect.any(String)
+    });
+  });
+
+  it("serializes restore so a second restore cannot start while one is in flight", async () => {
+    const lock = createDesktopRestoreLock();
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const first = lock.run(async () => {
+      await firstGate;
+      return "first";
+    });
+
+    await expect(lock.run(async () => "second")).rejects.toThrow(/already in progress/);
+    releaseFirst();
+    await expect(first).resolves.toBe("first");
+    await expect(lock.run(async () => "third")).resolves.toBe("third");
+  });
+
+  it("recovers live data from the safety backup when the restore copy fails after wipe", () => {
+    const root = mkdtempSync(join(tmpdir(), "assini-desktop-recover-"));
+    tempDirs.push(root);
+    const source = createBackupFixture({ dbContents: '{"from":"source"}' });
+    const safety = createBackupFixture({ dbContents: '{"from":"safety"}' });
+    const liveData = join(root, "live-data");
+    mkdirSync(liveData, { recursive: true });
+    writeFileSync(join(liveData, "local-db.json"), '{"from":"live"}', "utf8");
+
+    let calls = 0;
+    const copyTree = vi.fn((_from: string, to: string) => {
+      calls += 1;
+      if (calls === 1) {
+        throw new Error("disk full while copying restore source");
+      }
+      rmSync(to, { recursive: true, force: true });
+      mkdirSync(to, { recursive: true });
+      writeFileSync(join(to, "local-db.json"), '{"from":"safety"}', "utf8");
+    });
+
+    expect(() =>
+      replaceLiveDesktopDataFromBackup({
+        sourceBackupDir: source.dir,
+        targetDataDir: liveData,
+        safetyBackupDir: safety.dir,
+        copyTree
+      })
+    ).toThrow(/recovered from safety backup/);
+
+    expect(copyTree).toHaveBeenCalledTimes(2);
+    expect(calls).toBe(2);
+  });
+
+  it("reports when restore fails and safety recovery is also unavailable", () => {
+    const { dir: source } = createBackupFixture();
+    const liveData = join(mkdtempSync(join(tmpdir(), "assini-desktop-no-safety-")), "live");
+    tempDirs.push(join(liveData, ".."));
+
+    expect(() =>
+      replaceLiveDesktopDataFromBackup({
+        sourceBackupDir: source,
+        targetDataDir: liveData,
+        safetyBackupDir: null,
+        copyTree: () => {
+          throw new Error("copy failed");
+        }
+      })
+    ).toThrow(/no safety backup was available/);
   });
 });

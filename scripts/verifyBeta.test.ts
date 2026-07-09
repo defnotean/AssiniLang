@@ -88,4 +88,48 @@ describe("verify:beta launcher", () => {
     expect(calls).toEqual(["npm run model:verify"]);
     expect(result).toEqual({ exitCode: 0, skipped: false });
   });
+
+  it("propagates a non-zero model:verify exit code", async () => {
+    const stderr: string[] = [];
+    const result = await runVerifyBeta({
+      env: { ASSINI_VERIFY_MODEL: "1" },
+      platform: "linux",
+      spawnFn() {
+        return exitOnNextTick(2);
+      },
+      stdout: { write() {} },
+      stderr: {
+        write(message) {
+          stderr.push(String(message));
+        }
+      }
+    });
+
+    expect(result).toEqual({ exitCode: 2, skipped: false, failedStep: "model:verify" });
+    expect(stderr.join("")).toContain("model:verify failed with exit code 2");
+  });
+
+  it("reports spawn startup failures without claiming a clean skip", async () => {
+    const stderr: string[] = [];
+    const result = await runVerifyBeta({
+      env: { ASSINI_VERIFY_MODEL: "true" },
+      platform: "linux",
+      spawnFn() {
+        throw new Error("npm missing");
+      },
+      stdout: { write() {} },
+      stderr: {
+        write(message) {
+          stderr.push(String(message));
+        }
+      }
+    });
+
+    expect(result).toEqual({ exitCode: 1, skipped: false, failedStep: "model:verify" });
+    expect(stderr.join("")).toContain("model:verify failed to start: npm missing");
+  });
+
+  it("does not build a model:verify step when the opt-in gate is unset", () => {
+    expect(createVerifyBetaStep({ platform: "linux", env: {} })).toBeNull();
+  });
 });

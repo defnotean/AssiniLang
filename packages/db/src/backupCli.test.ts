@@ -119,6 +119,28 @@ describe("runBackupCli", () => {
     );
   });
 
+  it("dry-runs an existing destination with --force without the overwrite warning and without writing", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const destination = join(dir, "existing-backup.json");
+    await writeFile(destination, '{"stale":true}', "utf8");
+    const stdout = vi.fn();
+
+    const result = await runBackupCli({
+      argv: ["--dry-run", "--force", destination],
+      env: { ASSINI_DB_PATH: dbPath },
+      stdout
+    });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.written).toBeUndefined();
+    expect(await readFile(destination, "utf8")).toBe('{"stale":true}');
+    expect(stdout).toHaveBeenCalledWith(`Dry run: would back up local database at ${resolve(dbPath)}`);
+    expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${resolve(destination)}`);
+    expect(stdout).not.toHaveBeenCalledWith(
+      expect.stringContaining("a real backup would need --force")
+    );
+  });
+
   it("rejects backing up an invalid workspace before writing a copy", async () => {
     const { dbPath } = await createTempDb({ validWorkspace: false });
     const destination = join(dirname(dbPath), "should-not-write.json");
@@ -162,12 +184,85 @@ describe("runBackupCli", () => {
     ).rejects.toThrow(/same as the live database/);
   });
 
+  it("rejects dry-run and --force when the destination is a Windows case-fold alias", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const caseAlias = join(dir, "LOCAL-DB.JSON");
+    const stdout = vi.fn();
+
+    await expect(
+      runBackupCli({
+        argv: ["--dry-run", caseAlias],
+        env: { ASSINI_DB_PATH: dbPath },
+        stdout
+      })
+    ).rejects.toThrow(/same as the live database/);
+    await expect(
+      runBackupCli({
+        argv: ["--force", caseAlias],
+        env: { ASSINI_DB_PATH: dbPath },
+        stdout
+      })
+    ).rejects.toThrow(/same as the live database/);
+    expect(stdout).not.toHaveBeenCalled();
+  });
+
+  it("rejects backing up onto a Windows \\\\?\\ extended-prefix alias of the live database", async () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+    const { dbPath } = await createTempDb({ validWorkspace: true });
+    const extendedAlias = `\\\\?\\${resolve(dbPath)}`;
+    const stdout = vi.fn();
+
+    await expect(
+      runBackupCli({
+        argv: [extendedAlias],
+        env: { ASSINI_DB_PATH: dbPath },
+        stdout
+      })
+    ).rejects.toThrow(/same as the live database/);
+    await expect(
+      runBackupCli({
+        argv: ["--force", "--dry-run", extendedAlias],
+        env: { ASSINI_DB_PATH: dbPath },
+        stdout
+      })
+    ).rejects.toThrow(/same as the live database/);
+    expect(stdout).not.toHaveBeenCalled();
+  });
+
+  it("rejects backing up onto a ..-normalized alias of the live database", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const parentHopAlias = join(dir, "nested", "..", "local-db.json");
+
+    await expect(
+      runBackupCli({
+        argv: [parentHopAlias],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/same as the live database/);
+  });
+
   it("rejects backing up onto the live database path", async () => {
     const { dbPath } = await createTempDb({ validWorkspace: true });
 
     await expect(
       runBackupCli({
         argv: [dbPath],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/same as the live database/);
+  });
+
+  it("rejects --force when the destination is the live database path", async () => {
+    const { dbPath } = await createTempDb({ validWorkspace: true });
+
+    await expect(
+      runBackupCli({
+        argv: ["--force", dbPath],
         env: { ASSINI_DB_PATH: dbPath }
       })
     ).rejects.toThrow(/same as the live database/);

@@ -220,10 +220,13 @@ const KNOWN_EXPORT_VERSIONS = new Set([
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
  * manifest is missing or null, uses an unexpected algorithm or generator id, has
- * a mismatched or reordered redaction policy list, has a contentHash that is not
- * exactly 64 hex digits, has an unknown or missing `exportVersion`, or the hash
- * does not match. Hex digests are compared case-insensitively so uppercase
- * `contentHash` values still verify.
+ * a mismatched, reordered, truncated, or extended redaction policy list, has a
+ * contentHash that is not a string of exactly 64 hex digits, has an unknown,
+ * missing, or non-string `exportVersion`, inherits integrity fields from a
+ * prototype instead of own properties, or the hash does not match. Hex digests
+ * are compared case-insensitively so uppercase `contentHash` values still
+ * verify. Payload key order does not matter: verification uses the same stable
+ * key sort as export.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;
@@ -234,6 +237,10 @@ export function verifyExportIntegrity(exported: {
     !integrity
     || typeof integrity !== "object"
     || Array.isArray(integrity)
+    || !Object.hasOwn(integrity, "algorithm")
+    || !Object.hasOwn(integrity, "generatedBy")
+    || !Object.hasOwn(integrity, "contentHash")
+    || !Object.hasOwn(integrity, "redactionPolicy")
     || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM
     || integrity.generatedBy !== EXPORT_GENERATOR_ID
   ) {

@@ -1,6 +1,12 @@
 import type { GovernanceRecord } from "@assini/db";
 import type { GovernanceWorkspace } from "../hooks/useGovernanceWorkspace";
-import { formatStatus, safeDomId } from "../lib/format";
+import {
+  formatActorRole,
+  formatAuditAction,
+  formatAuditEntityPill,
+  formatStatus,
+  safeDomId
+} from "../lib/format";
 import { useI18n } from "../i18n";
 
 export function GovernanceView({
@@ -339,14 +345,14 @@ export function GovernanceView({
                 <div className="record-topline">
                   <div>
                     <span className="detail-label">{event.at}</span>
-                    <h3>{event.action}</h3>
+                    <h3>{formatAuditAction(event.action, t)}</h3>
                   </div>
-                  <span className="status-badge under_review">{event.actorRole}</span>
+                  <span className="status-badge under_review">{formatActorRole(event.actorRole, t)}</span>
                 </div>
                 <p>{event.summary}</p>
                 <div className="pill-row">
                   <span className="pill">{event.actorId}</span>
-                  <span className="pill">{event.entityType} / {event.entityId}</span>
+                  <span className="pill">{formatAuditEntityPill(event.entityType, event.entityId, t)}</span>
                 </div>
               </article>
             ))}

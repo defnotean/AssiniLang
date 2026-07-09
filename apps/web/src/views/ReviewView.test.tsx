@@ -73,8 +73,19 @@ describe("ReviewView", () => {
     );
 
     const reviewQueue = screen.getByRole("region", { name: "Review queue" });
-    expect(reviewQueue).toHaveTextContent("No notes for this language yet.");
-    expect(reviewQueue).toHaveTextContent("Process a source in Build to propose grammar notes, then review them here.");
+    const queueEmpty = reviewQueue.querySelector(".empty-state");
+    expect(queueEmpty).toHaveAttribute("role", "status");
+    expect(queueEmpty).toHaveAttribute("aria-live", "polite");
+    expect(queueEmpty).toHaveTextContent("No notes for this language yet.");
+    expect(queueEmpty).toHaveTextContent(
+      "Process a source in Build, accept grammar-note drafts there, then review them here."
+    );
+
+    const detailEmpty = screen.getByRole("region", { name: "Note detail panel" }).querySelector(".empty-state");
+    expect(detailEmpty).toHaveAttribute("aria-live", "polite");
+    expect(detailEmpty).toHaveTextContent(
+      "Process a source in Build, accept grammar-note drafts there, then review them here."
+    );
   });
 
   it("shows filter-specific next-step guidance when no notes match the active filter", () => {
@@ -95,15 +106,19 @@ describe("ReviewView", () => {
     fireEvent.click(screen.getByRole("button", { name: /Rejected/i }));
 
     const reviewQueue = screen.getByRole("region", { name: "Review queue" });
-    expect(reviewQueue).toHaveTextContent("No Rejected notes.");
-    expect(reviewQueue).toHaveTextContent("Try another filter, or process a source in Build to add notes.");
+    const queueEmpty = reviewQueue.querySelector(".empty-state");
+    expect(queueEmpty).toHaveAttribute("aria-live", "polite");
+    expect(queueEmpty).toHaveTextContent("No Rejected notes.");
+    expect(queueEmpty).toHaveTextContent("Try another filter, or process a source in Build to add notes.");
     expect(document.querySelector("button.note-row")).not.toBeInTheDocument();
 
     // Detail must not claim the language is empty, and must hide Approve for a
     // note the filtered queue is not listing.
     const detailPanel = screen.getByRole("region", { name: "Note detail panel" });
-    expect(detailPanel).toHaveTextContent("No Rejected notes.");
-    expect(detailPanel).toHaveTextContent("Try another filter, or process a source in Build to add notes.");
+    const detailEmpty = detailPanel.querySelector(".empty-state");
+    expect(detailEmpty).toHaveAttribute("aria-live", "polite");
+    expect(detailEmpty).toHaveTextContent("No Rejected notes.");
+    expect(detailEmpty).toHaveTextContent("Try another filter, or process a source in Build to add notes.");
     expect(detailPanel).not.toHaveTextContent("No notes for this language yet.");
     expect(screen.queryByRole("button", { name: "Approve verb chains" })).not.toBeInTheDocument();
   });
@@ -152,12 +167,18 @@ describe("ReviewView", () => {
       />
     );
 
-    expect(screen.getByText(/No examples on this note yet/)).toBeInTheDocument();
-    expect(screen.getByText(/Link a corpus passage as evidence in Build/)).toBeInTheDocument();
-    expect(screen.getByText(/No reviewer comments yet/)).toBeInTheDocument();
-    expect(screen.getByText(/Leave a note when contesting/)).toBeInTheDocument();
-    expect(screen.getByText(/No edit history yet/)).toBeInTheDocument();
-    expect(screen.getByText(/Saving a revised explanation below starts this trail/)).toBeInTheDocument();
+    const examplesEmpty = screen.getByText(/No examples on this note yet/);
+    expect(examplesEmpty).toHaveAttribute("role", "status");
+    expect(examplesEmpty).toHaveAttribute("aria-live", "polite");
+    expect(examplesEmpty).toHaveTextContent(/Link a corpus passage as evidence in Build/);
+
+    const commentsEmpty = screen.getByText(/No reviewer comments yet/);
+    expect(commentsEmpty).toHaveAttribute("aria-live", "polite");
+    expect(commentsEmpty).toHaveTextContent(/Leave a note when contesting/);
+
+    const historyEmpty = screen.getByText(/No edit history yet/);
+    expect(historyEmpty).toHaveAttribute("aria-live", "polite");
+    expect(historyEmpty).toHaveTextContent(/Saving a revised explanation below starts this trail/);
   });
 
   it("disables review actions while workflow is busy", () => {
@@ -238,5 +259,41 @@ describe("ReviewView", () => {
     expect(screen.getAllByText("under review").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("medium confidence").length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText("under_review")).not.toBeInTheDocument();
+  });
+
+  it("localizes edit-history action tokens instead of raw snake_case", () => {
+    const note = createReviewNote({
+      editHistory: [
+        {
+          at: "2026-06-01T12:00:00.000Z",
+          by: "draft-agent",
+          action: "drafted",
+          summary: "Generated from the Avenik grammar fixture."
+        },
+        {
+          at: "2026-06-02T12:00:00.000Z",
+          by: "elder-1",
+          action: "applied_correction",
+          summary: "Applied an elder correction."
+        }
+      ]
+    });
+
+    render(
+      <ReviewView
+        notes={[note]}
+        selectedNote={note}
+        isWorkflowBusy={false}
+        reviewingNoteId={null}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("Drafted")).toBeInTheDocument();
+    expect(screen.getByText("Applied correction")).toBeInTheDocument();
+    expect(screen.queryByText("drafted")).not.toBeInTheDocument();
+    expect(screen.queryByText("applied_correction")).not.toBeInTheDocument();
   });
 });

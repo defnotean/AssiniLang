@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { ApiError } from "./lib/apiClient";
 import { CorpusView } from "./views/CorpusView";
 import type { CorpusPassage } from "./lib/types";
 
@@ -94,12 +95,16 @@ beforeEach(() => {
   validateCorpusImportMock.mockReset();
 });
 
+afterEach(() => {
+  cleanup();
+});
+
 describe("CorpusView display modes", () => {
   it("shows a Build-oriented empty state when the corpus is empty", () => {
     renderCorpusView([]);
 
     expect(screen.getByRole("status")).toHaveTextContent(
-      "No saved examples yet. Process a source in Build and accept corpus drafts to populate this list."
+      "No saved examples yet. Process a source in Build and accept corpus drafts, or open Add source passage above to import one here."
     );
   });
 
@@ -245,9 +250,12 @@ describe("CorpusView network graph mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph" }));
 
     await waitFor(() => {
-      expect(screen.getByText(
-        "No graph records yet. Process a source in Build and accept corpus or note drafts so the graph has passages to link."
-      )).toBeInTheDocument();
+      const emptyState = screen.getByRole("status");
+      expect(emptyState).toHaveClass("empty-state");
+      expect(emptyState).toHaveAttribute("aria-live", "polite");
+      expect(emptyState).toHaveTextContent(
+        "No graph records yet. Process a source in Build and accept corpus or note drafts, or import a passage above, so the graph has records to link."
+      );
     });
   });
 
@@ -271,6 +279,39 @@ describe("CorpusView network graph mode", () => {
       expect(screen.getByText("1 nodes")).toBeInTheDocument();
     });
     expect(fetchNeuralMapMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("localizes rate-limit and payload-too-large neural map failures", async () => {
+    fetchNeuralMapMock.mockRejectedValueOnce(
+      new ApiError("Request failed: /observability/neural-map (429): Rate limit exceeded", {
+        status: 429,
+        i18nKey: "app.rateLimitExceeded",
+        i18nParams: { seconds: 5 }
+      })
+    );
+    renderCorpusView();
+
+    fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "Too many requests. Wait 5 seconds, then retry."
+      );
+    });
+
+    fetchNeuralMapMock.mockRejectedValueOnce(
+      new ApiError("Request failed: /observability/neural-map (413): Payload too large", {
+        status: 413,
+        i18nKey: "errors.payloadTooLarge"
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Retry network" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "That request is too large. Shrink the payload or upload a smaller file, then retry."
+      );
+    });
   });
 });
 

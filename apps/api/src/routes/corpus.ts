@@ -278,7 +278,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (validationError) {
       reply.code(400);
-      return { error: validationError };
+      return {
+        error: validationError,
+        i18nKey: "errors.corpusImportValidationFailed"
+      };
     }
 
     if (!passage) {

@@ -3,12 +3,17 @@ import type { AiSession } from "@assini/db";
 import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
 import {
+  formatActorRole,
+  formatAuditAction,
+  formatAuditEntityPill,
+  formatAuditEntityType,
   buildEvaluationArtifactDownload,
   buildSnapshotDownload,
   extractionDraftSummary,
   formatIntegrityLabel,
   formatMetric,
   formatMode,
+  formatNoteEditAction,
   formatOrthographyMeta,
   formatReachability,
   formatSignedTrendPoints,
@@ -21,6 +26,7 @@ import {
   latestAssistantMessage,
   formatLlmProvider,
   localizeApiError,
+  localizeExtractionDraftFailure,
   localizeLlmStatusWarning,
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
@@ -347,6 +353,36 @@ describe("localizeApiError", () => {
 
     expect(
       localizeApiError(
+        new ApiError("Context note not found for language: missing-note", {
+          status: 400,
+          i18nKey: "errors.aiSessionContextNoteNotFound"
+        }),
+        t,
+        "assistant.errSessionCreateFailed"
+      )
+    ).toBe("One of the selected context notes was not found for this language.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Context passage not found for language: missing-passage", { status: 400 }),
+        t,
+        "assistant.errSessionCreateFailed"
+      )
+    ).toBe("One of the selected context passages was not found for this language.");
+
+    expect(
+      localizeApiError(
+        new ApiError("LLM generation failed: LLM provider request timed out after 25ms", {
+          status: 502,
+          i18nKey: "errors.llmGenerationFailed"
+        }),
+        t,
+        "assistant.errSessionCreateFailed"
+      )
+    ).toBe("The language model could not generate a reply. Retry, or check model settings.");
+
+    expect(
+      localizeApiError(
         new ApiError("Invalid review body", {
           status: 400,
           i18nKey: "errors.invalidReviewBody"
@@ -500,6 +536,40 @@ describe("localizeApiError", () => {
     ).toBe("Too many requests. Wait 4 seconds, then retry.");
   });
 
+  it("falls back to the generic rate-limit copy when seconds are unavailable", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /dashboard (429): Rate limit exceeded", {
+          status: 429,
+          i18nKey: "app.rateLimitExceeded"
+        }),
+        t,
+        "errors.draftGenerationFailed"
+      )
+    ).toBe("Too many requests. Wait a moment, then retry.");
+  });
+
+  it("localizes rate-limit and payload keys even when status is missing", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Rate limit exceeded", {
+          i18nKey: "app.rateLimitExceeded",
+          i18nParams: { seconds: 3 }
+        }),
+        t,
+        "app.workspaceUnavailable"
+      )
+    ).toBe("Too many requests. Wait 3 seconds, then retry.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Payload too large", { i18nKey: "errors.payloadTooLarge" }),
+        t,
+        "app.workspaceUnavailable"
+      )
+    ).toBe("That request is too large. Shrink the payload or upload a smaller file, then retry.");
+  });
+
   it("localizes offline provider failures", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /llm/status (503): LLM provider is offline", { status: 503 }),
@@ -612,6 +682,27 @@ describe("localizeApiError", () => {
         "elderWs.errApplyFailed"
       )
     ).toBe("Only note-linked elder corrections can be applied.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Note not found for language: missing-note", {
+          status: 400,
+          i18nKey: "elderWs.errNoteNotFoundForLanguage"
+        }),
+        t,
+        "elderWs.errSubmitFailed"
+      )
+    ).toBe("That note was not found for the selected language. Choose another note or clear the link.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Passage not found for language: missing-passage", {
+          status: 400
+        }),
+        t,
+        "elderWs.errSubmitFailed"
+      )
+    ).toBe("That passage was not found for the selected language. Choose another passage or clear the link.");
   });
 
   it("localizes prototype-auth and study-loop draft negatives from i18n metadata", () => {
@@ -772,6 +863,121 @@ describe("localizeApiError", () => {
         "corpus.importFailed"
       )
     ).toBe("The corpus passage could not be imported. Retry, or check the API logs.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Corpus segmentation surface is not present in target text: ghost", {
+          status: 400,
+          i18nKey: "errors.corpusImportValidationFailed"
+        }),
+        t,
+        "corpus.importFailed"
+      )
+    ).toBe("The corpus passage failed validation. Check segmentation, phonology, lexicon grounding, and duplicates.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages/avenik/corpus (400): Corpus topic tag is duplicated: learning", {
+          status: 400
+        }),
+        t,
+        "corpus.importFailed"
+      )
+    ).toBe("The corpus passage failed validation. Check segmentation, phonology, lexicon grounding, and duplicates.");
+  });
+
+  it("localizes source registration, upload, and process errors via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid source body: provide kind (text|wordlist|url), title, and rawText or url", {
+          status: 400,
+          i18nKey: "errors.invalidSourceBody"
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("Provide a valid source: kind (text, wordlist, or url), title, and raw text or URL.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages/avenik/sources (400): Invalid source body", {
+          status: 400
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("Provide a valid source: kind (text, wordlist, or url), title, and raw text or URL.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Invalid Obsidian vault import body: provide vaultPath, includeSubfolders, and maxFiles", {
+          status: 400,
+          i18nKey: "errors.invalidObsidianVaultImportBody"
+        }),
+        t,
+        "ingest.vaultImportFailed"
+      )
+    ).toBe("Provide a vault path, include-subfolders choice, and max files before importing.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Upload requires a multipart file field", {
+          status: 400,
+          i18nKey: "errors.sourceUploadRequiresFile"
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("Choose a file to upload before continuing.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Uploaded file is empty", {
+          status: 400
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("That uploaded file is empty. Choose a non-empty file and retry.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Source not found: missing-source", {
+          status: 404,
+          i18nKey: "errors.sourceNotFound"
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("That source was not found. Refresh Build and select another source.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Source could not be processed", {
+          status: 500,
+          i18nKey: "errors.sourceProcessFailed"
+        }),
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("The source could not be processed. Retry, or check the API logs.");
+  });
+
+  it("localizes note edit-history action tokens", () => {
+    expect(formatNoteEditAction("drafted", t)).toBe("Drafted");
+    expect(formatNoteEditAction("applied_correction", t)).toBe("Applied correction");
+    expect(formatNoteEditAction("disposition_resolved", t)).toBe("Disposition resolved");
+    expect(formatNoteEditAction("unknown_action")).toBe("unknown action");
+  });
+
+  it("localizes extraction-draft already-status bulk failure messages", () => {
+    expect(localizeExtractionDraftFailure("Extraction draft is already accepted.", t)).toBe(
+      "This extraction draft is already accepted."
+    );
+    expect(localizeExtractionDraftFailure("Extraction draft is already rejected.", t)).toBe(
+      "This extraction draft is already rejected."
+    );
+    expect(localizeExtractionDraftFailure(undefined, t)).toBe("Unknown failure");
   });
 
   it("localizes extraction-draft not-found and accept failures via i18nKey or English message", () => {
@@ -1247,5 +1453,35 @@ describe("formatTypology", () => {
     expect(formatTypology("polysynthetic-lite", t)).toBe("polysynthetic-lite");
     expect(formatTypology(undefined, t)).toBe("unknown");
     expect(formatTypology("agglutinative")).toBe("agglutinative");
+  });
+});
+
+describe("audit ledger formatters", () => {
+  it("localizes actor roles, entity types, actions, and entity pills", () => {
+    expect(formatActorRole("lead", t)).toBe("Lead");
+    expect(formatActorRole("reviewer", t)).toBe("Reviewer");
+    expect(formatActorRole("custom-role")).toBe("custom-role");
+
+    expect(formatAuditEntityType("governance_record", t)).toBe("Governance record");
+    expect(formatAuditEntityType("note", t)).toBe("Note");
+    expect(formatAuditEntityType("mystery_type")).toBe("mystery type");
+
+    expect(formatAuditAction("governance_record.created", t)).toBe("Governance record created");
+    expect(formatAuditAction("note.reviewed", t)).toBe("Note reviewed");
+    expect(formatAuditAction("custom.event_code")).toBe("custom event code");
+
+    expect(formatAuditEntityPill("governance_record", "governance-1", t)).toBe(
+      "Governance record / governance-1"
+    );
+    expect(formatAuditEntityPill("note", "note-1")).toBe("note / note-1");
+  });
+
+  it("localizes audit labels in Arabic", () => {
+    const ar = createTranslator("ar");
+    expect(formatActorRole("lead", ar)).toBe("قائد");
+    expect(formatAuditAction("note.reviewed", ar)).toBe("تمت مراجعة الملاحظة");
+    expect(formatAuditEntityPill("governance_record", "governance-1", ar)).toBe(
+      "سجل حوكمة / governance-1"
+    );
   });
 });

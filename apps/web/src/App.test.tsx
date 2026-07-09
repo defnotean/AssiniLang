@@ -2501,12 +2501,15 @@ describe("App", () => {
 
     const auditLedger = await screen.findByRole("region", { name: "Audit event ledger" });
     expect(apiMock.fetchAuditEvents).toHaveBeenCalledWith("avenik");
-    expect(within(auditLedger).getByText("governance_record.created")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Governance record created")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Lead")).toBeInTheDocument();
     expect(within(auditLedger).getByText("lead-1")).toBeInTheDocument();
-    expect(within(auditLedger).getByText("governance_record / governance-1")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Governance record / governance-1")).toBeInTheDocument();
     expect(within(auditLedger).getByText("Created generation governance policy record.")).toBeInTheDocument();
-    expect(within(auditLedger).getByText("note.reviewed")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Note reviewed")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Reviewer")).toBeInTheDocument();
     expect(within(auditLedger).getByText("reviewer-1")).toBeInTheDocument();
+    expect(within(auditLedger).getByText("Note / avn-rule-verb-chain-note")).toBeInTheDocument();
   });
 
   it("loads lead-only audit events after reviewer-scoped governance requests settle", async () => {

@@ -835,7 +835,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus segmentation surface is not present in target text: ghost" });
+    expect(response.json()).toEqual({
+      error: "Corpus segmentation surface is not present in target text: ghost",
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
@@ -872,7 +875,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus segmentation does not cover target token: nemi-na" });
+    expect(response.json()).toEqual({
+      error: "Corpus segmentation does not cover target token: nemi-na",
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
@@ -910,7 +916,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus morpheme is not grounded in the Testlang lexicon: noru" });
+    expect(response.json()).toEqual({
+      error: "Corpus morpheme is not grounded in the Testlang lexicon: noru",
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
@@ -948,7 +957,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "Corpus target text uses z outside Testlang phonology inventory: mira-z talo-na" });
+    expect(response.json()).toEqual({
+      error: "Corpus target text uses z outside Testlang phonology inventory: mira-z talo-na",
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
@@ -1006,7 +1018,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error });
+    expect(response.json()).toEqual({
+      error,
+      i18nKey: "errors.corpusImportValidationFailed"
+    });
 
     const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
     expect(after.json()).toEqual(before.json());
@@ -3747,7 +3762,8 @@ describe("api server", () => {
 
     expect(response.statusCode).toBe(502);
     expect(response.json()).toEqual({
-      error: "LLM generation failed: LLM provider request failed with status 429: Rate limit for [redacted-secret]"
+      error: "LLM generation failed: LLM provider request failed with status 429: Rate limit for [redacted-secret]",
+      i18nKey: "errors.llmGenerationFailed"
     });
     expect(JSON.stringify(response.json())).not.toContain("sk-route-secret");
   });
@@ -3837,7 +3853,8 @@ describe("api server", () => {
 
       expect(response.statusCode).toBe(502);
       expect(response.json()).toEqual({
-        error: "LLM generation failed: LLM provider request failed with status 500: [redacted-secret]"
+        error: "LLM generation failed: LLM provider request failed with status 500: [redacted-secret]",
+        i18nKey: "errors.llmGenerationFailed"
       });
       expect(JSON.stringify(response.json())).not.toContain("plain-provider-secret");
 
@@ -3898,7 +3915,8 @@ describe("api server", () => {
 
     expect(followUp.statusCode).toBe(502);
     expect(followUp.json()).toEqual({
-      error: "LLM generation failed: LLM provider request timed out after 25ms"
+      error: "LLM generation failed: LLM provider request timed out after 25ms",
+      i18nKey: "errors.llmGenerationFailed"
     });
   });
 
@@ -4372,10 +4390,13 @@ describe("api server", () => {
     expect(second.statusCode).toBe(201);
     expect(third.statusCode).toBe(429);
     expect(third.headers["retry-after"]).toBe("60");
+    const rateLimitRequestId = third.headers["x-request-id"];
+    expect(rateLimitRequestId).toEqual(expect.any(String));
     expect(third.json()).toEqual({
       error: "Rate limit exceeded",
       i18nKey: "app.rateLimitExceeded",
-      i18nParams: { seconds: 60 }
+      i18nParams: { seconds: 60 },
+      requestId: rateLimitRequestId
     });
 
     now += 60_001;
@@ -5074,7 +5095,11 @@ describe("api server", () => {
           item.action === "source_asset.processing_recovered" && item.entityId === "stuck-asset-id"
       );
       expect(recoveryEvent).toBeDefined();
-      expect(recoveryEvent.metadata).toEqual({ sourceId: "stuck-asset-id", previousStatus: "processing" });
+      expect(recoveryEvent.metadata).toEqual({
+        sourceId: "stuck-asset-id",
+        previousStatus: "processing",
+        reason: "interrupted_restart"
+      });
     });
 
     it("allows a recovered source to be processed again", async () => {
@@ -5105,6 +5130,52 @@ describe("api server", () => {
       expect(processed.json().asset.error).toBeUndefined();
       // Successful reprocess after recovery clears the attempt counter.
       expect(processed.json().asset.processingAttempts).toBeUndefined();
+    });
+
+    it("reclaims orphaned stale-heartbeat processing assets without a restart", async () => {
+      const { recoverStaleProcessingSources, STALE_PROCESSING_ERROR } = await import("./jobRecovery.js");
+      const state = buildTestWorkspaceState();
+      state.sourceAssets.push({
+        id: "orphan-stale-id",
+        languageId: TEST_LANGUAGE_ID,
+        kind: "text",
+        title: "Orphaned processing source",
+        status: "processing",
+        processingStartedAt: "2026-06-06T00:00:00.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:30.000Z",
+        processingAttempts: 2,
+        createdBy: "reviewer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      });
+
+      let memory = state;
+      const recoveredCount = await recoverStaleProcessingSources(
+        {
+          async update(updater) {
+            memory = updater(memory);
+            return memory;
+          }
+        },
+        {
+          recoveredAt: "2026-06-06T00:20:00.000Z",
+          nowMs: Date.parse("2026-06-06T00:20:00.000Z")
+        }
+      );
+
+      expect(recoveredCount).toBe(1);
+      const orphan = memory.sourceAssets.find((item) => item.id === "orphan-stale-id");
+      expect(orphan).toMatchObject({
+        status: "failed",
+        error: STALE_PROCESSING_ERROR,
+        processingAttempts: 2
+      });
+      expect(orphan?.processingStartedAt).toBeUndefined();
+      expect(orphan?.processingHeartbeatAt).toBeUndefined();
+      expect(memory.auditEvents.some((item) => (
+        item.action === "source_asset.processing_recovered"
+        && item.entityId === "orphan-stale-id"
+        && (item.metadata as { reason?: string } | undefined)?.reason === "stale_heartbeat"
+      ))).toBe(true);
     });
   });
 });

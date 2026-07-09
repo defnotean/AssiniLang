@@ -21,7 +21,12 @@ import {
   saveModelProfile,
   updateRuntimeSettings
 } from "../api";
-import { isRealModelProvider, latestAssistantMessage, sessionUsedDeterministicFallback } from "../lib/format";
+import {
+  isRealModelProvider,
+  latestAssistantMessage,
+  localizeApiError,
+  sessionUsedDeterministicFallback
+} from "../lib/format";
 import type { AsyncState, ViewMode } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -136,10 +141,10 @@ export function useModelWorkspace(
       }
     } catch (error) {
       if (discoveryRequestIdRef.current === requestId && options.showLoading) {
-        const message = error instanceof Error ? error.message : t("model.errModelDiscoveryFailed");
+        const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
         setModelDiscoveryState({ status: "error", message });
       } else if (discoveryRequestIdRef.current === requestId) {
-        const message = error instanceof Error ? error.message : t("model.errModelDiscoveryFailed");
+        const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
         setModelDiscoveryState({
           status: "ready",
           data: {
@@ -178,8 +183,8 @@ export function useModelWorkspace(
         setSettingsState({ status: "ready", data: settings });
         setLlmState({ status: "ready", data: settings.status });
       })
-      .catch((error: Error) => {
-        const message = error.message || t("model.errSettingsLoadFailed");
+      .catch((error: unknown) => {
+        const message = localizeApiError(error, t, "model.errSettingsLoadFailed");
         setSettingsState({ status: "error", message });
         setLlmState({ status: "error", message });
       });
@@ -188,8 +193,11 @@ export function useModelWorkspace(
       .then((observability) => {
         setObservabilityState({ status: "ready", data: observability });
       })
-      .catch((error: Error) => {
-        setObservabilityState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        setObservabilityState({
+          status: "error",
+          message: localizeApiError(error, t, "model.errObservabilityFailed")
+        });
       });
   }, [startModelDiscovery, t]);
 
@@ -214,9 +222,9 @@ export function useModelWorkspace(
           setLlmState({ status: "ready", data: settings.status });
         }
       })
-      .catch((error: Error) => {
+      .catch((error: unknown) => {
         if (isCurrent) {
-          const message = error.message || t("model.errSettingsLoadFailed");
+          const message = localizeApiError(error, t, "model.errSettingsLoadFailed");
           setSettingsState({ status: "error", message });
           // Keep llmState in sync: ModelSetupView gates on llmState, so a settings
           // failure must not leave the view stuck on the loading screen forever.
@@ -228,8 +236,13 @@ export function useModelWorkspace(
       .then((observability) => {
         if (isCurrent) setObservabilityState({ status: "ready", data: observability });
       })
-      .catch((error: Error) => {
-        if (isCurrent) setObservabilityState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setObservabilityState({
+            status: "error",
+            message: localizeApiError(error, t, "model.errObservabilityFailed")
+          });
+        }
       });
 
     return () => {
@@ -271,8 +284,10 @@ export function useModelWorkspace(
     try {
       setObservabilityState({ status: "ready", data: await fetchObservability() });
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errObservabilityFailed");
-      setObservabilityState({ status: "error", message });
+      setObservabilityState({
+        status: "error",
+        message: localizeApiError(error, t, "model.errObservabilityFailed")
+      });
     }
   }
 
@@ -307,8 +322,7 @@ export function useModelWorkspace(
         force: true
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errSettingsSaveFailed");
-      setSettingsSaveError(message);
+      setSettingsSaveError(localizeApiError(error, t, "model.errSettingsSaveFailed"));
       throw error;
     } finally {
       setIsSavingSettings(false);
@@ -343,8 +357,7 @@ export function useModelWorkspace(
       setSettingsSaveResult(t(payload.activate ? "model.profileSavedAndApplied" : "model.profileSaved"));
       refreshDiscoveryForSettings(nextSettings);
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errProfileSaveFailed");
-      setSettingsSaveError(message);
+      setSettingsSaveError(localizeApiError(error, t, "model.errProfileSaveFailed"));
       throw error;
     } finally {
       setIsSavingSettings(false);
@@ -365,8 +378,7 @@ export function useModelWorkspace(
       setSettingsSaveResult(t("model.profileApplied"));
       refreshDiscoveryForSettings(nextSettings);
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errProfileApplyFailed");
-      setSettingsSaveError(message);
+      setSettingsSaveError(localizeApiError(error, t, "model.errProfileApplyFailed"));
       throw error;
     } finally {
       setIsSavingSettings(false);
@@ -382,8 +394,7 @@ export function useModelWorkspace(
       applyRuntimeSettingsResponse(nextSettings);
       setSettingsSaveResult(t("model.profileDeleted"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errProfileDeleteFailed");
-      setSettingsSaveError(message);
+      setSettingsSaveError(localizeApiError(error, t, "model.errProfileDeleteFailed"));
       throw error;
     } finally {
       setIsSavingSettings(false);
@@ -408,10 +419,9 @@ export function useModelWorkspace(
 
     autoAppliedDiscoveryModelIdRef.current = candidate.id;
     void handleSaveSettings(payloadForDiscoveredModel(settingsState.data.settings, candidate)).catch((error) => {
-      const message = error instanceof Error ? error.message : t("model.errSettingsSaveFailed");
-      setSettingsSaveError(message);
+      setSettingsSaveError(localizeApiError(error, t, "model.errSettingsSaveFailed"));
     });
-  }, [modelDiscoveryState, settingsState, view]);
+  }, [modelDiscoveryState, settingsState, view, t]);
 
   async function handleModelSmokeTest() {
     if (!data) return;
@@ -436,8 +446,7 @@ export function useModelWorkspace(
       setModelTestIsPlaceholder(!isRealModelProvider(refreshedStatus) || sessionUsedDeterministicFallback(session));
       await refreshModelObservability();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errSmokeTestFailed");
-      setModelTestResult(message);
+      setModelTestResult(localizeApiError(error, t, "model.errSmokeTestFailed"));
       setModelTestIsPlaceholder(false);
       await refreshModelObservability();
     } finally {
@@ -452,8 +461,7 @@ export function useModelWorkspace(
     try {
       setReachabilityResult(await checkLlmReachability());
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("model.errReachabilityFailed");
-      setReachabilityError(message);
+      setReachabilityError(localizeApiError(error, t, "model.errReachabilityFailed"));
     } finally {
       setIsCheckingReachability(false);
     }

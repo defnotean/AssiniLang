@@ -336,6 +336,58 @@ describe("transcribeAudioFile", () => {
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
+  it("sanitizes network failures from the transcription endpoint", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ingest-transcribe-net-"));
+    const filePath = join(dir, "clip.wav");
+    await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
+    const fetchStub = (async () => {
+      throw new Error("connect failed with Bearer whisper-secret-value");
+    }) as typeof fetch;
+
+    await expect(transcribeAudioFile({
+      filePath,
+      env: {
+        ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_TRANSCRIBE_API_KEY: "whisper-secret-value",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/Transcription request failed:.*\[redacted-secret\]/);
+
+    try {
+      await transcribeAudioFile({
+        filePath,
+        env: {
+          ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_TRANSCRIBE_API_KEY: "whisper-secret-value",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      });
+    } catch (error) {
+      expect((error as Error).message).not.toContain("whisper-secret-value");
+    }
+  });
+
+  it("fails clearly when the transcription endpoint returns invalid JSON", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ingest-transcribe-json-"));
+    const filePath = join(dir, "clip.wav");
+    await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
+    const fetchStub = (async () => new Response("not-json", {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    await expect(transcribeAudioFile({
+      filePath,
+      env: {
+        ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/Transcription endpoint returned invalid JSON/);
+  });
+
   it("posts the audio file to an OpenAI-compatible transcription endpoint", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-ingest-test-"));
     const filePath = join(dir, "clip.wav");
@@ -394,6 +446,41 @@ describe("ocrImageWithModel", () => {
       fetchFn: fetchStub
     })).rejects.toThrow(/private or local network/);
     expect(fetchStub).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes network failures from the OCR model endpoint", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-ingest-ocr-net-"));
+    const filePath = join(dir, "photo.png");
+    await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
+    const fetchStub = (async () => {
+      throw new Error("ECONNREFUSED with Bearer ocr-net-secret");
+    }) as typeof fetch;
+
+    await expect(ocrImageWithModel({
+      filePath,
+      mimeType: "image/png",
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_OCR_API_KEY: "ocr-net-secret",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/OCR model request failed:.*\[redacted-secret\]/);
+
+    try {
+      await ocrImageWithModel({
+        filePath,
+        mimeType: "image/png",
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_OCR_API_KEY: "ocr-net-secret",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      });
+    } catch (error) {
+      expect((error as Error).message).not.toContain("ocr-net-secret");
+    }
   });
 
   it("posts the image to an OpenAI-compatible chat completions endpoint", async () => {
@@ -848,6 +935,38 @@ describe("extractCandidatesForAsset document support", () => {
       },
       fetchFn: fetchStub
     })).rejects.toThrow(/Configured OCR model could not read the scanned PDF:.*status 503/);
+  });
+
+  it("preserves page-image guidance when a scanned PDF has no embeddable page 1 image", async () => {
+    pdfStub.text = "   ";
+    pdfOcrStub.images = [];
+    const { asset, dataDir } = await makeDocumentAsset("scan-no-image.pdf");
+
+    await expect(extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      }
+    })).rejects.toThrow(/no embedded page image to OCR/);
+
+    try {
+      await extractCandidatesForAsset({
+        asset,
+        language,
+        provider: providerWithoutChat,
+        dataDir,
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        }
+      });
+    } catch (error) {
+      expect((error as Error).message).not.toMatch(/Configured OCR model could not read/);
+    }
   });
 
   it("explains when a DOCX has no extractable text", async () => {

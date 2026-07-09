@@ -28,12 +28,34 @@ function inferBackend(dbPath: string): StoreBackend {
 }
 
 /**
+ * Strips Windows extended-length path prefixes so realpath (`\\?\...`) and
+ * resolve(...) paths compare equal. `\\?\UNC\server\share` -> `\\server\share`;
+ * `\\?\C:\foo` -> `C:\foo`. Always applied (not platform-gated) so Linux CI can
+ * still validate Windows path strings.
+ */
+export function stripWindowsExtendedPrefix(pathValue: string): string {
+  if (pathValue.startsWith("\\\\?\\UNC\\")) {
+    return `\\\\${pathValue.slice("\\\\?\\UNC\\".length)}`;
+  }
+  if (pathValue.startsWith("\\\\?\\")) {
+    return pathValue.slice("\\\\?\\".length);
+  }
+  return pathValue;
+}
+
+function normalizeWindowsPathForIdentity(pathValue: string): string {
+  return stripWindowsExtendedPrefix(pathValue).replace(/\//g, "\\").toLowerCase();
+}
+
+/**
  * Canonicalize a path for same-file checks. Prefer realpath so a symlink alias
  * of the live database is treated as the same file; fall back to resolve when
- * the path does not exist yet (typical for a new backup destination).
+ * the path does not exist yet (typical for a new backup destination). Strip
+ * Windows `\\?\` prefixes first — Node's realpath/resolve leave them intact and
+ * string compares would otherwise miss same-file aliases.
  */
 function canonicalizePathForIdentity(pathValue: string): string {
-  const resolved = resolve(pathValue);
+  const resolved = resolve(stripWindowsExtendedPrefix(pathValue));
   try {
     return realpathSync(resolved);
   } catch {
@@ -43,17 +65,17 @@ function canonicalizePathForIdentity(pathValue: string): string {
 
 /**
  * True when two filesystem paths refer to the same location after resolve +
- * realpath (case-insensitive on Windows), or when both exist as the same
- * inode/device (hard-link aliases). Catches symlink and hard-link aliases of
- * the live database so backup/restore cannot overwrite the source through a
- * different path string.
+ * realpath (case-insensitive on Windows, including `\\?\` extended prefixes),
+ * or when both exist as the same inode/device (hard-link aliases). Catches
+ * symlink and hard-link aliases of the live database so backup/restore cannot
+ * overwrite the source through a different path string.
  */
 export function pathsReferToSameFile(left: string, right: string): boolean {
   const normalizedLeft = canonicalizePathForIdentity(left);
   const normalizedRight = canonicalizePathForIdentity(right);
   const sameResolvedPath =
     process.platform === "win32"
-      ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+      ? normalizeWindowsPathForIdentity(normalizedLeft) === normalizeWindowsPathForIdentity(normalizedRight)
       : normalizedLeft === normalizedRight;
   if (sameResolvedPath) {
     return true;

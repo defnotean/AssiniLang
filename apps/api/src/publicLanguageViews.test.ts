@@ -328,6 +328,120 @@ describe("public language views", () => {
       integrity: [snapshot!.integrity]
     };
     expect(verifyExportIntegrity(arrayIntegrity as typeof snapshot)).toBe(false);
+
+    const stringIntegrity = {
+      ...snapshot!,
+      integrity: "not-an-object"
+    };
+    expect(verifyExportIntegrity(stringIntegrity as typeof snapshot)).toBe(false);
+
+    const nullContentHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: null
+      }
+    };
+    expect(verifyExportIntegrity(nullContentHash as typeof snapshot)).toBe(false);
+
+    const numericContentHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: 0
+      }
+    };
+    expect(verifyExportIntegrity(numericContentHash as typeof snapshot)).toBe(false);
+
+    const whitespaceHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: ` ${snapshot!.integrity.contentHash}`
+      }
+    };
+    expect(verifyExportIntegrity(whitespaceHash)).toBe(false);
+
+    const nullRedactionPolicy = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        redactionPolicy: null
+      }
+    };
+    expect(verifyExportIntegrity(nullRedactionPolicy as typeof snapshot)).toBe(false);
+
+    const objectRedactionPolicy = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        redactionPolicy: { 0: EXPORT_REDACTION_POLICY[0] }
+      }
+    };
+    expect(verifyExportIntegrity(objectRedactionPolicy as typeof snapshot)).toBe(false);
+
+    const extendedPolicy = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        redactionPolicy: [...EXPORT_REDACTION_POLICY, "extra-policy-entry"]
+      }
+    };
+    expect(verifyExportIntegrity(extendedPolicy)).toBe(false);
+
+    const nonStringExportVersion = {
+      ...snapshot!,
+      exportVersion: 2
+    };
+    expect(verifyExportIntegrity(nonStringExportVersion as typeof snapshot)).toBe(false);
+
+    const emptyExportVersion = {
+      ...snapshot!,
+      exportVersion: ""
+    };
+    expect(verifyExportIntegrity(emptyExportVersion)).toBe(false);
+
+    const missingAlgorithm = {
+      ...snapshot!,
+      integrity: {
+        contentHash: snapshot!.integrity.contentHash,
+        generatedBy: snapshot!.integrity.generatedBy,
+        redactionPolicy: snapshot!.integrity.redactionPolicy
+      }
+    };
+    expect(verifyExportIntegrity(missingAlgorithm as typeof snapshot)).toBe(false);
+
+    const missingGeneratedBy = {
+      ...snapshot!,
+      integrity: {
+        algorithm: snapshot!.integrity.algorithm,
+        contentHash: snapshot!.integrity.contentHash,
+        redactionPolicy: snapshot!.integrity.redactionPolicy
+      }
+    };
+    expect(verifyExportIntegrity(missingGeneratedBy as typeof snapshot)).toBe(false);
+
+    const inheritedIntegrity = {
+      ...snapshot!,
+      integrity: Object.create(snapshot!.integrity)
+    };
+    expect(Object.hasOwn(inheritedIntegrity.integrity, "algorithm")).toBe(false);
+    expect(verifyExportIntegrity(inheritedIntegrity as typeof snapshot)).toBe(false);
+
+    // Stable key sort: reordering top-level payload keys must not break verify.
+    const reorderedKeys = {
+      integrity: snapshot!.integrity,
+      exportVersion: snapshot!.exportVersion,
+      exportedAt: snapshot!.exportedAt,
+      language: snapshot!.language,
+      linguisticProfile: snapshot!.linguisticProfile,
+      corpus: snapshot!.corpus,
+      notes: snapshot!.notes,
+      exercises: snapshot!.exercises,
+      governance: snapshot!.governance,
+      evaluations: snapshot!.evaluations
+    };
+    expect(verifyExportIntegrity(reorderedKeys)).toBe(true);
   });
 
   it("returns undefined snapshots for unknown languages", () => {
@@ -509,6 +623,33 @@ describe("public language views", () => {
       exportedAt: "2099-01-01T00:00:00.000Z"
     };
     expect(verifyExportIntegrity(mutatedPayload)).toBe(false);
+
+    const unknownExportVersion = {
+      ...artifact,
+      exportVersion: "evaluation-artifact-v1"
+    };
+    expect(verifyExportIntegrity(unknownExportVersion)).toBe(false);
+
+    const nonStringExportVersion = {
+      ...artifact,
+      exportVersion: null
+    };
+    expect(verifyExportIntegrity(nonStringExportVersion as typeof artifact)).toBe(false);
+
+    const extendedPolicy = {
+      ...artifact,
+      integrity: {
+        ...artifact.integrity,
+        redactionPolicy: [...EXPORT_REDACTION_POLICY, "extra-policy-entry"]
+      }
+    };
+    expect(verifyExportIntegrity(extendedPolicy)).toBe(false);
+
+    const inheritedIntegrity = {
+      ...artifact,
+      integrity: Object.create(artifact.integrity)
+    };
+    expect(verifyExportIntegrity(inheritedIntegrity as typeof artifact)).toBe(false);
   });
 
   it("marks empty-workspace and no-run evaluation artifacts as failed gates", () => {

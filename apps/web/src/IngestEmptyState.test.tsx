@@ -28,16 +28,19 @@ describe("IngestView empty-state guidance", () => {
     render(<IngestView languageId="avenik" />);
 
     const sourcesEmpty = await screen.findByText("No sources registered yet.");
-    expect(sourcesEmpty.closest("[role='status']")).toHaveTextContent(
-      "Add raw text, a word list, or a URL above, or upload a file. Then process the source to propose drafts."
+    const sourcesStatus = sourcesEmpty.closest("[role='status']");
+    expect(sourcesStatus).toHaveAttribute("aria-live", "polite");
+    expect(sourcesStatus).toHaveTextContent(
+      "Add raw text, a word list, or a URL above, upload a file, or import Markdown notes from an Obsidian vault. Then process the source to propose drafts."
     );
 
     await waitFor(() => {
       expect(screen.getByText("No proposed extraction drafts.")).toBeInTheDocument();
     });
     const draftsEmpty = screen.getByText("No proposed extraction drafts.").closest("[role='status']");
+    expect(draftsEmpty).toHaveAttribute("aria-live", "polite");
     expect(draftsEmpty).toHaveTextContent(
-      "Process a registered source above to propose lexemes, passages, and grammar notes for review."
+      "Process a registered source above to propose lexemes, passages, and grammar notes. Accept drafts here; grammar notes then appear in Review."
     );
   });
 });

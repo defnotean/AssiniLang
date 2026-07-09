@@ -145,7 +145,17 @@ describe("locale catalogs", () => {
     expect(en["errors.invalidCorpusImportBody"]).toContain("complete corpus passage");
     expect(ar["errors.invalidCorpusImportBody"]).toContain("مقطع مدوّنة");
     expect(ar["errors.invalidCorpusImportBody"]).not.toBe(en["errors.invalidCorpusImportBody"]);
+    expect(ar["errors.corpusImportValidationFailed"]).not.toBe(en["errors.corpusImportValidationFailed"]);
     expect(ar["errors.corpusImportFailed"]).not.toBe(en["errors.corpusImportFailed"]);
+  });
+
+  it("localizes source registration and upload validation errors in Arabic", () => {
+    expect(en["errors.invalidSourceBody"]).toContain("kind");
+    expect(ar["errors.invalidSourceBody"]).toContain("النوع");
+    expect(ar["errors.invalidSourceBody"]).not.toBe(en["errors.invalidSourceBody"]);
+    expect(ar["errors.sourceNotFound"]).not.toBe(en["errors.sourceNotFound"]);
+    expect(ar["errors.sourceUploadEmpty"]).not.toBe(en["errors.sourceUploadEmpty"]);
+    expect(ar["errors.invalidObsidianVaultImportBody"]).not.toBe(en["errors.invalidObsidianVaultImportBody"]);
   });
 
   it("localizes extraction-draft not-found errors in Arabic", () => {
@@ -153,6 +163,15 @@ describe("locale catalogs", () => {
     expect(ar["errors.extractionDraftNotFound"]).toContain("البناء");
     expect(ar["errors.extractionDraftNotFound"]).not.toBe(en["errors.extractionDraftNotFound"]);
     expect(ar["errors.extractionDraftAcceptFailed"]).not.toBe(en["errors.extractionDraftAcceptFailed"]);
+  });
+
+  it("localizes Review edit-history actions and extraction-draft already-status leftovers in Arabic", () => {
+    expect(en["reviewView.editAction.drafted"]).toBe("Drafted");
+    expect(ar["reviewView.editAction.drafted"]).toBe("صياغة");
+    expect(ar["reviewView.editAction.applied_correction"]).not.toBe(en["reviewView.editAction.applied_correction"]);
+    expect(ar["errors.extractionDraftAlreadyAccepted"]).toContain("مقبولة");
+    expect(ar["errors.extractionDraftAlreadyAccepted"]).not.toBe(en["errors.extractionDraftAlreadyAccepted"]);
+    expect(ar["ingest.bulkFailureRow"]).toContain("{draftId}");
   });
 
   it("localizes governance empty-policy next-step guidance", () => {
@@ -171,6 +190,63 @@ describe("locale catalogs", () => {
     expect(en["learner.noExercisesDetailEmptyHint"]).toContain("authoring form");
     expect(ar["learner.noExercisesDetailEmptyHint"]).toContain("التأليف");
     expect(ar["learner.noExercisesDetailEmptyHint"]).not.toBe(en["learner.noExercisesDetailEmptyHint"]);
+  });
+
+  it("localizes Chat conversation-setup seed-prompt prefix in Arabic", () => {
+    expect(en["assistant.conversationSetupSeedPrefix"]).toContain("{instructions}");
+    expect(en["assistant.conversationSetupSeedPrefix"]).toContain("Conversation setup");
+    expect(ar["assistant.conversationSetupSeedPrefix"]).toContain("{instructions}");
+    expect(ar["assistant.conversationSetupSeedPrefix"]).toContain("إعداد المحادثة");
+    expect(ar["assistant.conversationSetupSeedPrefix"]).not.toBe(en["assistant.conversationSetupSeedPrefix"]);
+  });
+
+  it("localizes Chat and Elder correction empty-state next-step guidance", () => {
+    expect(en["assistant.emptyState"]).toContain("No conversation yet");
+    expect(en["assistant.emptyStateHint"]).toContain("seed prompt");
+    expect(en["assistant.emptyStateHint"]).toContain("local model");
+    expect(ar["assistant.emptyState"]).toContain("محادثة");
+    expect(ar["assistant.emptyStateHint"]).toContain("افتتاحي");
+    expect(ar["assistant.emptyState"]).not.toBe(en["assistant.emptyState"]);
+    expect(ar["assistant.emptyStateHint"]).not.toBe(en["assistant.emptyStateHint"]);
+
+    expect(en["elderPage.noSuggestions"]).toBe("No suggestions yet.");
+    expect(en["elderPage.noSuggestionsHint"]).toContain("three steps");
+    expect(ar["elderPage.noSuggestions"]).toContain("اقتراحات");
+    expect(ar["elderPage.noSuggestionsHint"]).toContain("الخطوات");
+    expect(ar["elderPage.noSuggestions"]).not.toBe(en["elderPage.noSuggestions"]);
+    expect(ar["elderPage.noSuggestionsHint"]).not.toBe(en["elderPage.noSuggestionsHint"]);
+  });
+
+  it("localizes Corpus, Build, and Notes empty-state next-step guidance", () => {
+    expect(en["corpus.emptyCorpus"]).toContain("Add source passage");
+    expect(en["corpus.emptyNetwork"]).toContain("import a passage above");
+    expect(en["ingest.noSourcesHint"]).toContain("Obsidian vault");
+    expect(en["profile.grammarEmptyState"]).toContain("Build notes queue");
+    expect(ar["corpus.emptyCorpus"]).toContain("إضافة مقطع مصدر");
+    expect(ar["corpus.emptyNetwork"]).toContain("استورد مقطعًا أعلاه");
+    expect(ar["ingest.noSourcesHint"]).toContain("Obsidian");
+    expect(ar["profile.grammarEmptyState"]).toContain("قائمة ملاحظات البناء");
+    expect(ar["corpus.emptyCorpus"]).not.toBe(en["corpus.emptyCorpus"]);
+    expect(ar["corpus.emptyNetwork"]).not.toBe(en["corpus.emptyNetwork"]);
+    expect(ar["ingest.noSourcesHint"]).not.toBe(en["ingest.noSourcesHint"]);
+    expect(ar["profile.grammarEmptyState"]).not.toBe(en["profile.grammarEmptyState"]);
+  });
+
+  it("localizes Review and extraction-draft empty-state next-step guidance", () => {
+    expect(en["reviewView.noNotesForLanguageHint"]).toContain("Build");
+    expect(en["reviewView.noNotesForLanguageHint"]).toContain("accept grammar-note drafts");
+    expect(en["reviewView.noNotesInFilterHint"]).toContain("Build");
+    expect(en["reviewView.noExamplesSupplied"]).toContain("Build");
+    expect(en["ingest.noDraftsHint"]).toContain("Process a registered source");
+    expect(en["ingest.noDraftsHint"]).toContain("Review");
+    expect(ar["reviewView.noNotesForLanguageHint"]).toContain("البناء");
+    expect(ar["reviewView.noNotesForLanguageHint"]).toContain("اقبل");
+    expect(ar["reviewView.noNotesInFilterHint"]).toContain("البناء");
+    expect(ar["reviewView.noExamplesSupplied"]).toContain("البناء");
+    expect(ar["ingest.noDraftsHint"]).toContain("عالِج مصدرًا");
+    expect(ar["ingest.noDraftsHint"]).toContain("المراجعة");
+    expect(ar["reviewView.noNotesForLanguageHint"]).not.toBe(en["reviewView.noNotesForLanguageHint"]);
+    expect(ar["ingest.noDraftsHint"]).not.toBe(en["ingest.noDraftsHint"]);
   });
 
   it("localizes elder apply negatives and desktop-only bridge notices in Arabic", () => {

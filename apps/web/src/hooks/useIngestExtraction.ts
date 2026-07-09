@@ -11,7 +11,12 @@ import {
   uploadSourceFile
 } from "../api";
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
-import { localizeApiError, localizeSourceProcessingError, localizeVaultImportError } from "../lib/format";
+import {
+  localizeApiError,
+  localizeExtractionDraftFailure,
+  localizeSourceProcessingError,
+  localizeVaultImportError
+} from "../lib/format";
 import type { Translate } from "../i18n";
 
 export const INGEST_POLL_INTERVAL_MS = 2500;
@@ -371,7 +376,10 @@ export function useIngestExtraction(
         setBulkFailures(
           result.results
             .filter((item) => !item.ok)
-            .map((item) => ({ draftId: item.draftId, error: item.error ?? t("ingest.unknownFailure") }))
+            .map((item) => ({
+              draftId: item.draftId,
+              error: localizeExtractionDraftFailure(item.error, t)
+            }))
         );
       } else {
         setDraftNotice(summary);

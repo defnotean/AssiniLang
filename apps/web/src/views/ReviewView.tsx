@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Note } from "@assini/db";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { DetailBlock } from "../components/DetailBlock";
-import { formatEvidenceLabel, localizeApiError } from "../lib/format";
+import { formatEvidenceLabel, formatNoteEditAction, localizeApiError } from "../lib/format";
 import { useI18n } from "../i18n";
 import type { ReviewFilter, ReviewStatus } from "../lib/types";
 
@@ -110,7 +110,7 @@ export function ReviewView({
 
         <div className="note-table-body">
           {filteredNotes.length === 0 ? (
-            <div className="empty-state" role="status">
+            <div className="empty-state" role="status" aria-live="polite">
               <p>
                 {filter === "all"
                   ? t("reviewView.noNotesForLanguage")
@@ -228,7 +228,7 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.examples")}>
               {detailNote.examples.length === 0 ? (
-                <p className="inline-empty">{t("reviewView.noExamplesSupplied")}</p>
+                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noExamplesSupplied")}</p>
               ) : (
                 <div className="detail-list">
                   {detailNote.examples.map((example, index) => (
@@ -243,7 +243,7 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.reviewerComments")}>
               {detailNote.reviewer.comments.length === 0 ? (
-                <p className="inline-empty">{t("reviewView.noReviewerComments")}</p>
+                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noReviewerComments")}</p>
               ) : (
                 <div className="detail-list">
                   {detailNote.reviewer.comments.map((comment, index) => (
@@ -257,12 +257,12 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.editHistory")}>
               {detailNote.editHistory.length === 0 ? (
-                <p className="inline-empty">{t("reviewView.noEditHistory")}</p>
+                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noEditHistory")}</p>
               ) : (
                 <div className="detail-list">
                   {detailNote.editHistory.map((entry, index) => (
                     <div key={`${index}:${entry.at}:${entry.action}:${entry.summary}`} className="detail-row">
-                      <strong>{entry.action}</strong>
+                      <strong>{formatNoteEditAction(entry.action, t)}</strong>
                       <span>{entry.summary}</span>
                       <span className="muted">{entry.by}</span>
                       <span className="muted">{entry.at}</span>
@@ -321,7 +321,7 @@ export function ReviewView({
             </div>
           </article>
         ) : (
-          <div className="empty-state" role="status">
+          <div className="empty-state" role="status" aria-live="polite">
             {notes.length === 0 ? (
               <>
                 <p>{t("reviewView.noNotesForLanguage")}</p>

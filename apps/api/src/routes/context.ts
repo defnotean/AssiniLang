@@ -30,7 +30,7 @@ export type RouteContext = {
     request: FastifyRequest,
     reply: FastifyReply,
     actor: User | undefined
-  ) => { error: string; i18nKey: string; i18nParams?: Record<string, number> } | undefined;
+  ) => { error: string; i18nKey: string; i18nParams?: Record<string, number>; requestId?: string } | undefined;
   authToken: string | undefined;
   prototypeSessions: PrototypeSessionMap;
   enablePrototypeAuth: boolean;

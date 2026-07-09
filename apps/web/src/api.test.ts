@@ -41,7 +41,12 @@ import {
   uploadSourceFile,
   updateRuntimeSettings
 } from "./api";
-import { fetchAsActor, resetPrototypeSessionCache, actorRequest as buildActorRequest } from "./lib/apiClient";
+import {
+  assertOk,
+  fetchAsActor,
+  resetPrototypeSessionCache,
+  actorRequest as buildActorRequest
+} from "./lib/apiClient";
 
 describe("fetchDashboardData", () => {
   afterEach(() => {
@@ -577,11 +582,20 @@ describe("fetchDashboardData", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expectApiError(fetchLlmStatus(), {
-      message: "Request failed: /llm/status (413): Payload is too large (request id: req-body-413)",
-      status: 413,
-      requestId: "req-body-413"
-    });
+    let caught: unknown;
+    try {
+      await fetchLlmStatus();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const error = caught as ApiError;
+    expect(error.message).toBe(
+      "Request failed: /llm/status (413): Payload is too large (request id: req-body-413)"
+    );
+    expect(error.status).toBe(413);
+    expect(error.requestId).toBe("req-body-413");
+    expect(error.i18nKey).toBe("errors.payloadTooLarge");
   });
 
   it("includes Retry-After guidance when rate-limited responses carry the header", async () => {
@@ -599,11 +613,52 @@ describe("fetchDashboardData", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expectApiError(fetchLlmStatus(), {
-      message: "Request failed: /llm/status (429): Rate limit exceeded Retry after 12 seconds.",
-      status: 429,
-      requestId: undefined
+    let caught: unknown;
+    try {
+      await fetchLlmStatus();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const error = caught as ApiError;
+    expect(error.message).toBe(
+      "Request failed: /llm/status (429): Rate limit exceeded Retry after 12 seconds."
+    );
+    expect(error.status).toBe(429);
+    expect(error.requestId).toBeUndefined();
+    expect(error.i18nKey).toBe("app.rateLimitExceeded");
+    expect(error.i18nParams).toEqual({ seconds: 12 });
+  });
+
+  it("preserves body i18nParams seconds over Retry-After for rate limits", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return {
+        ok: false,
+        status: 429,
+        headers: new Headers({ "Retry-After": "99" }),
+        json: async () => ({
+          error: "Rate limit exceeded",
+          i18nKey: "app.rateLimitExceeded",
+          i18nParams: { seconds: 7 }
+        })
+      };
     });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    let caught: unknown;
+    try {
+      await fetchLlmStatus();
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ApiError);
+    const error = caught as ApiError;
+    expect(error.i18nKey).toBe("app.rateLimitExceeded");
+    expect(error.i18nParams).toEqual({ seconds: 7 });
   });
 
   it("creates AI sessions with role-aware prototype auth and no browser API key", async () => {
@@ -1083,8 +1138,9 @@ describe("fetchDashboardData", () => {
     expect(fetchMock).toHaveBeenCalledWith("/api/users/me", actorRequest);
   });
 
-  it("opens a new prototype session after a 401 and after sign-out", async () => {
+  it("reopens once on 401 then succeeds, and again after sign-out", async () => {
     let sessionPosts = 0;
+    let meCalls = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes("/auth/prototype-session") && init?.method === "POST") {
@@ -1094,27 +1150,117 @@ describe("fetchDashboardData", () => {
       if (url.includes("/auth/prototype-session") && init?.method === "DELETE") {
         return { ok: true, status: 204, json: async () => undefined };
       }
-      if (sessionPosts === 1) {
-        return {
-          ok: false,
-          status: 401,
-          json: async () => ({ error: "Unauthorized" })
-        };
+      if (url.includes("/users/me")) {
+        meCalls += 1;
+        // First attempt after the initial open is stale; retry after reopen succeeds.
+        if (meCalls === 1) {
+          return {
+            ok: false,
+            status: 401,
+            json: async () => ({ error: "Unauthorized" })
+          };
+        }
+        return { ok: true, json: async () => ({ id: "me" }) };
       }
       return { ok: true, json: async () => ({ id: "me" }) };
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchCurrentUser()).rejects.toBeInstanceOf(ApiError);
-    expect(sessionPosts).toBe(1);
-
-    // 401 cleared the reuse cache, so the next same-actor call opens again.
-    await fetchCurrentUser();
+    await expect(fetchCurrentUser()).resolves.toEqual({ id: "me" });
     expect(sessionPosts).toBe(2);
+    expect(meCalls).toBe(2);
 
     await closePrototypeSession();
     await fetchCurrentUser();
     expect(sessionPosts).toBe(3);
+  });
+
+  it("surfaces 401 after a single reopen retry still fails", async () => {
+    let sessionPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/auth/prototype-session") && init?.method === "POST") {
+        sessionPosts += 1;
+        return { ok: true, json: async () => ({ id: "reviewer-1" }) };
+      }
+      return {
+        ok: false,
+        status: 401,
+        json: async () => ({ error: "Unauthorized" })
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchCurrentUser()).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401
+    });
+    // Initial open + one reopen; no third POST (single retry only).
+    expect(sessionPosts).toBe(2);
+  });
+
+  it("opens a new prototype session when the actor changes", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({ ok: true }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAsActor("learner", "/api/users/me");
+    await fetchAsActor("reviewer", "/api/users/me");
+    await fetchAsActor("learner", "/api/users/me");
+
+    const sessionPosts = fetchMock.mock.calls
+      .map((call) => call as unknown as [unknown, RequestInit?])
+      .filter((call) => String(call[0]).includes("/auth/prototype-session"));
+    expect(sessionPosts).toHaveLength(3);
+    expect(JSON.parse(String(sessionPosts[0]?.[1]?.body))).toEqual({ userId: "learner-1" });
+    expect(JSON.parse(String(sessionPosts[1]?.[1]?.body))).toEqual({ userId: "reviewer-1" });
+    expect(JSON.parse(String(sessionPosts[2]?.[1]?.body))).toEqual({ userId: "learner-1" });
+  });
+
+  it("does not revive the reuse cache when a 401 invalidates during an in-flight open", async () => {
+    let resolvePost: (() => void) | undefined;
+    const postGate = new Promise<void>((resolve) => {
+      resolvePost = resolve;
+    });
+    let sessionPosts = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/auth/prototype-session") && init?.method === "POST") {
+        sessionPosts += 1;
+        await postGate;
+        return { ok: true, json: async () => ({ id: "reviewer-1" }) };
+      }
+      return { ok: true, json: async () => ({ id: "me" }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const openPromise = buildActorRequest("reviewer");
+    // Wait until the POST is gated, then invalidate via a parallel 401.
+    await Promise.resolve();
+    await Promise.resolve();
+    await expect(
+      assertOk(
+        {
+          ok: false,
+          status: 401,
+          headers: { get: () => null },
+          json: async () => ({ error: "Unauthorized" })
+        } as unknown as Response,
+        "stale"
+      )
+    ).rejects.toBeInstanceOf(ApiError);
+
+    resolvePost?.();
+    await openPromise;
+    expect(sessionPosts).toBe(1);
+
+    // Generation bumped during POST, so the completed open must not mark the session reusable.
+    await buildActorRequest("reviewer");
+    expect(sessionPosts).toBe(2);
   });
 
   it("serializes concurrent actorRequest opens so overlapping actors do not race", async () => {
@@ -1160,6 +1306,30 @@ describe("fetchDashboardData", () => {
 
     expect(maxInFlightPosts).toBe(1);
     expect(prototypeSessionPostCount(fetchMock)).toBe(2);
+  });
+
+  it("serializes sign-out with actor opens so DELETE cannot overlap a POST", async () => {
+    let inFlightAuth = 0;
+    let maxInFlightAuth = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/auth/prototype-session")) {
+        inFlightAuth += 1;
+        maxInFlightAuth = Math.max(maxInFlightAuth, inFlightAuth);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        inFlightAuth -= 1;
+        return {
+          ok: true,
+          status: init?.method === "DELETE" ? 204 : 200,
+          json: async () => ({})
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await Promise.all([buildActorRequest("learner"), closePrototypeSession()]);
+
+    expect(maxInFlightAuth).toBe(1);
   });
 
   it("includes server error details when prototype sign-out fails", async () => {

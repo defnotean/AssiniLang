@@ -258,7 +258,7 @@ export function IngestView({
           </div>
         )}
         {sources.length === 0 ? (
-          <div className="empty-state" role="status">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>{t("ingest.noSources")}</p>
             <p className="muted">{t("ingest.noSourcesHint")}</p>
           </div>
@@ -345,12 +345,17 @@ export function IngestView({
         {bulkFailures.length > 0 && (
           <ul className="warning-list" aria-label={t("ingest.bulkReviewFailuresAria")}>
             {bulkFailures.map((failure) => (
-              <li key={failure.draftId}>{failure.draftId}: {failure.error}</li>
+              <li key={failure.draftId}>
+                {t("ingest.bulkFailureRow", {
+                  draftId: failure.draftId,
+                  error: failure.error
+                })}
+              </li>
             ))}
           </ul>
         )}
         {drafts.length === 0 ? (
-          <div className="empty-state" role="status">
+          <div className="empty-state" role="status" aria-live="polite">
             <p>{t("ingest.noDrafts")}</p>
             <p className="muted">{t("ingest.noDraftsHint")}</p>
           </div>

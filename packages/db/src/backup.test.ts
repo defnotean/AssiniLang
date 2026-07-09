@@ -2,7 +2,7 @@ import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile }
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { JsonStore, pathsReferToSameFile } from "./store.js";
+import { JsonStore, pathsReferToSameFile, stripWindowsExtendedPrefix } from "./store.js";
 import { buildTestWorkspaceState } from "./testing.js";
 
 let dir: string;
@@ -164,6 +164,53 @@ it("treats Windows case-only path aliases as the same file for backup and restor
   // On POSIX, case-distinct paths are different files; the win32 branch is the
   // operator-relevant identity check. Still assert the helper stays case-sensitive.
   expect(pathsReferToSameFile(dbPath, caseAlias)).toBe(false);
+});
+
+it("strips Windows extended-length prefixes for path identity compares", () => {
+  expect(stripWindowsExtendedPrefix("\\\\?\\C:\\Users\\op\\local-db.json")).toBe(
+    "C:\\Users\\op\\local-db.json"
+  );
+  expect(stripWindowsExtendedPrefix("\\\\?\\UNC\\server\\share\\local-db.json")).toBe(
+    "\\\\server\\share\\local-db.json"
+  );
+  expect(stripWindowsExtendedPrefix("/posix/unchanged")).toBe("/posix/unchanged");
+});
+
+it("treats Windows \\\\?\\ extended-prefix aliases as the same file for backup and restore", async () => {
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+  const extendedAlias = `\\\\?\\${resolve(dbPath)}`;
+
+  expect(pathsReferToSameFile(dbPath, extendedAlias)).toBe(true);
+
+  if (process.platform === "win32") {
+    await expect(store.backupTo(extendedAlias)).rejects.toThrow(/destination must differ/);
+    await expect(store.restoreFrom(extendedAlias)).rejects.toThrow(/backup source must differ/);
+    // force must not bypass same-file identity (including extended-prefix aliases).
+    await expect(store.backupTo(extendedAlias, { force: true })).rejects.toThrow(/destination must differ/);
+    expect(await store.read()).toEqual(before);
+  }
+});
+
+it("treats Windows forward-slash and ..-normalized aliases as the same file", async () => {
+  if (process.platform !== "win32") {
+    return;
+  }
+  const dbPath = join(dir, "db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  const before = await store.read();
+  const forwardSlashAlias = resolve(dbPath).replace(/\\/g, "/");
+  const parentHopAlias = join(dir, "nested", "..", "db.json");
+
+  expect(pathsReferToSameFile(dbPath, forwardSlashAlias)).toBe(true);
+  expect(pathsReferToSameFile(dbPath, parentHopAlias)).toBe(true);
+  await expect(store.backupTo(forwardSlashAlias)).rejects.toThrow(/destination must differ/);
+  await expect(store.backupTo(parentHopAlias)).rejects.toThrow(/destination must differ/);
+  await expect(store.restoreFrom(forwardSlashAlias)).rejects.toThrow(/backup source must differ/);
+  expect(await store.read()).toEqual(before);
 });
 
 it("rejects restore when the backup source is an existing directory", async () => {

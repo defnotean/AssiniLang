@@ -120,4 +120,40 @@ describe("createReadinessReport", () => {
       }
     });
   });
+
+  it("treats unsafe schema versions as sanitized storage failures", async () => {
+    const invalidSchema = {
+      ...createEmptyState(),
+      schemaVersion: Number.NaN
+    } as ReturnType<typeof createEmptyState>;
+
+    const report = await createReadinessReport(async () => invalidSchema);
+
+    expect(report).toEqual({
+      ok: false,
+      checks: {
+        storage: {
+          ok: false,
+          error: "Storage read failed"
+        },
+        jobQueue: {
+          ok: true,
+          pending: 0,
+          active: 0
+        }
+      }
+    });
+    expect(JSON.stringify(report)).not.toContain("NaN");
+  });
+
+  it("does not expose job identifiers when queue status is healthy", async () => {
+    const report = await createReadinessReport(
+      async () => createEmptyState(),
+      () => ({ pending: 1, active: 1 })
+    );
+
+    expect(report.ok).toBe(true);
+    expect(JSON.stringify(report)).not.toContain("source-secret");
+    expect(Object.keys(report.checks.jobQueue).sort()).toEqual(["active", "ok", "pending"]);
+  });
 });

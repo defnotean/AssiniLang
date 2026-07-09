@@ -156,7 +156,10 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
         };
       }
       reply.code(422);
-      return { error: redactErrorSecrets(error instanceof Error ? error.message : "Draft note generation failed.") };
+      return {
+        error: redactErrorSecrets(error instanceof Error ? error.message : "Draft note generation failed."),
+        i18nKey: "errors.modelDraftGenerationFailed"
+      };
     }
 
     const passagesById = new Map(corpus.map((passage) => [passage.id, passage]));

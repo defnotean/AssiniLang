@@ -10,6 +10,8 @@ import {
   prototypeSessionCookieSecure,
   readPrototypeSessionAbsoluteMaxMs,
   readPrototypeSessionTtlMs,
+  serializeExpiredPrototypeSessionCookie,
+  serializePrototypeSessionCookie,
   type PrototypeSessionMap
 } from "./routeHelpers.js";
 
@@ -44,6 +46,42 @@ function createSessionServer(
   });
 }
 
+function firstSetCookie(response: { headers: { "set-cookie"?: string | string[] } }): string {
+  const setCookie = response.headers["set-cookie"];
+  const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+  expect(cookieHeader).toBeTruthy();
+  return cookieHeader!;
+}
+
+/** Asserts the shared Secure/HttpOnly/SameSite/Path contract for every Set-Cookie path. */
+function expectPrototypeSessionCookieAttributes(
+  cookieHeader: string,
+  options: { maxAge: number; secure?: boolean }
+): void {
+  expect(cookieHeader).toContain("assini_prototype_session=");
+  expect(cookieHeader).toContain(`Max-Age=${options.maxAge}`);
+  expect(cookieHeader).toContain("HttpOnly");
+  expect(cookieHeader).toContain("SameSite=Strict");
+  expect(cookieHeader).toContain("Path=/");
+  if (options.secure) {
+    expect(cookieHeader).toMatch(/(?:^|;\s*)Secure(?:;|$)/);
+  } else if (options.secure === false) {
+    expect(cookieHeader).not.toMatch(/(?:^|;\s*)Secure(?:;|$)/);
+  }
+}
+
+async function withCookieSecureFlag<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+  const previous = process.env.ASSINI_COOKIE_SECURE;
+  if (value === undefined) delete process.env.ASSINI_COOKIE_SECURE;
+  else process.env.ASSINI_COOKIE_SECURE = value;
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) delete process.env.ASSINI_COOKIE_SECURE;
+    else process.env.ASSINI_COOKIE_SECURE = previous;
+  }
+}
+
 async function openSession(app: ReturnType<typeof createServer>, userId = "learner-1"): Promise<string> {
   const response = await app.inject({
     method: "POST",
@@ -51,10 +89,9 @@ async function openSession(app: ReturnType<typeof createServer>, userId = "learn
     payload: { userId }
   });
   expect(response.statusCode).toBe(200);
-  const setCookie = response.headers["set-cookie"];
-  const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+  const cookieHeader = firstSetCookie(response);
   expect(cookieHeader).toContain("assini_prototype_session=");
-  return cookieHeader!.split(";")[0];
+  return cookieHeader.split(";")[0];
 }
 
 describe("prototype session lifecycle", () => {
@@ -72,20 +109,12 @@ describe("prototype session lifecycle", () => {
     clock.advance(DEFAULT_PROTOTYPE_SESSION_TTL_MS + 1);
     const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(expired.statusCode).toBe(401);
-    const expiredSetCookie = expired.headers["set-cookie"];
-    const expiredCookieHeader = Array.isArray(expiredSetCookie) ? expiredSetCookie[0] : expiredSetCookie;
-    expect(expiredCookieHeader).toContain("assini_prototype_session=");
-    expect(expiredCookieHeader).toContain("Max-Age=0");
-    expect(expiredCookieHeader).toContain("HttpOnly");
-    expect(expiredCookieHeader).toContain("SameSite=Strict");
-    expect(expiredCookieHeader).toContain("Path=/");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(expired), { maxAge: 0, secure: false });
 
     // requireActor paths (not only /users/me) also expire the stale cookie on 401.
     const expiredList = await app.inject({ method: "GET", url: "/evaluations", headers: { cookie } });
     expect(expiredList.statusCode).toBe(401);
-    const listSetCookie = expiredList.headers["set-cookie"];
-    const listCookieHeader = Array.isArray(listSetCookie) ? listSetCookie[0] : listSetCookie;
-    expect(listCookieHeader).toContain("Max-Age=0");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(expiredList), { maxAge: 0, secure: false });
 
     // Lazy eviction: the expired record was deleted, so a retry is still 401.
     const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
@@ -118,11 +147,7 @@ describe("prototype session lifecycle", () => {
 
     const orphaned = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(orphaned.statusCode).toBe(401);
-    const orphanSetCookie = orphaned.headers["set-cookie"];
-    const orphanCookieHeader = Array.isArray(orphanSetCookie) ? orphanSetCookie[0] : orphanSetCookie;
-    expect(orphanCookieHeader).toContain("Max-Age=0");
-    expect(orphanCookieHeader).toContain("HttpOnly");
-    expect(orphanCookieHeader).toContain("SameSite=Strict");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(orphaned), { maxAge: 0, secure: false });
 
     // Orphan eviction: the map entry is gone, so a retry stays 401 (no zombie renewal).
     const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
@@ -144,13 +169,7 @@ describe("prototype session lifecycle", () => {
       headers: { cookie: "assini_prototype_session=does-not-exist" }
     });
     expect(response.statusCode).toBe(401);
-    const setCookie = response.headers["set-cookie"];
-    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-    expect(cookieHeader).toContain("assini_prototype_session=");
-    expect(cookieHeader).toContain("Max-Age=0");
-    expect(cookieHeader).toContain("HttpOnly");
-    expect(cookieHeader).toContain("SameSite=Strict");
-    expect(cookieHeader).toContain("Path=/");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(response), { maxAge: 0, secure: false });
   });
 
   it("does not emit Set-Cookie on 401 when no prototype-session cookie was sent", async () => {
@@ -184,6 +203,7 @@ describe("prototype session lifecycle", () => {
     clock.advance(6 * HOUR_MS + 1);
     const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(expired.statusCode).toBe(401);
+    expectPrototypeSessionCookieAttributes(firstSetCookie(expired), { maxAge: 0, secure: false });
   });
 
   it("rejects a session that reaches the absolute max even when sliding would still renew", async () => {
@@ -199,14 +219,31 @@ describe("prototype session lifecycle", () => {
     clock.advance(50_000);
     const mid = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(mid.statusCode).toBe(200);
-    const midSetCookie = mid.headers["set-cookie"];
-    const midCookieHeader = Array.isArray(midSetCookie) ? midSetCookie[0] : midSetCookie;
     // Remaining lifetime is absoluteMax - elapsed (40s), not a full TTL reset.
-    expect(midCookieHeader).toContain("Max-Age=40");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(mid), { maxAge: 40, secure: false });
 
     clock.advance(40_001);
     const pastAbsolute = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(pastAbsolute.statusCode).toBe(401);
+    expectPrototypeSessionCookieAttributes(firstSetCookie(pastAbsolute), { maxAge: 0, secure: false });
+  });
+
+  it("expires an absolute-max session cookie with Secure when ASSINI_COOKIE_SECURE is enabled", async () => {
+    await withCookieSecureFlag("1", async () => {
+      const clock = createClock();
+      const ttlMs = 60_000;
+      const absoluteMaxMs = 90_000;
+      const app = createSessionServer(clock, {
+        prototypeSessionTtlMs: ttlMs,
+        prototypeSessionAbsoluteMaxMs: absoluteMaxMs
+      });
+      const cookie = await openSession(app);
+
+      clock.advance(absoluteMaxMs + 1);
+      const pastAbsolute = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+      expect(pastAbsolute.statusCode).toBe(401);
+      expectPrototypeSessionCookieAttributes(firstSetCookie(pastAbsolute), { maxAge: 0, secure: true });
+    });
   });
 
   it("revokes prior sessions for the same user when a new session is minted", async () => {
@@ -289,14 +326,21 @@ describe("prototype session lifecycle", () => {
     clock.advance(30_000);
     const response = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(response.statusCode).toBe(200);
+    expectPrototypeSessionCookieAttributes(firstSetCookie(response), { maxAge: 90, secure: false });
+  });
 
-    const setCookie = response.headers["set-cookie"];
-    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-    expect(cookieHeader).toContain("assini_prototype_session=");
-    expect(cookieHeader).toContain("Max-Age=90");
-    expect(cookieHeader).toContain("HttpOnly");
-    expect(cookieHeader).toContain("SameSite=Strict");
-    expect(cookieHeader).toContain("Path=/");
+  it("refreshes the sliding Set-Cookie with Secure when ASSINI_COOKIE_SECURE is enabled", async () => {
+    await withCookieSecureFlag("1", async () => {
+      const clock = createClock();
+      const ttlMs = 90_000;
+      const app = createSessionServer(clock, { prototypeSessionTtlMs: ttlMs });
+      const cookie = await openSession(app);
+
+      clock.advance(30_000);
+      const response = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+      expect(response.statusCode).toBe(200);
+      expectPrototypeSessionCookieAttributes(firstSetCookie(response), { maxAge: 90, secure: true });
+    });
   });
 
   it("clears the session record and expires the cookie on logout", async () => {
@@ -310,13 +354,7 @@ describe("prototype session lifecycle", () => {
       headers: { cookie }
     });
     expect(logout.statusCode).toBe(204);
-    const setCookie = logout.headers["set-cookie"];
-    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-    expect(cookieHeader).toContain("assini_prototype_session=");
-    expect(cookieHeader).toContain("Max-Age=0");
-    expect(cookieHeader).toContain("HttpOnly");
-    expect(cookieHeader).toContain("SameSite=Strict");
-    expect(cookieHeader).toContain("Path=/");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(logout), { maxAge: 0, secure: false });
 
     // The server-side record is gone: the old cookie no longer authenticates.
     const afterLogout = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
@@ -324,9 +362,7 @@ describe("prototype session lifecycle", () => {
   });
 
   it("expires the logout cookie with Secure when ASSINI_COOKIE_SECURE is enabled", async () => {
-    const previous = process.env.ASSINI_COOKIE_SECURE;
-    process.env.ASSINI_COOKIE_SECURE = "1";
-    try {
+    await withCookieSecureFlag("1", async () => {
       const clock = createClock();
       const app = createSessionServer(clock);
       const cookie = await openSession(app);
@@ -337,17 +373,8 @@ describe("prototype session lifecycle", () => {
         headers: { cookie }
       });
       expect(logout.statusCode).toBe(204);
-      const setCookie = logout.headers["set-cookie"];
-      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-      expect(cookieHeader).toContain("Max-Age=0");
-      expect(cookieHeader).toContain("Secure");
-      expect(cookieHeader).toContain("HttpOnly");
-      expect(cookieHeader).toContain("SameSite=Strict");
-      expect(cookieHeader).toContain("Path=/");
-    } finally {
-      if (previous === undefined) delete process.env.ASSINI_COOKIE_SECURE;
-      else process.env.ASSINI_COOKIE_SECURE = previous;
-    }
+      expectPrototypeSessionCookieAttributes(firstSetCookie(logout), { maxAge: 0, secure: true });
+    });
   });
 
   it("treats logout as idempotent when no session exists", async () => {
@@ -470,21 +497,18 @@ describe("prototype session lifecycle", () => {
       payload: { userId: "learner-1" }
     });
     expect(response.statusCode).toBe(200);
-    const setCookie = response.headers["set-cookie"];
-    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-    expect(cookieHeader).toContain("Max-Age=90");
+    expectPrototypeSessionCookieAttributes(firstSetCookie(response), { maxAge: 90, secure: false });
   });
 
   it("appends Secure on Set-Cookie when ASSINI_COOKIE_SECURE is enabled", async () => {
-    const previous = process.env.ASSINI_COOKIE_SECURE;
-    process.env.ASSINI_COOKIE_SECURE = "1";
-    try {
-      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "1" })).toBe(true);
-      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "true" })).toBe(true);
-      expect(prototypeSessionCookieSecure({ NODE_ENV: "production" })).toBe(true);
-      expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "0", NODE_ENV: "production" })).toBe(false);
-      expect(prototypeSessionCookieSecure({})).toBe(false);
+    expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "1" })).toBe(true);
+    expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "true" })).toBe(true);
+    expect(prototypeSessionCookieSecure({ NODE_ENV: "production" })).toBe(true);
+    expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "0", NODE_ENV: "production" })).toBe(false);
+    expect(prototypeSessionCookieSecure({ ASSINI_COOKIE_SECURE: "false", NODE_ENV: "production" })).toBe(false);
+    expect(prototypeSessionCookieSecure({})).toBe(false);
 
+    await withCookieSecureFlag("1", async () => {
       const clock = createClock();
       const app = createSessionServer(clock);
       const response = await app.inject({
@@ -493,39 +517,77 @@ describe("prototype session lifecycle", () => {
         payload: { userId: "learner-1" }
       });
       expect(response.statusCode).toBe(200);
-      const setCookie = response.headers["set-cookie"];
-      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-      expect(cookieHeader).toContain("Secure");
-      expect(cookieHeader).toContain("HttpOnly");
-      expect(cookieHeader).toContain("SameSite=Strict");
-    } finally {
-      if (previous === undefined) delete process.env.ASSINI_COOKIE_SECURE;
-      else process.env.ASSINI_COOKIE_SECURE = previous;
-    }
+      expectPrototypeSessionCookieAttributes(firstSetCookie(response), {
+        maxAge: Math.ceil(DEFAULT_PROTOTYPE_SESSION_TTL_MS / 1000),
+        secure: true
+      });
+    });
   });
 
   it("omits Secure on Set-Cookie for local HTTP when ASSINI_COOKIE_SECURE is unset", async () => {
-    const previousSecure = process.env.ASSINI_COOKIE_SECURE;
     const previousNodeEnv = process.env.NODE_ENV;
-    delete process.env.ASSINI_COOKIE_SECURE;
     process.env.NODE_ENV = "test";
     try {
-      const clock = createClock();
-      const app = createSessionServer(clock);
-      const response = await app.inject({
-        method: "POST",
-        url: "/auth/prototype-session",
-        payload: { userId: "learner-1" }
+      await withCookieSecureFlag(undefined, async () => {
+        const clock = createClock();
+        const app = createSessionServer(clock);
+        const response = await app.inject({
+          method: "POST",
+          url: "/auth/prototype-session",
+          payload: { userId: "learner-1" }
+        });
+        expect(response.statusCode).toBe(200);
+        expectPrototypeSessionCookieAttributes(firstSetCookie(response), {
+          maxAge: Math.ceil(DEFAULT_PROTOTYPE_SESSION_TTL_MS / 1000),
+          secure: false
+        });
       });
-      expect(response.statusCode).toBe(200);
-      const setCookie = response.headers["set-cookie"];
-      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
-      expect(cookieHeader).not.toMatch(/(?:^|;\s*)Secure(?:;|$)/);
     } finally {
-      if (previousSecure === undefined) delete process.env.ASSINI_COOKIE_SECURE;
-      else process.env.ASSINI_COOKIE_SECURE = previousSecure;
       if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = previousNodeEnv;
     }
+  });
+
+  it("keeps Secure/SameSite/Path aligned on create, refresh, and 401 expire serializers", () => {
+    const issued = serializePrototypeSessionCookie("session-id-1", 120, {
+      env: { ASSINI_COOKIE_SECURE: "1" }
+    });
+    expectPrototypeSessionCookieAttributes(issued, { maxAge: 120, secure: true });
+
+    const local = serializePrototypeSessionCookie("session-id-1", 120, {
+      env: { NODE_ENV: "test" }
+    });
+    expectPrototypeSessionCookieAttributes(local, { maxAge: 120, secure: false });
+
+    const expiredSecure = serializeExpiredPrototypeSessionCookie({
+      env: { ASSINI_COOKIE_SECURE: "true" }
+    });
+    expectPrototypeSessionCookieAttributes(expiredSecure, { maxAge: 0, secure: true });
+
+    const expiredLocal = serializeExpiredPrototypeSessionCookie({
+      env: { ASSINI_COOKIE_SECURE: "0", NODE_ENV: "production" }
+    });
+    expectPrototypeSessionCookieAttributes(expiredLocal, { maxAge: 0, secure: false });
+  });
+
+  it("expires unknown and TTL-stale cookies with Secure when ASSINI_COOKIE_SECURE is enabled", async () => {
+    await withCookieSecureFlag("1", async () => {
+      const clock = createClock();
+      const app = createSessionServer(clock, { prototypeSessionTtlMs: 1_000 });
+
+      const unknown = await app.inject({
+        method: "GET",
+        url: "/users/me",
+        headers: { cookie: "assini_prototype_session=does-not-exist" }
+      });
+      expect(unknown.statusCode).toBe(401);
+      expectPrototypeSessionCookieAttributes(firstSetCookie(unknown), { maxAge: 0, secure: true });
+
+      const cookie = await openSession(app);
+      clock.advance(1_002);
+      const expired = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+      expect(expired.statusCode).toBe(401);
+      expectPrototypeSessionCookieAttributes(firstSetCookie(expired), { maxAge: 0, secure: true });
+    });
   });
 });

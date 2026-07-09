@@ -484,6 +484,7 @@ async function createDataBackup(options = {}) {
 
   return {
     ...actionResult(`Created backup at ${backupPath}`),
+    backupPath,
     backupSummary: desktopBackupSummary()
   };
 }
@@ -557,83 +558,131 @@ async function pruneOldDataBackups() {
   };
 }
 
+const desktopRestoreLock = (() => {
+  const { createDesktopRestoreLock } = require("./backupRestore.cjs");
+  return createDesktopRestoreLock();
+})();
+
 async function restoreLatestDataBackup() {
   if (!desktopRuntime) {
     throw new Error("Desktop runtime paths are not ready yet.");
   }
 
-  const { pickPreferredRestoreBackup } = require("./backupRestore.cjs");
-  // Prefer newest routine backup so a just-created safety copy is not the default.
-  const latest = pickPreferredRestoreBackup(restorableBackups());
-  if (!latest) {
-    return {
-      ok: false,
-      message: "No desktop data backup is available to restore.",
-      backupSummary: desktopBackupSummary()
-    };
-  }
-
-  const userDataDir = path.resolve(desktopRuntime.userDataDir);
-  const targetDataDir = assertChildPathInside(userDataDir, desktopRuntime.dataDir, "Desktop data folder");
-  const targetSettingsPath = desktopRuntime.settingsPath
-    ? assertChildPathInside(userDataDir, desktopRuntime.settingsPath, "Desktop settings file")
-    : null;
-  const sourceDataDir = assertChildPathInside(latest.path, path.join(latest.path, "data"), "Backup data folder");
-  const sourceSettingsPath = assertChildPathInside(latest.path, path.join(latest.path, ".env"), "Backup settings file");
-
-  // Validate the backup database before touching live data (matches CLI restoreFrom).
   try {
-    const { assertDesktopBackupReadable } = require("./backupRestore.cjs");
-    const { JsonStore } = await import("@assini/db");
-    await assertDesktopBackupReadable(latest.path, {
-      readWorkspace: async (dbPath) => {
-        await new JsonStore(dbPath).read();
+    return await desktopRestoreLock.run(async () => {
+      const {
+        SAFETY_BACKUP_PREFIX,
+        assertBackupDistinctFromLive,
+        assertDesktopBackupReadable,
+        assertSafetyBackupBeforeRestore,
+        pickPreferredRestoreBackup,
+        replaceLiveDesktopDataFromBackup
+      } = require("./backupRestore.cjs");
+
+      // Prefer newest routine backup so a just-created safety copy is not the default.
+      const latest = pickPreferredRestoreBackup(restorableBackups());
+      if (!latest) {
+        return {
+          ok: false,
+          message: "No desktop data backup is available to restore.",
+          backupSummary: desktopBackupSummary()
+        };
       }
-    });
-  } catch (error) {
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : String(error),
-      backupSummary: desktopBackupSummary()
-    };
-  }
 
-  const { SAFETY_BACKUP_PREFIX, assertSafetyBackupBeforeRestore } = require("./backupRestore.cjs");
-  try {
-    await assertSafetyBackupBeforeRestore(() => createDataBackup({ prefix: SAFETY_BACKUP_PREFIX }));
-  } catch (error) {
-    return {
-      ok: false,
-      message: error instanceof Error ? error.message : String(error),
-      backupSummary: desktopBackupSummary()
-    };
-  }
+      const userDataDir = path.resolve(desktopRuntime.userDataDir);
+      const targetDataDir = assertChildPathInside(userDataDir, desktopRuntime.dataDir, "Desktop data folder");
+      const targetSettingsPath = desktopRuntime.settingsPath
+        ? assertChildPathInside(userDataDir, desktopRuntime.settingsPath, "Desktop settings file")
+        : null;
+      assertChildPathInside(latest.path, path.join(latest.path, "data"), "Backup data folder");
+      assertChildPathInside(latest.path, path.join(latest.path, ".env"), "Backup settings file");
 
-  rmSync(targetDataDir, { recursive: true, force: true });
-  cpSync(sourceDataDir, targetDataDir, {
-    recursive: true,
-    force: true,
-    errorOnExist: false
-  });
-  if (targetSettingsPath && existsSync(sourceSettingsPath)) {
-    cpSync(sourceSettingsPath, targetSettingsPath, {
-      force: true,
-      errorOnExist: false
-    });
-  }
+      try {
+        assertBackupDistinctFromLive(latest.path, targetDataDir);
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          backupSummary: desktopBackupSummary()
+        };
+      }
 
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    setTimeout(() => {
+      // Validate the backup database before touching live data (matches CLI restoreFrom).
+      try {
+        const { JsonStore } = await import("@assini/db");
+        await assertDesktopBackupReadable(latest.path, {
+          readWorkspace: async (dbPath) => {
+            await new JsonStore(dbPath).read();
+          }
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          backupSummary: desktopBackupSummary()
+        };
+      }
+
+      let safetyBackupPath = null;
+      try {
+        const safety = await assertSafetyBackupBeforeRestore(() =>
+          createDataBackup({ prefix: SAFETY_BACKUP_PREFIX })
+        );
+        safetyBackupPath = typeof safety.backupPath === "string" ? safety.backupPath : null;
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          backupSummary: desktopBackupSummary()
+        };
+      }
+
+      try {
+        replaceLiveDesktopDataFromBackup({
+          sourceBackupDir: latest.path,
+          targetDataDir,
+          targetSettingsPath,
+          safetyBackupDir: safetyBackupPath,
+          copyTree: (sourcePath, targetPath) => {
+            if (existsSync(targetPath)) {
+              rmSync(targetPath, { recursive: true, force: true });
+            }
+            cpSync(sourcePath, targetPath, {
+              recursive: true,
+              force: true,
+              errorOnExist: false
+            });
+          }
+        });
+      } catch (error) {
+        return {
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+          backupSummary: desktopBackupSummary(),
+          recoveredFromSafety: Boolean(error && error.recoveredFromSafety)
+        };
+      }
+
       if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.reload();
+        setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.reload();
+          }
+        }, 1200);
       }
-    }, 1200);
-  }
 
-  return {
-    ...actionResult(`Restored latest backup ${latest.name}. Reloading workspace...`),
-    backupSummary: desktopBackupSummary()
-  };
+      return {
+        ...actionResult(`Restored latest backup ${latest.name}. Reloading workspace...`),
+        backupSummary: desktopBackupSummary()
+      };
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      backupSummary: desktopBackupSummary()
+    };
+  }
 }
 
 function registerDesktopActions() {

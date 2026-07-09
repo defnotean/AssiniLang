@@ -118,15 +118,24 @@ describe("project documentation", () => {
     const docs = await readAllDocs();
 
     const expectedContent: Record<string, string[]> = {
-      "README.md": ["[Documentation Hub](docs/README.md)", "```mermaid", "First Nations", "npm.cmd run smoke:backup"],
+      "README.md": [
+        "[Documentation Hub](docs/README.md)",
+        "```mermaid",
+        "First Nations",
+        "npm.cmd run smoke:backup",
+        "npm.cmd run verify:beta",
+        "npm.cmd run ci:green"
+      ],
       "docs/README.md": ["[UI Design Guide](ui-design.md)", "## Reading paths", "## Doc index"],
       "docs/api.md": [
         "verifyExportIntegrity",
         "missing or null `integrity`",
         "non-object `integrity`",
-        "unexpected `algorithm`/`generatedBy`",
-        "mismatched or reordered `redactionPolicy`",
-        "missing or unknown `exportVersion`",
+        "own properties required",
+        "unexpected or missing `algorithm`/`generatedBy`",
+        "mismatched, reordered, truncated, or extended `redactionPolicy`",
+        "missing, non-string, or unknown `exportVersion`",
+        "Payload key order does not affect verification",
         "vacuous green gate",
         "exactly 64 hex digits",
         "case-insensitive",
@@ -165,6 +174,7 @@ describe("project documentation", () => {
         "errors.invalidExerciseSubmissionBody",
         "errors.exerciseNotFound",
         "errors.invalidCorpusImportBody",
+        "errors.corpusImportValidationFailed",
         "errors.extractionDraftNotFound",
         "errors.invalidReviewBody",
         "errors.noteExplanationTooShort",
@@ -176,9 +186,15 @@ describe("project documentation", () => {
         "errors.payloadTooLarge",
         "app.rateLimitExceeded",
         "elderWs.errInvalidCorrectionBody",
+        "elderWs.errNoteNotFoundForLanguage",
+        "elderWs.errPassageNotFoundForLanguage",
         "elderWs.errCorrectionMustBeAccepted",
         "elderWs.errCorrectionNotPending",
-        "joined before parsing"
+        "joined before parsing",
+        "empty-workspace guidance",
+        "ASSINI_EVAL_REQUIRE_LANGUAGES",
+        "A successful run also clears `processingAttempts`",
+        "capped asset stays blocked"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -187,7 +203,9 @@ describe("project documentation", () => {
         "`testing-only`",
         "data/local-db.json",
         "```mermaid",
-        "schemaVersion"
+        "schemaVersion",
+        "ASSINI_EVAL_REQUIRE_LANGUAGES",
+        "empty seed cannot green-pass"
       ],
       "docs/configuration.md": [
         "## Setup recipes",
@@ -205,7 +223,9 @@ describe("project documentation", () => {
         "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
         "sliding ∩ absolute",
         "three times the configured sliding TTL",
-        "raise if extractions are getting truncated"
+        "raise if extractions are getting truncated",
+        "ASSINI_VERIFY_MODEL",
+        "verify:beta"
       ],
       "docs/development.md": [
         "npm.cmd run verify",
@@ -213,10 +233,14 @@ describe("project documentation", () => {
         "verify:beta",
         "model:verify",
         "npm.cmd run smoke:backup",
+        "npm.cmd run ci:green",
+        "--omit=dev",
         "CLI refusal checks",
         "SQLite force-overwrite",
         "select-or-create empty state",
-        "Building a language from raw sources"
+        "Building a language from raw sources",
+        "ASSINI_EVAL_REQUIRE_LANGUAGES",
+        "exits `0` with System Eval guidance"
       ],
       "docs/ingestion.md": [
         "## Source kinds",
@@ -232,7 +256,9 @@ describe("project documentation", () => {
         "ingest.warningOfflineHeuristicFallback",
         "ingest.warningModelExtractionFailed",
         "OCR model endpoint returned no text",
-        "leaving the model unset"
+        "leaving the model unset",
+        "successful run clears the counter",
+        "stay blocked"
       ],
       "docs/maintenance.md": [
         "## Adding an API route",
@@ -243,6 +269,8 @@ describe("project documentation", () => {
         "symlink alias",
         "hard-link alias",
         "case-only path alias",
+        "extended-length prefix",
+        "does not bypass same-file identity",
         "validates the live workspace",
         "not an existing directory",
         "is also refused unless",
@@ -269,9 +297,13 @@ describe("project documentation", () => {
         "refuses to archive an invalid workspace",
         "symlink or hard-link aliases",
         "case-only path aliases",
+        "extended-length prefixes",
+        "does not bypass same-file identity",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "processingStartedAt",
+        "successful reprocess clears the counter",
+        "ingest.sourceMaxProcessingAttempts",
         "npm.cmd run seed",
         "existing directory is rejected",
         "refuses when the backup path is a directory",
@@ -292,7 +324,14 @@ describe("project documentation", () => {
         "verify:beta",
         "groundingFailureCodes",
         "First Nations",
-        "timeout/max-token starting points"
+        "timeout/max-token starting points",
+        "Clear ingest attempts on success",
+        "Eval empty gates",
+        "ASSINI_EVAL_REQUIRE_LANGUAGES",
+        "Prototype session absolute max",
+        "sliding ∩ absolute",
+        "smoke:backup",
+        "success clears the counter"
       ],
       "docs/product-guide.md": [
         "leadless",
@@ -310,6 +349,9 @@ describe("project documentation", () => {
         "ASSINI_ALLOW_PRIVATE_URLS",
         "data/local-db.json",
         "ingest.processingInterruptedByRestart",
+        "ingest.sourceMaxProcessingAttempts",
+        "errors.noLanguagesToEvaluate",
+        "ASSINI_EVAL_REQUIRE_LANGUAGES",
         "relative roots were set",
         "errors.prototypeAuthDisabled",
         "ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS",
@@ -319,6 +361,8 @@ describe("project documentation", () => {
         "destination already exists",
         "same as the live database",
         "case-only alias",
+        "extended-length prefix",
+        "does not bypass this check",
         "backup source is a directory",
         "database file only",
         "could not create a safety backup",

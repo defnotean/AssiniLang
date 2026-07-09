@@ -21,6 +21,32 @@ function expectStatus(label, response, expected) {
   console.log(`${label}: ${response.statusCode} OK`);
 }
 
+function expectReady(label, response) {
+  expectStatus(label, response, 200);
+  const body = response.json();
+  if (body.ok !== true) {
+    console.error(`${label}: expected ok=true, got: ${response.body}`);
+    process.exit(1);
+  }
+  if (!body.checks?.storage?.ok) {
+    console.error(`${label}: expected checks.storage.ok, got: ${response.body}`);
+    process.exit(1);
+  }
+  if (!body.checks?.jobQueue?.ok) {
+    console.error(`${label}: expected checks.jobQueue.ok, got: ${response.body}`);
+    process.exit(1);
+  }
+  if (typeof body.checks.jobQueue.pending !== "number" || typeof body.checks.jobQueue.active !== "number") {
+    console.error(`${label}: expected numeric jobQueue pending/active, got: ${response.body}`);
+    process.exit(1);
+  }
+  console.log(`  ready checks: storage ok, jobQueue pending=${body.checks.jobQueue.pending} active=${body.checks.jobQueue.active}`);
+}
+
+// 0. Readiness probe (same storage + jobQueue shape CI asserts on built-dist /ready)
+const ready = await app.inject({ method: "GET", url: "/ready" });
+expectReady("ready", ready);
+
 // 1. Create a language
 const createLanguage = await app.inject({
   method: "POST",

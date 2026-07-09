@@ -23,6 +23,9 @@ describe("sourceProcessingErrorI18n", () => {
     expect(sourceProcessingErrorI18n(
       "Configured OCR model could not read the scanned PDF: OCR model request failed with status 503."
     )).toEqual({ i18nKey: "ingest.ocrModelFailed" });
+    expect(sourceProcessingErrorI18n(
+      "Configured OCR model could not read the image: OCR model request failed: [redacted-secret]"
+    )).toEqual({ i18nKey: "ingest.ocrModelFailed" });
   });
 
   it("classifies OCR model endpoint empty or invalid responses", () => {
@@ -34,6 +37,14 @@ describe("sourceProcessingErrorI18n", () => {
       .toEqual({ i18nKey: "ingest.ocrModelFailed" });
     expect(sourceProcessingErrorI18n("OCR model request failed with status 502."))
       .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+    expect(sourceProcessingErrorI18n("OCR model request failed: fetch failed"))
+      .toEqual({ i18nKey: "ingest.ocrModelFailed" });
+  });
+
+  it("classifies local tesseract OCR wrapper failures", () => {
+    expect(sourceProcessingErrorI18n(
+      "Local OCR could not read the image: OCR found no readable text in the image. Configure a vision-capable model via ASSINI_LLM_PROVIDER (for example llava via Ollama), or provide a clearer image."
+    )).toEqual({ i18nKey: "ingest.ocrNoReadableText" });
   });
 
   it("classifies non-vision main-LLM image failures", () => {
@@ -73,7 +84,11 @@ describe("sourceProcessingErrorI18n", () => {
   it("classifies transcription endpoint failures", () => {
     expect(sourceProcessingErrorI18n("Transcription request failed with status 502."))
       .toEqual({ i18nKey: "ingest.transcribeFailed" });
+    expect(sourceProcessingErrorI18n("Transcription request failed: [redacted-secret]"))
+      .toEqual({ i18nKey: "ingest.transcribeFailed" });
     expect(sourceProcessingErrorI18n("Transcription endpoint returned no text."))
+      .toEqual({ i18nKey: "ingest.transcribeFailed" });
+    expect(sourceProcessingErrorI18n("Transcription endpoint returned invalid JSON."))
       .toEqual({ i18nKey: "ingest.transcribeFailed" });
   });
 

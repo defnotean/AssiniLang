@@ -6,7 +6,12 @@ import {
   type RecommendedExercises
 } from "../api";
 import type { LearnerWorkspace } from "../hooks/useLearnerWorkspace";
-import { formatSubmissionExplanation, formatSubmissionStatus, parseAuthoringList } from "../lib/format";
+import {
+  formatSubmissionExplanation,
+  formatSubmissionStatus,
+  localizeApiError,
+  parseAuthoringList
+} from "../lib/format";
 import { useI18n } from "../i18n";
 import type { AsyncState, PublicExercise } from "../lib/types";
 import { LearnerPracticeNextPanel } from "./LearnerPracticeNextPanel";
@@ -72,7 +77,7 @@ export function LearnerView({
         if (!cancelled) {
           setPracticeState({
             status: "error",
-            message: error instanceof Error ? error.message : t("learner.practiceRecommendationsLoadError")
+            message: localizeApiError(error, t, "learner.practiceRecommendationsLoadError")
           });
         }
       });
@@ -142,8 +147,7 @@ export function LearnerView({
         setAuthoringError(validation.errors.join(" "));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("learner.validateExerciseFailed");
-      setAuthoringError(message);
+      setAuthoringError(localizeApiError(error, t, "learner.validateExerciseFailed"));
     } finally {
       setIsValidatingExercise(false);
     }
@@ -160,8 +164,7 @@ export function LearnerView({
       await onCreateExercise(buildAuthoringPayload());
       setAuthoringMessage(t("learner.exerciseAuthored"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("learner.exerciseAuthoringFailed");
-      setAuthoringError(message);
+      setAuthoringError(localizeApiError(error, t, "learner.exerciseAuthoringFailed"));
     } finally {
       setIsCreatingExercise(false);
     }
@@ -192,8 +195,7 @@ export function LearnerView({
       const base = t("learner.draftGenerated");
       setAuthoringMessage(warnings.length > 0 ? `${base} ${warnings.join(" ")}` : base);
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("learner.modelExerciseGenerationFailed");
-      setAuthoringError(message);
+      setAuthoringError(localizeApiError(error, t, "learner.modelExerciseGenerationFailed"));
     } finally {
       setIsGeneratingExercise(false);
     }

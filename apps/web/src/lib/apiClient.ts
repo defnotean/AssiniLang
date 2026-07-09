@@ -85,14 +85,21 @@ type ErrorDetails = {
 let actorFetchQueue: Promise<void> = Promise.resolve();
 /** Last actor that successfully opened a browser prototype session in this tab. */
 let cachedPrototypeActor: LocalActor | undefined;
+/**
+ * Bumped on sign-out and 401 so an in-flight POST cannot revive the reuse cache
+ * after the cookie was cleared.
+ */
+let prototypeSessionGeneration = 0;
 
 /** Test helper: clears the in-memory prototype-session reuse cache. */
 export function resetPrototypeSessionCache(): void {
   cachedPrototypeActor = undefined;
+  prototypeSessionGeneration += 1;
 }
 
 function invalidatePrototypeSessionCache(): void {
   cachedPrototypeActor = undefined;
+  prototypeSessionGeneration += 1;
 }
 
 async function runSerialized<T>(operation: () => Promise<T>): Promise<T> {
@@ -240,11 +247,36 @@ async function errorFromResponse(response: Response, fallback: string): Promise<
     ? `${fallback}${status}: ${details.detail}${requestIdSuffix}${retryAfterSuffix}`
     : `${fallback}${status}${requestIdSuffix}${retryAfterSuffix}`;
 
+  let i18nKey = details.i18nKey;
+  let i18nParams = details.i18nParams ? { ...details.i18nParams } : undefined;
+
+  // Synthesize operator-facing keys when older proxies omit them, and prefer
+  // Retry-After for rate-limit seconds when the body did not include i18nParams.
+  if (response.status === 429) {
+    i18nKey ??= "app.rateLimitExceeded";
+    const bodySeconds = i18nParams?.seconds;
+    const parsedBodySeconds = typeof bodySeconds === "number"
+      ? bodySeconds
+      : typeof bodySeconds === "string"
+        ? Number.parseInt(bodySeconds, 10)
+        : undefined;
+    const seconds = parsedBodySeconds !== undefined
+      && Number.isFinite(parsedBodySeconds)
+      && parsedBodySeconds > 0
+      ? parsedBodySeconds
+      : retryAfterSeconds;
+    if (seconds !== undefined) {
+      i18nParams = { ...(i18nParams ?? {}), seconds };
+    }
+  } else if (response.status === 413) {
+    i18nKey ??= "errors.payloadTooLarge";
+  }
+
   return new ApiError(message, {
     status: response.status || undefined,
     requestId,
-    i18nKey: details.i18nKey,
-    i18nParams: details.i18nParams
+    i18nKey,
+    i18nParams
   });
 }
 
@@ -289,7 +321,8 @@ async function postPrototypeSession(actor: LocalActor): Promise<void> {
 
 /**
  * Opens a prototype session only when the actor changed, after sign-out, or after a 401.
- * Serialized with actorRequest/fetchAsActor so concurrent calls cannot race two POSTs.
+ * Serialized with actorRequest/fetchAsActor/closePrototypeSession so concurrent calls
+ * cannot race two POSTs or revive the cache after sign-out.
  */
 async function ensurePrototypeSession(actor: LocalActor): Promise<void> {
   if (desktopBridge()?.prototypeAuth) {
@@ -305,28 +338,65 @@ async function ensurePrototypeSession(actor: LocalActor): Promise<void> {
     return;
   }
 
+  const generationAtStart = prototypeSessionGeneration;
   await postPrototypeSession(actor);
+  // Sign-out or 401 while POST was in flight must not mark the cleared cookie as reusable.
+  if (generationAtStart !== prototypeSessionGeneration) {
+    return;
+  }
   cachedPrototypeActor = actor;
+}
+
+/**
+ * Ensure + credentialed fetch, with one reopen/retry when the cookie is stale (401).
+ * Caller must already be inside runSerialized (or be the sole queue owner).
+ */
+async function credentialedActorFetch(
+  actor: LocalActor,
+  input: RequestInfo | URL,
+  init: RequestInit,
+  json: boolean
+): Promise<Response> {
+  await ensurePrototypeSession(actor);
+  const headers = {
+    ...jsonHeaders(json),
+    ...((init.headers ?? {}) as Record<string, string>)
+  };
+  const requestInit: RequestInit = {
+    ...init,
+    credentials: "include",
+    headers
+  };
+
+  let response = await fetch(input, requestInit);
+  if (response.status === 401) {
+    invalidatePrototypeSessionCache();
+    await ensurePrototypeSession(actor);
+    response = await fetch(input, requestInit);
+  }
+  return response;
 }
 
 /** Logs out of the local prototype session: clears the server record and expires the HttpOnly cookie. */
 export async function closePrototypeSession(): Promise<void> {
-  invalidatePrototypeSessionCache();
+  return runSerialized(async () => {
+    invalidatePrototypeSessionCache();
 
-  if (desktopBridge()?.prototypeAuth) {
-    return;
-  }
+    if (desktopBridge()?.prototypeAuth) {
+      return;
+    }
 
-  if (!import.meta.env.DEV) {
-    throw prototypeAuthUnavailable();
-  }
+    if (!import.meta.env.DEV) {
+      throw prototypeAuthUnavailable();
+    }
 
-  const response = await fetch("/api/auth/prototype-session", {
-    method: "DELETE",
-    credentials: "include"
+    const response = await fetch("/api/auth/prototype-session", {
+      method: "DELETE",
+      credentials: "include"
+    });
+
+    await assertOk(response, "Prototype sign-out failed");
   });
-
-  await assertOk(response, "Prototype sign-out failed");
 }
 
 export async function actorRequest(actor: LocalActor, json = false): Promise<RequestInit> {
@@ -359,17 +429,7 @@ export async function fetchAsActor(
     });
   }
 
-  return runSerialized(async () => {
-    await ensurePrototypeSession(actor);
-    return fetch(input, {
-      ...init,
-      credentials: "include",
-      headers: {
-        ...jsonHeaders(json),
-        ...((init.headers ?? {}) as Record<string, string>)
-      }
-    });
-  });
+  return runSerialized(() => credentialedActorFetch(actor, input, init, json));
 }
 
 export async function getJson<T>(path: string, actor?: LocalActor, init?: RequestInit): Promise<T> {
@@ -388,12 +448,17 @@ export async function actorJsonRequest<T>(
   init: Omit<RequestInit, "credentials" | "headers">,
   fallback: string
 ): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    ...(await actorRequest(actor, true))
-  });
+  const desktopHeaders = desktopActorHeaders(actor, true);
+  if (desktopHeaders) {
+    const response = await fetch(input, {
+      ...init,
+      headers: desktopHeaders
+    });
+    await assertOk(response, fallback);
+    return response.json() as Promise<T>;
+  }
 
+  const response = await runSerialized(() => credentialedActorFetch(actor, input, init, true));
   await assertOk(response, fallback);
-
   return response.json() as Promise<T>;
 }

@@ -3,20 +3,26 @@ const path = require("node:path");
 
 /** Prefix for pre-restore safety copies; must start with `backup-` so restore/prune can see them. */
 const SAFETY_BACKUP_PREFIX = "backup-safety-before-restore";
+/** Legacy prefix from before safety copies used the restorable `backup-` naming. */
+const LEGACY_SAFETY_BACKUP_PREFIX = "safety-before-restore";
 
 /**
  * Routine and safety desktop backups both use a `backup-` folder name so they
- * appear in the restorable set. Safety copies are retained longer by prune.
+ * appear in the restorable set. Legacy `safety-before-restore-…` folders remain
+ * restorable so older installs can still recover. Safety copies are retained
+ * longer by prune.
  */
 function isRestorableBackupName(name) {
-  return typeof name === "string" && name.startsWith("backup-");
+  return typeof name === "string" && (
+    name.startsWith("backup-") ||
+    name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`)
+  );
 }
 
 function isSafetyBackupName(name) {
   return typeof name === "string" && (
     name.startsWith(`${SAFETY_BACKUP_PREFIX}-`) ||
-    // Legacy prefix from before safety copies were restorable.
-    name.startsWith("safety-before-restore-")
+    name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`)
   );
 }
 
@@ -35,6 +41,79 @@ function pickPreferredRestoreBackup(backups) {
   }
   const routine = backups.find((entry) => entry && !isSafetyBackupName(entry.name));
   return routine ?? backups[0] ?? null;
+}
+
+/**
+ * True when `candidate` is the same path as `parent`, or a path nested under it.
+ */
+function isPathInsideOrSame(parentPath, candidatePath) {
+  const parent = path.resolve(parentPath);
+  const candidate = path.resolve(candidatePath);
+  if (parent === candidate) {
+    return true;
+  }
+  const relative = path.relative(parent, candidate);
+  return Boolean(relative) && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
+/**
+ * Refuse restore when the backup folder overlaps the live data directory
+ * (same path, backup nested under live, or live nested under backup). That
+ * would wipe the source while copying, or copy live onto itself.
+ */
+function assertBackupDistinctFromLive(backupDir, liveDataDir) {
+  if (typeof backupDir !== "string" || !backupDir.trim()) {
+    throw new Error("Backup folder path is required before restore.");
+  }
+  if (typeof liveDataDir !== "string" || !liveDataDir.trim()) {
+    throw new Error("Live desktop data path is required before restore.");
+  }
+
+  const backupRoot = path.resolve(backupDir);
+  const liveRoot = path.resolve(liveDataDir);
+  const backupData = path.join(backupRoot, "data");
+
+  if (
+    isPathInsideOrSame(liveRoot, backupRoot) ||
+    isPathInsideOrSame(liveRoot, backupData) ||
+    isPathInsideOrSame(backupRoot, liveRoot) ||
+    isPathInsideOrSame(backupData, liveRoot)
+  ) {
+    throw new Error(
+      `Refusing restore: backup folder ${backupRoot} overlaps the live data directory ${liveRoot}.`
+    );
+  }
+
+  return { backupRoot, liveRoot };
+}
+
+/**
+ * Serialize desktop restore so a second "Restore latest" cannot interleave
+ * after the first has wiped live data but before copy completes.
+ */
+function createDesktopRestoreLock() {
+  let inFlight = false;
+  return {
+    get inFlight() {
+      return inFlight;
+    },
+    async run(work) {
+      if (typeof work !== "function") {
+        throw new Error("Restore lock requires a work function.");
+      }
+      if (inFlight) {
+        throw new Error(
+          "Refusing restore: a restore is already in progress. Wait for it to finish before starting another."
+        );
+      }
+      inFlight = true;
+      try {
+        return await work();
+      } finally {
+        inFlight = false;
+      }
+    }
+  };
 }
 
 /**
@@ -125,6 +204,7 @@ async function assertDesktopBackupReadable(backupDir, { readWorkspace } = {}) {
 /**
  * Gate desktop restore on a successful safety backup.
  * `createSafetyBackup` should return `{ ok: true }` or `{ ok: false, message? }`.
+ * Prefer including `backupPath` so a failed wipe/copy can recover from that folder.
  */
 async function assertSafetyBackupBeforeRestore(createSafetyBackup) {
   if (typeof createSafetyBackup !== "function") {
@@ -142,13 +222,100 @@ async function assertSafetyBackupBeforeRestore(createSafetyBackup) {
   return safety;
 }
 
+/**
+ * Replace live desktop data from a backup folder. If the wipe/copy fails and a
+ * safety backup folder is available, attempt to put live data back from that
+ * safety copy before surfacing the original failure.
+ *
+ * `copyTree(sourceDir, targetDir)` should recursively replace target with source
+ * (typically rmSync + cpSync). Optional settings copy uses the same helper.
+ */
+function replaceLiveDesktopDataFromBackup({
+  sourceBackupDir,
+  targetDataDir,
+  targetSettingsPath = null,
+  safetyBackupDir = null,
+  copyTree
+} = {}) {
+  if (typeof copyTree !== "function") {
+    throw new Error("copyTree is required to replace live desktop data.");
+  }
+  if (typeof sourceBackupDir !== "string" || !sourceBackupDir.trim()) {
+    throw new Error("sourceBackupDir is required to replace live desktop data.");
+  }
+  if (typeof targetDataDir !== "string" || !targetDataDir.trim()) {
+    throw new Error("targetDataDir is required to replace live desktop data.");
+  }
+
+  const sourceDataDir = path.join(path.resolve(sourceBackupDir), "data");
+  const sourceSettingsPath = path.join(path.resolve(sourceBackupDir), ".env");
+
+  if (!existsSync(sourceDataDir)) {
+    throw new Error(`Backup at ${sourceBackupDir} has no data/ folder to restore.`);
+  }
+
+  const applyFrom = (backupDir) => {
+    const dataDir = path.join(path.resolve(backupDir), "data");
+    const settingsPath = path.join(path.resolve(backupDir), ".env");
+    copyTree(dataDir, targetDataDir);
+    if (targetSettingsPath && existsSync(settingsPath)) {
+      copyTree(settingsPath, targetSettingsPath);
+    }
+  };
+
+  try {
+    applyFrom(sourceBackupDir);
+    return { recoveredFromSafety: false };
+  } catch (error) {
+    const original = error instanceof Error ? error.message : String(error);
+    const safetyRoot = typeof safetyBackupDir === "string" && safetyBackupDir.trim()
+      ? path.resolve(safetyBackupDir)
+      : null;
+    const safetyData = safetyRoot ? path.join(safetyRoot, "data") : null;
+
+    if (safetyRoot && safetyData && existsSync(safetyData)) {
+      try {
+        applyFrom(safetyRoot);
+        const recovered = new Error(
+          `Restore failed after wiping live data; recovered from safety backup at ${safetyRoot}. Original error: ${original}`,
+          { cause: error }
+        );
+        recovered.recoveredFromSafety = true;
+        recovered.safetyBackupDir = safetyRoot;
+        throw recovered;
+      } catch (recoveryError) {
+        if (recoveryError && recoveryError.recoveredFromSafety) {
+          throw recoveryError;
+        }
+        const recoveryMessage = recoveryError instanceof Error
+          ? recoveryError.message
+          : String(recoveryError);
+        throw new Error(
+          `Restore failed after wiping live data, and safety recovery also failed. Original error: ${original}. Recovery error: ${recoveryMessage}`,
+          { cause: error }
+        );
+      }
+    }
+
+    throw new Error(
+      `Restore failed after wiping live data and no safety backup was available to recover from. ${original}`,
+      { cause: error }
+    );
+  }
+}
+
 module.exports = {
+  LEGACY_SAFETY_BACKUP_PREFIX,
   SAFETY_BACKUP_PREFIX,
+  assertBackupDistinctFromLive,
   assertDesktopBackupReadable,
   assertDesktopLiveDbReadable,
   assertSafetyBackupBeforeRestore,
+  createDesktopRestoreLock,
+  isPathInsideOrSame,
   isRestorableBackupName,
   isSafetyBackupName,
   pickPreferredRestoreBackup,
+  replaceLiveDesktopDataFromBackup,
   resolveBackupDbFile
 };

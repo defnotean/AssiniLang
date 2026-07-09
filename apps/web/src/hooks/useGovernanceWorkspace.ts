@@ -107,8 +107,11 @@ export function useGovernanceWorkspace(
       .then((records) => {
         setGovernanceState({ status: "ready", data: records });
       })
-      .catch((error: Error) => {
-        setGovernanceState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        setGovernanceState({
+          status: "error",
+          message: localizeApiError(error, t, "governance.errPolicyCreationFailed")
+        });
       });
     const reviewPolicyRequest = fetchReviewPolicy(selectedLanguageId)
       .then((policy) => {
@@ -117,25 +120,34 @@ export function useGovernanceWorkspace(
         setReviewPolicyApprovalThreshold(policy.approvalThreshold.toString());
         setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
       })
-      .catch((error: Error) => {
-        setReviewPolicyState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        setReviewPolicyState({
+          status: "error",
+          message: localizeApiError(error, t, "governance.errReviewPolicyUpdateFailed")
+        });
       });
     const reviewDispositionRequest = fetchReviewDispositions(selectedLanguageId)
       .then((dispositions) => {
         setReviewDispositionState({ status: "ready", data: dispositions });
       })
-      .catch((error: Error) => {
-        setReviewDispositionState({ status: "error", message: error.message });
+      .catch((error: unknown) => {
+        setReviewDispositionState({
+          status: "error",
+          message: localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
+        });
       });
     void Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest])
       .then(() => fetchAuditEvents(selectedLanguageId)
         .then((events) => {
           setAuditEventState({ status: "ready", data: events });
         })
-        .catch((error: Error) => {
-          setAuditEventState({ status: "error", message: error.message });
+        .catch((error: unknown) => {
+          setAuditEventState({
+            status: "error",
+            message: localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
+          });
         }));
-  }, [selectedLanguageId]);
+  }, [selectedLanguageId, t]);
 
   useEffect(() => {
     if ((view !== "governance" && view !== "model") || !selectedLanguageId) {
@@ -208,8 +220,7 @@ export function useGovernanceWorkspace(
       setGovernanceSuccess(t("governance.msgPolicyRecorded"));
       setGovernanceState({ status: "ready", data: await fetchGovernance() });
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("governance.errPolicyCreationFailed");
-      setGovernanceError(message);
+      setGovernanceError(localizeApiError(error, t, "governance.errPolicyCreationFailed"));
     } finally {
       setIsSubmittingGovernance(false);
     }
@@ -262,8 +273,7 @@ export function useGovernanceWorkspace(
       setReviewPolicyRequiresAssigned(policy.requiresAssignedReviewer);
       setReviewPolicySuccess(t("governance.msgReviewPolicyUpdated"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("governance.errReviewPolicyUpdateFailed");
-      setReviewPolicyError(message);
+      setReviewPolicyError(localizeApiError(error, t, "governance.errReviewPolicyUpdateFailed"));
     } finally {
       setIsSubmittingReviewPolicy(false);
     }
@@ -296,8 +306,9 @@ export function useGovernanceWorkspace(
       setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: "" }));
       setReviewDispositionSuccess(t("governance.msgReviewDispositionResolved"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("governance.errReviewDispositionResolutionFailed");
-      setReviewDispositionError(message);
+      setReviewDispositionError(
+        localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
+      );
     } finally {
       setResolvingReviewDispositionId(null);
     }

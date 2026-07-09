@@ -204,21 +204,33 @@ export async function transcribeAudioFile(
   const headers: Record<string, string> = {};
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const response = await fetchFn(transcriptionUrl, {
-    method: "POST",
-    headers,
-    body: form,
-    redirect: "manual"
-  });
+  let response: Response;
+  try {
+    response = await fetchFn(transcriptionUrl, {
+      method: "POST",
+      headers,
+      body: form,
+      redirect: "manual"
+    });
+  } catch (error) {
+    const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
+    throw new Error(`Transcription request failed: ${reason}`);
+  }
   if (!response.ok) {
     throw new Error(`Transcription request failed with status ${response.status}.`);
   }
 
-  const payload = await response.json() as { text?: unknown };
-  if (typeof payload.text !== "string" || payload.text.trim().length === 0) {
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw new Error("Transcription endpoint returned invalid JSON.");
+  }
+  const text = (payload as { text?: unknown }).text;
+  if (typeof text !== "string" || text.trim().length === 0) {
     throw new Error("Transcription endpoint returned no text.");
   }
-  return payload.text.trim();
+  return text.trim();
 }
 
 export function ocrModelConfigured(env: Env = process.env): boolean {
@@ -396,29 +408,35 @@ export async function ocrImageWithModel(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
-  const response = await fetchFn(completionsUrl, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: "Extract all readable text from this image. Return plain text only — no commentary, explanation, or JSON."
-            },
-            {
-              type: "image_url",
-              image_url: { url: `data:${mimeType};base64,${base64Data}` }
-            }
-          ]
-        }
-      ]
-    }),
-    redirect: "manual"
-  });
+  let response: Response;
+  try {
+    response = await fetchFn(completionsUrl, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: "Extract all readable text from this image. Return plain text only — no commentary, explanation, or JSON."
+              },
+              {
+                type: "image_url",
+                image_url: { url: `data:${mimeType};base64,${base64Data}` }
+              }
+            ]
+          }
+        ]
+      }),
+      redirect: "manual"
+    });
+  } catch (error) {
+    const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
+    throw new Error(`OCR model request failed: ${reason}`);
+  }
   if (!response.ok) {
     throw new Error(`OCR model request failed with status ${response.status}.`);
   }
@@ -789,6 +807,11 @@ async function resolveAssetText(
           });
         } catch (error) {
           const reason = redactErrorSecrets(error instanceof Error ? error.message : String(error));
+          // Preserve the page-image guidance so clients map to ingest.ocrPdfNoImage
+          // instead of the generic configured-model failure key.
+          if (/no embedded page image to OCR/i.test(reason)) {
+            throw new Error(reason);
+          }
           throw new Error(`Configured OCR model could not read the scanned PDF: ${reason}`);
         }
         warnings.push("Used configured OCR model to read scanned document (page 1).");

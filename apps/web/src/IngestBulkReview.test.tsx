@@ -125,7 +125,7 @@ describe("IngestView bulk draft review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm accept selected" }));
 
     await screen.findByText("Bulk review finished: 1 accepted, 1 failed.");
-    expect(screen.getByText("draft-2: Extraction draft is already accepted.")).toBeInTheDocument();
+    expect(screen.getByText("draft-2: This extraction draft is already accepted.")).toBeInTheDocument();
   });
 
   it("disables the bulk action bar while a bulk review is running", async () => {

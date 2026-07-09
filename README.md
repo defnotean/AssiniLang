@@ -99,6 +99,8 @@ The most common variables; the [Configuration Reference](docs/configuration.md) 
 | `npm.cmd run desktop:package:smoke` | Rebuild the Windows package and immediately run the packaged desktop visual smoke check. |
 | `AssiniLang Desktop.cmd` | Windows double-click launcher for the desktop shell. |
 | `npm.cmd run verify` | Full quality gate: tests, type checks, seed, eval, builds. |
+| `npm.cmd run verify:beta` | Optional live-model gate; skips cleanly unless `ASSINI_VERIFY_MODEL=1`. |
+| `npm.cmd run ci:green` | Fast pre-push production-dependency audit (`npm audit --omit=dev`). |
 | `npm.cmd test` | All Vitest tests. |
 | `npm.cmd run check` | TypeScript project checks. |
 | `npm.cmd run seed` | Reset to an empty workspace at `data/local-db.json`. |
@@ -143,7 +145,5 @@ data/            Generated local database, uploaded assets, OCR cache (gitignore
 The workspace ships empty. All language data is created by users from raw materials they bring themselves, and every corpus passage carries consent and provenance metadata.
 
 Do not connect real First Nations, Indigenous, or community language data without the governance, consent, access-control, and review infrastructure described in the [Roadmap](docs/roadmap.md). The prototype is a workflow testbed, not a stewardship platform.
-
-## Repository state
 
 The default branch is `master`. The project is intentionally local-first: generated data and build output are ignored by Git, and prototype auth is not production security.

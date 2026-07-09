@@ -94,9 +94,14 @@ export function serializePrototypeSessionCookie(
   return parts.join("; ");
 }
 
-/** Same attributes as the create path, but Max-Age=0 so the browser drops the cookie immediately. */
-export function serializeExpiredPrototypeSessionCookie(): string {
-  return serializePrototypeSessionCookie("", 0);
+/**
+ * Same Secure/HttpOnly/SameSite/Path rules as create/refresh, but Max-Age=0 so the
+ * browser drops the cookie immediately (logout and 401 stale-session clears).
+ */
+export function serializeExpiredPrototypeSessionCookie(
+  options: { secure?: boolean; env?: Record<string, string | undefined> } = {}
+): string {
+  return serializePrototypeSessionCookie("", 0, options);
 }
 
 export function prototypeSessionAbsoluteDeadline(session: PrototypeSessionRecord): number {

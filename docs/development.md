@@ -98,7 +98,7 @@ npm.cmd run dev
 npm.cmd run demo
 ```
 
-This seeds the empty workspace, runs evaluation, and starts both local services.
+This seeds an empty workspace, runs `npm run eval` (which exits `0` with System Eval guidance when there are no languages, unless `ASSINI_EVAL_REQUIRE_LANGUAGES` is set), and starts both local services.
 
 ## Model and transcription configuration
 

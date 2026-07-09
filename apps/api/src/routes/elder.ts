@@ -67,7 +67,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const language = state.languages.find((item) => item.id === languageId);
     if (!language) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     return {
@@ -87,7 +90,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
 
     if (query.languageId && !state.languages.some((language) => language.id === query.languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${query.languageId}` };
+      return {
+        error: `Language not found: ${query.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     return query.languageId
@@ -121,12 +127,18 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
 
     if (body.noteId && !current.notes.some((note) => note.id === body.noteId && note.languageId === body.languageId)) {
       reply.code(400);
-      return { error: `Note not found for language: ${body.noteId}` };
+      return {
+        error: `Note not found for language: ${body.noteId}`,
+        i18nKey: "elderWs.errNoteNotFoundForLanguage"
+      };
     }
 
     if (body.passageId && !current.corpus.some((passage) => passage.id === body.passageId && passage.languageId === body.languageId)) {
       reply.code(400);
-      return { error: `Passage not found for language: ${body.passageId}` };
+      return {
+        error: `Passage not found for language: ${body.passageId}`,
+        i18nKey: "elderWs.errPassageNotFoundForLanguage"
+      };
     }
 
     let correction: ElderCorrection | undefined;

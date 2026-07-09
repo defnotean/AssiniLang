@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID, type AppState, type SourceAsset } from "@assini/db";
 import {
+  DEFAULT_PROCESSING_STALE_MS,
   INTERRUPTED_PROCESSING_ERROR,
   PROCESSING_RECOVERED_ACTION,
+  STALE_PROCESSING_ERROR,
+  isProcessingHeartbeatStale,
   recoverInterruptedSources,
-  recoverInterruptedSourcesState
+  recoverInterruptedSourcesState,
+  recoverStaleProcessingSources,
+  recoverStaleProcessingSourcesState
 } from "./jobRecovery.js";
 
 function buildSource(overrides: Partial<SourceAsset>): SourceAsset {
@@ -73,7 +78,11 @@ describe("recoverInterruptedSourcesState", () => {
     expect(event?.entityType).toBe("source_asset");
     expect(event?.entityId).toBe("source-interrupted");
     expect(event?.languageId).toBe(TEST_LANGUAGE_ID);
-    expect(event?.metadata).toEqual({ sourceId: "source-interrupted", previousStatus: "processing" });
+    expect(event?.metadata).toEqual({
+      sourceId: "source-interrupted",
+      previousStatus: "processing",
+      reason: "interrupted_restart"
+    });
   });
 
   it("includes processing metadata in recovery audit events when present", () => {
@@ -91,6 +100,7 @@ describe("recoverInterruptedSourcesState", () => {
     expect(event?.metadata).toEqual({
       sourceId: "source-interrupted",
       previousStatus: "processing",
+      reason: "interrupted_restart",
       processingAttempts: 2,
       processingStartedAt: "2026-06-06T00:00:30.000Z",
       processingHeartbeatAt: "2026-06-06T00:00:45.000Z"
@@ -115,6 +125,124 @@ describe("recoverInterruptedSourcesState", () => {
     state.sourceAssets.push(buildSource({ id: "source-pending", status: "pending" }));
 
     const recovered = recoverInterruptedSourcesState(state);
+
+    expect(recovered).toBe(state);
+  });
+});
+
+describe("isProcessingHeartbeatStale", () => {
+  it("treats missing or unparseable markers as stale while status is processing", () => {
+    expect(isProcessingHeartbeatStale({ status: "processing" }, Date.parse("2026-06-06T00:20:00.000Z"))).toBe(true);
+    expect(isProcessingHeartbeatStale({
+      status: "processing",
+      processingStartedAt: "not-a-date"
+    }, Date.parse("2026-06-06T00:20:00.000Z"))).toBe(true);
+  });
+
+  it("uses heartbeat over startedAt and respects the stale window", () => {
+    const nowMs = Date.parse("2026-06-06T00:20:00.000Z");
+    expect(isProcessingHeartbeatStale({
+      status: "processing",
+      processingStartedAt: "2026-06-06T00:00:00.000Z",
+      processingHeartbeatAt: "2026-06-06T00:15:00.000Z"
+    }, nowMs, DEFAULT_PROCESSING_STALE_MS)).toBe(false);
+    expect(isProcessingHeartbeatStale({
+      status: "processing",
+      processingStartedAt: "2026-06-06T00:00:00.000Z",
+      processingHeartbeatAt: "2026-06-06T00:09:00.000Z"
+    }, nowMs, DEFAULT_PROCESSING_STALE_MS)).toBe(true);
+  });
+
+  it("ignores non-processing assets", () => {
+    expect(isProcessingHeartbeatStale({
+      status: "failed",
+      processingHeartbeatAt: "2026-06-06T00:00:00.000Z"
+    }, Date.parse("2026-06-06T01:00:00.000Z"))).toBe(false);
+  });
+});
+
+describe("recoverStaleProcessingSourcesState", () => {
+  it("resets only heartbeat-stale processing sources and keeps attempts", () => {
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-stale",
+        processingStartedAt: "2026-06-06T00:00:00.000Z",
+        processingHeartbeatAt: "2026-06-06T00:01:00.000Z",
+        processingAttempts: 3
+      }),
+      buildSource({
+        id: "source-fresh",
+        processingStartedAt: "2026-06-06T00:15:00.000Z",
+        processingHeartbeatAt: "2026-06-06T00:19:00.000Z",
+        processingAttempts: 1
+      }),
+      buildSource({ id: "source-pending", status: "pending" })
+    );
+
+    const recovered = recoverStaleProcessingSourcesState(state, {
+      recoveredAt: "2026-06-06T00:20:00.000Z",
+      nowMs: Date.parse("2026-06-06T00:20:00.000Z")
+    });
+
+    const stale = recovered.sourceAssets.find((asset) => asset.id === "source-stale");
+    expect(stale).toMatchObject({
+      status: "failed",
+      error: STALE_PROCESSING_ERROR,
+      processedAt: "2026-06-06T00:20:00.000Z",
+      processingAttempts: 3
+    });
+    expect(stale?.processingStartedAt).toBeUndefined();
+    expect(stale?.processingHeartbeatAt).toBeUndefined();
+
+    expect(recovered.sourceAssets.find((asset) => asset.id === "source-fresh")?.status).toBe("processing");
+    expect(recovered.sourceAssets.find((asset) => asset.id === "source-pending")?.status).toBe("pending");
+
+    const event = recovered.auditEvents.find(
+      (item) => item.action === PROCESSING_RECOVERED_ACTION && item.entityId === "source-stale"
+    );
+    expect(event?.metadata).toEqual({
+      sourceId: "source-stale",
+      previousStatus: "processing",
+      reason: "stale_heartbeat",
+      staleMs: DEFAULT_PROCESSING_STALE_MS,
+      lastProgressAt: "2026-06-06T00:01:00.000Z",
+      processingAttempts: 3,
+      processingStartedAt: "2026-06-06T00:00:00.000Z",
+      processingHeartbeatAt: "2026-06-06T00:01:00.000Z"
+    });
+  });
+
+  it("honors skipIds so queued-but-not-started claims are left alone", () => {
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "source-queued",
+      processingStartedAt: "2026-06-06T00:00:00.000Z",
+      processingHeartbeatAt: "2026-06-06T00:00:00.000Z",
+      processingAttempts: 1
+    }));
+
+    const recovered = recoverStaleProcessingSourcesState(state, {
+      recoveredAt: "2026-06-06T00:20:00.000Z",
+      nowMs: Date.parse("2026-06-06T00:20:00.000Z"),
+      skipIds: new Set(["source-queued"])
+    });
+
+    expect(recovered).toBe(state);
+  });
+
+  it("returns the state unchanged when nothing is stale", () => {
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "source-fresh",
+      processingStartedAt: "2026-06-06T00:19:30.000Z",
+      processingHeartbeatAt: "2026-06-06T00:19:45.000Z"
+    }));
+
+    const recovered = recoverStaleProcessingSourcesState(state, {
+      recoveredAt: "2026-06-06T00:20:00.000Z",
+      nowMs: Date.parse("2026-06-06T00:20:00.000Z")
+    });
 
     expect(recovered).toBe(state);
   });
@@ -151,5 +279,35 @@ describe("recoverInterruptedSources", () => {
 
     await expect(recoverInterruptedSources(store)).resolves.toBe(0);
     expect(state.auditEvents.some((item) => item.action === PROCESSING_RECOVERED_ACTION)).toBe(false);
+  });
+});
+
+describe("recoverStaleProcessingSources", () => {
+  it("applies the stale sweep through the store update seam", async () => {
+    let state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "source-stale",
+      processingStartedAt: "2026-06-06T00:00:00.000Z",
+      processingHeartbeatAt: "2026-06-06T00:00:30.000Z",
+      processingAttempts: 2
+    }));
+    const store = {
+      async update(updater: (current: AppState) => AppState): Promise<AppState> {
+        state = updater(state);
+        return state;
+      }
+    };
+
+    const recoveredCount = await recoverStaleProcessingSources(store, {
+      recoveredAt: "2026-06-06T00:20:00.000Z",
+      nowMs: Date.parse("2026-06-06T00:20:00.000Z")
+    });
+
+    expect(recoveredCount).toBe(1);
+    expect(state.sourceAssets.find((asset) => asset.id === "source-stale")).toMatchObject({
+      status: "failed",
+      error: STALE_PROCESSING_ERROR,
+      processingAttempts: 2
+    });
   });
 });

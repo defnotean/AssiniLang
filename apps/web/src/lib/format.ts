@@ -23,6 +23,30 @@ export function formatEvidenceLabel(count: number, t?: Translate): string {
   return `${count} evidence ${count === 1 ? "link" : "links"}`;
 }
 
+const NOTE_EDIT_ACTION_KEYS: Record<string, MessageKey> = {
+  applied_correction: "reviewView.editAction.applied_correction",
+  created: "reviewView.editAction.created",
+  disposition_resolved: "reviewView.editAction.disposition_resolved",
+  drafted: "reviewView.editAction.drafted",
+  migrated: "reviewView.editAction.migrated",
+  reviewed: "reviewView.editAction.reviewed"
+};
+
+/** Localizes note edit-history action tokens for Review detail chrome. */
+export function formatNoteEditAction(action: string, t?: Translate): string {
+  const key = NOTE_EDIT_ACTION_KEYS[action];
+  if (t && key) return t(key);
+  return action.replace(/_/g, " ");
+}
+
+/** Localizes bulk extraction-draft per-item failure messages for Build review. */
+export function localizeExtractionDraftFailure(error: string | undefined, t: Translate): string {
+  if (!error?.trim()) return t("ingest.unknownFailure");
+  const mapped = operatorApiErrorI18n(error);
+  if (mapped) return t(mapped.i18nKey, mapped.i18nParams);
+  return error;
+}
+
 export function formatScore(value: number): string {
   return `${Math.round(value * 100)}%`;
 }
@@ -140,6 +164,94 @@ export function formatStatus(value: string, t?: Translate): string {
   const key = STATUS_MESSAGE_KEYS[value];
   if (t && key) return t(key);
   return value.replace(/_/g, " ");
+}
+
+const ACTOR_ROLE_MESSAGE_KEYS: Record<string, MessageKey> = {
+  admin: "role.admin",
+  elder: "role.elder",
+  programmer: "role.programmer",
+  reviewer: "role.reviewer",
+  lead: "role.lead",
+  learner: "role.learner"
+};
+
+/** Localizes audit-ledger actor role badges. */
+export function formatActorRole(value: string, t?: Translate): string {
+  const key = ACTOR_ROLE_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
+  return value;
+}
+
+const AUDIT_ENTITY_MESSAGE_KEYS: Record<string, MessageKey> = {
+  exercise_submission: "audit.entity.exerciseSubmission",
+  evaluation_run: "audit.entity.evaluationRun",
+  governance_record: "audit.entity.governanceRecord",
+  review_policy: "audit.entity.reviewPolicy",
+  review_approval: "audit.entity.reviewApproval",
+  review_disposition: "audit.entity.reviewDisposition",
+  exercise: "audit.entity.exercise",
+  corpus: "audit.entity.corpus",
+  note: "audit.entity.note",
+  ai_session: "audit.entity.aiSession",
+  ai_message: "audit.entity.aiMessage",
+  elder_correction: "audit.entity.elderCorrection",
+  language: "audit.entity.language",
+  source_asset: "audit.entity.sourceAsset",
+  extraction_draft: "audit.entity.extractionDraft",
+  lexeme: "audit.entity.lexeme"
+};
+
+/** Localizes audit entity-type labels shown in the governance ledger. */
+export function formatAuditEntityType(value: string, t?: Translate): string {
+  const key = AUDIT_ENTITY_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
+  return value.replace(/_/g, " ");
+}
+
+const AUDIT_ACTION_MESSAGE_KEYS: Record<string, MessageKey> = {
+  "language.created": "audit.action.languageCreated",
+  "language.updated": "audit.action.languageUpdated",
+  "language.deleted": "audit.action.languageDeleted",
+  "governance_record.created": "audit.action.governanceRecordCreated",
+  "review_policy.upserted": "audit.action.reviewPolicyUpserted",
+  "review_disposition.resolved": "audit.action.reviewDispositionResolved",
+  "note.reviewed": "audit.action.noteReviewed",
+  "note.draft_generated": "audit.action.noteDraftGenerated",
+  "note.elder_correction_applied": "audit.action.noteElderCorrectionApplied",
+  "elder_correction.created": "audit.action.elderCorrectionCreated",
+  "elder_correction.reviewed": "audit.action.elderCorrectionReviewed",
+  "elder_correction.applied": "audit.action.elderCorrectionApplied",
+  "exercise.created": "audit.action.exerciseCreated",
+  "exercise_submission.created": "audit.action.exerciseSubmissionCreated",
+  "corpus.imported": "audit.action.corpusImported",
+  "evaluation_run.created": "audit.action.evaluationRunCreated",
+  "source_asset.registered": "audit.action.sourceAssetRegistered",
+  "source_asset.uploaded": "audit.action.sourceAssetUploaded",
+  "source_asset.process_started": "audit.action.sourceAssetProcessStarted",
+  "source_asset.processed": "audit.action.sourceAssetProcessed",
+  "source_asset.process_failed": "audit.action.sourceAssetProcessFailed",
+  "source_asset.obsidian_vault_imported": "audit.action.sourceAssetObsidianVaultImported",
+  "extraction_draft.accepted": "audit.action.extractionDraftAccepted",
+  "extraction_draft.rejected": "audit.action.extractionDraftRejected",
+  "ai_session.created": "audit.action.aiSessionCreated",
+  "ai_session.failed": "audit.action.aiSessionFailed",
+  "ai_message.created": "audit.action.aiMessageCreated",
+  "ai_message.failed": "audit.action.aiMessageFailed"
+};
+
+/** Localizes audit action titles; unknown codes fall back to spaced machine ids. */
+export function formatAuditAction(value: string, t?: Translate): string {
+  const key = AUDIT_ACTION_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
+  return value.replace(/[_.]/g, " ");
+}
+
+/** Localizes the entity-type / entity-id pill in the audit ledger. */
+export function formatAuditEntityPill(entityType: string, entityId: string, t?: Translate): string {
+  const typeLabel = formatAuditEntityType(entityType, t);
+  return t
+    ? t("audit.entityPill", { entityType: typeLabel, entityId })
+    : `${typeLabel} / ${entityId}`;
 }
 
 const TYPOLOGY_MESSAGE_KEYS: Record<string, MessageKey> = {
@@ -515,6 +627,15 @@ function operatorApiErrorI18n(
   if (/^AI session not found:/i.test(normalized)) {
     return { i18nKey: "errors.aiSessionNotFound" };
   }
+  if (/^Context note not found for language:/i.test(normalized)) {
+    return { i18nKey: "errors.aiSessionContextNoteNotFound" };
+  }
+  if (/^Context passage not found for language:/i.test(normalized)) {
+    return { i18nKey: "errors.aiSessionContextPassageNotFound" };
+  }
+  if (/^LLM generation failed/i.test(normalized)) {
+    return { i18nKey: "errors.llmGenerationFailed" };
+  }
   if (/Invalid review body/i.test(normalized)) {
     return { i18nKey: "errors.invalidReviewBody" };
   }
@@ -563,6 +684,33 @@ function operatorApiErrorI18n(
   if (/Corpus passage could not be imported/i.test(normalized)) {
     return { i18nKey: "errors.corpusImportFailed" };
   }
+  if (/Corpus (passage already exists|segmentation|topic tag|morpheme|target text|import language not found)/i.test(normalized)) {
+    return { i18nKey: "errors.corpusImportValidationFailed" };
+  }
+  if (/Invalid source body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidSourceBody" };
+  }
+  if (/Source could not be registered/i.test(normalized)) {
+    return { i18nKey: "errors.sourceRegisterFailed" };
+  }
+  if (/Invalid Obsidian vault import body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidObsidianVaultImportBody" };
+  }
+  if (/Upload requires a multipart file field/i.test(normalized)) {
+    return { i18nKey: "errors.sourceUploadRequiresFile" };
+  }
+  if (/Uploaded file is empty/i.test(normalized)) {
+    return { i18nKey: "errors.sourceUploadEmpty" };
+  }
+  if (/Source could not be stored/i.test(normalized)) {
+    return { i18nKey: "errors.sourceStoreFailed" };
+  }
+  if (/^Source not found:/i.test(normalized)) {
+    return { i18nKey: "errors.sourceNotFound" };
+  }
+  if (/Source could not be processed/i.test(normalized)) {
+    return { i18nKey: "errors.sourceProcessFailed" };
+  }
   if (/Extraction draft not found:/i.test(normalized)) {
     return { i18nKey: "errors.extractionDraftNotFound" };
   }
@@ -571,6 +719,25 @@ function operatorApiErrorI18n(
   }
   if (/Extraction draft could not be rejected/i.test(normalized)) {
     return { i18nKey: "errors.extractionDraftRejectFailed" };
+  }
+  {
+    const alreadyMatch = normalized.match(/^Extraction draft is already (\w+)\.?$/i);
+    if (alreadyMatch?.[1]) {
+      const status = alreadyMatch[1].toLowerCase();
+      if (status === "accepted") {
+        return { i18nKey: "errors.extractionDraftAlreadyAccepted" };
+      }
+      if (status === "rejected") {
+        return { i18nKey: "errors.extractionDraftAlreadyRejected" };
+      }
+      if (status === "proposed") {
+        return { i18nKey: "errors.extractionDraftAlreadyProposed" };
+      }
+      return {
+        i18nKey: "errors.extractionDraftAlreadyStatus",
+        i18nParams: { status }
+      };
+    }
   }
   if (/Exercise not found:/i.test(normalized)) {
     return { i18nKey: "errors.exerciseNotFound" };
@@ -615,6 +782,12 @@ function operatorApiErrorI18n(
   if (/^Note not found for correction:/i.test(normalized)) {
     return { i18nKey: "elderWs.errNoteNotFoundForCorrection" };
   }
+  if (/^Note not found for language:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errNoteNotFoundForLanguage" };
+  }
+  if (/^Passage not found for language:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errPassageNotFoundForLanguage" };
+  }
   if (/Invalid elder correction apply body/i.test(normalized)) {
     return { i18nKey: "elderWs.errInvalidApplyBody" };
   }
@@ -657,11 +830,35 @@ export function localizeVaultImportError(error: unknown, t: Translate, fallback:
   return t(fallback);
 }
 
+function rateLimitSecondsFromApiError(error: ApiError): number | undefined {
+  const raw = error.i18nParams?.seconds;
+  const fromParams = typeof raw === "number"
+    ? raw
+    : typeof raw === "string"
+      ? Number.parseInt(raw, 10)
+      : undefined;
+  if (fromParams !== undefined && Number.isFinite(fromParams) && fromParams > 0) {
+    return fromParams;
+  }
+  return retryAfterSecondsFromMessage(error.message);
+}
+
 /** Localizes API and persisted processing errors for operator-facing UI. */
 export function localizeApiError(error: unknown, t: Translate, fallback: MessageKey): string {
   if (error instanceof ApiError) {
     if (error.status === 401) {
       return t("app.sessionExpired");
+    }
+    // Handle 429/413 before generic i18nKey lookup so a missing `{seconds}`
+    // param never renders the raw placeholder from app.rateLimitExceeded.
+    if (error.i18nKey === "app.rateLimitExceeded" || error.status === 429) {
+      const seconds = rateLimitSecondsFromApiError(error);
+      return seconds
+        ? t("app.rateLimitExceeded", { ...(error.i18nParams ?? {}), seconds })
+        : t("app.rateLimitExceededGeneric");
+    }
+    if (error.i18nKey === "errors.payloadTooLarge" || error.status === 413) {
+      return t("errors.payloadTooLarge");
     }
     if (error.i18nKey) {
       return t(error.i18nKey as MessageKey, error.i18nParams);
@@ -672,15 +869,6 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
         return t(forbiddenI18n.i18nKey, forbiddenI18n.i18nParams);
       }
       return t("app.forbidden");
-    }
-    if (error.status === 429) {
-      const seconds = retryAfterSecondsFromMessage(error.message);
-      return seconds
-        ? t("app.rateLimitExceeded", { seconds })
-        : t("app.rateLimitExceededGeneric");
-    }
-    if (error.status === 413) {
-      return t("errors.payloadTooLarge");
     }
     if (error.status === 503 && /offline/i.test(error.message)) {
       return t("app.providerOffline");
