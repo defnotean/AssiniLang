@@ -881,6 +881,29 @@ describe("App", () => {
     );
   });
 
+  it("does not show desktop reconnect guidance for expired sessions in AssiniLang Desktop", async () => {
+    Object.defineProperty(window, "assiniDesktop", {
+      configurable: true,
+      value: {
+        apiBaseUrl: "http://127.0.0.1:4567",
+        authToken: "desktop-token",
+        prototypeAuth: true
+      }
+    });
+    apiMock.fetchDashboardData.mockRejectedValue(
+      new ApiError("Request failed: /dashboard (401): Unauthorized", { status: 401 })
+    );
+
+    render(<App />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session."
+    );
+    expect(screen.queryByText(
+      "AssiniLang Desktop could not reach the local API. Restart the app or open Settings → Desktop app to verify the data folder."
+    )).not.toBeInTheDocument();
+  });
+
   it("shows desktop reconnect guidance when the workspace fails to load in AssiniLang Desktop", async () => {
     Object.defineProperty(window, "assiniDesktop", {
       configurable: true,

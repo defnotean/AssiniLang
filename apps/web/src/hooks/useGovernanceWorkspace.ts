@@ -316,7 +316,7 @@ export function useGovernanceWorkspace(
 
     try {
       const snapshot = await fetchLanguageSnapshot(selectedLanguageId);
-      setSnapshotDownload(buildSnapshotDownload(snapshot));
+      setSnapshotDownload(buildSnapshotDownload(snapshot, t));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("governance.errSnapshotExportFailed");
       setSnapshotError(message);

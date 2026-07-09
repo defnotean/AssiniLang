@@ -132,7 +132,7 @@ export function ReviewView({
                   <small>{t(`confidence.${note.confidence}`)}</small>
                 </span>
                 <StatusBadge status={note.status} />
-                <span className="note-evidence">{formatEvidenceLabel(note.evidenceCount)}</span>
+                <span className="note-evidence">{formatEvidenceLabel(note.evidenceCount, t)}</span>
               </button>
             ))
           )}
@@ -190,7 +190,7 @@ export function ReviewView({
             <dl className="detail-grid">
               <div>
                 <dt>{t("reviewView.evidence")}</dt>
-                <dd>{formatEvidenceLabel(selectedNote.evidenceCount)}</dd>
+                <dd>{formatEvidenceLabel(selectedNote.evidenceCount, t)}</dd>
               </div>
               <div>
                 <dt>{t("reviewView.dialectScope")}</dt>

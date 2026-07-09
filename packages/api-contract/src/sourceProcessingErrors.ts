@@ -32,3 +32,30 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
 
   return undefined;
 }
+
+/**
+ * Maps known processing warning text (e.g. multi-page PDF OCR limits) to i18n keys.
+ * Unknown warnings are left as raw operator-facing English from the API.
+ */
+export function sourceProcessingWarningI18n(warning: string): SourceProcessingErrorI18n | undefined {
+  const normalized = warning.trim();
+  if (!normalized) return undefined;
+
+  const multiPage = normalized.match(/PDF has (\d+) pages;\s*only page 1 was OCR'?d/i);
+  if (multiPage) {
+    return {
+      i18nKey: "ingest.ocrPdfMultiPageWarning",
+      i18nParams: { pages: Number(multiPage[1]) }
+    };
+  }
+
+  if (/Used configured OCR model to read scanned document \(page 1\)/i.test(normalized)) {
+    return { i18nKey: "ingest.ocrPdfPage1Used" };
+  }
+
+  if (/Used configured OCR model to read the image/i.test(normalized)) {
+    return { i18nKey: "ingest.ocrImageUsed" };
+  }
+
+  return undefined;
+}

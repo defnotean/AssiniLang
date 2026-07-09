@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sourceProcessingErrorI18n } from "./sourceProcessingErrors.js";
+import { sourceProcessingErrorI18n, sourceProcessingWarningI18n } from "./sourceProcessingErrors.js";
 
 describe("sourceProcessingErrorI18n", () => {
   it("classifies OCR-not-configured guidance", () => {
@@ -27,5 +27,25 @@ describe("sourceProcessingErrorI18n", () => {
 
   it("returns undefined for unrelated processing errors", () => {
     expect(sourceProcessingErrorI18n("Remote failure [redacted-secret]")).toBeUndefined();
+  });
+});
+
+describe("sourceProcessingWarningI18n", () => {
+  it("classifies multi-page PDF OCR limits", () => {
+    expect(sourceProcessingWarningI18n(
+      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
+    )).toEqual({
+      i18nKey: "ingest.ocrPdfMultiPageWarning",
+      i18nParams: { pages: 4 }
+    });
+  });
+
+  it("classifies page-1 scanned PDF OCR success notices", () => {
+    expect(sourceProcessingWarningI18n("Used configured OCR model to read scanned document (page 1)."))
+      .toEqual({ i18nKey: "ingest.ocrPdfPage1Used" });
+  });
+
+  it("returns undefined for unrelated warnings", () => {
+    expect(sourceProcessingWarningI18n("fell back to offline heuristics")).toBeUndefined();
   });
 });

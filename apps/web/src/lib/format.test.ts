@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LanguageSnapshot } from "../api";
 import { ApiError } from "./apiClient";
-import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError, localizeVaultImportError } from "./format";
+import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError, localizeSourceProcessingWarning, localizeVaultImportError } from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
 
@@ -115,7 +115,7 @@ describe("formatSnapshotReviewAccountability", () => {
         dialectScope: "baseline",
         editHistory: []
       }
-    ])).toBe("2 notes still need review");
+    ], t)).toBe("2 notes still need review");
   });
 });
 
@@ -136,7 +136,7 @@ describe("buildSnapshotDownload", () => {
         dialectScope: "baseline",
         editHistory: []
       }
-    ]));
+    ]), t);
 
     expect(download.summary).toContain("1 note still needs review");
   });
@@ -210,6 +210,28 @@ describe("localizeApiError", () => {
 
     expect(message).toBe(
       "This document needs OCR. Set an OCR base URL in Runtime settings (Model tab), then process again."
+    );
+  });
+
+  it("passes fallback params when a processing error is empty", () => {
+    const message = localizeSourceProcessingError(
+      "   ",
+      t,
+      "ingest.processingFailed",
+      { title: "River notes" }
+    );
+
+    expect(message).toBe("Processing River notes failed.");
+  });
+
+  it("localizes multi-page PDF OCR warnings", () => {
+    const message = localizeSourceProcessingWarning(
+      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them.",
+      t
+    );
+
+    expect(message).toBe(
+      "PDF has 4 pages; only page 1 was OCR'd. Split remaining pages into separate sources if you need them."
     );
   });
 });

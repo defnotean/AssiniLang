@@ -403,7 +403,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
             </ModelSettingsFormFields>
 
             <div className="settings-actions">
-              <button type="submit" disabled={isSavingSettings}>
+              <button type="submit" disabled={isSavingSettings} aria-busy={isSavingSettings}>
                 {isSavingSettings ? t("model.savingSettings") : t("model.saveSettings")}
               </button>
               {formError && <p className="inline-error" role="alert">{formError}</p>}

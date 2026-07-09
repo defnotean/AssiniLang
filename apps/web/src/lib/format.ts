@@ -1,5 +1,5 @@
 import type { AiSession } from "@assini/db";
-import { sourceProcessingErrorI18n } from "@assini/api-contract";
+import { sourceProcessingErrorI18n, sourceProcessingWarningI18n } from "@assini/api-contract";
 import type {
   EvaluationArtifact,
   ExtractionDraft,
@@ -14,7 +14,12 @@ import type { EvaluationTrendStatus } from "../evaluationTrends";
 import { ApiError } from "./apiClient";
 import type { SnapshotDownload } from "./types";
 
-export function formatEvidenceLabel(count: number): string {
+export function formatEvidenceLabel(count: number, t?: Translate): string {
+  if (t) {
+    return count === 1
+      ? t("reviewView.evidenceLinkOne", { count })
+      : t("reviewView.evidenceLinkMany", { count });
+  }
   return `${count} evidence ${count === 1 ? "link" : "links"}`;
 }
 
@@ -115,15 +120,23 @@ export function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): 
   return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
 }
 
-export function formatSnapshotReviewAccountability(notes: LanguageSnapshot["notes"]): string | undefined {
+export function formatSnapshotReviewAccountability(
+  notes: LanguageSnapshot["notes"],
+  t?: Translate
+): string | undefined {
   const pendingReview = notes.filter((note) => note.status !== "approved").length;
   if (pendingReview === 0) return undefined;
+  if (t) {
+    return pendingReview === 1
+      ? t("governance.snapshotNoteNeedsReviewOne", { count: pendingReview })
+      : t("governance.snapshotNotesNeedReviewMany", { count: pendingReview });
+  }
   return formatCount(pendingReview, "note still needs review", "notes still need review");
 }
 
-export function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownload {
+export function buildSnapshotDownload(snapshot: LanguageSnapshot, t?: Translate): SnapshotDownload {
   const safeLanguageId = snapshot.language.id.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "language";
-  const reviewAccountability = formatSnapshotReviewAccountability(snapshot.notes);
+  const reviewAccountability = formatSnapshotReviewAccountability(snapshot.notes, t);
   const summary = [
     formatCount(snapshot.corpus.length, "corpus passage"),
     formatCount(snapshot.notes.length, "note"),
@@ -138,7 +151,9 @@ export function buildSnapshotDownload(snapshot: LanguageSnapshot): SnapshotDownl
   return {
     fileName: `assini-${safeLanguageId}-snapshot.json`,
     href: `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(snapshot, null, 2))}`,
-    summary: `Snapshot ready: ${summary}.`,
+    summary: t
+      ? t("governance.snapshotReadySummary", { summary })
+      : `Snapshot ready: ${summary}.`,
     exportedAt: snapshot.exportedAt
   };
 }
@@ -301,12 +316,22 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
 export function localizeSourceProcessingError(
   error: string | undefined,
   t: Translate,
-  fallback: MessageKey
+  fallback: MessageKey,
+  fallbackParams?: Record<string, string | number>
 ): string {
-  if (!error) return t(fallback);
+  if (!error?.trim()) return t(fallback, fallbackParams);
   const sourceI18n = sourceProcessingErrorI18n(error);
   if (sourceI18n) {
     return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
   }
   return error;
+}
+
+/** Localizes known processing warnings; leaves unrecognized API warnings unchanged. */
+export function localizeSourceProcessingWarning(warning: string, t: Translate): string {
+  const mapped = sourceProcessingWarningI18n(warning);
+  if (mapped) {
+    return t(mapped.i18nKey as MessageKey, mapped.i18nParams);
+  }
+  return warning;
 }

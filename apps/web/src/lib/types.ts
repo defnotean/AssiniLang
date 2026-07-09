@@ -7,7 +7,7 @@ export type ReviewFilter = "all" | "pending" | "contested" | "rejected" | "defer
 export type AsyncState<T> =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; statusCode?: number }
   | { status: "ready"; data: T };
 
 export type DashboardLoadState = Exclude<AsyncState<DashboardData>, { status: "idle" }>;

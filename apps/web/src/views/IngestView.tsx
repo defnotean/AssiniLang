@@ -1,7 +1,14 @@
 import type { SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
-import { extractionDraftSummary, formatCount, localizeSourceProcessingError, relativeAge, type RelativeAge } from "../lib/format";
+import {
+  extractionDraftSummary,
+  formatCount,
+  localizeSourceProcessingError,
+  localizeSourceProcessingWarning,
+  relativeAge,
+  type RelativeAge
+} from "../lib/format";
 import { useI18n, type Translate } from "../i18n";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
@@ -235,14 +242,17 @@ export function IngestView({
         {processNotice && <p className="result-notice" role="status" aria-live="polite">{processNotice}</p>}
         {processError && <p className="result-notice error" role="alert">{processError}</p>}
         {processWarnings.length > 0 && (
-          <div className="warning-list">
+          <div className="warning-list" role="status" aria-live="polite">
             {processWarnings.map((warning, index) => (
-              <p key={`${index}:${warning}`}>{warning}</p>
+              <p key={`${index}:${warning}`}>{localizeSourceProcessingWarning(warning, t)}</p>
             ))}
           </div>
         )}
         {sources.length === 0 ? (
-          <p className="empty-state">{t("ingest.noSources")}</p>
+          <div className="empty-state" role="status">
+            <p>{t("ingest.noSources")}</p>
+            <p className="muted">{t("ingest.noSourcesHint")}</p>
+          </div>
         ) : (
           <div className="detail-list">
             {sources.map((source) => (
@@ -288,7 +298,7 @@ export function IngestView({
                   {source.warnings && source.warnings.length > 0 && (
                     <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>
                       {source.warnings.map((warning, index) => (
-                        <li key={`${index}:${warning}`}>{warning}</li>
+                        <li key={`${index}:${warning}`}>{localizeSourceProcessingWarning(warning, t)}</li>
                       ))}
                     </ul>
                   )}
@@ -328,7 +338,10 @@ export function IngestView({
           </ul>
         )}
         {drafts.length === 0 ? (
-          <p className="empty-state">{t("ingest.noDrafts")}</p>
+          <div className="empty-state" role="status">
+            <p>{t("ingest.noDrafts")}</p>
+            <p className="muted">{t("ingest.noDraftsHint")}</p>
+          </div>
         ) : (
           <>
             <div className="pill-row bulk-review-bar" aria-label={t("ingest.bulkDraftReviewAria")}>

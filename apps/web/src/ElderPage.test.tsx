@@ -137,3 +137,27 @@ describe("ElderPage loading and empty states", () => {
     expect(screen.getByText("No suggestions yet. Use the steps above to send your first one.")).toBeInTheDocument();
   });
 });
+
+describe("ElderPage correction submit busy guard", () => {
+  it("disables send and marks the button busy while a correction submit is in flight", () => {
+    render(
+      <ElderPage
+        elder={createElderState({
+          formContextText: "mira talo-mi-na",
+          formCorrection: "Use -na for locative.",
+          formRationale: "That is how elders say it.",
+          isSubmittingCorrection: true
+        })}
+        data={createDashboardData()}
+        isWorkflowBusy={false}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next" }));
+
+    const sendButton = screen.getByRole("button", { name: "Sending…" });
+    expect(sendButton).toBeDisabled();
+    expect(sendButton).toHaveAttribute("aria-busy", "true");
+  });
+});

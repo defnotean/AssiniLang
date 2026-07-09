@@ -278,7 +278,7 @@ export function useIngestExtraction(
         } else if (asset.status === "failed") {
           setProcessError(
             asset.error
-              ? localizeSourceProcessingError(asset.error, t, "ingest.processingFailed")
+              ? localizeSourceProcessingError(asset.error, t, "ingest.processingFailed", { title: sourceTitle })
               : t("ingest.processingFailed", { title: sourceTitle })
           );
           setProcessWarnings(asset.warnings ?? []);

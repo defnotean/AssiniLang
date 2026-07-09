@@ -19,6 +19,7 @@ import { StatusScreen } from "./components/StatusScreen";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { CompassMark, DiamondBand } from "./components/marks";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
+import { ApiError } from "./lib/apiClient";
 import { localizeApiError } from "./lib/format";
 import { getDesktopBridgeInfo } from "./lib/desktopBridge";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
@@ -152,7 +153,8 @@ export function App() {
         if (isCurrent) {
           setLoadState({
             status: "error",
-            message: localizeApiError(error, t, "app.workspaceUnavailable")
+            message: localizeApiError(error, t, "app.workspaceUnavailable"),
+            statusCode: error instanceof ApiError ? error.status : undefined
           });
         }
       });
@@ -245,7 +247,11 @@ export function App() {
   }
 
   if (loadState.status === "error") {
-    const desktopHint = getDesktopBridgeInfo() ? t("app.desktopReconnectHint") : undefined;
+    // Reconnect guidance is for connectivity failures only — not auth/rate-limit.
+    const statusCode = loadState.statusCode;
+    const isAuthOrClientLimit = statusCode === 401 || statusCode === 403 || statusCode === 429;
+    const desktopHint =
+      getDesktopBridgeInfo() && !isAuthOrClientLimit ? t("app.desktopReconnectHint") : undefined;
     return (
       <StatusScreen
         kind="error"

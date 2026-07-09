@@ -259,6 +259,7 @@ export function ElderPage({
                     type="submit"
                     className="elder-primary"
                     disabled={isWorkflowBusy || elder.isSubmittingCorrection || !hasTarget || !hasFix}
+                    aria-busy={elder.isSubmittingCorrection || isWorkflowBusy}
                   >
                     {elder.isSubmittingCorrection ? t("elderPage.sending") : t("elderPage.send")}
                   </button>
