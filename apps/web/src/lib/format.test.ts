@@ -378,6 +378,46 @@ describe("localizeApiError", () => {
       "This document has no extractable text, and DOCX OCR is not supported yet. Export pages as images or paste the text, then process again."
     );
   });
+
+  it("localizes restart-recovery interruptions from persisted source errors", () => {
+    const message = localizeSourceProcessingError(
+      "Processing interrupted by a server restart. Re-run processing.",
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "Processing was interrupted by a server restart. Re-run processing on this source."
+    );
+  });
+
+  it("localizes missing transcription endpoint guidance from persisted source errors", () => {
+    const message = localizeSourceProcessingError(
+      "Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL to an OpenAI-compatible /audio/transcriptions server (for example a local whisper server).",
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "Audio sources need a transcription endpoint. Set a transcription base URL in Runtime settings (Model tab), then process again."
+    );
+  });
+
+  it("localizes offline-heuristic fallback warnings", () => {
+    expect(
+      localizeSourceProcessingWarning(
+        "Model output was not valid extraction JSON; fell back to offline heuristics.",
+        t
+      )
+    ).toBe("Model output was not valid extraction JSON; fell back to offline heuristics.");
+
+    expect(
+      localizeSourceProcessingWarning(
+        "Model output for part 2 of 5 was not valid extraction JSON; that part was skipped.",
+        createTranslator("ar")
+      )
+    ).toBe("لم يكن خرج النموذج للجزء 2 من 5 JSON استخلاص صالحًا؛ تم تخطي ذلك الجزء.");
+  });
 });
 
 describe("formatReachability", () => {

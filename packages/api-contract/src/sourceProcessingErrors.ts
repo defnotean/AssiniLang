@@ -38,6 +38,24 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.sourceAlreadyProcessing" };
   }
 
+  if (/Processing interrupted by a server restart/i.test(normalized)) {
+    return { i18nKey: "ingest.processingInterruptedByRestart" };
+  }
+
+  if (
+    /ASSINI_TRANSCRIBE_BASE_URL/i.test(normalized)
+    && /Audio sources need a transcription endpoint|Set ASSINI_TRANSCRIBE/i.test(normalized)
+  ) {
+    return { i18nKey: "ingest.transcribeNotConfigured" };
+  }
+
+  if (
+    /Transcription request failed/i.test(normalized)
+    || /Transcription endpoint returned no text/i.test(normalized)
+  ) {
+    return { i18nKey: "ingest.transcribeFailed" };
+  }
+
   return undefined;
 }
 
@@ -63,6 +81,38 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
 
   if (/Used configured OCR model to read the image/i.test(normalized)) {
     return { i18nKey: "ingest.ocrImageUsed" };
+  }
+
+  if (/No model configured \(deterministic mode\);\s*used offline heuristic parsing/i.test(normalized)) {
+    return { i18nKey: "ingest.warningDeterministicHeuristic" };
+  }
+
+  if (/Model output was not valid extraction JSON;\s*fell back to offline heuristics/i.test(normalized)) {
+    return { i18nKey: "ingest.warningOfflineHeuristicFallback" };
+  }
+
+  if (/No vision model configured;\s*used local OCR \(tesseract\.js\)/i.test(normalized)) {
+    return { i18nKey: "ingest.warningLocalOcrUsed" };
+  }
+
+  const chunkSkipped = normalized.match(
+    /Model output for part (\d+) of (\d+) was not valid extraction JSON;\s*that part was skipped/i
+  );
+  if (chunkSkipped) {
+    return {
+      i18nKey: "ingest.warningChunkParseSkipped",
+      i18nParams: { part: Number(chunkSkipped[1]), total: Number(chunkSkipped[2]) }
+    };
+  }
+
+  const chunkCap = normalized.match(
+    /Source text is very long;\s*only the first (\d+) parts were processed and (\d+) characters were skipped/i
+  );
+  if (chunkCap) {
+    return {
+      i18nKey: "ingest.warningChunkCapSkipped",
+      i18nParams: { parts: Number(chunkCap[1]), skipped: Number(chunkCap[2]) }
+    };
   }
 
   return undefined;

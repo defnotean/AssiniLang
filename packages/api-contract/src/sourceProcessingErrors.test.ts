@@ -36,6 +36,25 @@ describe("sourceProcessingErrorI18n", () => {
       .toEqual({ i18nKey: "ingest.sourceAlreadyProcessing" });
   });
 
+  it("classifies restart-recovery interruptions", () => {
+    expect(sourceProcessingErrorI18n(
+      "Processing interrupted by a server restart. Re-run processing."
+    )).toEqual({ i18nKey: "ingest.processingInterruptedByRestart" });
+  });
+
+  it("classifies missing transcription endpoint guidance", () => {
+    expect(sourceProcessingErrorI18n(
+      "Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL to an OpenAI-compatible /audio/transcriptions server (for example a local whisper server)."
+    )).toEqual({ i18nKey: "ingest.transcribeNotConfigured" });
+  });
+
+  it("classifies transcription endpoint failures", () => {
+    expect(sourceProcessingErrorI18n("Transcription request failed with status 502."))
+      .toEqual({ i18nKey: "ingest.transcribeFailed" });
+    expect(sourceProcessingErrorI18n("Transcription endpoint returned no text."))
+      .toEqual({ i18nKey: "ingest.transcribeFailed" });
+  });
+
   it("returns undefined for unrelated processing errors", () => {
     expect(sourceProcessingErrorI18n("Remote failure [redacted-secret]")).toBeUndefined();
   });
@@ -56,7 +75,48 @@ describe("sourceProcessingWarningI18n", () => {
       .toEqual({ i18nKey: "ingest.ocrPdfPage1Used" });
   });
 
+  it("classifies image OCR success notices", () => {
+    expect(sourceProcessingWarningI18n("Used configured OCR model to read the image."))
+      .toEqual({ i18nKey: "ingest.ocrImageUsed" });
+  });
+
+  it("classifies deterministic offline-heuristic notices", () => {
+    expect(sourceProcessingWarningI18n(
+      "No model configured (deterministic mode); used offline heuristic parsing."
+    )).toEqual({ i18nKey: "ingest.warningDeterministicHeuristic" });
+  });
+
+  it("classifies model JSON fallback notices", () => {
+    expect(sourceProcessingWarningI18n(
+      "Model output was not valid extraction JSON; fell back to offline heuristics."
+    )).toEqual({ i18nKey: "ingest.warningOfflineHeuristicFallback" });
+  });
+
+  it("classifies local tesseract fallback notices", () => {
+    expect(sourceProcessingWarningI18n(
+      "No vision model configured; used local OCR (tesseract.js) to read the image."
+    )).toEqual({ i18nKey: "ingest.warningLocalOcrUsed" });
+  });
+
+  it("classifies per-chunk parse skips with part counts", () => {
+    expect(sourceProcessingWarningI18n(
+      "Model output for part 2 of 5 was not valid extraction JSON; that part was skipped."
+    )).toEqual({
+      i18nKey: "ingest.warningChunkParseSkipped",
+      i18nParams: { part: 2, total: 5 }
+    });
+  });
+
+  it("classifies chunk-cap skip notices with counts", () => {
+    expect(sourceProcessingWarningI18n(
+      "Source text is very long; only the first 8 parts were processed and 12000 characters were skipped."
+    )).toEqual({
+      i18nKey: "ingest.warningChunkCapSkipped",
+      i18nParams: { parts: 8, skipped: 12000 }
+    });
+  });
+
   it("returns undefined for unrelated warnings", () => {
-    expect(sourceProcessingWarningI18n("fell back to offline heuristics")).toBeUndefined();
+    expect(sourceProcessingWarningI18n("Custom operator note from a plugin")).toBeUndefined();
   });
 });

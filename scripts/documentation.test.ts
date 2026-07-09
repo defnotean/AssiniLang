@@ -155,7 +155,10 @@ describe("project documentation", () => {
         "## Duplicate flags on drafts",
         "```mermaid",
         "Source processing attempt limit reached",
-        "ingest.sourceAlreadyProcessing"
+        "ingest.sourceAlreadyProcessing",
+        "ingest.processingInterruptedByRestart",
+        "ingest.transcribeNotConfigured",
+        "ingest.warningOfflineHeuristicFallback"
       ],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
       "docs/operator-recovery.md": [
@@ -168,7 +171,13 @@ describe("project documentation", () => {
       ],
       "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
       "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "groundingFailureCodes", "First Nations"],
-      "docs/troubleshooting.md": ["## Startup and ports", "ASSINI_TRANSCRIBE_BASE_URL", "ASSINI_ALLOW_PRIVATE_URLS", "data/local-db.json"],
+      "docs/troubleshooting.md": [
+        "## Startup and ports",
+        "ASSINI_TRANSCRIBE_BASE_URL",
+        "ASSINI_ALLOW_PRIVATE_URLS",
+        "data/local-db.json",
+        "ingest.processingInterruptedByRestart"
+      ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };
 

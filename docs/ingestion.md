@@ -152,6 +152,7 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Source not found: ...` / `Language not found: ...` | 404 | Unknown IDs | Check the source/language ID. |
 | `Source is already processing: ...` (`i18nKey: ingest.sourceAlreadyProcessing`) | 409 | A sync or async run is in flight (or a crash left the asset stuck) | Wait for polling to finish; after a crash, see [troubleshooting](troubleshooting.md). |
 | `Source processing attempt limit reached (5).` (`i18nKey: ingest.sourceMaxProcessingAttempts`) | 409 | `processingAttempts` already reached the max of 5 | Inspect the asset error/history, fix the underlying failure, or register a fresh source; do not keep retrying the same asset. |
+| `Processing interrupted by a server restart. Re-run processing.` (`i18nKey: ingest.processingInterruptedByRestart`) | asset `failed` | Startup recovery sweep reset a crash-stuck `processing` asset | Re-run processing; see [troubleshooting](troubleshooting.md). |
 | `Source URL is not a valid URL: ...` / `Source URLs must use http or https.` | 422 | Unparseable URL or wrong scheme | Use a full http(s) URL. |
 | `Source URL points at a private or local network ... and was blocked.` | 422 | SSRF guard blocked the hostname/IP | Use a public URL, or set `ASSINI_ALLOW_PRIVATE_URLS=1` in a trusted local setup. |
 | `Obsidian vault import is disabled until ASSINI_OBSIDIAN_VAULT_ROOTS is set ...` / `Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.` | 400 | Vault roots unset, or path outside allowlist (`..` / symlink escapes included) | Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to semicolon-separated absolute roots and import a path under one of them. |
@@ -159,8 +160,8 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Fetching source URL failed with status N.` | 422 | The remote server returned an error | Check the URL is reachable and public. |
 | `Source URL content is too large to process locally.` | 422 | Response over 2 MB | Save the relevant part as text and paste or upload it. |
 | `Source URL returned no readable text content.` | 422 | Page had no extractable text | Paste the text manually. |
-| `Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL ...` | 422 | No transcription server configured | Configure a whisper-style server; see [configuration](configuration.md#transcription-audio-sources). |
-| `Transcription request failed with status N.` / `Transcription endpoint returned no text.` | 422 | Transcription server error or empty result | Check the server, model name, and audio file. |
+| `Audio sources need a transcription endpoint. Set ASSINI_TRANSCRIBE_BASE_URL ...` (`i18nKey: ingest.transcribeNotConfigured`) | 422 | No transcription server configured | Configure a whisper-style server; see [configuration](configuration.md#transcription-audio-sources). |
+| `Transcription request failed with status N.` / `Transcription endpoint returned no text.` (`i18nKey: ingest.transcribeFailed`) | 422 | Transcription server error or empty result | Check the server, model name, and audio file. |
 | `OCR model request failed with status N.` / `OCR endpoint returned no text.` | 422 | OCR model server error or empty result | Check `ASSINI_OCR_BASE_URL`, `ASSINI_OCR_MODEL`, and that the vision model is loaded (for example `ollama pull llava`). |
 | `Local OCR could not read the image: ...` | 422 | Tesseract fallback failed (often `OCR found no readable text in the image.`) | Provide a clearer image, set `ASSINI_OCR_LANG` to match the script, or configure `ASSINI_OCR_BASE_URL` / a vision-capable main LLM. |
 | `The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or configure ASSINI_OCR_BASE_URL, or rely on the local OCR fallback by leaving both unset.` | 422 | An image source was sent to a configured but non-vision main LLM with no OCR model | Configure `ASSINI_OCR_BASE_URL` with a vision model, set a vision-capable `ASSINI_LLM_MODEL`, or leave both unset so the image falls back to local tesseract. |
@@ -176,13 +177,13 @@ Warnings (extraction still succeeds, result is flagged). Processing warnings are
 
 | Warning | Meaning |
 | --- | --- |
-| `No model configured (deterministic mode); used offline heuristic parsing.` | No real model is set up; only delimited lines were parsed, at low confidence. |
-| `Model output was not valid extraction JSON; fell back to offline heuristics.` | The model replied with unparseable output; heuristics ran instead. |
-| `Model output for part N of M was not valid extraction JSON; that part was skipped.` | One chunk of a long source failed to parse; the rest merged normally. |
-| `Source text is very long; only the first 8 parts were processed and N characters were skipped.` | The source exceeded the chunk cap. |
-| `No vision model configured; used local OCR (tesseract.js) to read the image.` | The tesseract fallback path ran for an image source (no OCR model or vision LLM succeeded). |
-| `Used configured OCR model to read the image.` | The `ASSINI_OCR_BASE_URL` endpoint read the image successfully. |
-| `Used configured OCR model to read scanned document (page 1).` | A scanned PDF with no text layer was OCR'd via page 1's embedded image. |
+| `No model configured (deterministic mode); used offline heuristic parsing.` (`i18nKey: ingest.warningDeterministicHeuristic`) | No real model is set up; only delimited lines were parsed, at low confidence. |
+| `Model output was not valid extraction JSON; fell back to offline heuristics.` (`i18nKey: ingest.warningOfflineHeuristicFallback`) | The model replied with unparseable output; heuristics ran instead. |
+| `Model output for part N of M was not valid extraction JSON; that part was skipped.` (`i18nKey: ingest.warningChunkParseSkipped`) | One chunk of a long source failed to parse; the rest merged normally. |
+| `Source text is very long; only the first 8 parts were processed and N characters were skipped.` (`i18nKey: ingest.warningChunkCapSkipped`) | The source exceeded the chunk cap. |
+| `No vision model configured; used local OCR (tesseract.js) to read the image.` (`i18nKey: ingest.warningLocalOcrUsed`) | The tesseract fallback path ran for an image source (no OCR model or vision LLM succeeded). |
+| `Used configured OCR model to read the image.` (`i18nKey: ingest.ocrImageUsed`) | The `ASSINI_OCR_BASE_URL` endpoint read the image successfully. |
+| `Used configured OCR model to read scanned document (page 1).` (`i18nKey: ingest.ocrPdfPage1Used`) | A scanned PDF with no text layer was OCR'd via page 1's embedded image. |
 
 ## After extraction
 

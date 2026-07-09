@@ -44,7 +44,7 @@ Background extraction marks a source `processing`, runs in the API process, and 
 If the API **crashes or restarts** while a source is `processing`:
 
 1. On startup, `apps/api/src/jobRecovery.ts` sweeps every asset still in `processing`.
-2. Each recovered asset moves to `failed` with the operator-visible error: `Processing interrupted by a server restart. Re-run processing.`
+2. Each recovered asset moves to `failed` with the operator-visible error: `Processing interrupted by a server restart. Re-run processing.` (web console localizes via `i18nKey: ingest.processingInterruptedByRestart`).
 3. An audit event `source_asset.processing_recovered` is appended per asset.
 4. In Build, re-run **Process** on the source.
 
