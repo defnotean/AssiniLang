@@ -10,6 +10,14 @@ import { actorRequest, assertOk, getJson } from "../lib/apiClient";
 /** Alias kept for existing call sites; matches the shared API contract. */
 export type ProcessSourceResult = ProcessSourceResponse;
 
+/** Non-persisted queue phase from GET/process responses (in-memory job queue). */
+export type ProcessingQueuePhase = "queued" | "active";
+
+/** Source asset as returned by intake list/process/cancel routes. */
+export type SourceAssetView = SourceAsset & {
+  processingQueuePhase?: ProcessingQueuePhase;
+};
+
 /**
  * Read-time duplicate flag computed by the API when listing extraction
  * drafts. Never persisted; informs the reviewer without blocking review.
@@ -66,11 +74,11 @@ export type BulkReviewExtractionDraftsResult = {
   failed: number;
 };
 
-export async function fetchSources(languageId: string): Promise<SourceAsset[]> {
-  return getJson<SourceAsset[]>(`/languages/${encodeURIComponent(languageId)}/sources`, "reviewer");
+export async function fetchSources(languageId: string): Promise<SourceAssetView[]> {
+  return getJson<SourceAssetView[]>(`/languages/${encodeURIComponent(languageId)}/sources`, "reviewer");
 }
 
-export async function registerSource(languageId: string, payload: SourceRegistrationPayload): Promise<SourceAsset> {
+export async function registerSource(languageId: string, payload: SourceRegistrationPayload): Promise<SourceAssetView> {
   const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/sources`, {
     method: "POST",
     ...(await actorRequest("reviewer", true)),
@@ -82,7 +90,7 @@ export async function registerSource(languageId: string, payload: SourceRegistra
   return response.json() as Promise<SourceAsset>;
 }
 
-export async function uploadSourceFile(languageId: string, file: File, title?: string): Promise<SourceAsset> {
+export async function uploadSourceFile(languageId: string, file: File, title?: string): Promise<SourceAssetView> {
   const formData = new FormData();
   formData.append("file", file);
   const trimmedTitle = title?.trim();
@@ -133,7 +141,7 @@ export async function processSource(
   return response.json() as Promise<ProcessSourceResult>;
 }
 
-export async function cancelSourceProcessing(sourceId: string): Promise<{ asset: SourceAsset }> {
+export async function cancelSourceProcessing(sourceId: string): Promise<{ asset: SourceAssetView }> {
   const response = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/cancel-processing`, {
     method: "POST",
     ...(await actorRequest("reviewer"))
@@ -141,7 +149,7 @@ export async function cancelSourceProcessing(sourceId: string): Promise<{ asset:
 
   await assertOk(response, "Source processing cancel failed");
 
-  return response.json() as Promise<{ asset: SourceAsset }>;
+  return response.json() as Promise<{ asset: SourceAssetView }>;
 }
 
 export async function fetchExtractionDrafts(

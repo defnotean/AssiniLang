@@ -55,7 +55,31 @@ export const MAX_SOURCE_PROCESSING_ATTEMPTS = 5;
  * is cancelled via POST /sources/:sourceId/cancel-processing.
  */
 export const CANCELLED_PROCESSING_ERROR =
-  "Queued source processing was cancelled. Re-run processing when ready.";
+  "Queued source processing was cancelled. Use Retry when ready.";
+
+/** Non-persisted operator queue phase derived from the in-memory job queue. */
+export type ProcessingQueuePhase = "queued" | "active";
+
+export type SourceAssetView = SourceAsset & {
+  processingQueuePhase?: ProcessingQueuePhase;
+};
+
+export function withProcessingQueuePhase(
+  asset: SourceAsset,
+  queue: { isPending(id: string): boolean; isActive(id: string): boolean }
+): SourceAssetView {
+  if (asset.status !== "processing") {
+    return asset;
+  }
+  if (queue.isPending(asset.id)) {
+    return { ...asset, processingQueuePhase: "queued" };
+  }
+  if (queue.isActive(asset.id)) {
+    return { ...asset, processingQueuePhase: "active" };
+  }
+  // Orphaned processing claim (not in queue): treat as active so Cancel stays hidden.
+  return { ...asset, processingQueuePhase: "active" };
+}
 /** Default multipart file cap for source uploads (also registered on the Fastify multipart plugin). */
 export const MAX_SOURCE_UPLOAD_BYTES = 25 * 1024 * 1024;
 /** Cap for the optional multipart `title` text field (and busboy `fieldSize`). */
@@ -305,7 +329,9 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         i18nKey: "errors.languageNotFound"
       };
     }
-    return state.sourceAssets.filter((asset) => asset.languageId === languageId);
+    return state.sourceAssets
+      .filter((asset) => asset.languageId === languageId)
+      .map((asset) => withProcessingQueuePhase(asset, jobQueue));
   });
 
   app.post("/languages/:languageId/sources", async (request, reply) => {
@@ -830,7 +856,11 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       });
 
       reply.code(202);
-      return { asset: claimedAsset, drafts: [], warnings: [] };
+      return {
+        asset: withProcessingQueuePhase(claimedAsset, jobQueue),
+        drafts: [],
+        warnings: []
+      };
     }
 
     let extraction: SourceExtractionResult | undefined;

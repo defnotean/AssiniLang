@@ -15,7 +15,7 @@ import type {
   AcceptExtractionDraftOptions,
   BulkReviewAction,
   ExtractionDraftView,
-  SourceAsset,
+  SourceAssetView,
   SourceRegistrationPayload
 } from "../api";
 import {
@@ -36,7 +36,7 @@ export function useIngestExtraction(
   t: Translate,
   onIntakeCommitted?: () => Promise<void> | void
 ) {
-  const [sources, setSources] = useState<SourceAsset[]>([]);
+  const [sources, setSources] = useState<SourceAssetView[]>([]);
   const [drafts, setDrafts] = useState<ExtractionDraftView[]>([]);
   const [isLoadingIntake, setIsLoadingIntake] = useState(true);
   const [intakeError, setIntakeError] = useState<string | null>(null);

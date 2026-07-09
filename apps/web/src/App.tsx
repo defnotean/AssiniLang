@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { User } from "@assini/db";
+import type { Language, User } from "@assini/db";
 import type {
   CorpusImportPayload,
   LanguageCreatePayload
@@ -50,6 +50,7 @@ import { IngestView } from "./views/IngestView";
 import { LearnerView } from "./views/LearnerView";
 import { ModelSetupView } from "./views/ModelSetupView";
 import { NoLanguageNotice } from "./views/NoLanguageNotice";
+import { PhonologyInventoryEditor } from "./views/PhonologyInventoryEditor";
 import { ReviewView } from "./views/ReviewView";
 import { GuidedTour } from "./components/GuidedTour";
 import "./styles.css";
@@ -204,6 +205,21 @@ export function App() {
   async function refreshDashboard() {
     const refreshed = await fetchDashboardData(selectedLanguageId ?? undefined);
     setLoadState({ status: "ready", data: refreshed });
+  }
+
+  function applyLanguageUpdate(updated: Language) {
+    setLoadState((current) => {
+      if (current.status !== "ready") return current;
+      return {
+        status: "ready",
+        data: {
+          ...current.data,
+          languages: current.data.languages.map((language) =>
+            language.id === updated.id ? updated : language
+          )
+        }
+      };
+    });
   }
 
   function handleLanguageSelect(languageId: string) {
@@ -446,6 +462,13 @@ export function App() {
                         </div>
                       )}
                     </section>
+                    {selectedLanguage && (
+                      <PhonologyInventoryEditor
+                        language={selectedLanguage}
+                        isWorkflowBusy={isWorkflowBusy}
+                        onSaved={applyLanguageUpdate}
+                      />
+                    )}
                     <section className="simple-section surface-section" aria-label={t("simple.savedExamplesAria")}>
                       <div className="simple-section-heading">
                         <span className="detail-label">{t("simple.savedExamples")}</span>
@@ -521,6 +544,7 @@ export function App() {
                         notes={data.notes}
                         learner={learner}
                         isWorkflowBusy={isWorkflowBusy}
+                        onOpenBuild={() => handleViewSelect("ingest")}
                       />
                     </section>
                     <section className="simple-section" aria-label={t("simple.askModelAria")}>

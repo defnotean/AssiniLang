@@ -109,6 +109,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
             </div>
           </div>
           <p className="empty-state" role="status" aria-live="polite">{t("profile.phonologyEmptyState")}</p>
+          <p className="muted">{t("profile.inventoryEditorBody")}</p>
         </section>
       )}
 

@@ -1,4 +1,4 @@
-import type { SourceAsset, SourceRegistrationPayload } from "../api";
+import type { SourceAsset, SourceAssetView, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import {
@@ -14,6 +14,16 @@ import { useI18n, type Translate } from "../i18n";
 import { hasSegmentationConflict, SegmentationConflictPanel } from "./SegmentationConflictPanel";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
+/** Matches API `MAX_SOURCE_PROCESSING_ATTEMPTS`. */
+const MAX_PROCESSING_ATTEMPTS = 5;
+
+function isAttemptCapped(source: Pick<SourceAsset, "status" | "processingAttempts">): boolean {
+  return source.status === "failed" && (source.processingAttempts ?? 0) >= MAX_PROCESSING_ATTEMPTS;
+}
+
+function isQueuedForCancel(source: SourceAssetView): boolean {
+  return source.status === "processing" && source.processingQueuePhase === "queued";
+}
 
 function isProcessingStale(source: SourceAsset, now = Date.now()): boolean {
   if (source.status !== "processing") return false;
@@ -269,17 +279,42 @@ export function IngestView({
           </div>
         ) : (
           <div className="detail-list">
-            {sources.map((source) => (
+            {sources.map((source) => {
+              const attemptCapped = isAttemptCapped(source);
+              const queued = isQueuedForCancel(source);
+              const showAttempts =
+                (source.status === "processing" || source.status === "failed")
+                && source.processingAttempts !== undefined
+                && source.processingAttempts > 0;
+              return (
               <article className="detail-row source-row" key={source.id} aria-label={t("ingest.sourceRowAria", { title: source.title })}>
                 <div>
                   <strong>{source.title}</strong>
                   <div className="pill-row">
                     <span className="pill">{formatSourceKind(source.kind, t)}</span>
-                    <StatusBadge status={source.status} />
-                    {(source.status === "processing" || source.status === "failed") &&
-                      source.processingAttempts !== undefined &&
-                      source.processingAttempts > 0 && (
-                      <span className="pill muted">{t("ingest.processingAttempts", { count: source.processingAttempts })}</span>
+                    {source.status === "processing" && source.processingQueuePhase === "queued" ? (
+                      <span className="status-badge pending" role="status">
+                        {t("ingest.processingQueueQueued")}
+                      </span>
+                    ) : source.status === "processing" ? (
+                      <span className="status-badge processing" role="status">
+                        {t("ingest.processingQueueActive")}
+                      </span>
+                    ) : (
+                      <StatusBadge status={source.status} />
+                    )}
+                    {attemptCapped && (
+                      <span className="status-badge failed" role="status">
+                        {t("ingest.processingAttemptsCapped")}
+                      </span>
+                    )}
+                    {showAttempts && (
+                      <span className="pill muted">
+                        {t("ingest.processingAttempts", {
+                          count: source.processingAttempts ?? 0,
+                          max: MAX_PROCESSING_ATTEMPTS
+                        })}
+                      </span>
                     )}
                     {source.kind === "audio" && (
                       <span className="pill">{source.transcript ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}</span>
@@ -309,6 +344,11 @@ export function IngestView({
                       {localizeSourceProcessingError(source.error, t, "ingest.sourceProcessingFailed")}
                     </p>
                   )}
+                  {attemptCapped && (
+                    <p className="result-notice warning" role="status">
+                      {t("ingest.processingAttemptsCappedHint", { max: MAX_PROCESSING_ATTEMPTS })}
+                    </p>
+                  )}
                   {source.warnings && source.warnings.length > 0 && (
                     <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>
                       {source.warnings.map((warning, index) => (
@@ -318,7 +358,7 @@ export function IngestView({
                   )}
                 </div>
                 <div className="source-row-actions">
-                  {source.status === "processing" && (
+                  {queued && (
                     <button
                       type="button"
                       className="secondary"
@@ -338,10 +378,7 @@ export function IngestView({
                       processingSourceId !== null
                       || cancellingSourceId !== null
                       || source.status === "processing"
-                      || (
-                        source.status === "failed"
-                        && (source.processingAttempts ?? 0) >= 5
-                      )
+                      || attemptCapped
                     }
                     aria-busy={
                       processingSourceId === source.id || source.status === "processing" || undefined
@@ -358,7 +395,8 @@ export function IngestView({
                   </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

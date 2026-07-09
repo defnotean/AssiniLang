@@ -80,9 +80,14 @@ describe("paradigm gaps panel", () => {
     expect(within(phonologyPanel).getByText("No phonology declared yet")).toBeInTheDocument();
     expect(
       within(phonologyPanel).getByText(
-        "No phonology recorded yet. Seed consonants, vowels, and syllable structure on the language record or import a snapshot that includes phonology."
+        "No phonology recorded yet. Add consonants and vowels below to start the inventory, or import a snapshot that already includes phonology."
       )
     ).toHaveAttribute("aria-live", "polite");
+    expect(
+      within(phonologyPanel).getByText(
+        "Add or remove orthography symbols used for corpus checks. Save to update this language."
+      )
+    ).toBeInTheDocument();
 
     const vocabularyPanel = screen.getByRole("region", { name: "Vocabulary inventory" });
     expect(within(vocabularyPanel).getByText("0 entries")).toBeInTheDocument();

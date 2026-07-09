@@ -65,7 +65,10 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.processingStalledWithoutProgress" };
   }
 
-  if (/Queued source processing was cancelled/i.test(normalized)) {
+  if (
+    /Queued source processing was cancelled/i.test(normalized)
+    && (/Use Retry when ready/i.test(normalized) || /Re-run processing when ready/i.test(normalized))
+  ) {
     return { i18nKey: "ingest.sourceProcessingCancelled" };
   }
 

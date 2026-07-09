@@ -77,7 +77,9 @@ export type {
   DraftGroundingFlag,
   ExtractionDraftDuplicate,
   ExtractionDraftView,
-  ProcessSourceResult
+  ProcessingQueuePhase,
+  ProcessSourceResult,
+  SourceAssetView
 } from "./api/ingestApi";
 
 export {

@@ -52,6 +52,7 @@ const apiMock = vi.hoisted(() => ({
   submitExerciseAnswer: vi.fn(),
   updateRuntimeSettings: vi.fn(),
   updateReviewPolicy: vi.fn(),
+  updateLanguage: vi.fn(),
   validateExerciseAuthoring: vi.fn()
 }));
 
@@ -1063,12 +1064,55 @@ describe("App", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Start" })).toBeInTheDocument();
     expect(apiMock.fetchLanguageProfile).not.toHaveBeenCalled();
     expect(screen.getByRole("region", { name: "Language overview" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Phonology profile" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Saved examples" })).toBeInTheDocument();
     expect(screen.getByText("Agglutinative test language.")).toBeInTheDocument();
     expect(screen.getByText("Read and search what you have")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Corpus passages" })).toBeInTheDocument();
     expect(screen.getByText("mira talo-mi-na")).toBeInTheDocument();
     expect(screen.queryByText("This language has no saved material yet.")).not.toBeInTheDocument();
+    expect(screen.getByText("No phonology declared yet")).toBeInTheDocument();
+    expect(screen.getByText(/Add consonants and vowels below/)).toBeInTheDocument();
+  });
+
+  it("saves phonology inventory edits from Start without loading the language profile", async () => {
+    const savedLanguage = {
+      id: "avenik",
+      name: "Avenik",
+      typology: "agglutinative" as const,
+      description: "Agglutinative test language.",
+      orthography: "Latin",
+      status: "active" as const,
+      phonology: {
+        consonants: ["m"],
+        vowels: ["a"],
+        notes: [] as string[]
+      }
+    };
+    apiMock.updateLanguage.mockResolvedValue(savedLanguage);
+
+    await renderReady();
+    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+
+    const panel = await screen.findByRole("region", { name: "Phonology profile" });
+    const form = within(panel).getByRole("form", { name: "Phonology inventory editor" });
+    fireEvent.change(within(form).getByLabelText("New consonant symbol"), { target: { value: "m" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Add consonant" }));
+    fireEvent.change(within(form).getByLabelText("New vowel symbol"), { target: { value: "a" } });
+    fireEvent.click(within(form).getByRole("button", { name: "Add vowel" }));
+    fireEvent.click(within(form).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(apiMock.updateLanguage).toHaveBeenCalledWith("avenik", {
+      phonology: {
+        consonants: ["m"],
+        vowels: ["a"],
+        notes: []
+      }
+    }));
+    expect(apiMock.fetchLanguageProfile).not.toHaveBeenCalled();
+    expect(await within(form).findByRole("status")).toHaveTextContent("Phonology inventory saved.");
+    expect(within(form).getByText("m")).toBeInTheDocument();
+    expect(within(form).getByText("a")).toBeInTheDocument();
   });
 
   it("shows Start next-step guidance when the selected language has no saved material", async () => {

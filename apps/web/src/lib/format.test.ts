@@ -1288,12 +1288,20 @@ describe("localizeApiError", () => {
 
   it("localizes cancelled queued processing from persisted source errors", () => {
     const message = localizeSourceProcessingError(
-      "Queued source processing was cancelled. Re-run processing when ready.",
+      "Queued source processing was cancelled. Use Retry when ready.",
       t,
       "ingest.sourceProcessingFailed"
     );
 
-    expect(message).toBe("Queued processing was cancelled. Re-run processing when ready.");
+    expect(message).toBe("Queued processing was cancelled. Use Retry when ready.");
+
+    expect(
+      localizeSourceProcessingError(
+        "Queued source processing was cancelled. Re-run processing when ready.",
+        t,
+        "ingest.sourceProcessingFailed"
+      )
+    ).toBe("Queued processing was cancelled. Use Retry when ready.");
   });
 
   it("localizes missing transcription endpoint guidance from persisted source errors", () => {

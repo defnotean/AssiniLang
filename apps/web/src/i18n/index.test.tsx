@@ -228,6 +228,19 @@ describe("locale catalogs", () => {
     expect(ar["learner.noExercisesDetailEmptyHint"]).not.toBe(en["learner.noExercisesDetailEmptyHint"]);
   });
 
+  it("localizes Practice next empty-state CTAs and post-grade guidance", () => {
+    expect(en["learner.noExercisesPracticeNextHint"]).toContain("Author the first learner task");
+    expect(en["learner.noPracticeRecommendationsWithExercisesHint"]).toContain("exercises exist");
+    expect(en["learner.authorExerciseCta"]).toBe("Author an exercise");
+    expect(en["learner.openBuildCta"]).toBe("Open Build");
+    expect(en["learner.practiceNextRecommended"]).toContain("Practice next");
+    expect(ar["learner.noExercisesPracticeNextHint"]).toContain("ألّف");
+    expect(ar["learner.noPracticeRecommendationsWithExercisesHint"]).toContain("تمارين");
+    expect(ar["learner.authorExerciseCta"]).not.toBe(en["learner.authorExerciseCta"]);
+    expect(ar["learner.openBuildCta"]).not.toBe(en["learner.openBuildCta"]);
+    expect(ar["learner.practiceNextRecommended"]).not.toBe(en["learner.practiceNextRecommended"]);
+  });
+
   it("localizes Chat conversation-setup seed-prompt prefix in Arabic", () => {
     expect(en["assistant.conversationSetupSeedPrefix"]).toContain("{instructions}");
     expect(en["assistant.conversationSetupSeedPrefix"]).toContain("Conversation setup");
@@ -274,14 +287,24 @@ describe("locale catalogs", () => {
     expect(en["simple.emptyLanguageHint"]).toContain("Saved examples");
     expect(en["sidebar.noLanguagesHint"]).toContain("New language");
     expect(en["sidebar.noLanguagesHint"]).toContain("Start");
+    expect(en["profile.phonologyEmptyState"]).toContain("Add consonants and vowels below");
+    expect(en["profile.phonologyEmptyState"]).toContain("import a snapshot");
+    expect(en["profile.addConsonant"]).toContain("Add consonant");
+    expect(en["profile.inventorySaved"]).toContain("saved");
     expect(ar["simple.emptyLanguage"]).toContain("مواد محفوظة");
     expect(ar["simple.emptyLanguageHint"]).toContain("البناء");
     expect(ar["simple.emptyLanguageHint"]).toContain("الأمثلة المحفوظة");
     expect(ar["sidebar.noLanguagesHint"]).toContain("لغة جديدة");
     expect(ar["sidebar.noLanguagesHint"]).toContain("الملف اللغوي");
+    expect(ar["profile.phonologyEmptyState"]).toContain("الصوامت والصوائت");
+    expect(ar["profile.phonologyEmptyState"]).toContain("لقطة");
+    expect(ar["profile.addConsonant"]).toContain("صامت");
+    expect(ar["profile.inventorySaved"]).toContain("حفظ");
     expect(ar["simple.emptyLanguage"]).not.toBe(en["simple.emptyLanguage"]);
     expect(ar["simple.emptyLanguageHint"]).not.toBe(en["simple.emptyLanguageHint"]);
     expect(ar["sidebar.noLanguagesHint"]).not.toBe(en["sidebar.noLanguagesHint"]);
+    expect(ar["profile.phonologyEmptyState"]).not.toBe(en["profile.phonologyEmptyState"]);
+    expect(ar["profile.addConsonant"]).not.toBe(en["profile.addConsonant"]);
   });
 
   it("localizes Review and extraction-draft empty-state next-step guidance", () => {

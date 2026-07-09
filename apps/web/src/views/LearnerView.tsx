@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   fetchRecommendedExercises,
   validateExerciseAuthoring,
@@ -57,13 +57,15 @@ export function LearnerView({
   exercises,
   notes = [],
   learner,
-  isWorkflowBusy
+  isWorkflowBusy,
+  onOpenBuild
 }: {
   languageId: string | null;
   exercises: PublicExercise[];
   notes?: PublicNote[];
   learner: LearnerWorkspace;
   isWorkflowBusy: boolean;
+  onOpenBuild?: () => void;
 }) {
   const {
     selectedExercise,
@@ -80,6 +82,7 @@ export function LearnerView({
     handleGenerateExercise: onGenerateExercise
   } = learner;
   const { t } = useI18n();
+  const authoringFormRef = useRef<HTMLFormElement>(null);
   const [authoringType, setAuthoringType] = useState<PublicExercise["type"]>("translate_to_target");
   const [authoringPrompt, setAuthoringPrompt] = useState("");
   const [authoringVocabulary, setAuthoringVocabulary] = useState("");
@@ -96,15 +99,25 @@ export function LearnerView({
   const [isValidatingExercise, setIsValidatingExercise] = useState(false);
   const [isGeneratingExercise, setIsGeneratingExercise] = useState(false);
   const [practiceState, setPracticeState] = useState<AsyncState<RecommendedExercises>>({ status: "idle" });
+  const [practiceRefreshKey, setPracticeRefreshKey] = useState(0);
+  const practiceLanguageIdRef = useRef(languageId);
 
   useEffect(() => {
     if (!languageId) {
+      practiceLanguageIdRef.current = null;
       setPracticeState({ status: "idle" });
       return;
     }
 
+    const languageChanged = practiceLanguageIdRef.current !== languageId;
+    practiceLanguageIdRef.current = languageId;
+
     let cancelled = false;
-    setPracticeState({ status: "loading" });
+    setPracticeState((current) => {
+      // Soft-refresh after grading: keep the current queue visible while refetching.
+      if (!languageChanged && current.status === "ready") return current;
+      return { status: "loading" };
+    });
     fetchRecommendedExercises(languageId)
       .then((data) => {
         if (!cancelled) setPracticeState({ status: "ready", data });
@@ -121,7 +134,24 @@ export function LearnerView({
     return () => {
       cancelled = true;
     };
-  }, [languageId, t]);
+  }, [languageId, t, practiceRefreshKey]);
+
+  useEffect(() => {
+    if (!exerciseResult) return;
+    setPracticeRefreshKey((current) => current + 1);
+  }, [exerciseResult]);
+
+  function focusAuthoringForm() {
+    authoringFormRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+    const promptField = document.getElementById("exercise-author-prompt");
+    if (promptField instanceof HTMLElement) {
+      promptField.focus();
+    }
+  }
+
+  const nextAfterGrade = exerciseResult && practiceState.status === "ready"
+    ? practiceState.data.exercises.find((exercise) => exercise.id !== selectedExercise?.id) ?? null
+    : null;
   const hasFilledAdversarialProbes = authoringAdversarialProbes.length >= MIN_ADVERSARIAL_PROBES
     && authoringAdversarialProbes.every(
       (probe) => probe.answer.trim().length > 0 && probe.reason.trim().length > 0
@@ -276,13 +306,38 @@ export function LearnerView({
       <LearnerPracticeNextPanel
         practiceState={practiceState}
         isWorkflowBusy={isWorkflowBusy}
+        exerciseCount={exercises.length}
         onSelectExercise={onSelectExercise}
+        onAuthorExercise={focusAuthoringForm}
+        onOpenBuild={onOpenBuild}
       />
 
       <section className="exercise-list" aria-label={t("learner.exerciseSelector")}>
         <div className="panel-heading">{t("learner.exercisesCount", { count: exercises.length })}</div>
         {exercises.length === 0 ? (
-          <p className="empty-state">{t("learner.noExercisesAvailable")}</p>
+          <div className="empty-state" role="status" aria-live="polite">
+            <p>{t("learner.noExercisesAvailable")}</p>
+            <div className="practice-next-actions">
+              <button
+                type="button"
+                className="secondary"
+                disabled={isWorkflowBusy}
+                onClick={focusAuthoringForm}
+              >
+                {t("learner.authorExerciseCta")}
+              </button>
+              {onOpenBuild && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={isWorkflowBusy}
+                  onClick={onOpenBuild}
+                >
+                  {t("learner.openBuildCta")}
+                </button>
+              )}
+            </div>
+          </div>
         ) : (
           exercises.map((exercise) => (
             <button
@@ -343,9 +398,33 @@ export function LearnerView({
               {isGrading ? t("learner.grading") : t("learner.grade")}
             </button>
             {exerciseResult && (
-              <p className="result-notice" role="status" aria-live="polite">
-                {exerciseResult}
-              </p>
+              <div className="practice-grade-followup" role="status" aria-live="polite">
+                <p className="result-notice">{exerciseResult}</p>
+                {nextAfterGrade ? (
+                  <div className="practice-next-actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={isWorkflowBusy || isGrading}
+                      onClick={() => onSelectExercise(nextAfterGrade.id)}
+                    >
+                      {t("learner.practiceNextRecommended")}
+                    </button>
+                    <span className="muted practice-next-followup-prompt">{nextAfterGrade.prompt}</span>
+                  </div>
+                ) : practiceState.status === "ready" && practiceState.data.exercises.length === 0 ? (
+                  <div className="practice-next-actions">
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={isWorkflowBusy}
+                      onClick={focusAuthoringForm}
+                    >
+                      {t("learner.authorExerciseCta")}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             )}
 
             <section className="submission-history" aria-label={t("learner.exerciseSubmissionHistory")}>
@@ -378,6 +457,26 @@ export function LearnerView({
               <>
                 <p>{t("learner.noExercisesDetailEmpty")}</p>
                 <p className="muted">{t("learner.noExercisesDetailEmptyHint")}</p>
+                <div className="practice-next-actions">
+                  <button
+                    type="button"
+                    className="secondary"
+                    disabled={isWorkflowBusy}
+                    onClick={focusAuthoringForm}
+                  >
+                    {t("learner.authorExerciseCta")}
+                  </button>
+                  {onOpenBuild && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={isWorkflowBusy}
+                      onClick={onOpenBuild}
+                    >
+                      {t("learner.openBuildCta")}
+                    </button>
+                  )}
+                </div>
               </>
             ) : (
               <p>{t("learner.noExercisesAuthorOrSelect")}</p>
@@ -385,7 +484,13 @@ export function LearnerView({
           </div>
         )}
 
-        <form className="record-card form-panel compact exercise-authoring-form" aria-label={t("learner.exerciseAuthoring")} onSubmit={handleCreateExercise}>
+        <form
+          ref={authoringFormRef}
+          id="exercise-authoring-form"
+          className="record-card form-panel compact exercise-authoring-form"
+          aria-label={t("learner.exerciseAuthoring")}
+          onSubmit={handleCreateExercise}
+        >
           <div>
             <span className="detail-label">{t("learner.exerciseAuthoring")}</span>
             <h3>{t("learner.createLearnerTask")}</h3>

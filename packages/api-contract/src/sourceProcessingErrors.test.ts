@@ -88,6 +88,10 @@ describe("sourceProcessingErrorI18n", () => {
     )).toEqual({ i18nKey: "ingest.processingStalledWithoutProgress" });
 
     expect(sourceProcessingErrorI18n(
+      "Queued source processing was cancelled. Use Retry when ready."
+    )).toEqual({ i18nKey: "ingest.sourceProcessingCancelled" });
+
+    expect(sourceProcessingErrorI18n(
       "Queued source processing was cancelled. Re-run processing when ready."
     )).toEqual({ i18nKey: "ingest.sourceProcessingCancelled" });
   });

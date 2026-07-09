@@ -5015,8 +5015,24 @@ describe("api server", () => {
       expect(pendingAccepted.json().asset).toMatchObject({
         id: pendingId,
         status: "processing",
-        processingAttempts: 1
+        processingAttempts: 1,
+        processingQueuePhase: "queued"
       });
+      expect(activeAccepted.json().asset).toMatchObject({
+        id: activeId,
+        status: "processing",
+        processingQueuePhase: "active"
+      });
+
+      const listed = await app.inject({
+        method: "GET",
+        url: `/languages/${TEST_LANGUAGE_ID}/sources`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(listed.statusCode).toBe(200);
+      const listedAssets = listed.json() as Array<{ id: string; processingQueuePhase?: string }>;
+      expect(listedAssets.find((asset) => asset.id === pendingId)?.processingQueuePhase).toBe("queued");
+      expect(listedAssets.find((asset) => asset.id === activeId)?.processingQueuePhase).toBe("active");
 
       const cancelled = await app.inject({
         method: "POST",
@@ -5027,7 +5043,7 @@ describe("api server", () => {
       expect(cancelled.json().asset).toMatchObject({
         id: pendingId,
         status: "failed",
-        error: "Queued source processing was cancelled. Re-run processing when ready.",
+        error: "Queued source processing was cancelled. Use Retry when ready.",
         processingAttempts: 1
       });
       expect(cancelled.json().asset.processingStartedAt).toBeUndefined();
@@ -5036,9 +5052,10 @@ describe("api server", () => {
       const storedPending = await fetchStoredSource(app, pendingId);
       expect(storedPending).toMatchObject({
         status: "failed",
-        error: "Queued source processing was cancelled. Re-run processing when ready.",
+        error: "Queued source processing was cancelled. Use Retry when ready.",
         processingAttempts: 1
       });
+      expect(storedPending.processingQueuePhase).toBeUndefined();
 
       const audit = await app.inject({
         method: "GET",

@@ -145,7 +145,9 @@ Each claim increments `processingAttempts` and stamps `processingStartedAt` / `p
 
 The route also supports background processing for long sources: send a JSON body of `{ "async": true }` and the server validates the same preconditions, marks the source `processing`, and returns `202` with the updated asset (and empty `drafts`/`warnings`). Extraction then runs in the background and persists the same results as the synchronous path: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset. Poll `GET /languages/:languageId/sources` until the asset leaves `processing`. A source that is already `processing` returns `409` with `i18nKey: "ingest.sourceAlreadyProcessing"` in both modes.
 
-`POST /sources/:sourceId/cancel-processing` removes a **pending** queue entry before it becomes active, marks the asset `failed` with `Queued source processing was cancelled. Re-run processing when ready.` (`i18nKey: ingest.sourceProcessingCancelled` when localized from the stored error), and writes a `source_asset.process_cancelled` audit event. If the job is already active (or the asset is not queued), the route returns `409` with `ingest.sourceProcessingCancelActive` or `ingest.sourceProcessingNotQueued`.
+`POST /sources/:sourceId/cancel-processing` removes a **pending** queue entry before it becomes active, marks the asset `failed` with `Queued source processing was cancelled. Use Retry when ready.` (`i18nKey: ingest.sourceProcessingCancelled` when localized from the stored error), and writes a `source_asset.process_cancelled` audit event. If the job is already active (or the asset is not queued), the route returns `409` with `ingest.sourceProcessingCancelActive` or `ingest.sourceProcessingNotQueued`.
+
+`GET /languages/:languageId/sources` and async `POST /sources/:sourceId/process` enrich `processing` assets with a non-persisted `processingQueuePhase` of `queued` or `active` from the in-memory job queue so operators can tell Cancel-eligible rows from in-flight work.
 
 ## Extraction drafts
 

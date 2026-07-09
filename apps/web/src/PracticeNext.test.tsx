@@ -1,5 +1,6 @@
+/** @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Dispatch, SetStateAction } from "react";
 import { LearnerView } from "./views/LearnerView";
@@ -11,6 +12,8 @@ const apiMock = vi.hoisted(() => ({
 }));
 
 vi.mock("./api", () => apiMock);
+
+const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
 
 function createExercise(id: string, prompt: string): PublicExercise {
   return {
@@ -70,7 +73,9 @@ function renderLearnerView(overrides: {
 
 describe("LearnerView practice next panel", () => {
   afterEach(() => {
+    cleanup();
     vi.clearAllMocks();
+    HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
   });
 
   it("shows up to three recommended exercises with status badges", async () => {
@@ -134,8 +139,109 @@ describe("LearnerView practice next panel", () => {
     const emptyState = within(panel).getByRole("status");
     expect(emptyState).toHaveAttribute("aria-live", "polite");
     expect(emptyState).toHaveTextContent(
-      "Author an exercise below, or grade existing ones, to build a Practice next queue."
+      "Recommendations are empty even though exercises exist. Pick one from the list, or author another task below to grow the Practice next queue."
     );
+    expect(within(panel).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Open Build" })).not.toBeInTheDocument();
+  });
+
+  it("offers author and Build CTAs when the language has no exercises", async () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
+    const onOpenBuild = vi.fn();
+    const focusSpy = vi.fn();
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+
+    render(
+      <LearnerView
+        languageId="avenik"
+        exercises={[]}
+        isWorkflowBusy={false}
+        onOpenBuild={onOpenBuild}
+        learner={{
+          selectedExercise: null,
+          selectedExerciseId: null,
+          setSelectedExerciseId: vi.fn(),
+          exerciseAnswer: "",
+          setExerciseAnswer: vi.fn(),
+          isGrading: false,
+          isLoadingSubmissions: false,
+          exerciseResult: null,
+          setExerciseResult: vi.fn(),
+          submissionHistory: [],
+          setSubmissionHistory: vi.fn(),
+          handleGrade: vi.fn(),
+          handleCreateExercise: vi.fn(),
+          handleGenerateExercise: vi.fn()
+        }}
+      />
+    );
+
+    const panel = await screen.findByRole("region", { name: "Practice next" });
+    expect(within(panel).getByText("No exercises to recommend yet.")).toBeInTheDocument();
+    expect(within(panel).getByText(
+      "Author the first learner task below, or open Build to accept grammar drafts that can become practice."
+    )).toBeInTheDocument();
+
+    const promptField = screen.getByLabelText("Exercise prompt");
+    promptField.focus = focusSpy;
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Author an exercise" }));
+    expect(focusSpy).toHaveBeenCalled();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Open Build" }));
+    expect(onOpenBuild).toHaveBeenCalledTimes(1);
+
+    const exerciseList = screen.getByRole("region", { name: "Exercise selector" });
+    expect(within(exerciseList).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
+    expect(within(exerciseList).getByRole("button", { name: "Open Build" })).toBeInTheDocument();
+  });
+
+  it("surfaces a one-click next recommendation after grading", async () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({
+      exercises: [fixtureExercises[1], fixtureExercises[2]],
+      rationale: [
+        { exerciseId: "avn-ex-002", status: "new", streak: 0 },
+        { exerciseId: "avn-ex-003", status: "new", streak: 0 }
+      ]
+    });
+    const onSelectExercise = vi.fn();
+
+    render(
+      <LearnerView
+        languageId="avenik"
+        exercises={fixtureExercises}
+        isWorkflowBusy={false}
+        learner={{
+          selectedExercise: fixtureExercises[0],
+          selectedExerciseId: fixtureExercises[0].id,
+          setSelectedExerciseId: (value) => {
+            const next = typeof value === "function" ? value(fixtureExercises[0].id) : value;
+            onSelectExercise(next ?? "");
+          },
+          exerciseAnswer: "mira talo-mi-na",
+          setExerciseAnswer: vi.fn(),
+          isGrading: false,
+          isLoadingSubmissions: false,
+          exerciseResult: "Submission accepted.",
+          setExerciseResult: vi.fn(),
+          submissionHistory: [],
+          setSubmissionHistory: vi.fn(),
+          handleGrade: vi.fn(),
+          handleCreateExercise: vi.fn(),
+          handleGenerateExercise: vi.fn()
+        }}
+      />
+    );
+
+    const nextButton = await screen.findByRole("button", { name: "Practice next recommended" });
+    const followup = nextButton.closest(".practice-grade-followup");
+    expect(followup).not.toBeNull();
+    expect(within(followup as HTMLElement).getByText("Translate: The child walks.")).toBeInTheDocument();
+    fireEvent.click(nextButton);
+    expect(onSelectExercise).toHaveBeenCalledWith("avn-ex-002");
+    await waitFor(() => {
+      expect(apiMock.fetchRecommendedExercises.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
   it("marks grade and authoring actions busy while in flight", async () => {
@@ -192,6 +298,7 @@ describe("LearnerView practice next panel", () => {
   });
 
   it("shows empty exercise list and detail states when the language has no exercises", () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
     renderLearnerView({ exercises: [], selectedExercise: null });
 
     const exerciseList = screen.getByRole("region", { name: "Exercise selector" });
@@ -199,6 +306,7 @@ describe("LearnerView practice next panel", () => {
       "No exercises yet. Author one below, or open Build to accept grammar drafts that can become practice tasks."
     )).toBeInTheDocument();
     expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
+    expect(within(exerciseList).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
 
     const detailPanel = screen.getByRole("region", { name: "Exercise detail panel" });
     const detailEmpty = within(detailPanel).getByRole("status");
@@ -208,6 +316,7 @@ describe("LearnerView practice next panel", () => {
       "Fill the authoring form below to create the first task, or open Build to accept grammar drafts that can become practice."
     );
     expect(within(detailPanel).queryByText("Select an exercise from the list or author one below.")).not.toBeInTheDocument();
+    expect(within(detailPanel).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
     expect(within(detailPanel).getByText("No learner tasks yet. Fill the form below, validate without saving, then create the exercise.")).toBeInTheDocument();
     expect(within(detailPanel).getByText("Validate checks rules and answer keys without creating an exercise.")).toBeInTheDocument();
   });

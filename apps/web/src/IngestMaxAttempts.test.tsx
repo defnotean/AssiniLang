@@ -56,6 +56,9 @@ describe("IngestView max processing attempts", () => {
 
     const retryButton = await screen.findByRole("button", { name: "Retry Over-processed source" });
     expect(retryButton).toBeDisabled();
+    expect(await screen.findByText("Attempt 5/5")).toBeInTheDocument();
+    expect(screen.getByText("attempt cap reached")).toBeInTheDocument();
+    expect(screen.getByText(/This source reached the 5-attempt cap/)).toBeInTheDocument();
   });
 
   it("keeps Retry enabled under the attempt cap and surfaces a 409 from process", async () => {

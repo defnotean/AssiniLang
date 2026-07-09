@@ -32,9 +32,24 @@ const QUEUED_SOURCE = {
   kind: "text" as const,
   title: "Queued source",
   status: "processing" as const,
+  processingQueuePhase: "queued" as const,
   processingAttempts: 1,
   processingStartedAt: "2026-06-10T11:50:00.000Z",
   processingHeartbeatAt: "2026-06-10T11:50:00.000Z",
+  createdAt: "2026-06-10T00:00:00.000Z",
+  createdBy: "reviewer"
+};
+
+const ACTIVE_SOURCE = {
+  id: "src-active",
+  languageId: LANGUAGE_ID,
+  kind: "text" as const,
+  title: "Active source",
+  status: "processing" as const,
+  processingQueuePhase: "active" as const,
+  processingAttempts: 1,
+  processingStartedAt: "2026-06-10T11:50:00.000Z",
+  processingHeartbeatAt: "2026-06-10T11:55:00.000Z",
   createdAt: "2026-06-10T00:00:00.000Z",
   createdBy: "reviewer"
 };
@@ -46,7 +61,7 @@ const FAILED_SOURCE = {
   title: "Failed source",
   status: "failed" as const,
   processingAttempts: 2,
-  error: "Queued source processing was cancelled. Re-run processing when ready.",
+  error: "Queued source processing was cancelled. Use Retry when ready.",
   createdAt: "2026-06-10T00:00:00.000Z",
   createdBy: "reviewer"
 };
@@ -69,13 +84,14 @@ describe("IngestView cancel queued processing", () => {
     apiMock.fetchExtractionDrafts.mockResolvedValue([]);
   });
 
-  it("shows Cancel for processing sources and Retry with attempt count for failed under the cap", async () => {
-    apiMock.fetchSources.mockResolvedValue([QUEUED_SOURCE, FAILED_SOURCE, MAXED_SOURCE]);
+  it("shows queued vs processing vs capped status, Attempt N/5, Cancel only when queued, and Retry after cancel", async () => {
+    apiMock.fetchSources.mockResolvedValue([QUEUED_SOURCE, ACTIVE_SOURCE, FAILED_SOURCE, MAXED_SOURCE]);
     apiMock.cancelSourceProcessing.mockResolvedValue({
       asset: {
         ...QUEUED_SOURCE,
         status: "failed",
-        error: "Queued source processing was cancelled. Re-run processing when ready.",
+        processingQueuePhase: undefined,
+        error: "Queued source processing was cancelled. Use Retry when ready.",
         processingStartedAt: undefined,
         processingHeartbeatAt: undefined
       }
@@ -83,11 +99,20 @@ describe("IngestView cancel queued processing", () => {
 
     render(<IngestView languageId={LANGUAGE_ID} />);
 
-    expect(await screen.findByText("Attempt 1")).toBeInTheDocument();
-    expect(screen.getByText("Attempt 2")).toBeInTheDocument();
-    expect(screen.getByText("Attempt 5")).toBeInTheDocument();
+    expect(await screen.findAllByText("Attempt 1/5")).toHaveLength(2);
+    expect(screen.getByText("Attempt 2/5")).toBeInTheDocument();
+    expect(screen.getByText("Attempt 5/5")).toBeInTheDocument();
+
+    expect(screen.getByText("queued")).toBeInTheDocument();
+    // Active queue phase badge (button labels also contain "processing" while busy).
+    expect(screen.getByText("processing", { selector: ".status-badge.processing" })).toBeInTheDocument();
+    expect(screen.getByText("attempt cap reached")).toBeInTheDocument();
+    expect(
+      screen.getByText(/This source reached the 5-attempt cap/)
+    ).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Cancel Queued source" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel Active source" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry Failed source" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry Capped source" })).toBeDisabled();
 
@@ -98,11 +123,11 @@ describe("IngestView cancel queued processing", () => {
     });
 
     expect(
-      await screen.findByText("Cancelled queued processing for Queued source.")
+      await screen.findByText("Cancelled queued processing for Queued source. Use Retry when ready.")
     ).toBeInTheDocument();
     // Appears on both the originally failed source and the newly cancelled one.
     expect(
-      screen.getAllByText("Queued processing was cancelled. Re-run processing when ready.")
+      screen.getAllByText("Queued processing was cancelled. Use Retry when ready.")
     ).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Retry Queued source" })).toBeInTheDocument();
   });
