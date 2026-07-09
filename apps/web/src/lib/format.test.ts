@@ -16,6 +16,7 @@ import {
   formatStatus,
   formatSubmissionStatus,
   formatTrendPoints,
+  formatTypology,
   latestAssistantMessage,
   localizeApiError,
   localizeSourceProcessingError,
@@ -439,12 +440,25 @@ describe("formatTrendPoints", () => {
 });
 
 describe("formatStatus and trendVerb", () => {
-  it("localizes disposition statuses and trend verbs", () => {
+  it("localizes note, source, session, and disposition statuses", () => {
     expect(formatStatus("open", t)).toBe("open");
     expect(formatStatus("resolved", t)).toBe("resolved");
+    expect(formatStatus("under_review", t)).toBe("under review");
+    expect(formatStatus("approved", t)).toBe("approved");
+    expect(formatStatus("processing", t)).toBe("processing");
+    expect(formatStatus("learner_practice", t)).toBe("learner practice");
     expect(formatStatus("under_review")).toBe("under review");
     expect(trendVerb("improved", t)).toBe("improved");
     expect(trendVerb("regressed", t)).toBe("regressed");
     expect(trendVerb("stable", t)).toBe("held steady");
+  });
+});
+
+describe("formatTypology", () => {
+  it("localizes typology labels and falls back for unknown values", () => {
+    expect(formatTypology("agglutinative", t)).toBe("agglutinative");
+    expect(formatTypology("polysynthetic-lite", t)).toBe("polysynthetic-lite");
+    expect(formatTypology(undefined, t)).toBe("unknown");
+    expect(formatTypology("agglutinative")).toBe("agglutinative");
   });
 });

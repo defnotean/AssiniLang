@@ -128,7 +128,7 @@ export function AssistantView({
       <div className="record-topline">
         <div>
           <span className="detail-label">{t("assistant.groundedChat")}</span>
-          <h2>{t("assistant.sessionHeading", { mode: formatStatus(session.mode) })}</h2>
+          <h2>{t("assistant.sessionHeading", { mode: formatStatus(session.mode, t) })}</h2>
         </div>
         <button
           type="button"

@@ -92,12 +92,56 @@ export function formatOrthographyMeta(value?: string, t?: Translate): string {
   return t ? t("header.orthographyNamed", { value }) : `${value} orthography`;
 }
 
+const STATUS_MESSAGE_KEYS: Record<string, MessageKey> = {
+  draft: "status.draft",
+  under_review: "status.underReview",
+  approved: "status.approved",
+  contested: "status.contested",
+  rejected: "status.rejected",
+  deferred: "status.deferred",
+  escalated: "status.escalated",
+  pending: "status.pending",
+  processing: "status.processing",
+  processed: "status.processed",
+  failed: "status.failed",
+  archived: "status.archived",
+  proposed: "status.proposed",
+  accepted: "status.accepted",
+  active: "status.active",
+  completed: "status.completed",
+  pending_review: "status.pendingReview",
+  open: "governance.dispositionStatus.open",
+  resolved: "governance.dispositionStatus.resolved",
+  learner_practice: "status.learnerPractice",
+  elder_review: "status.elderReview",
+  programmer_debug: "status.programmerDebug"
+};
+
 export function formatStatus(value: string, t?: Translate): string {
-  if (t) {
-    if (value === "open") return t("governance.dispositionStatus.open");
-    if (value === "resolved") return t("governance.dispositionStatus.resolved");
-  }
+  const key = STATUS_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
   return value.replace(/_/g, " ");
+}
+
+const TYPOLOGY_MESSAGE_KEYS: Record<string, MessageKey> = {
+  unknown: "typology.unknown",
+  agglutinative: "typology.agglutinative",
+  isolating: "typology.isolating",
+  fusional: "typology.fusional",
+  "polysynthetic-lite": "typology.polysyntheticLite",
+  polysynthetic: "typology.polysynthetic",
+  analytic: "typology.analytic",
+  mixed: "typology.mixed"
+};
+
+/** Localizes language typology labels for operator-facing chrome. */
+export function formatTypology(value: string | undefined, t?: Translate): string {
+  if (!value) {
+    return t ? t("common.unknown") : "unknown";
+  }
+  const key = TYPOLOGY_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
+  return value;
 }
 
 const METRIC_MESSAGE_KEYS: Record<string, MessageKey> = {

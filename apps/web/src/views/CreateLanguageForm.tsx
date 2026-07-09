@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from "react";
 import type { LanguageCreatePayload } from "../api";
+import { formatTypology } from "../lib/format";
 import { LANGUAGE_TYPOLOGY_OPTIONS } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 import type { Language } from "../lib/types";
@@ -88,7 +89,7 @@ export function CreateLanguageForm({
           onChange={(event) => setTypology(event.target.value as Language["typology"])}
         >
           {LANGUAGE_TYPOLOGY_OPTIONS.map((option) => (
-            <option key={option} value={option}>{option}</option>
+            <option key={option} value={option}>{formatTypology(option, t)}</option>
           ))}
         </select>
       </div>

@@ -1,4 +1,5 @@
 import type { Language, ViewMode } from "../lib/types";
+import { formatTypology } from "../lib/format";
 import { VIEW_ORDER } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 import { TypologyMark, ViewGlyph } from "./marks";
@@ -45,7 +46,7 @@ export function SidebarLanguageNav({
               </span>
               <span className="language-copy">
                 <strong>{language.name}</strong>
-                <span>{language.typology}</span>
+                <span>{formatTypology(language.typology, t)}</span>
               </span>
             </button>
 

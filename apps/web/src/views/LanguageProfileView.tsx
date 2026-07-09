@@ -1,5 +1,6 @@
 import type { LanguageProfile } from "../api";
 import { ConfidenceBadge } from "../components/badges";
+import { formatTypology } from "../lib/format";
 import type { AsyncState } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -37,7 +38,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <dl className="detail-grid">
           <div>
             <dt>{t("profile.typology")}</dt>
-            <dd>{language.typology}</dd>
+            <dd>{formatTypology(language.typology, t)}</dd>
           </div>
           <div>
             <dt>{t("profile.vocabulary")}</dt>

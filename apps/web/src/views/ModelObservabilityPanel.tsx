@@ -1,7 +1,7 @@
 import type { ObservabilityData } from "../api";
 import { StatusBadge } from "../components/badges";
 import { useI18n } from "../i18n";
-import { countFailedSessions, formatCount, formatStatus } from "../lib/format";
+import { countFailedSessions, formatStatus } from "../lib/format";
 import type { AsyncState } from "../lib/types";
 
 type ModelObservabilityPanelProps = {
@@ -61,15 +61,19 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
             </div>
           </dl>
           {recentSessions.length === 0 ? (
-            <p className="inline-empty">{t("model.noSessions")}</p>
+            <p className="inline-empty" role="status" aria-live="polite">{t("model.noSessions")}</p>
           ) : (
             <div className="detail-list session-list">
               {recentSessions.map((session) => (
                 <div key={session.id} className="detail-row session-row">
                   <StatusBadge status={session.status} />
-                  <strong>{formatStatus(session.mode)}</strong>
+                  <strong>{formatStatus(session.mode, t)}</strong>
                   <span>{session.languageId}</span>
-                  <span>{formatCount(session.messageCount, "message")}</span>
+                  <span>
+                    {session.messageCount === 1
+                      ? t("format.count.messageOne", { count: session.messageCount })
+                      : t("format.count.messageMany", { count: session.messageCount })}
+                  </span>
                 </div>
               ))}
             </div>

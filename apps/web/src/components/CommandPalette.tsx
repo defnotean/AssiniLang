@@ -110,8 +110,9 @@ export function CommandPalette({
         />
         <ul className="palette-list" id="command-palette-list" role="listbox" aria-label={t("palette.listAria")}>
           {filtered.length === 0 ? (
-            <li className="palette-empty" aria-disabled="true">
-              {t("palette.empty")}
+            <li className="palette-empty" role="status" aria-live="polite" aria-disabled="true">
+              <span>{t("palette.empty")}</span>
+              <span className="palette-empty-hint">{t("palette.emptyHint")}</span>
             </li>
           ) : (
             filtered.map((command, index) => (

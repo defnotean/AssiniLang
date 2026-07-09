@@ -46,7 +46,10 @@ describe("CommandPalette", () => {
     fireEvent.change(screen.getByLabelText("Search commands"), { target: { value: "zzzzzz" } });
 
     expect(screen.queryAllByRole("option")).toHaveLength(0);
-    expect(screen.getByText("No matching commands")).toBeInTheDocument();
+    const empty = screen.getByRole("status");
+    expect(empty).toHaveAttribute("aria-live", "polite");
+    expect(empty).toHaveTextContent("No matching commands");
+    expect(empty).toHaveTextContent("Try another keyword, or clear the search to see every command.");
   });
 
   it("runs the highlighted command with arrow keys plus Enter and closes", () => {

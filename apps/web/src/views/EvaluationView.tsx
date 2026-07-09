@@ -8,7 +8,7 @@ import {
 } from "../evaluationTrends";
 import { ScoreBar } from "../components/ScoreBar";
 import { ScoreRing } from "../components/ScoreRing";
-import { formatMetric, formatSignedTrendPoints, formatTrendPoints, scoreTone } from "../lib/format";
+import { formatMetric, formatSignedTrendPoints, formatTrendPoints, formatTypology, scoreTone } from "../lib/format";
 import { useI18n, type MessageKey } from "../i18n";
 import type { Language, SnapshotDownload } from "../lib/types";
 
@@ -91,7 +91,7 @@ export function EvaluationView({
             >
               <div>
                 <strong>{language.name}</strong>
-                <span>{language.typology}</span>
+                <span>{formatTypology(language.typology, t)}</span>
               </div>
               <ScoreRing score={score} />
             </button>

@@ -159,4 +159,24 @@ describe("ReviewView", () => {
 
     expect(screen.getByRole("alert")).toHaveTextContent("Review update failed.");
   });
+
+  it("shows humanized status and confidence badge labels in the queue and detail", () => {
+    const note = createReviewNote({ status: "under_review", confidence: "medium" });
+
+    render(
+      <ReviewView
+        notes={[note]}
+        selectedNote={note}
+        isWorkflowBusy={false}
+        reviewingNoteId={null}
+        onSelectNote={vi.fn()}
+        onReview={vi.fn()}
+        onSaveExplanation={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText("under review").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("medium confidence").length).toBeGreaterThanOrEqual(2);
+    expect(screen.queryByText("under_review")).not.toBeInTheDocument();
+  });
 });

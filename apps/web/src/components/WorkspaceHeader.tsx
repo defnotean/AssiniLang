@@ -1,5 +1,5 @@
 import type { Language, ViewMode } from "../lib/types";
-import { formatOrthographyMeta } from "../lib/format";
+import { formatOrthographyMeta, formatTypology } from "../lib/format";
 import { useI18n } from "../i18n";
 
 interface WorkspaceHeaderProps {
@@ -48,7 +48,7 @@ export function WorkspaceHeader({
         <h1>{currentTitle}</h1>
         {view !== "elder" && (
           <div className="language-metadata" aria-label={t("header.metadataAria")}>
-            <span>{selectedLanguage?.typology ?? t("common.unknown")}</span>
+            <span>{formatTypology(selectedLanguage?.typology, t)}</span>
             <span>{formatOrthographyMeta(selectedLanguage?.orthography, t)}</span>
             <span>{t("header.statusWorkspace", { status: selectedLanguage?.status ?? t("common.draft") })}</span>
           </div>
