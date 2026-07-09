@@ -1,8 +1,10 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { defaultSeedDbPath } from "./seedCli.js";
+import { JsonStore } from "./store.js";
+import { buildTestWorkspaceState } from "./testing.js";
 import {
   defaultBackupPath,
   parseBackupCliArgs,
@@ -37,16 +39,20 @@ describe("parseBackupCliArgs", () => {
 describe("runBackupCli", () => {
   const tempDirs: string[] = [];
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
-    tempDirs.length = 0;
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
-  async function createTempDb(): Promise<{ dir: string; dbPath: string }> {
+  async function createTempDb(options?: { validWorkspace?: boolean }): Promise<{ dir: string; dbPath: string }> {
     const dir = await mkdtemp(join(tmpdir(), "assini-backup-cli-"));
     tempDirs.push(dir);
     const dbPath = join(dir, "local-db.json");
-    await writeFile(dbPath, '{"languages":[],"users":[]}', "utf8");
+    if (options?.validWorkspace) {
+      await new JsonStore(dbPath).write(buildTestWorkspaceState());
+    } else {
+      await writeFile(dbPath, '{"languages":[],"users":[]}', "utf8");
+    }
     return { dir, dbPath };
   }
 
@@ -67,6 +73,25 @@ describe("runBackupCli", () => {
     expect(result.written).toBeUndefined();
     expect(stdout).toHaveBeenCalledWith(`Dry run: would back up local database at ${resolve(dbPath)}`);
     expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${result.destination}`);
+  });
+
+  it("writes a validated backup copy to the requested destination", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const destination = join(dir, "operator-backup.json");
+    const stdout = vi.fn();
+
+    const result = await runBackupCli({
+      argv: [destination],
+      env: { ASSINI_DB_PATH: dbPath },
+      stdout
+    });
+
+    expect(result.dryRun).toBe(false);
+    expect(result.written).toBe(resolve(destination));
+    expect(await readFile(result.written!, "utf8")).toBe(await readFile(dbPath, "utf8"));
+    expect(stdout).toHaveBeenCalledWith(`Backed up local database at ${resolve(dbPath)}`);
+    expect(stdout).toHaveBeenCalledWith(`Backup written to ${result.written}`);
+    expect(stdout.mock.calls.some((call) => String(call[0]).includes("Restore with:"))).toBe(true);
   });
 
   it("reports a helpful error when the database file is missing", async () => {

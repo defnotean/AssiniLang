@@ -58,6 +58,7 @@ export const ar: Record<MessageKey, string> = {
   "app.rateLimitExceededGeneric": "طلبات كثيرة جدًا. انتظر قليلًا ثم أعد المحاولة.",
   "app.providerOffline": "مزوّد النموذج المُهيّأ غير متصل. راجع إعدادات وقت التشغيل أو أعد المحاولة لاحقًا.",
   "app.sessionExpired": "انتهت جلستك المحلية. سجّل الخروج من الشريط الجانبي وأعد التحميل، أو اضغط إعادة المحاولة لفتح جلسة جديدة.",
+  "app.forbidden": "ليس لديك صلاحية لهذا الإجراء.",
   "app.retryLoad": "إعادة المحاولة",
   "app.desktopOfflineTitle": "الشبكة غير متصلة",
   "app.desktopOfflineHint": "يحتفظ AssiniLang Desktop بالبيانات محليًا، لكن مساحة العمل تحتاج واجهة API المضمّنة. أعد الاتصال ثم اضغط إعادة المحاولة إذا فشل التحميل.",

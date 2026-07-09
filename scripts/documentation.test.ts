@@ -175,12 +175,18 @@ describe("project documentation", () => {
         "OCR model endpoint returned no text",
         "leaving the model unset"
       ],
-      "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
+      "docs/maintenance.md": [
+        "## Adding an API route",
+        "## Documentation conventions",
+        "publicLanguageViews.ts",
+        "--dry-run"
+      ],
       "docs/operator-recovery.md": [
         "## Local data paths",
         "data/local-db.json",
         "data/ocr-cache/",
         "npm.cmd run db:backup",
+        "--dry-run",
         "source_asset.processing_recovered",
         "npm.cmd run seed"
       ],

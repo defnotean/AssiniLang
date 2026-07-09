@@ -23,6 +23,7 @@ export const en = {
   "app.rateLimitExceededGeneric": "Too many requests. Wait a moment, then retry.",
   "app.providerOffline": "The configured model provider is offline. Check Runtime settings or try again later.",
   "app.sessionExpired": "Your local session expired. Sign out from the sidebar and reload, or press Retry to open a fresh session.",
+  "app.forbidden": "You do not have permission for this action.",
   "app.retryLoad": "Retry",
   "app.desktopOfflineTitle": "Network offline",
   "app.desktopOfflineHint": "AssiniLang Desktop keeps data local, but the workspace needs the embedded API. Reconnect, then press Retry if loading fails.",

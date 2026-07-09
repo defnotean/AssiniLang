@@ -23,9 +23,10 @@ AssiniLang keeps all workspace data under the configured data directory (repo ch
 ```powershell
 npm.cmd run db:backup
 npm.cmd run db:backup -- path\to\my-backup.json
+npm.cmd run db:backup -- --dry-run
 ```
 
-Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). Restore is deliberate: use `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database.
+Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). `--dry-run` resolves the source and destination paths and prints them without writing a file. Restore is deliberate: use `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database.
 
 ### Desktop app
 

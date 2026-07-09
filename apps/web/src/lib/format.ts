@@ -544,6 +544,9 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     if (error.status === 401) {
       return t("app.sessionExpired");
     }
+    if (error.status === 403) {
+      return t("app.forbidden");
+    }
     if (error.i18nKey) {
       return t(error.i18nKey as MessageKey, error.i18nParams);
     }

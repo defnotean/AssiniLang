@@ -155,7 +155,12 @@ export function cookieValue(request: FastifyRequest, name: string): string | und
   for (const rawCookie of cookieHeader.split(";")) {
     const [rawName, ...rawValueParts] = rawCookie.trim().split("=");
     if (rawName === name) {
-      return decodeURIComponent(rawValueParts.join("="));
+      try {
+        return decodeURIComponent(rawValueParts.join("="));
+      } catch {
+        // Malformed percent-encoding must not 500 auth paths; treat as absent.
+        return undefined;
+      }
     }
   }
 

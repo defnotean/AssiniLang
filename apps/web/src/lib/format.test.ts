@@ -313,6 +313,16 @@ describe("localizeApiError", () => {
     );
   });
 
+  it("localizes forbidden responses without relying on English error text", () => {
+    const message = localizeApiError(
+      new ApiError("Request failed: /exports/evaluations/artifact (403): Forbidden", { status: 403 }),
+      t,
+      "app.workspaceUnavailable"
+    );
+
+    expect(message).toBe("You do not have permission for this action.");
+  });
+
   it("localizes already-processing conflicts from i18n metadata", () => {
     const message = localizeApiError(
       new ApiError("Source is already processing: src-1", {
