@@ -97,6 +97,28 @@ describe("runBackupCli", () => {
     expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${result.destination}`);
   });
 
+  it("dry-runs an existing destination without --force and warns that overwrite needs --force", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const destination = join(dir, "existing-backup.json");
+    await writeFile(destination, '{"stale":true}', "utf8");
+    const stdout = vi.fn();
+
+    const result = await runBackupCli({
+      argv: ["--dry-run", destination],
+      env: { ASSINI_DB_PATH: dbPath },
+      stdout
+    });
+
+    expect(result.dryRun).toBe(true);
+    expect(result.written).toBeUndefined();
+    expect(await readFile(destination, "utf8")).toBe('{"stale":true}');
+    expect(stdout).toHaveBeenCalledWith(`Dry run: would back up local database at ${resolve(dbPath)}`);
+    expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${resolve(destination)}`);
+    expect(stdout).toHaveBeenCalledWith(
+      `Dry run: destination already exists; a real backup would need --force to overwrite ${resolve(destination)}`
+    );
+  });
+
   it("rejects backing up an invalid workspace before writing a copy", async () => {
     const { dbPath } = await createTempDb({ validWorkspace: false });
     const destination = join(dirname(dbPath), "should-not-write.json");

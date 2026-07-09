@@ -133,6 +133,18 @@ Two practical notes from real-model testing:
 - On AMD GPUs that ROCm does not cover (verified on an RX 9070 XT), Ollama silently falls back to CPU at roughly a tenth of the speed. Start the Ollama server with `OLLAMA_VULKAN=1` to use the Vulkan backend and check placement with `ollama ps` (it should report `100% GPU`).
 - Extraction prompts generate long structured output; for very large local models, raise the request timeout beyond the 180-second default if long sources still abort.
 
+#### Timeout and max-token recommendations for slow local models
+
+Use these starting points when a local model is reachable but ingestion, model drafts, or chat still time out or truncate mid-JSON:
+
+| Symptom | Raise | Suggested starting value | Notes |
+| --- | --- | --- | --- |
+| Chunked extraction or model-draft calls abort with a timeout | `ASSINI_LLM_TIMEOUT_MS` | `300000` (5 min); try `600000` for CPU-only or very large models | Default is `180000`. Apply the same budget in Runtime settings / a saved profile so the running API picks it up without a full restart of unrelated knobs. |
+| Extraction JSON cuts off mid-object, or reasoning models never emit the final answer | `ASSINI_LLM_MAX_TOKENS` | `8192` (or `ASSINI_VERIFY_MAX_TOKENS` when using `model:verify`) | Default is `4096`. Reasoning-heavy local models often need the higher cap so the final JSON still fits after chain-of-thought tokens. |
+| Timeouts persist after raising the budget | (model / hardware) | Prefer a smaller/faster model for extraction, keep a vision model only on `ASSINI_OCR_*`, and confirm GPU placement (`ollama ps`) | A correct timeout cannot fix a model that never finishes; pair timeout/max-token changes with a model that can complete under load. |
+
+`npm run model:verify` (via `ASSINI_VERIFY_MODEL=1 npm.cmd run verify:beta`) can auto-raise max tokens through `ASSINI_VERIFY_MAX_TOKENS` when it switches models; keep Runtime settings aligned afterward so day-to-day ingestion matches the verified budget.
+
 ### LM Studio
 
 ```powershell

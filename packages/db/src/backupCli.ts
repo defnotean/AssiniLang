@@ -77,6 +77,7 @@ export async function runBackupCli({
     );
   }
 
+  let destinationExists = false;
   try {
     const destinationStat = await stat(destination);
     if (destinationStat.isDirectory()) {
@@ -84,7 +85,9 @@ export async function runBackupCli({
         `Cannot back up: destination ${destination} is a directory. Pass a file path (for example ${join(destination, basename(dbPath))}) or omit the path to use data/backups/.`
       );
     }
-    if (!force) {
+    destinationExists = true;
+    // Dry-run only previews paths; refuse overwrite on a real write unless --force.
+    if (!force && !dryRun) {
       throw new Error(
         `Cannot back up: destination ${destination} already exists. Pass a new path or --force to overwrite.`
       );
@@ -111,6 +114,11 @@ export async function runBackupCli({
   if (dryRun) {
     stdout(`Dry run: would back up local database at ${dbPath}`);
     stdout(`Dry run: backup destination would be ${destination}`);
+    if (destinationExists && !force) {
+      stdout(
+        `Dry run: destination already exists; a real backup would need --force to overwrite ${destination}`
+      );
+    }
     return { dryRun: true, dbPath, destination };
   }
 

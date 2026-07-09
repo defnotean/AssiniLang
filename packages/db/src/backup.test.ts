@@ -75,9 +75,13 @@ describe.each(backends)("JsonStore backup/restore ($label)", ({ file, backupFile
     const dbPath = join(dir, file);
     const store = new JsonStore(dbPath);
     await store.write(buildTestWorkspaceState());
+    const before = await store.read();
 
     const missingPath = join(dir, "missing", backupFile);
+    await expect(store.restoreFrom(missingPath)).rejects.toThrow(/backup not found/);
     await expect(store.restoreFrom(missingPath)).rejects.toThrow(dbPath);
+    await expect(store.restoreFrom(missingPath)).rejects.toThrow(missingPath);
+    expect(await store.read()).toEqual(before);
   });
 });
 

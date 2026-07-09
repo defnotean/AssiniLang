@@ -190,7 +190,10 @@ describe("project documentation", () => {
         "last matching pair wins",
         "trailing malformed percent-encoded",
         "joined before parsing",
-        "Relative segments"
+        "Relative segments",
+        "Timeout and max-token recommendations for slow local models",
+        "ASSINI_LLM_TIMEOUT_MS",
+        "ASSINI_LLM_MAX_TOKENS"
       ],
       "docs/development.md": [
         "npm.cmd run verify",
@@ -230,7 +233,8 @@ describe("project documentation", () => {
         "backup source is an existing directory",
         "same clear file-path error as backup",
         "Desktop create validates",
-        "Desktop restore validates"
+        "Desktop restore validates",
+        "dry-run still succeeds and prints a warning"
       ],
       "docs/operator-recovery.md": [
         "## Local data paths",
@@ -251,7 +255,16 @@ describe("project documentation", () => {
         "Create validates the live workspace",
         "Desktop's restore-latest",
         "backup-manifest.json",
-        "no silent fallback"
+        "no silent fallback",
+        "dry-run still succeeds and warns"
+      ],
+      "docs/roadmap.md": [
+        "Non-negotiable gate",
+        "testlang-baseline.json",
+        "verify:beta",
+        "groundingFailureCodes",
+        "First Nations",
+        "timeout/max-token starting points"
       ],
       "docs/product-guide.md": [
         "leadless",
@@ -259,7 +272,6 @@ describe("project documentation", () => {
         "Build and sources & intake",
         "evaluation artifact export"
       ],
-      "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "groundingFailureCodes", "First Nations"],
       "docs/troubleshooting.md": [
         "## Startup and ports",
         "ASSINI_TRANSCRIBE_BASE_URL",
