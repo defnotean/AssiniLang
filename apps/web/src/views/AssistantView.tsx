@@ -109,7 +109,12 @@ export function AssistantView({
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={(event) => handleComposerKeyDown(event, handleStart)}
           />
-          <button type="button" onClick={handleStart} disabled={isStarting || input.trim().length === 0}>
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={isStarting || input.trim().length === 0}
+            aria-busy={isStarting}
+          >
             {isStarting ? t("assistant.starting") : t("assistant.startConversation")}
           </button>
         </div>
@@ -173,7 +178,12 @@ export function AssistantView({
           onChange={(event) => setInput(event.target.value)}
           onKeyDown={(event) => handleComposerKeyDown(event, handleSend)}
         />
-        <button type="button" onClick={handleSend} disabled={isSending || input.trim().length === 0}>
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={isSending || input.trim().length === 0}
+          aria-busy={isSending}
+        >
           {isSending ? t("assistant.thinking") : t("assistant.send")}
         </button>
       </div>

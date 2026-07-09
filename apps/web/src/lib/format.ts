@@ -46,16 +46,27 @@ export function isRealModelProvider(status: LlmStatus): boolean {
   return status.mode === "local-openai-compatible" || status.mode === "remote-api";
 }
 
-export function formatReachability(result: LlmReachability): string {
+export function formatReachability(result: LlmReachability, t?: Translate): string {
   if (!result.checked) {
-    return "No external provider configured.";
+    return t ? t("model.reachability.notConfigured") : "No external provider configured.";
   }
+  const modeLabel = result.mode.replace(/-/g, " ");
   if (result.reachable) {
-    const latency = typeof result.latencyMs === "number" ? `, ${result.latencyMs} ms` : "";
-    return `Reachable (${result.mode.replace(/-/g, " ")}${latency})`;
+    if (typeof result.latencyMs === "number") {
+      return t
+        ? t("model.reachability.reachableWithLatency", { mode: modeLabel, ms: result.latencyMs })
+        : `Reachable (${modeLabel}, ${result.latencyMs} ms)`;
+    }
+    return t
+      ? t("model.reachability.reachable", { mode: modeLabel })
+      : `Reachable (${modeLabel})`;
   }
-  const detail = result.detail ? `: ${result.detail}` : "";
-  return `Unreachable${detail}`;
+  if (result.detail) {
+    return t
+      ? t("model.reachability.unreachableWithDetail", { detail: result.detail })
+      : `Unreachable: ${result.detail}`;
+  }
+  return t ? t("model.reachability.unreachable") : "Unreachable";
 }
 
 export function formatOrthographyMeta(value?: string): string {
@@ -176,9 +187,12 @@ export function buildEvaluationArtifactDownload(artifact: EvaluationArtifact): S
   };
 }
 
-export function latestAssistantMessage(session: AiSession): string {
+export function latestAssistantMessage(session: AiSession, t?: Translate): string {
   const assistant = session.messages.slice().reverse().find((message) => message.role === "assistant");
-  return assistant?.content ?? "Session created, but no assistant message was returned.";
+  if (assistant?.content) return assistant.content;
+  return t
+    ? t("model.smokeTest.noAssistantMessage")
+    : "Session created, but no assistant message was returned.";
 }
 
 /**

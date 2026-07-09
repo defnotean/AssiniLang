@@ -105,7 +105,12 @@ export function EvaluationView({
           <h2>{t("eval.portableArtifact")}</h2>
         </div>
         <div className="snapshot-actions">
-          <button type="button" onClick={onExportArtifact} disabled={isWorkflowBusy || isExportingArtifact}>
+          <button
+            type="button"
+            onClick={onExportArtifact}
+            disabled={isWorkflowBusy || isExportingArtifact}
+            aria-busy={isExportingArtifact}
+          >
             {isExportingArtifact ? t("eval.exporting") : t("eval.exportArtifact")}
           </button>
           {artifactDownload && (

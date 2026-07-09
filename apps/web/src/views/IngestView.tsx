@@ -159,7 +159,12 @@ export function IngestView({
             />
           </div>
         )}
-        <button type="submit" className="secondary" disabled={isRegisteringSource}>
+        <button
+          type="submit"
+          className="secondary"
+          disabled={isRegisteringSource}
+          aria-busy={isRegisteringSource}
+        >
           {isRegisteringSource ? t("ingest.registering") : t("ingest.registerSource")}
         </button>
       </form>
@@ -226,7 +231,12 @@ export function IngestView({
             onChange={(event) => setUploadFile(event.target.files?.[0] ?? null)}
           />
         </div>
-        <button type="submit" className="secondary" disabled={isUploadingSource || !uploadFile}>
+        <button
+          type="submit"
+          className="secondary"
+          disabled={isUploadingSource || !uploadFile}
+          aria-busy={isUploadingSource}
+        >
           {isUploadingSource ? t("ingest.uploading") : t("ingest.uploadSourceFile")}
         </button>
       </form>

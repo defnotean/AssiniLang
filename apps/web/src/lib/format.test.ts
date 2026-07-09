@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import type { LanguageSnapshot } from "../api";
+import type { AiSession } from "@assini/db";
+import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
-import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError, localizeSourceProcessingWarning, localizeVaultImportError } from "./format";
+import {
+  buildSnapshotDownload,
+  formatReachability,
+  formatSnapshotReviewAccountability,
+  latestAssistantMessage,
+  localizeApiError,
+  localizeSourceProcessingError,
+  localizeSourceProcessingWarning,
+  localizeVaultImportError
+} from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
 
@@ -244,6 +254,47 @@ describe("localizeApiError", () => {
 
     expect(message).toBe(
       "This document has no extractable text, and DOCX OCR is not supported yet. Export pages as images or paste the text, then process again."
+    );
+  });
+});
+
+describe("formatReachability", () => {
+  it("localizes unchecked, reachable, and unreachable connection results", () => {
+    const unchecked: LlmReachability = {
+      checked: false,
+      reachable: false,
+      mode: "deterministic"
+    };
+    expect(formatReachability(unchecked, t)).toBe("No external provider configured.");
+
+    const reachable: LlmReachability = {
+      checked: true,
+      reachable: true,
+      mode: "local-openai-compatible",
+      latencyMs: 42
+    };
+    expect(formatReachability(reachable, t)).toBe("Reachable (local openai compatible, 42 ms)");
+
+    const unreachable: LlmReachability = {
+      checked: true,
+      reachable: false,
+      mode: "remote-api",
+      detail: "connection refused"
+    };
+    expect(formatReachability(unreachable, t)).toBe("Unreachable: connection refused");
+  });
+});
+
+describe("latestAssistantMessage", () => {
+  it("returns assistant content when present and a localized empty-session fallback otherwise", () => {
+    const withReply = {
+      messages: [{ role: "assistant", content: "Practice with verb chains." }]
+    } as unknown as AiSession;
+    expect(latestAssistantMessage(withReply, t)).toBe("Practice with verb chains.");
+
+    const empty = { messages: [] } as unknown as AiSession;
+    expect(latestAssistantMessage(empty, t)).toBe(
+      "Session created, but no assistant message was returned."
     );
   });
 });

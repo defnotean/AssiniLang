@@ -156,7 +156,9 @@ describe("AssistantView", () => {
     fireEvent.keyDown(screen.getByLabelText("Message the assistant"), { key: "Enter" });
 
     expect(await screen.findByText("Thinking...", { selector: "p" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Thinking..." })).toBeDisabled();
+    const sendButton = screen.getByRole("button", { name: "Thinking..." });
+    expect(sendButton).toBeDisabled();
+    expect(sendButton).toHaveAttribute("aria-busy", "true");
     expect(screen.getByLabelText("Message the assistant")).toBeDisabled();
     expect(apiMock.continueAiSession).toHaveBeenCalledWith("ai-session-avenik-1", "And case particles?", "learner_practice");
 
@@ -168,14 +170,28 @@ describe("AssistantView", () => {
     expect(screen.getByLabelText("Message the assistant")).toBeEnabled();
   });
 
-  it("renders an error when the session cannot be created", async () => {
-    apiMock.createAiSession.mockRejectedValue(new Error("AI session creation failed 502"));
+  it("marks start busy while creating a session, then surfaces create errors as alerts", async () => {
+    let rejectCreate: (error: Error) => void = () => undefined;
+    apiMock.createAiSession.mockImplementation(
+      () => new Promise<AiSession>((_resolve, reject) => {
+        rejectCreate = reject;
+      })
+    );
+
     render(<Harness />);
     fireEvent.change(screen.getByLabelText("Seed prompt"), { target: { value: "Hello" } });
     fireEvent.click(screen.getByRole("button", { name: "Start conversation" }));
 
+    const startingButton = await screen.findByRole("button", { name: "Starting..." });
+    expect(startingButton).toBeDisabled();
+    expect(startingButton).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByLabelText("Seed prompt")).toBeDisabled();
+
+    rejectCreate(new Error("AI session creation failed 502"));
+
     expect(await screen.findByRole("alert")).toHaveTextContent("AI session creation failed 502");
     expect(screen.getByRole("button", { name: "Start conversation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start conversation" })).not.toHaveAttribute("aria-busy", "true");
   });
 
   it("renders a send error while keeping the conversation visible", async () => {

@@ -110,6 +110,7 @@ describe("IngestView Obsidian vault import", () => {
 
     const busyButton = await screen.findByRole("button", { name: "Importing vault..." });
     expect(busyButton).toBeDisabled();
+    expect(busyButton).toHaveAttribute("aria-busy", "true");
 
     resolveImport({
       imported: [],
@@ -118,5 +119,36 @@ describe("IngestView Obsidian vault import", () => {
       summary: { scanned: 1, imported: 1, skipped: 0 }
     });
     await screen.findByText("Vault import finished: 1 imported, 0 skipped.");
+  });
+
+  it("disables upload and marks the button busy while a source file upload is running", async () => {
+    let resolveUpload: (value: unknown) => void = () => {};
+    apiMock.uploadSourceFile.mockImplementation(
+      () => new Promise((resolve) => { resolveUpload = resolve; })
+    );
+
+    await renderIngestView();
+
+    const fileInput = screen.getByLabelText("Source file");
+    const file = new File(["ka = walk"], "wordlist.txt", { type: "text/plain" });
+    fireEvent.change(fileInput, { target: { files: [file] } });
+    fireEvent.click(screen.getByRole("button", { name: "Upload source file" }));
+
+    const busyButton = await screen.findByRole("button", { name: "Uploading..." });
+    expect(busyButton).toBeDisabled();
+    expect(busyButton).toHaveAttribute("aria-busy", "true");
+
+    resolveUpload({
+      id: "source-1",
+      languageId: LANGUAGE_ID,
+      kind: "document",
+      title: "wordlist.txt",
+      status: "registered"
+    });
+    await waitFor(() => {
+      expect(apiMock.uploadSourceFile).toHaveBeenCalled();
+    });
+    await screen.findByText("File uploaded as document source: wordlist.txt.");
+    expect(screen.getByRole("button", { name: "Upload source file" })).toBeDisabled();
   });
 });

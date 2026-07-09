@@ -1,37 +1,71 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDialog } from "./ConfirmDialog";
 
-describe("ConfirmDialog", () => {
-  it("cancels on Escape from the document listener", () => {
-    const onCancel = vi.fn();
-    render(
-      <ConfirmDialog
-        message="Delete this language?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />
-    );
+function ConfirmDialogHarness({
+  onCancel,
+  onConfirm = vi.fn()
+}: {
+  onCancel: () => void;
+  onConfirm?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" data-testid="trigger" onClick={() => setOpen(true)}>
+        Restore backup
+      </button>
+      {open && (
+        <ConfirmDialog
+          message="Restore the latest backup?"
+          onConfirm={() => {
+            onConfirm();
+            setOpen(false);
+          }}
+          onCancel={() => {
+            onCancel();
+            setOpen(false);
+          }}
+        />
+      )}
+    </>
+  );
+}
 
+function openFromTrigger() {
+  const trigger = screen.getByTestId("trigger");
+  trigger.focus();
+  fireEvent.click(trigger);
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(document.activeElement).not.toBe(trigger);
+  return trigger;
+}
+
+describe("ConfirmDialog", () => {
+  it("cancels on Escape from the document listener and restores focus to the trigger", () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialogHarness onCancel={onCancel} />);
+
+    const trigger = openFromTrigger();
     fireEvent.keyDown(document, { key: "Escape" });
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
   });
 
-  it("cancels when the cancel button is clicked", () => {
+  it("cancels when the cancel button is clicked and restores focus to the trigger", () => {
     const onCancel = vi.fn();
-    render(
-      <ConfirmDialog
-        message="Delete this language?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />
-    );
+    render(<ConfirmDialogHarness onCancel={onCancel} />);
 
+    const trigger = openFromTrigger();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("cancels when the overlay is clicked", () => {
@@ -62,28 +96,5 @@ describe("ConfirmDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 
     expect(onConfirm).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns focus to the trigger element when the dialog closes", () => {
-    const trigger = document.createElement("button");
-    trigger.type = "button";
-    trigger.textContent = "Restore backup";
-    document.body.append(trigger);
-    trigger.focus();
-
-    const view = render(
-      <ConfirmDialog
-        message="Restore the latest backup?"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />
-    );
-
-    expect(document.activeElement).not.toBe(trigger);
-
-    view.unmount();
-
-    expect(document.activeElement).toBe(trigger);
-    trigger.remove();
   });
 });

@@ -430,7 +430,7 @@ export function useModelWorkspace(
         contextNoteIds: data.notes.slice(0, 2).map((note) => note.id),
         contextPassageIds: data.corpus.slice(0, 2).map((passage) => passage.id)
       });
-      setModelTestResult(latestAssistantMessage(session));
+      setModelTestResult(latestAssistantMessage(session, t));
       const refreshedStatus = await fetchLlmStatus();
       setLlmState({ status: "ready", data: refreshedStatus });
       setModelTestIsPlaceholder(!isRealModelProvider(refreshedStatus) || sessionUsedDeterministicFallback(session));

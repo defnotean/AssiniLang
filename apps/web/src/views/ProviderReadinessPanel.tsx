@@ -104,7 +104,7 @@ export function ProviderReadinessPanel({
       )}
       {reachabilityResult && (
         <p className="result-notice" role="status" aria-live="polite">
-          {formatReachability(reachabilityResult)}
+          {formatReachability(reachabilityResult, t)}
         </p>
       )}
     </section>
