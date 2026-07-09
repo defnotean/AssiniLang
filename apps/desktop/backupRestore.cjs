@@ -41,6 +41,33 @@ function resolveBackupDbFile(backupDir, manifest = null) {
 }
 
 /**
+ * Schema-validate the live desktop database before creating a backup.
+ * Matches CLI `npm run db:backup`, which refuses to archive an invalid workspace.
+ * `readWorkspace(dbPath)` should parse/validate the file (e.g. JsonStore.read).
+ */
+async function assertDesktopLiveDbReadable(dbPath, { readWorkspace } = {}) {
+  if (typeof readWorkspace !== "function") {
+    throw new Error("readWorkspace is required to validate the live desktop database.");
+  }
+  if (typeof dbPath !== "string" || !dbPath.trim()) {
+    throw new Error("Desktop database path is not configured.");
+  }
+  if (!existsSync(dbPath)) {
+    throw new Error(`Cannot create backup: live database is missing at ${dbPath}.`);
+  }
+  try {
+    await readWorkspace(dbPath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Cannot create backup: live database at ${dbPath} is not a valid workspace: ${message}`,
+      { cause: error }
+    );
+  }
+  return dbPath;
+}
+
+/**
  * Schema-validate a desktop backup database before replacing live data.
  * `readWorkspace(dbPath)` should parse/validate the file (e.g. JsonStore.read).
  */
@@ -61,5 +88,6 @@ async function assertDesktopBackupReadable(backupDir, { readWorkspace } = {}) {
 
 module.exports = {
   assertDesktopBackupReadable,
+  assertDesktopLiveDbReadable,
   resolveBackupDbFile
 };

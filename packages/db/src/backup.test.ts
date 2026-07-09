@@ -1,6 +1,6 @@
 import { link, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JsonStore, pathsReferToSameFile } from "./store.js";
 import { buildTestWorkspaceState } from "./testing.js";
@@ -110,6 +110,20 @@ it("rejects backup when the destination is an existing directory", async () => {
   await mkdir(destinationDir, { recursive: true });
 
   await expect(store.backupTo(destinationDir)).rejects.toThrow(/must be a file path, not a directory/);
+});
+
+it("rejects backup when the destination file already exists unless force is set", async () => {
+  const dbPath = join(dir, "db.json");
+  const destination = join(dir, "existing-backup.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  await writeFile(destination, '{"stale":true}', "utf8");
+
+  await expect(store.backupTo(destination)).rejects.toThrow(/destination already exists/);
+  expect(await readFile(destination, "utf8")).toBe('{"stale":true}');
+
+  await expect(store.backupTo(destination, { force: true })).resolves.toBe(resolve(destination));
+  expect(await readFile(destination, "utf8")).toBe(await readFile(dbPath, "utf8"));
 });
 
 it("rejects restore when the backup source is an existing directory", async () => {

@@ -440,6 +440,23 @@ async function createDataBackup(options = {}) {
     throw new Error("Desktop runtime paths are not ready yet.");
   }
 
+  // Validate the live workspace before copying (parity with CLI db:backup).
+  try {
+    const { assertDesktopLiveDbReadable } = require("./backupRestore.cjs");
+    const { JsonStore } = await import("@assini/db");
+    await assertDesktopLiveDbReadable(desktopRuntime.dbPath, {
+      readWorkspace: async (dbPath) => {
+        await new JsonStore(dbPath).read();
+      }
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : String(error),
+      backupSummary: desktopBackupSummary()
+    };
+  }
+
   const backupPath = path.join(backupRootPath(), desktopBackupName(options.prefix));
   mkdirSync(backupPath, { recursive: true });
 

@@ -29,12 +29,18 @@ describe("backup CLI database path", () => {
 });
 
 describe("parseBackupCliArgs", () => {
-  it("detects dry-run and destination arguments", () => {
+  it("detects dry-run, force, and destination arguments", () => {
     expect(parseBackupCliArgs(["--dry-run", "C:\\backups\\assini.json"])).toEqual({
       dryRun: true,
+      force: false,
       destinationArg: "C:\\backups\\assini.json"
     });
-    expect(parseBackupCliArgs([])).toEqual({ dryRun: false, destinationArg: undefined });
+    expect(parseBackupCliArgs(["--force", "C:\\backups\\assini.json"])).toEqual({
+      dryRun: false,
+      force: true,
+      destinationArg: "C:\\backups\\assini.json"
+    });
+    expect(parseBackupCliArgs([])).toEqual({ dryRun: false, force: false, destinationArg: undefined });
   });
 });
 
@@ -144,6 +150,31 @@ describe("runBackupCli", () => {
         env: { ASSINI_DB_PATH: dbPath }
       })
     ).rejects.toThrow(/Pass a file path/);
+  });
+
+  it("rejects overwriting an existing backup file unless --force is passed", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const destination = join(dir, "existing-backup.json");
+    await writeFile(destination, '{"stale":true}', "utf8");
+
+    await expect(
+      runBackupCli({
+        argv: [destination],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/already exists/);
+    expect(await readFile(destination, "utf8")).toBe('{"stale":true}');
+
+    const stdout = vi.fn();
+    const result = await runBackupCli({
+      argv: ["--force", destination],
+      env: { ASSINI_DB_PATH: dbPath },
+      stdout
+    });
+
+    expect(result.written).toBe(resolve(destination));
+    expect(await readFile(result.written!, "utf8")).toBe(await readFile(dbPath, "utf8"));
+    expect(stdout).toHaveBeenCalledWith(`Backup written to ${result.written}`);
   });
 
   it("writes a validated backup copy to the requested destination", async () => {

@@ -126,6 +126,7 @@ describe("project documentation", () => {
         "mismatched `redactionPolicy`",
         "case-insensitive",
         "Relative root segments",
+        "ingest.errorVaultOutsideAllowlist",
         "in-flight markers are cleared",
         "## Route index",
         "Lead and admin users remain server-token actors",
@@ -224,8 +225,11 @@ describe("project documentation", () => {
         "hard-link alias",
         "validates the live workspace",
         "not an existing directory",
+        "is also refused unless",
+        "--force",
         "backup source is an existing directory",
         "same clear file-path error as backup",
+        "Desktop create validates",
         "Desktop restore validates"
       ],
       "docs/operator-recovery.md": [
@@ -234,6 +238,8 @@ describe("project documentation", () => {
         "data/ocr-cache/",
         "npm.cmd run db:backup",
         "--dry-run",
+        "refuses to overwrite an existing backup file",
+        "--force",
         "refuses to archive an invalid workspace",
         "symlink or hard-link aliases",
         "JsonStore.restoreFrom",
@@ -242,6 +248,7 @@ describe("project documentation", () => {
         "npm.cmd run seed",
         "existing directory is rejected",
         "refuses when the backup path is a directory",
+        "Create validates the live workspace",
         "Desktop's restore-latest",
         "backup-manifest.json",
         "no silent fallback"
@@ -263,6 +270,7 @@ describe("project documentation", () => {
         "errors.prototypeAuthDisabled",
         "app.rateLimitExceeded",
         "destination is a directory",
+        "destination already exists",
         "backup source is a directory"
       ],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]

@@ -4,12 +4,23 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertObsidianVaultPathAllowed,
+  i18nKeyForVaultPathError,
   isPathInsideRoot,
   parseObsidianVaultRoots,
-  stripWindowsExtendedPrefix
+  stripWindowsExtendedPrefix,
+  VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE,
+  VAULT_ROOTS_UNSET_MESSAGE
 } from "./vaultPathSafety.js";
 
 describe("Obsidian vault path safety", () => {
+  it("maps allowlist English errors to ingest i18n keys", () => {
+    expect(i18nKeyForVaultPathError(VAULT_ROOTS_UNSET_MESSAGE)).toBe("ingest.errorVaultRootsUnset");
+    expect(i18nKeyForVaultPathError(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE)).toBe(
+      "ingest.errorVaultOutsideAllowlist"
+    );
+    expect(i18nKeyForVaultPathError("unrelated")).toBeUndefined();
+  });
+
   it("parses semicolon-separated roots and ignores blank segments", () => {
     expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: undefined })).toEqual([]);
     expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "  ; ; " })).toEqual([]);

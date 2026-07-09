@@ -887,6 +887,21 @@ describe("localizeApiError", () => {
     );
   });
 
+  it("prefers vault i18nKey metadata over English error text", () => {
+    const message = localizeVaultImportError(
+      new ApiError("Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.", {
+        status: 400,
+        i18nKey: "ingest.errorVaultOutsideAllowlist"
+      }),
+      t,
+      "ingest.vaultImportFailed"
+    );
+
+    expect(message).toBe(
+      "That folder is outside the allowed vault roots. Update ASSINI_OBSIDIAN_VAULT_ROOTS or choose a folder under an allowed root."
+    );
+  });
+
   it("localizes relative vault-root configuration failures", () => {
     const message = localizeVaultImportError(
       new Error(

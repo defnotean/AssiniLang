@@ -4596,7 +4596,10 @@ describe("api server", () => {
         });
 
         expect(response.statusCode).toBe(400);
-        expect(response.json().error).toMatch(/ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/);
+        expect(response.json()).toMatchObject({
+          error: expect.stringMatching(/ASSINI_OBSIDIAN_VAULT_ROOTS allowlist/),
+          i18nKey: "ingest.errorVaultOutsideAllowlist"
+        });
       } finally {
         restoreEnv("ASSINI_OBSIDIAN_VAULT_ROOTS", previousVaultRoots);
       }
@@ -4622,7 +4625,10 @@ describe("api server", () => {
         });
 
         expect(response.statusCode).toBe(400);
-        expect(response.json().error).toMatch(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/);
+        expect(response.json()).toMatchObject({
+          error: expect.stringMatching(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/),
+          i18nKey: "ingest.errorVaultRootsUnset"
+        });
       } finally {
         restoreEnv("ASSINI_OBSIDIAN_VAULT_ROOTS", previousVaultRoots);
       }

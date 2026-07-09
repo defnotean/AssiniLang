@@ -678,8 +678,9 @@ export class JsonStore {
    * Copies the live database to `destinationPath`. JSON databases are copied
    * byte-for-byte; SQLite databases use better-sqlite3's online backup API so
    * the copy is consistent even if other processes hold the file open.
+   * Refuses to overwrite an existing destination file unless `force` is set.
    */
-  async backupTo(destinationPath: string): Promise<string> {
+  async backupTo(destinationPath: string, options: { force?: boolean } = {}): Promise<string> {
     const destination = resolve(destinationPath);
     if (pathsReferToSameFile(this.dbPath, destination)) {
       throw new Error(
@@ -692,6 +693,11 @@ export class JsonStore {
       if (destinationStat.isDirectory()) {
         throw new Error(
           `Failed to back up local database at ${this.dbPath}: destination must be a file path, not a directory (${destination})`
+        );
+      }
+      if (!options.force) {
+        throw new Error(
+          `Failed to back up local database at ${this.dbPath}: destination already exists (${destination}). Pass a new path or use force to overwrite.`
         );
       }
     } catch (error) {

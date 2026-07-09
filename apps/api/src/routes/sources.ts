@@ -13,7 +13,12 @@ import {
 import type { AppState, ExtractionDraft, SourceAsset, SourceAssetKind, User } from "@assini/db";
 import { extractCandidatesForAsset, type ExtractionCandidate, type SourceExtractionResult } from "../ingestion.js";
 import { appendAuditEvent, redactErrorSecrets, requireActor } from "../routeHelpers.js";
-import { assertObsidianVaultPathAllowed } from "../vaultPathSafety.js";
+import {
+  assertObsidianVaultPathAllowed,
+  i18nKeyForVaultPathError,
+  VAULT_PATH_NOT_DIRECTORY_MESSAGE,
+  VAULT_PATH_UNREADABLE_MESSAGE
+} from "../vaultPathSafety.js";
 import type { RouteContext } from "./context.js";
 import { parseSchemaBody } from "./requestBody.js";
 
@@ -326,8 +331,13 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     try {
       rootPath = await assertObsidianVaultPathAllowed(body.vaultPath);
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Obsidian vault path is not allowed.";
+      const i18nKey = i18nKeyForVaultPathError(message);
       reply.code(400);
-      return { error: error instanceof Error ? error.message : "Obsidian vault path is not allowed." };
+      return {
+        error: message,
+        ...(i18nKey ? { i18nKey } : {})
+      };
     }
 
     const vaultLabel = vaultAuditLabel(rootPath);
@@ -338,11 +348,17 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       const rootStat = await stat(rootPath);
       if (!rootStat.isDirectory()) {
         reply.code(400);
-        return { error: "Obsidian vault path is not a directory." };
+        return {
+          error: VAULT_PATH_NOT_DIRECTORY_MESSAGE,
+          i18nKey: "ingest.errorVaultNotDirectory"
+        };
       }
     } catch {
       reply.code(400);
-      return { error: "Obsidian vault path could not be read." };
+      return {
+        error: VAULT_PATH_UNREADABLE_MESSAGE,
+        i18nKey: "ingest.errorVaultUnreadable"
+      };
     }
 
     const markdownFiles = await collectObsidianMarkdownFiles(

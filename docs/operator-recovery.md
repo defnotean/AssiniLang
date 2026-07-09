@@ -26,7 +26,7 @@ npm.cmd run db:backup -- path\to\my-backup.json
 npm.cmd run db:backup -- --dry-run
 ```
 
-Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the **file** path you pass — an existing directory is rejected with a clear error). `--dry-run` resolves the source and destination paths and prints them without writing a file after confirming the live database parses. The CLI refuses to write onto the live database path (including symlink or hard-link aliases of that file) and refuses to archive an invalid workspace. After a successful write, the CLI prints a pasteable restore recipe with the live database path and backup path filled in (there is no `npm run db:restore` script). Restore is deliberate: call `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database, refuses when the backup path is a directory, and also refuses when the backup path is the live database (or a symlink/hard-link to it). AssiniLang Desktop's restore-latest action validates the backup database the same way before replacing live workspace data.
+Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the **file** path you pass — an existing directory is rejected with a clear error). `--dry-run` resolves the source and destination paths and prints them without writing a file after confirming the live database parses. The CLI refuses to write onto the live database path (including symlink or hard-link aliases of that file), refuses to overwrite an existing backup file unless you pass `--force`, and refuses to archive an invalid workspace. After a successful write, the CLI prints a pasteable restore recipe with the live database path and backup path filled in (there is no `npm run db:restore` script). Restore is deliberate: call `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database, refuses when the backup path is a directory, and also refuses when the backup path is the live database (or a symlink/hard-link to it). AssiniLang Desktop's restore-latest action validates the backup database the same way before replacing live workspace data.
 
 Example (paths from the CLI restore hint):
 
@@ -38,7 +38,7 @@ node --input-type=module -e "import { JsonStore } from '@assini/db'; await new J
 
 In Settings → Desktop app tools:
 
-- **Create backup** — timestamped copy before experiments.
+- **Create backup** — timestamped copy before experiments. Create validates the live workspace first (same schema check as CLI `db:backup`) and refuses to archive an invalid or missing database.
 - **Restore latest backup** — confirms, then replaces live data from the newest backup (a safety backup is created first when possible). Restore validates the backup database first and refuses when `backup-manifest.json` names a database file that is missing under `data/` (no silent fallback to `local-db.*`).
 - **Open backups folder** / **Prune old backups** — keeps the newest five routine backups; safety restore backups are left alone.
 

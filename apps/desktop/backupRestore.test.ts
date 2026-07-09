@@ -7,10 +7,15 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const {
   assertDesktopBackupReadable,
+  assertDesktopLiveDbReadable,
   resolveBackupDbFile
 } = require("./backupRestore.cjs") as {
   assertDesktopBackupReadable: (
     backupDir: string,
+    options: { readWorkspace: (dbPath: string) => Promise<unknown> }
+  ) => Promise<string>;
+  assertDesktopLiveDbReadable: (
+    dbPath: string,
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
   ) => Promise<string>;
   resolveBackupDbFile: (backupDir: string, manifest?: Record<string, unknown> | null) => string;
@@ -95,5 +100,41 @@ describe("desktop backup restore validation", () => {
         readWorkspace: async () => ({})
       })
     ).rejects.toThrow(/no readable database/);
+  });
+
+  it("validates the live desktop database before create", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "assini-desktop-live-db-"));
+    tempDirs.push(dir);
+    const dbPath = join(dir, "local-db.json");
+    writeFileSync(dbPath, '{"ok":true}', "utf8");
+    const readWorkspace = vi.fn(async () => ({ languages: [] }));
+
+    await expect(assertDesktopLiveDbReadable(dbPath, { readWorkspace })).resolves.toBe(dbPath);
+    expect(readWorkspace).toHaveBeenCalledWith(dbPath);
+  });
+
+  it("refuses create when the live database is missing", async () => {
+    const missing = join(tmpdir(), "assini-missing-live-db.json");
+
+    await expect(
+      assertDesktopLiveDbReadable(missing, {
+        readWorkspace: async () => ({})
+      })
+    ).rejects.toThrow(/live database is missing/);
+  });
+
+  it("refuses create when the live database is not a valid workspace", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "assini-desktop-corrupt-live-"));
+    tempDirs.push(dir);
+    const dbPath = join(dir, "local-db.json");
+    writeFileSync(dbPath, "{not-json", "utf8");
+
+    await expect(
+      assertDesktopLiveDbReadable(dbPath, {
+        readWorkspace: async () => {
+          throw new Error("Unexpected token");
+        }
+      })
+    ).rejects.toThrow(/not a valid workspace/);
   });
 });

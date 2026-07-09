@@ -30,13 +30,15 @@ export function formatBackupRestoreHint(dbPath: string, backupPath: string): str
 
 export type BackupCliArgs = {
   dryRun: boolean;
+  force: boolean;
   destinationArg?: string;
 };
 
 export function parseBackupCliArgs(argv: string[] = process.argv.slice(2)): BackupCliArgs {
   const dryRun = argv.includes("--dry-run");
+  const force = argv.includes("--force");
   const destinationArg = argv.find((arg) => !arg.startsWith("-"));
-  return { dryRun, destinationArg };
+  return { dryRun, force, destinationArg };
 }
 
 export type BackupCliResult = {
@@ -57,7 +59,7 @@ export async function runBackupCli({
   now?: Date;
   stdout?: (message?: unknown, ...optionalParams: unknown[]) => void;
 } = {}): Promise<BackupCliResult> {
-  const { dryRun, destinationArg } = parseBackupCliArgs(argv);
+  const { dryRun, force, destinationArg } = parseBackupCliArgs(argv);
   const dbPath = resolveBackupDbPath(env);
   const destination = destinationArg ? resolve(destinationArg) : defaultBackupPath(dbPath, now);
 
@@ -80,6 +82,11 @@ export async function runBackupCli({
     if (destinationStat.isDirectory()) {
       throw new Error(
         `Cannot back up: destination ${destination} is a directory. Pass a file path (for example ${join(destination, basename(dbPath))}) or omit the path to use data/backups/.`
+      );
+    }
+    if (!force) {
+      throw new Error(
+        `Cannot back up: destination ${destination} already exists. Pass a new path or --force to overwrite.`
       );
     }
   } catch (error) {
@@ -107,7 +114,7 @@ export async function runBackupCli({
     return { dryRun: true, dbPath, destination };
   }
 
-  const written = await store.backupTo(destination);
+  const written = await store.backupTo(destination, { force });
 
   stdout(`Backed up local database at ${dbPath}`);
   stdout(`Backup written to ${written}`);

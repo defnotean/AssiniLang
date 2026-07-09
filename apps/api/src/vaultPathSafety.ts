@@ -9,14 +9,36 @@ export type VaultPathSafetyOptions = {
   realpathFn?: RealpathFn;
 };
 
-const VAULT_ROOTS_UNSET_MESSAGE =
+export const VAULT_ROOTS_UNSET_MESSAGE =
   "Obsidian vault import is disabled until ASSINI_OBSIDIAN_VAULT_ROOTS is set to one or more semicolon-separated absolute directory roots.";
 
-const VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE =
+export const VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE =
   "ASSINI_OBSIDIAN_VAULT_ROOTS entries must be absolute directory paths; relative roots are ignored.";
 
-const VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE =
+export const VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE =
   "Obsidian vault path is outside the configured ASSINI_OBSIDIAN_VAULT_ROOTS allowlist.";
+
+export const VAULT_PATH_NOT_DIRECTORY_MESSAGE = "Obsidian vault path is not a directory.";
+
+export const VAULT_PATH_UNREADABLE_MESSAGE = "Obsidian vault path could not be read.";
+
+/** Maps vault allowlist / path-safety English errors to web i18n keys. */
+export function i18nKeyForVaultPathError(message: string): string | undefined {
+  switch (message) {
+    case VAULT_ROOTS_UNSET_MESSAGE:
+      return "ingest.errorVaultRootsUnset";
+    case VAULT_ROOTS_MUST_BE_ABSOLUTE_MESSAGE:
+      return "ingest.errorVaultRootsMustBeAbsolute";
+    case VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE:
+      return "ingest.errorVaultOutsideAllowlist";
+    case VAULT_PATH_NOT_DIRECTORY_MESSAGE:
+      return "ingest.errorVaultNotDirectory";
+    case VAULT_PATH_UNREADABLE_MESSAGE:
+      return "ingest.errorVaultUnreadable";
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Strips Windows extended-length path prefixes so realpath (\\?\...) and resolve(...) paths compare equal.

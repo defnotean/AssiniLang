@@ -638,6 +638,9 @@ function operatorApiErrorI18n(
 /** Localizes Obsidian vault import failures for operator-facing UI. */
 export function localizeVaultImportError(error: unknown, t: Translate, fallback: MessageKey): string {
   if (error instanceof ApiError) {
+    if (error.i18nKey) {
+      return t(error.i18nKey as MessageKey, error.i18nParams);
+    }
     const vaultI18n = vaultImportErrorI18n(error.message);
     if (vaultI18n) return t(vaultI18n.i18nKey);
     return localizeApiError(error, t, fallback);
