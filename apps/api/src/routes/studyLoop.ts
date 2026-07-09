@@ -180,27 +180,7 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
       ]
     }));
 
-    if (createdNotes.length > 0) {
-      await updateState((state) => appendAuditEvents({
-        ...state,
-        notes: [...state.notes, ...createdNotes]
-      }, createdNotes.map((note) => ({
-        actor,
-        at: generatedAt,
-        action: "note.draft_generated",
-        entityType: "note",
-        entityId: note.id,
-        languageId: note.languageId,
-        summary: `Generated model-backed draft note for ${note.topic}.`,
-        metadata: {
-          topic: note.topic,
-          status: note.status,
-          confidence: note.confidence
-        }
-      }))));
-    }
-
-    // Grounding scores are response-only metadata; persisted notes keep their schema.
+    // Grounding scores are response-only on notes; failure codes persist on audit events.
     const scoringContext = {
       languageId,
       passages: corpus,
@@ -211,6 +191,28 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
       ...note,
       grounding: scoreModelDraft(note, scoringContext)
     }));
+
+    if (scoredNotes.length > 0) {
+      await updateState((state) => appendAuditEvents({
+        ...state,
+        notes: [...state.notes, ...createdNotes]
+      }, scoredNotes.map((note) => ({
+        actor,
+        at: generatedAt,
+        action: "note.draft_generated",
+        entityType: "note",
+        entityId: note.id,
+        languageId: note.languageId,
+        summary: `Generated model-backed draft note for ${note.topic}.`,
+        metadata: {
+          topic: note.topic,
+          status: note.status,
+          confidence: note.confidence,
+          groundingScore: note.grounding.score,
+          groundingFailureCodes: note.grounding.failureCodes
+        }
+      }))));
+    }
 
     return { notes: scoredNotes, warnings: generation.warnings, generated: createdNotes.length };
   });

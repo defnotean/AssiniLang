@@ -1,8 +1,8 @@
 import type { SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
-import { extractionDraftSummary, formatCount } from "../lib/format";
-import { useI18n } from "../i18n";
+import { extractionDraftSummary, formatCount, relativeAge, type RelativeAge } from "../lib/format";
+import { useI18n, type Translate } from "../i18n";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
 
@@ -11,6 +11,24 @@ function isProcessingStale(source: SourceAsset, now = Date.now()): boolean {
   const marker = source.processingHeartbeatAt ?? source.processingStartedAt;
   if (!marker) return false;
   return now - Date.parse(marker) > PROCESSING_STALE_MS;
+}
+
+function processingHeartbeatMarker(source: SourceAsset): string | undefined {
+  if (source.status !== "processing") return undefined;
+  return source.processingHeartbeatAt ?? source.processingStartedAt;
+}
+
+function formatRelativeAgeLabel(age: RelativeAge, t: Translate): string {
+  switch (age.kind) {
+    case "justNow":
+      return t("ingest.heartbeatAge.justNow");
+    case "minutes":
+      return t("ingest.heartbeatAge.minutes", { count: age.count });
+    case "hours":
+      return t("ingest.heartbeatAge.hours", { count: age.count });
+    case "days":
+      return t("ingest.heartbeatAge.days", { count: age.count });
+  }
 }
 
 export function IngestView({
@@ -242,6 +260,15 @@ export function IngestView({
                     {source.kind === "audio" && (
                       <span className="pill">{source.transcript ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}</span>
                     )}
+                    {(() => {
+                      const marker = processingHeartbeatMarker(source);
+                      if (!marker) return null;
+                      return (
+                        <span className="pill muted">
+                          {t("ingest.processingHeartbeatAge", { age: formatRelativeAgeLabel(relativeAge(marker), t) })}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <small className="muted">{t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}</small>
                   {isProcessingStale(source) && (

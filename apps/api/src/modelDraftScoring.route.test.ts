@@ -127,4 +127,75 @@ describe("model-draft grounding scores", () => {
       evidenceCount: created.evidenceCount
     });
   });
+
+  it("persists grounding failure codes on the draft-generation audit event", async () => {
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      llmProvider: noteProvider(groundedNoteJson)
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/study-loop/model-draft`,
+      headers: authHeaders("reviewer-1")
+    });
+    expect(response.statusCode).toBe(200);
+    const created = (response.json() as { notes: ScoredNote[] }).notes[0];
+
+    const auditResponse = await app.inject({
+      method: "GET",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+      headers: authHeaders("programmer-1")
+    });
+    expect(auditResponse.statusCode).toBe(200);
+    const events = auditResponse.json() as Array<{
+      action: string;
+      entityId: string;
+      metadata: { groundingFailureCodes?: string[]; groundingScore?: number };
+    }>;
+    const draftEvent = events.find((event) => event.action === "note.draft_generated" && event.entityId === created.id);
+
+    expect(draftEvent).toBeDefined();
+    expect(draftEvent?.metadata.groundingFailureCodes).toEqual(created.grounding.failureCodes);
+    expect(draftEvent?.metadata.groundingScore).toBe(created.grounding.score);
+  });
+
+  it("records misaligned-topic failure codes on the audit event", async () => {
+    const misalignedJson = JSON.stringify({
+      notes: [
+        {
+          topic: "phonology/exotic-clusters",
+          explanation: "Consonant clusters appear word-initially in borrowed vocabulary items.",
+          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c003`],
+          confidence: "low"
+        }
+      ]
+    });
+    const app = createServer({
+      initialState: buildTestWorkspaceState(),
+      llmProvider: noteProvider(misalignedJson)
+    });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/study-loop/model-draft`,
+      headers: authHeaders("reviewer-1")
+    });
+    expect(response.statusCode).toBe(200);
+    const created = (response.json() as { notes: ScoredNote[] }).notes[0];
+
+    const auditResponse = await app.inject({
+      method: "GET",
+      url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
+      headers: authHeaders("programmer-1")
+    });
+    const events = auditResponse.json() as Array<{
+      action: string;
+      entityId: string;
+      metadata: { groundingFailureCodes?: string[] };
+    }>;
+    const draftEvent = events.find((event) => event.action === "note.draft_generated" && event.entityId === created.id);
+
+    expect(draftEvent?.metadata.groundingFailureCodes).toContain("topicAlignment:mismatch");
+  });
 });

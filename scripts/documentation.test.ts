@@ -155,7 +155,7 @@ describe("project documentation", () => {
         "npm.cmd run seed"
       ],
       "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
-      "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "First Nations"],
+      "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "groundingFailureCodes", "First Nations"],
       "docs/troubleshooting.md": ["## Startup and ports", "ASSINI_TRANSCRIBE_BASE_URL", "ASSINI_ALLOW_PRIVATE_URLS", "data/local-db.json"],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

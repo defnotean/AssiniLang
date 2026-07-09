@@ -71,6 +71,23 @@ export function formatCount(count: number, singular: string, plural = `${singula
   return `${count} ${count === 1 ? singular : plural}`;
 }
 
+export type RelativeAge =
+  | { kind: "justNow" }
+  | { kind: "minutes"; count: number }
+  | { kind: "hours"; count: number }
+  | { kind: "days"; count: number };
+
+/** Buckets an ISO timestamp into a coarse relative-age unit for operator-facing labels. */
+export function relativeAge(isoTimestamp: string, now = Date.now()): RelativeAge {
+  const elapsedMs = Math.max(0, now - Date.parse(isoTimestamp));
+  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
+  if (elapsedMinutes < 1) return { kind: "justNow" };
+  if (elapsedMinutes < 60) return { kind: "minutes", count: elapsedMinutes };
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return { kind: "hours", count: elapsedHours };
+  return { kind: "days", count: Math.floor(elapsedHours / 24) };
+}
+
 export function parseReviewerIds(value: string): string[] {
   return Array.from(new Set(
     value
