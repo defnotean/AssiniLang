@@ -537,6 +537,12 @@ function operatorApiErrorI18n(
   if (/Invalid exercise submission body/i.test(normalized)) {
     return { i18nKey: "errors.invalidExerciseSubmissionBody" };
   }
+  if (/Invalid corpus import body/i.test(normalized)) {
+    return { i18nKey: "errors.invalidCorpusImportBody" };
+  }
+  if (/Corpus passage could not be imported/i.test(normalized)) {
+    return { i18nKey: "errors.corpusImportFailed" };
+  }
   if (/Exercise not found:/i.test(normalized)) {
     return { i18nKey: "errors.exerciseNotFound" };
   }

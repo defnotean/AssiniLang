@@ -1120,13 +1120,13 @@ describe("api server", () => {
     const response = await app.inject({ method: "GET", url: `/languages/not-a-language/${resource}` });
 
     expect(response.statusCode).toBe(404);
-    if (resource === "exercises") {
+    if (resource === "notes") {
+      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    } else {
       expect(response.json()).toEqual({
         error: "Language not found: not-a-language",
         i18nKey: "errors.languageNotFound"
       });
-    } else {
-      expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
     }
   });
 

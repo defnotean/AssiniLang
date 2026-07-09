@@ -180,6 +180,8 @@ export const ar: Record<MessageKey, string> = {
   "errors.exerciseNotFound": "لم يُعثر على ذلك التمرين. اختر تمرينًا آخر أو ألّف واحدًا جديدًا.",
   "errors.exerciseCreateFailed": "تعذّر إنشاء التمرين. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
   "errors.exerciseSubmissionCreateFailed": "تعذّر حفظ إجابة التمرين. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
+  "errors.invalidCorpusImportBody": "قدّم مقطع مدوّنة كاملًا: المصدر والنصوص والتجزئة والوسوم والموافقة.",
+  "errors.corpusImportFailed": "تعذّر استيراد مقطع المدوّنة. أعد المحاولة، أو راجع سجلات واجهة البرمجة.",
 
   "viewConfig.profile.label": "الملف اللغوي",
   "viewConfig.profile.title": "الملف اللغوي",

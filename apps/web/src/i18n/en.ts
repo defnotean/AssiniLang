@@ -153,6 +153,8 @@ export const en = {
   "errors.exerciseNotFound": "That exercise was not found. Select another exercise or author a new one.",
   "errors.exerciseCreateFailed": "The exercise could not be created. Retry, or check the API logs.",
   "errors.exerciseSubmissionCreateFailed": "The exercise submission could not be saved. Retry, or check the API logs.",
+  "errors.invalidCorpusImportBody": "Provide a complete corpus passage: source, texts, segmentation, tags, and consent.",
+  "errors.corpusImportFailed": "The corpus passage could not be imported. Retry, or check the API logs.",
 
   // View registry (label = nav/breadcrumb, title = header H1, eyebrow = kicker).
   "viewConfig.profile.label": "Start",

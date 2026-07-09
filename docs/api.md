@@ -36,8 +36,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/extraction-drafts/:draftId/accept` | reviewer, lead, admin | Accept a draft and commit the entity. |
 | POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
 | POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. Invalid `action` returns `400` with `i18nKey: "errors.bulkReviewInvalidAction"`; missing/empty `draftIds` returns `400` with `i18nKey: "errors.bulkReviewInvalidDraftIds"`; more than 50 ids returns `400` with `i18nKey: "errors.bulkReviewTooManyDraftIds"` and `i18nParams.max`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
-| GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. |
-| POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
+| GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. Invalid bodies return `400` with `i18nKey: "errors.invalidCorpusImportBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | GET | `/languages/:languageId/notes` | Public | Public review notes. |
 | PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. Invalid bodies return `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
@@ -163,7 +163,7 @@ Both decisions record reviewer attribution, the committed entity ID on accept, a
 
 `POST /languages/:languageId/corpus`
 
-The route imports one corpus passage after validating provenance, consent, segmentation, and duplicate target text. The response returns only the public corpus passage, but the server also stores a private corpus answer key derived from the validated target text, translation, and segmentation.
+The route imports one corpus passage after validating provenance, consent, segmentation, and duplicate target text. The response returns only the public corpus passage, but the server also stores a private corpus answer key derived from the validated target text, translation, and segmentation. Bodies that fail schema parsing return `400` with `{ "error": "Invalid corpus import body", "i18nKey": "errors.invalidCorpusImportBody" }`. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`.
 
 Example body:
 

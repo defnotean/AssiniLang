@@ -9,6 +9,7 @@ import {
   type CorpusImportDraft
 } from "../corpusImport";
 import { MorphChips } from "../components/MorphChips";
+import { localizeApiError } from "../lib/format";
 import type { CorpusPassage } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -135,8 +136,7 @@ export function CorpusView({
         setImportError(validation.errors.join(" "));
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("corpus.validateFailed");
-      setImportError(message);
+      setImportError(localizeApiError(error, t, "corpus.validateFailed"));
     } finally {
       setIsValidatingCorpus(false);
     }
@@ -159,8 +159,7 @@ export function CorpusView({
       setImportDraft({ ...EMPTY_CORPUS_IMPORT_DRAFT });
       setImportMessage(t("corpus.importSuccess"));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("corpus.importFailed");
-      setImportError(message);
+      setImportError(localizeApiError(error, t, "corpus.importFailed"));
     } finally {
       setIsImportingCorpus(false);
     }

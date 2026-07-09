@@ -169,6 +169,48 @@ describe("runBackupCli", () => {
     expect(restoreHint).not.toContain("JsonStore(dbPath)");
   });
 
+  it("backs up a SQLite workspace and restores through the printed JsonStore recipe", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-backup-cli-sqlite-"));
+    tempDirs.push(dir);
+    const dbPath = join(dir, "local-db.sqlite");
+    const destination = join(dir, "operator-backup.sqlite");
+    const fixture = buildTestWorkspaceState();
+    await new JsonStore(dbPath).write(fixture);
+    const stdout = vi.fn();
+
+    const result = await runBackupCli({
+      argv: [destination],
+      env: { ASSINI_DB_PATH: dbPath },
+      stdout
+    });
+
+    expect(result.written).toBe(resolve(destination));
+    expect(stdout).toHaveBeenCalledWith(formatBackupRestoreHint(resolve(dbPath), result.written!));
+
+    // Corrupt the live SQLite file, then restore from the CLI backup path.
+    await writeFile(dbPath, "not-a-sqlite-database", "utf8");
+    await expect(new JsonStore(dbPath).read()).rejects.toThrow(dbPath);
+
+    const restored = await new JsonStore(dbPath).restoreFrom(result.written!);
+    expect(restored.languages).toEqual(fixture.languages);
+    expect(await new JsonStore(dbPath).read()).toEqual(restored);
+  });
+
+  it("rejects backing up an invalid SQLite workspace before writing a copy", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-backup-cli-sqlite-bad-"));
+    tempDirs.push(dir);
+    const dbPath = join(dir, "local-db.sqlite");
+    const destination = join(dir, "should-not-write.sqlite");
+    await writeFile(dbPath, "not-a-valid-sqlite-workspace", "utf8");
+
+    await expect(
+      runBackupCli({
+        argv: [destination],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/not a valid workspace/);
+  });
+
   it("reports a helpful error when the database file is missing", async () => {
     const missingPath = join(tmpdir(), "assini-missing-db.json");
 

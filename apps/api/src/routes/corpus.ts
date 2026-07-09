@@ -172,7 +172,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
     const state = await readState();
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
     return state.corpus.filter((passage) => passage.languageId === languageId);
   });
@@ -191,7 +194,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
         } satisfies CorpusImportDryRunResponse;
       }
       reply.code(400);
-      return { error: "Invalid corpus import body" };
+      return {
+        error: "Invalid corpus import body",
+        i18nKey: "errors.invalidCorpusImportBody"
+      };
     }
 
     const current = await readState();
@@ -202,7 +208,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!current.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (dryRun) {
@@ -261,7 +270,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (languageMissing) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (validationError) {
@@ -271,7 +283,10 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!passage) {
       reply.code(500);
-      return { error: "Corpus passage could not be imported" };
+      return {
+        error: "Corpus passage could not be imported",
+        i18nKey: "errors.corpusImportFailed"
+      };
     }
 
     reply.code(201);

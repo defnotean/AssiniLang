@@ -109,6 +109,13 @@ describe("locale catalogs", () => {
     expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
   });
 
+  it("localizes corpus import validation errors in Arabic", () => {
+    expect(en["errors.invalidCorpusImportBody"]).toContain("complete corpus passage");
+    expect(ar["errors.invalidCorpusImportBody"]).toContain("مقطع مدوّنة");
+    expect(ar["errors.invalidCorpusImportBody"]).not.toBe(en["errors.invalidCorpusImportBody"]);
+    expect(ar["errors.corpusImportFailed"]).not.toBe(en["errors.corpusImportFailed"]);
+  });
+
   it("keeps paradigm-gap empty-state next-step guidance localized", () => {
     expect(en["profile.paradigmGapsEmptyState"]).toContain("Build or Corpus");
     expect(ar["profile.paradigmGapsEmptyState"]).toContain("البناء أو المدوّنة");

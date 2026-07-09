@@ -656,6 +656,40 @@ describe("localizeApiError", () => {
     ).toBe("Choose accept or reject before reviewing this correction.");
   });
 
+  it("localizes corpus import validation errors via i18nKey or English message", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid corpus import body", {
+          status: 400,
+          i18nKey: "errors.invalidCorpusImportBody"
+        }),
+        t,
+        "corpus.importFailed"
+      )
+    ).toBe("Provide a complete corpus passage: source, texts, segmentation, tags, and consent.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /languages/avenik/corpus (400): Invalid corpus import body", {
+          status: 400
+        }),
+        t,
+        "corpus.importFailed"
+      )
+    ).toBe("Provide a complete corpus passage: source, texts, segmentation, tags, and consent.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Corpus passage could not be imported", {
+          status: 500,
+          i18nKey: "errors.corpusImportFailed"
+        }),
+        t,
+        "corpus.importFailed"
+      )
+    ).toBe("The corpus passage could not be imported. Retry, or check the API logs.");
+  });
+
   it("localizes exercise authoring and submission validation errors via i18nKey or English message", () => {
     expect(
       localizeApiError(

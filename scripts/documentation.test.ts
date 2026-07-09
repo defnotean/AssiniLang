@@ -156,6 +156,7 @@ describe("project documentation", () => {
         "errors.invalidExerciseAuthoringBody",
         "errors.invalidExerciseSubmissionBody",
         "errors.exerciseNotFound",
+        "errors.invalidCorpusImportBody",
         "errors.prototypeAuthDisabled",
         "errors.invalidPrototypeSessionBody",
         "errors.missingLanguageId",
