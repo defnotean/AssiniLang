@@ -131,6 +131,49 @@ describe("LearnerView practice next panel", () => {
 
     const panel = screen.getByRole("region", { name: "Practice next" });
     expect(await within(panel).findByText("No practice recommendations yet.")).toBeInTheDocument();
+    const emptyState = within(panel).getByRole("status");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(
+      "Author an exercise below, or grade existing ones, to build a Practice next queue."
+    );
+  });
+
+  it("marks grade and authoring actions busy while in flight", async () => {
+    apiMock.fetchRecommendedExercises.mockResolvedValue({ exercises: [], rationale: [] });
+
+    render(
+      <LearnerView
+        languageId="avenik"
+        exercises={fixtureExercises}
+        isWorkflowBusy={false}
+        learner={{
+          selectedExercise: fixtureExercises[0],
+          selectedExerciseId: fixtureExercises[0].id,
+          setSelectedExerciseId: vi.fn(),
+          exerciseAnswer: "mira talo-mi-na",
+          setExerciseAnswer: vi.fn(),
+          isGrading: true,
+          isLoadingSubmissions: false,
+          exerciseResult: null,
+          setExerciseResult: vi.fn(),
+          submissionHistory: [],
+          setSubmissionHistory: vi.fn(),
+          handleGrade: vi.fn(),
+          handleCreateExercise: vi.fn(),
+          handleGenerateExercise: vi.fn()
+        }}
+      />
+    );
+
+    await screen.findByText("No practice recommendations yet.");
+
+    const gradeButton = screen.getByRole("button", { name: "Grading..." });
+    expect(gradeButton).toBeDisabled();
+    expect(gradeButton).toHaveAttribute("aria-busy", "true");
+
+    const history = screen.getByRole("region", { name: "Exercise submission history" });
+    expect(within(history).getByText("No submissions yet.")).toBeInTheDocument();
+    expect(within(history).getByText("Grade an answer above to start this history.")).toBeInTheDocument();
   });
 
   it("shows an error state when loading recommendations fails", async () => {
@@ -208,7 +251,11 @@ describe("LearnerView practice next panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Validate exercise authoring" }));
 
     await waitFor(() => expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledTimes(1));
-    expect(await screen.findByRole("status")).toHaveTextContent("Dry-run only — nothing saved yet.");
-    expect(screen.getByRole("status")).toHaveTextContent("Validation passed: 1 expected answers and 1 adversarial probes ready to save.");
+    const authoringForm = screen.getByRole("form", { name: "Exercise authoring" });
+    const dryRunStatus = await within(authoringForm).findByRole("status");
+    expect(dryRunStatus).toHaveTextContent("Dry-run only — nothing saved yet.");
+    expect(dryRunStatus).toHaveTextContent(
+      "Validation passed: 1 expected answers and 1 adversarial probes ready to save."
+    );
   });
 });

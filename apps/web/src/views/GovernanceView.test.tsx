@@ -152,6 +152,37 @@ describe("GovernanceView export and disposition guards", () => {
     expect(exportButton).toHaveAttribute("aria-busy", "true");
   });
 
+  it("marks policy and review-policy submits busy while recording or updating", () => {
+    const recording = createGovernanceWorkspace();
+    recording.isSubmittingGovernance = true;
+
+    const { unmount } = render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={recording}
+      />
+    );
+
+    const recordButton = screen.getByRole("button", { name: "Recording..." });
+    expect(recordButton).toBeDisabled();
+    expect(recordButton).toHaveAttribute("aria-busy", "true");
+    unmount();
+
+    const updating = createGovernanceWorkspace();
+    updating.isSubmittingReviewPolicy = true;
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={updating}
+      />
+    );
+
+    const updateButton = screen.getByRole("button", { name: "Updating..." });
+    expect(updateButton).toBeDisabled();
+    expect(updateButton).toHaveAttribute("aria-busy", "true");
+  });
+
   it("disables other disposition resolve buttons while one resolution is in flight", () => {
     const workspace = createGovernanceWorkspace();
     workspace.reviewDispositionState = {

@@ -118,7 +118,7 @@ export function GovernanceView({
             />
           </div>
 
-          <button type="submit" disabled={isSubmittingGovernance}>
+          <button type="submit" disabled={isSubmittingGovernance} aria-busy={isSubmittingGovernance}>
             {isSubmittingGovernance ? t("governance.recording") : t("governance.createPolicyRecord")}
           </button>
         </form>
@@ -186,7 +186,7 @@ export function GovernanceView({
             <span>{t("governance.requireAssignedReviewer")}</span>
           </label>
 
-          <button type="submit" disabled={isSubmittingReviewPolicy}>
+          <button type="submit" disabled={isSubmittingReviewPolicy} aria-busy={isSubmittingReviewPolicy}>
             {isSubmittingReviewPolicy ? t("governance.updating") : t("governance.updateReviewPolicy")}
           </button>
         </form>

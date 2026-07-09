@@ -1,6 +1,5 @@
 import type { LanguageProfile } from "../api";
 import { ConfidenceBadge } from "../components/badges";
-import { formatCount } from "../lib/format";
 import type { AsyncState } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -116,7 +115,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("profile.grammarInventory")}</span>
-            <h2>{formatCount(grammarRules.length, "rule")}</h2>
+            <h2>
+              {grammarRules.length === 1
+                ? t("profile.ruleCountOne", { count: grammarRules.length })
+                : t("profile.ruleCountMany", { count: grammarRules.length })}
+            </h2>
           </div>
         </div>
         <div className="detail-list">
@@ -143,7 +146,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("profile.vocabularyInventory")}</span>
-            <h2>{formatCount(vocabulary.length, "entry", "entries")}</h2>
+            <h2>
+              {vocabulary.length === 1
+                ? t("profile.entryCountOne", { count: vocabulary.length })
+                : t("profile.entryCountMany", { count: vocabulary.length })}
+            </h2>
           </div>
         </div>
         <div className="vocabulary-grid">
@@ -168,7 +175,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("profile.morphemeInventory")}</span>
-            <h2>{formatCount(morphemeInventory.length, "morpheme")}</h2>
+            <h2>
+              {morphemeInventory.length === 1
+                ? t("profile.morphemeCountOne", { count: morphemeInventory.length })
+                : t("profile.morphemeCountMany", { count: morphemeInventory.length })}
+            </h2>
           </div>
         </div>
         <div className="morpheme-grid">
@@ -178,7 +189,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
             <article className="morpheme-entry" key={`${index}:${item.surface}:${item.lemma}`}>
               <div className="morpheme-entry-topline">
                 <code>{item.surface}</code>
-                <span className="id-badge">{formatCount(item.occurrenceCount, "corpus use")}</span>
+                <span className="id-badge">
+                  {item.occurrenceCount === 1
+                    ? t("profile.corpusUseCountOne", { count: item.occurrenceCount })
+                    : t("profile.corpusUseCountMany", { count: item.occurrenceCount })}
+                </span>
               </div>
               <strong>{item.lemma}</strong>
               <span>{item.glosses.join(" / ")}</span>
@@ -204,7 +219,11 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("profile.paradigmGaps")}</span>
-            <h2>{formatCount(paradigmGaps.length, "fieldwork to-do")}</h2>
+            <h2>
+              {paradigmGaps.length === 1
+                ? t("profile.fieldworkTodoCountOne", { count: paradigmGaps.length })
+                : t("profile.fieldworkTodoCountMany", { count: paradigmGaps.length })}
+            </h2>
           </div>
         </div>
         {paradigmGaps.length === 0 ? (
@@ -219,7 +238,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
                   <code>{gap.lemma}</code>
                   <span className="paradigm-gap-dimension">{gap.dimension}</span>
                   <span className="id-badge">
-                    {formatCount(gap.evidencePassageIds.length, "linked passage")}
+                    {gap.evidencePassageIds.length === 1
+                      ? t("profile.linkedPassageCountOne", { count: gap.evidencePassageIds.length })
+                      : t("profile.linkedPassageCountMany", { count: gap.evidencePassageIds.length })}
                   </span>
                 </div>
                 <div className="pill-row">

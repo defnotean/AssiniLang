@@ -261,7 +261,13 @@ export function LearnerView({
               onChange={(event) => onAnswerChange(event.target.value)}
               placeholder={t("learner.typeYourAnswerHere")}
             />
-            <button type="button" className="full-width" onClick={onGrade} disabled={isGrading || exerciseAnswer.trim().length === 0}>
+            <button
+              type="button"
+              className="full-width"
+              onClick={onGrade}
+              disabled={isGrading || exerciseAnswer.trim().length === 0}
+              aria-busy={isGrading}
+            >
               {isGrading ? t("learner.grading") : t("learner.grade")}
             </button>
             {exerciseResult && (
@@ -277,7 +283,10 @@ export function LearnerView({
                   {t("learner.loadingSubmissions")}
                 </p>
               ) : submissionHistory.length === 0 ? (
-                <p className="inline-empty">{t("learner.noSubmissionsYet")}</p>
+                <div className="inline-empty" role="status" aria-live="polite">
+                  <p>{t("learner.noSubmissionsYet")}</p>
+                  <p className="muted">{t("learner.noSubmissionsHint")}</p>
+                </div>
               ) : (
                 <div className="detail-list">
                   {submissionHistory.map((submission) => (
@@ -423,6 +432,7 @@ export function LearnerView({
               className="secondary"
               onClick={handleGenerateWithModel}
               disabled={isWorkflowBusy || isCreatingExercise || isGeneratingExercise || isValidatingExercise}
+              aria-busy={isGeneratingExercise}
             >
               {isGeneratingExercise ? t("learner.generating") : t("learner.generateWithModel")}
             </button>
@@ -432,11 +442,17 @@ export function LearnerView({
               aria-label={t("learner.validateExerciseAria")}
               aria-describedby="exercise-validate-dry-run-hint"
               disabled={!canValidateExercise}
+              aria-busy={isValidatingExercise}
               onClick={() => void handleValidateExercise()}
             >
               {isValidatingExercise ? t("learner.validatingExercise") : t("learner.validateExercise")}
             </button>
-            <button type="submit" className="secondary" disabled={!canCreateExercise}>
+            <button
+              type="submit"
+              className="secondary"
+              disabled={!canCreateExercise}
+              aria-busy={isCreatingExercise}
+            >
               {isCreatingExercise ? t("learner.creating") : t("learner.createExercise")}
             </button>
           </div>

@@ -34,7 +34,12 @@ export function LearnerPracticeNextPanel({
 
     const { exercises: recommended, rationale } = practiceState.data;
     if (recommended.length === 0) {
-      return <p className="inline-empty">{t("learner.noPracticeRecommendationsYet")}</p>;
+      return (
+        <div className="inline-empty" role="status" aria-live="polite">
+          <p>{t("learner.noPracticeRecommendationsYet")}</p>
+          <p className="muted">{t("learner.noPracticeRecommendationsHint")}</p>
+        </div>
+      );
     }
 
     return (
