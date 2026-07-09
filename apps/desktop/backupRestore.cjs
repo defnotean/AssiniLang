@@ -117,8 +117,71 @@ function createDesktopRestoreLock() {
 }
 
 /**
+ * Split a manifest path into segments using both `/` and `\` so Windows
+ * absolute paths recorded on one machine still parse on Linux CI/hosts.
+ */
+function splitManifestPathSegments(rawPath) {
+  return String(rawPath)
+    .replace(/\\/g, "/")
+    .split("/")
+    .filter((segment) => segment.length > 0);
+}
+
+/**
+ * Map a manifest `dbPath` onto a file under the backup package's `data/` folder.
+ * Accepts relative `data/...` entries, bare filenames, and absolute paths
+ * (including Windows) by remapping basename or a trailing `data/...` suffix.
+ * Never returns a path outside `dataDir`.
+ *
+ * @returns {{ candidate: string, label: string } | null}
+ */
+function mapManifestDbPathToBackupData(dataDir, rawDbPath) {
+  if (typeof rawDbPath !== "string" || !rawDbPath.trim()) {
+    return null;
+  }
+
+  const trimmed = rawDbPath.trim();
+  const segments = splitManifestPathSegments(trimmed);
+  if (segments.length === 0) {
+    return null;
+  }
+
+  const dataIndex = segments.lastIndexOf("data");
+  /** @type {string[]} */
+  let relativeSegments;
+  if (dataIndex >= 0 && dataIndex < segments.length - 1) {
+    // Prefer the trailing `data/<file>` (or nested) segment from absolute paths.
+    relativeSegments = segments.slice(dataIndex + 1);
+  } else if (!path.isAbsolute(trimmed) && !/^[A-Za-z]:[\\/]/.test(trimmed)) {
+    // Relative path recorded in the manifest (e.g. `data/local-db.json` or `local-db.json`).
+    relativeSegments = segments[0] === "data" ? segments.slice(1) : segments;
+  } else {
+    // Absolute path without a `data` segment — use the final filename only.
+    relativeSegments = [segments[segments.length - 1]];
+  }
+
+  if (
+    relativeSegments.length === 0 ||
+    relativeSegments.some((segment) => segment === "." || segment === "..")
+  ) {
+    return null;
+  }
+
+  const candidate = path.resolve(dataDir, ...relativeSegments);
+  if (!isPathInsideOrSame(dataDir, candidate)) {
+    return null;
+  }
+
+  return {
+    candidate,
+    label: relativeSegments.join("/")
+  };
+}
+
+/**
  * Resolve the database file inside a desktop backup folder.
- * Prefers the basename recorded in backup-manifest.json when present.
+ * Prefers the path recorded in backup-manifest.json, remapped into this
+ * backup's `data/` directory so Windows absolute paths restore on Linux.
  */
 function resolveBackupDbFile(backupDir, manifest = null) {
   const root = path.resolve(backupDir);
@@ -133,15 +196,17 @@ function resolveBackupDbFile(backupDir, manifest = null) {
   }
 
   if (parsed && typeof parsed.dbPath === "string" && parsed.dbPath.trim()) {
-    const basename = path.basename(parsed.dbPath);
-    const candidate = path.join(dataDir, basename);
-    if (existsSync(candidate)) {
-      return candidate;
+    const mapped = mapManifestDbPathToBackupData(dataDir, parsed.dbPath);
+    if (mapped && existsSync(mapped.candidate)) {
+      return mapped.candidate;
     }
+    const label = mapped?.label
+      ?? splitManifestPathSegments(parsed.dbPath).at(-1)
+      ?? parsed.dbPath.trim();
     // Manifest named a database file that is missing — do not silently fall back
     // to local-db.* (that could restore the wrong workspace).
     throw new Error(
-      `Backup at ${root} lists database ${basename} in backup-manifest.json, but that file is missing under data/.`
+      `Backup at ${root} lists database ${label} in backup-manifest.json, but that file is missing under data/.`
     );
   }
 

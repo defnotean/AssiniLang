@@ -1,5 +1,5 @@
 import { realpath as fsRealpath } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve as resolvePath, sep } from "node:path";
+import { isAbsolute, join, relative, resolve as resolvePath, sep, win32 } from "node:path";
 
 type Env = Record<string, string | undefined>;
 type RealpathFn = (path: string) => Promise<string>;
@@ -65,6 +65,30 @@ function looksLikeWindowsAbsolutePath(pathValue: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(stripped) || stripped.startsWith("\\\\");
 }
 
+/** Bare `C:` (drive-relative cwd) — not absolute, but still a volume root. */
+function looksLikeBareWindowsDrive(pathValue: string): boolean {
+  const stripped = stripWindowsExtendedPrefix(pathValue.trim());
+  // `C:` and win32.normalize("C:") => `C:.`
+  return /^[A-Za-z]:\.?$/i.test(stripped);
+}
+
+/**
+ * Normalize an allowlist root without letting POSIX path.resolve rewrite
+ * Windows drive/UNC strings into CWD-relative junk on Linux CI hosts.
+ */
+function normalizeConfiguredRoot(pathValue: string): string {
+  const stripped = stripWindowsExtendedPrefix(pathValue.trim());
+  if (looksLikeBareWindowsDrive(stripped)) {
+    // Canonicalize bare drive letters to an explicit drive root (`C:\`),
+    // never `C:.` (win32.normalize of bare `C:`).
+    return `${stripped[0]!.toUpperCase()}:\\`;
+  }
+  if (looksLikeWindowsAbsolutePath(stripped)) {
+    return win32.normalize(stripped);
+  }
+  return resolvePath(stripped);
+}
+
 function normalizeForCompare(pathValue: string): string {
   const stripped = stripWindowsExtendedPrefix(pathValue);
   return process.platform === "win32" || looksLikeWindowsAbsolutePath(stripped)
@@ -99,30 +123,39 @@ export function isPathInsideRoot(candidate: string, root: string): boolean {
 }
 
 function isAbsoluteVaultRoot(pathValue: string): boolean {
-  return isAbsolute(pathValue) || looksLikeWindowsAbsolutePath(pathValue);
+  // Bare `C:` is not path.isAbsolute, but it is a Windows volume root and must be
+  // classified (then rejected) rather than treated as a relative segment.
+  return (
+    isAbsolute(pathValue) ||
+    looksLikeWindowsAbsolutePath(pathValue) ||
+    looksLikeBareWindowsDrive(pathValue)
+  );
+}
+
+/** True when a win32-normalized path is only a drive letter (C:, C:\, C:.). */
+function isWindowsDriveRootNormalized(normalized: string): boolean {
+  return /^[A-Za-z]:\.?$/i.test(normalized.replace(/\\+$/g, ""));
 }
 
 /**
  * True for drive/volume roots that would allowlist the entire filesystem
- * (e.g. `C:\`, `C:/`, `/`). UNC share roots like `\\server\share` are kept.
+ * (e.g. `C:\`, `C:/`, `C:`, `/`). UNC share roots like `\\server\share` are kept.
  * Always evaluates Windows-shaped paths so Linux CI can validate them.
  */
 export function isFilesystemRootPath(pathValue: string): boolean {
   const stripped = stripWindowsExtendedPrefix(pathValue.trim());
   if (!stripped) return false;
 
-  if (looksLikeWindowsAbsolutePath(stripped)) {
-    const normalized = stripped.replace(/\//g, "\\").replace(/\\+$/g, "");
-    // `C:` / `C:\` (no further segments)
-    if (/^[A-Za-z]:$/i.test(normalized)) return true;
-    return false;
+  if (looksLikeWindowsAbsolutePath(stripped) || looksLikeBareWindowsDrive(stripped)) {
+    // Lexical win32 normalize so `C:/` / `C:\` / bare `C:` collapse without POSIX resolve.
+    return isWindowsDriveRootNormalized(win32.normalize(stripped));
   }
 
   if (stripped === "/" || stripped === "\\") return true;
 
   // On POSIX hosts, resolve("/") stays "/"; on Windows resolve("/") becomes a drive root.
   const resolved = resolvePath(stripped);
-  if (looksLikeWindowsAbsolutePath(resolved)) {
+  if (looksLikeWindowsAbsolutePath(resolved) || looksLikeBareWindowsDrive(resolved)) {
     return isFilesystemRootPath(resolved);
   }
   return resolved === "/" || resolved === sep;
@@ -132,6 +165,8 @@ export function isFilesystemRootPath(pathValue: string): boolean {
  * Parses semicolon-separated absolute roots from ASSINI_OBSIDIAN_VAULT_ROOTS.
  * Empty/unset => []. Relative segments and filesystem roots (`C:\`, `/`) are
  * dropped so CWD / whole-drive allowlists cannot silently widen imports.
+ * Windows-shaped roots are win32-normalized on every host so Linux CI never
+ * rewrites `C:\Vaults` into a CWD-relative path via POSIX resolve.
  */
 export function parseObsidianVaultRoots(env: Env = process.env): string[] {
   const raw = env.ASSINI_OBSIDIAN_VAULT_ROOTS?.trim();
@@ -141,7 +176,7 @@ export function parseObsidianVaultRoots(env: Env = process.env): string[] {
     .map((part) => part.trim())
     .filter(Boolean)
     .filter(isAbsoluteVaultRoot)
-    .map((part) => resolvePath(part))
+    .map((part) => normalizeConfiguredRoot(part))
     .filter((part) => !isFilesystemRootPath(part));
 }
 
@@ -171,6 +206,16 @@ function pathHasUnsafeControlChars(pathValue: string): boolean {
 }
 
 async function resolveExistingPath(pathValue: string, realpathFn: RealpathFn): Promise<string> {
+  const stripped = stripWindowsExtendedPrefix(pathValue);
+  // On non-Windows hosts, Windows drive/UNC strings are not real filesystem paths.
+  // Keep them lexical so allowlist checks stay meaningful in Linux CI.
+  if (
+    process.platform !== "win32" &&
+    (looksLikeWindowsAbsolutePath(stripped) || looksLikeBareWindowsDrive(stripped))
+  ) {
+    return win32.normalize(stripped);
+  }
+
   const resolved = resolvePath(pathValue);
   try {
     return await realpathFn(resolved);

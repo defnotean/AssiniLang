@@ -88,6 +88,22 @@ describe("desktop backup restore validation", () => {
     expect(resolveBackupDbFile(dir)).toBe(dbPath);
   });
 
+  it("remaps Windows absolute manifest dbPath into the backup data folder", () => {
+    const { dir, dbPath } = createBackupFixture({
+      dbName: "local-db.json",
+      manifestDbPath: "C:\\Users\\op\\AppData\\AssiniLang\\data\\local-db.json"
+    });
+    expect(resolveBackupDbFile(dir)).toBe(dbPath);
+  });
+
+  it("resolves relative data/ entries from the manifest into the backup package", () => {
+    const { dir, dbPath } = createBackupFixture({
+      dbName: "workspace.json",
+      manifestDbPath: "data/workspace.json"
+    });
+    expect(resolveBackupDbFile(dir)).toBe(dbPath);
+  });
+
   it("falls back to local-db.json when the manifest path is missing", () => {
     const { dir, dbPath } = createBackupFixture();
     writeFileSync(join(dir, "backup-manifest.json"), "{}", "utf8");
@@ -101,6 +117,15 @@ describe("desktop backup restore validation", () => {
     });
 
     expect(() => resolveBackupDbFile(dir)).toThrow(/lists database workspace-custom\.json/);
+  });
+
+  it("refuses manifest paths that escape the backup data directory", () => {
+    const { dir } = createBackupFixture({
+      dbName: "local-db.json",
+      manifestDbPath: "data/../outside.json"
+    });
+
+    expect(() => resolveBackupDbFile(dir)).toThrow(/lists database/);
   });
 
   it("validates a readable backup before restore", async () => {

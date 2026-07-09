@@ -48,16 +48,16 @@ describe("Obsidian vault path safety", () => {
   it("drops filesystem / drive roots so whole-volume allowlists cannot widen imports", () => {
     expect(isFilesystemRootPath("C:\\")).toBe(true);
     expect(isFilesystemRootPath("C:/")).toBe(true);
+    expect(isFilesystemRootPath("C:")).toBe(true);
     expect(isFilesystemRootPath("/")).toBe(true);
     expect(isFilesystemRootPath("C:\\Vaults")).toBe(false);
     expect(isFilesystemRootPath("\\\\server\\share")).toBe(false);
 
-    expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;/;C:/" })).toEqual([]);
+    expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;/;C:/;C:" })).toEqual([]);
+    // Windows drive strings must stay lexical on every host (no POSIX resolve into CWD).
     expect(parseObsidianVaultRoots({
       ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;C:\\Vaults;/"
-    })).toEqual(
-      parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults" })
-    );
+    })).toEqual(["C:\\Vaults"]);
   });
 
   it("treats a path as inside a root only when equal or a descendant", () => {
