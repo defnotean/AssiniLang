@@ -919,6 +919,7 @@ export const ar: Record<MessageKey, string> = {
   "model.reachability.reachableWithLatency": "قابل للوصول ({mode}، {ms} مللي ثانية)",
   "model.reachability.unreachable": "غير قابل للوصول",
   "model.reachability.unreachableWithDetail": "غير قابل للوصول: {detail}",
+  "model.smokeTest.seedPrompt": "أنشئ سؤال تدريب موجزًا وآمنًا واحدًا باستخدام سياق مساحة العمل العامة المتاح فقط.",
   "model.smokeTest.noAssistantMessage": "أُنشئت الجلسة، لكن لم يُرجَع أي رد من المساعد.",
   "model.observabilityAria": "رصد جلسات النموذج",
   "model.sessionObservability": "رصد الجلسات",

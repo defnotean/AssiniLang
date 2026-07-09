@@ -88,6 +88,8 @@ describe("locale catalogs", () => {
     expect(en["model.modelNamePlaceholder"]).toBe("irene-fusion");
     expect(en["model.transcriptionBaseUrlPlaceholder"]).toContain("9000");
     expect(en["model.ocrBaseUrlPlaceholder"]).toContain("11434");
+    expect(en["model.smokeTest.seedPrompt"]).toContain("public workspace context");
+    expect(ar["model.smokeTest.seedPrompt"]).not.toBe(en["model.smokeTest.seedPrompt"]);
     // Guard against the previous English Settings leftovers leaking back into AR.
     expect(ar["model.desktopToolsAria"]).not.toBe(en["model.desktopToolsAria"]);
     expect(ar["model.discoveredModels"]).not.toBe(en["model.discoveredModels"]);

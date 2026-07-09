@@ -47,7 +47,7 @@ The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currentl
 
 ## Backing up and restoring the local database
 
-`JsonStore` exposes `backupTo(destinationPath)` and `restoreFrom(sourcePath)` for both backends: JSON backups are byte-for-byte copies; SQLite backups use better-sqlite3's online backup API. Both refuse when the source and destination resolve to the same path, including when one path is a symlink alias of the other (`realpath` identity). `npm run db:backup` validates the live workspace against the current schema before copying, so a corrupt database cannot be archived as a backup. Restore also validates that the backup parses against the current schema before it replaces the live database, and fails loudly (with the database path) otherwise.
+`JsonStore` exposes `backupTo(destinationPath)` and `restoreFrom(sourcePath)` for both backends: JSON backups are byte-for-byte copies; SQLite backups use better-sqlite3's online backup API. Both refuse when the source and destination resolve to the same path, including when one path is a symlink alias of the other (`realpath` identity) or a hard-link alias (same device + inode). `npm run db:backup` validates the live workspace against the current schema before copying, so a corrupt database cannot be archived as a backup. Restore also validates that the backup parses against the current schema before it replaces the live database, and fails loudly (with the database path) otherwise.
 
 From the command line:
 

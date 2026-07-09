@@ -3,6 +3,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, getInitialTheme } from "./App";
 import { ApiError } from "./lib/apiClient";
+import { en } from "./i18n/en";
 
 const apiMock = vi.hoisted(() => ({
   acceptExtractionDraft: vi.fn(),
@@ -1389,7 +1390,7 @@ describe("App", () => {
     await waitFor(() => expect(apiMock.createAiSession).toHaveBeenCalledWith({
       languageId: "avenik",
       mode: "learner_practice",
-      seedPrompt: "Create one concise, safe practice prompt using only the provided public workspace context.",
+      seedPrompt: en["model.smokeTest.seedPrompt"],
       contextNoteIds: ["avn-rule-verb-chain-note", "avn-rule-case-note"],
       contextPassageIds: ["avn-c001"]
     }));

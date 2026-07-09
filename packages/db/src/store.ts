@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import type Database from "better-sqlite3";
@@ -43,16 +43,41 @@ function canonicalizePathForIdentity(pathValue: string): string {
 
 /**
  * True when two filesystem paths refer to the same location after resolve +
- * realpath (case-insensitive on Windows). Catches symlink aliases of the live
- * database so backup/restore cannot overwrite the source through a different path.
+ * realpath (case-insensitive on Windows), or when both exist as the same
+ * inode/device (hard-link aliases). Catches symlink and hard-link aliases of
+ * the live database so backup/restore cannot overwrite the source through a
+ * different path string.
  */
 export function pathsReferToSameFile(left: string, right: string): boolean {
   const normalizedLeft = canonicalizePathForIdentity(left);
   const normalizedRight = canonicalizePathForIdentity(right);
-  if (process.platform === "win32") {
-    return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
+  const sameResolvedPath =
+    process.platform === "win32"
+      ? normalizedLeft.toLowerCase() === normalizedRight.toLowerCase()
+      : normalizedLeft === normalizedRight;
+  if (sameResolvedPath) {
+    return true;
   }
-  return normalizedLeft === normalizedRight;
+
+  // Hard links share device+inode while keeping distinct path strings (realpath
+  // does not collapse them the way it collapses symlink aliases).
+  try {
+    const leftStat = statSync(normalizedLeft);
+    const rightStat = statSync(normalizedRight);
+    if (
+      leftStat.isFile()
+      && rightStat.isFile()
+      && leftStat.dev === rightStat.dev
+      && leftStat.ino === rightStat.ino
+      && leftStat.ino !== 0
+    ) {
+      return true;
+    }
+  } catch {
+    // One or both paths may not exist yet (typical for a new backup destination).
+  }
+
+  return false;
 }
 
 function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBackend {

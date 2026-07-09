@@ -943,6 +943,7 @@ export const en = {
   "model.reachability.reachableWithLatency": "Reachable ({mode}, {ms} ms)",
   "model.reachability.unreachable": "Unreachable",
   "model.reachability.unreachableWithDetail": "Unreachable: {detail}",
+  "model.smokeTest.seedPrompt": "Create one concise, safe practice prompt using only the provided public workspace context.",
   "model.smokeTest.noAssistantMessage": "Session created, but no assistant message was returned.",
   "model.observabilityAria": "Model session observability",
   "model.sessionObservability": "Session observability",

@@ -157,7 +157,13 @@ describe("project documentation", () => {
         "```mermaid",
         "schemaVersion"
       ],
-      "docs/configuration.md": ["## Setup recipes", "ASSINI_LLM_PROVIDER", "Deterministic / no-model mode"],
+      "docs/configuration.md": [
+        "## Setup recipes",
+        "ASSINI_LLM_PROVIDER",
+        "Deterministic / no-model mode",
+        "Empty or whitespace-only session cookie",
+        "last matching pair wins"
+      ],
       "docs/development.md": [
         "npm.cmd run verify",
         "fixtures/eval/testlang-baseline.json",
@@ -187,6 +193,7 @@ describe("project documentation", () => {
         "--dry-run",
         "same path",
         "symlink alias",
+        "hard-link alias",
         "validates the live workspace"
       ],
       "docs/operator-recovery.md": [
@@ -196,7 +203,7 @@ describe("project documentation", () => {
         "npm.cmd run db:backup",
         "--dry-run",
         "refuses to archive an invalid workspace",
-        "symlink aliases",
+        "symlink or hard-link aliases",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "npm.cmd run seed"

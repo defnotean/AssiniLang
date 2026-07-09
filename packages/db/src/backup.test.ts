@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { link, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -118,6 +118,20 @@ it("treats a symlink alias of the live database as the same file", async () => {
   expect(pathsReferToSameFile(dbPath, aliasPath)).toBe(true);
   await expect(store.backupTo(aliasPath)).rejects.toThrow(/destination must differ/);
   await expect(store.restoreFrom(aliasPath)).rejects.toThrow(/backup source must differ/);
+  expect(await store.read()).toEqual(before);
+});
+
+it("treats a hard-link alias of the live database as the same file", async () => {
+  const dbPath = join(dir, "db.json");
+  const hardLinkPath = join(dir, "hardlink-db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  await link(dbPath, hardLinkPath);
+  const before = await store.read();
+
+  expect(pathsReferToSameFile(dbPath, hardLinkPath)).toBe(true);
+  await expect(store.backupTo(hardLinkPath)).rejects.toThrow(/destination must differ/);
+  await expect(store.restoreFrom(hardLinkPath)).rejects.toThrow(/backup source must differ/);
   expect(await store.read()).toEqual(before);
 });
 

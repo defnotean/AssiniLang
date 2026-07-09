@@ -426,7 +426,7 @@ export function useModelWorkspace(
       const session = await createAiSession({
         languageId: selectedLanguageId,
         mode: "learner_practice",
-        seedPrompt: "Create one concise, safe practice prompt using only the provided public workspace context.",
+        seedPrompt: t("model.smokeTest.seedPrompt"),
         contextNoteIds: data.notes.slice(0, 2).map((note) => note.id),
         contextPassageIds: data.corpus.slice(0, 2).map((passage) => passage.id)
       });

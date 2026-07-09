@@ -242,6 +242,37 @@ describe("public language views", () => {
     };
     expect(verifyExportIntegrity(wrongPolicy)).toBe(false);
 
+    const wrongAlgorithm = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        algorithm: "sha1"
+      }
+    };
+    expect(verifyExportIntegrity(wrongAlgorithm)).toBe(false);
+
+    const nonHexHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: "g".repeat(64)
+      }
+    };
+    expect(verifyExportIntegrity(nonHexHash)).toBe(false);
+
+    const shortHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: "0".repeat(63)
+      }
+    };
+    expect(verifyExportIntegrity(shortHash)).toBe(false);
+
+    const missingIntegrity = { ...snapshot! };
+    delete (missingIntegrity as { integrity?: unknown }).integrity;
+    expect(verifyExportIntegrity(missingIntegrity)).toBe(false);
+
     const mutatedPayload = {
       ...snapshot!,
       exportedAt: "2099-01-01T00:00:00.000Z"

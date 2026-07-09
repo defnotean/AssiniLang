@@ -88,4 +88,36 @@ describe("createReadinessReport", () => {
     });
     expect(JSON.stringify(report)).not.toContain("source-secret-123");
   });
+
+  it("treats non-finite or negative job-queue counts as unavailable", async () => {
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => ({ pending: -1, active: 0 }))
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => ({ pending: 0, active: Number.NaN }))
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+
+    await expect(
+      createReadinessReport(async () => createEmptyState(), () => ({
+        pending: Number.POSITIVE_INFINITY,
+        active: 1
+      }))
+    ).resolves.toMatchObject({
+      ok: false,
+      checks: {
+        jobQueue: { ok: false, error: "Job queue status unavailable" }
+      }
+    });
+  });
 });

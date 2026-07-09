@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { link, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -109,6 +109,19 @@ describe("runBackupCli", () => {
     await expect(
       runBackupCli({
         argv: [dbPath],
+        env: { ASSINI_DB_PATH: dbPath }
+      })
+    ).rejects.toThrow(/same as the live database/);
+  });
+
+  it("rejects backing up onto a hard-link alias of the live database", async () => {
+    const { dir, dbPath } = await createTempDb({ validWorkspace: true });
+    const hardLinkPath = join(dir, "hardlink-backup.json");
+    await link(dbPath, hardLinkPath);
+
+    await expect(
+      runBackupCli({
+        argv: [hardLinkPath],
         env: { ASSINI_DB_PATH: dbPath }
       })
     ).rejects.toThrow(/same as the live database/);
