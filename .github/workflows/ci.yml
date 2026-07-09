@@ -62,8 +62,10 @@ jobs:
             echo "Built dist server never answered /health" >&2
             exit 1
           fi
-          curl -fsS "http://127.0.0.1:4517/health"
-          curl -fsS "http://127.0.0.1:4517/ready"
+          health_body="$(curl -fsS "http://127.0.0.1:4517/health")"
+          ready_body="$(curl -fsS "http://127.0.0.1:4517/ready")"
+          node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}' "$health_body"
+          node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}; if(!body.checks?.storage?.ok){console.error(body); process.exit(1)}' "$ready_body"
 
       - name: Audit dependencies
         run: npm audit --audit-level=moderate

@@ -152,21 +152,24 @@ export function cookieValue(request: FastifyRequest, name: string): string | und
   const cookieHeader = getHeaderValue(request, "cookie");
   if (!cookieHeader) return undefined;
 
+  // Last matching pair wins so a stale earlier `name=` (or an old session id)
+  // cannot shadow a later valid session cookie in the same Cookie header.
+  let matched: string | undefined;
   for (const rawCookie of cookieHeader.split(";")) {
     const [rawName, ...rawValueParts] = rawCookie.trim().split("=");
     if (rawName === name) {
       try {
         const value = decodeURIComponent(rawValueParts.join("=")).trim();
         // Empty values (expired Max-Age=0 cookies, bare `name=`) are absent sessions.
-        return value.length > 0 ? value : undefined;
+        matched = value.length > 0 ? value : undefined;
       } catch {
         // Malformed percent-encoding must not 500 auth paths; treat as absent.
-        return undefined;
+        matched = undefined;
       }
     }
   }
 
-  return undefined;
+  return matched;
 }
 
 export function resolveActorContext(

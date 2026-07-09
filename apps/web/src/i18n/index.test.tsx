@@ -84,6 +84,10 @@ describe("locale catalogs", () => {
     expect(ar["model.clearSavedModel"]).toBe("استخدام الوضع دون اتصال");
     expect(ar["model.endpointConnected"]).toContain("{baseUrl}");
     expect(ar["model.endpointConnected"]).toContain("{count}");
+    expect(en["model.baseUrlPlaceholder"]).toContain("11434");
+    expect(en["model.modelNamePlaceholder"]).toBe("irene-fusion");
+    expect(en["model.transcriptionBaseUrlPlaceholder"]).toContain("9000");
+    expect(en["model.ocrBaseUrlPlaceholder"]).toContain("11434");
     // Guard against the previous English Settings leftovers leaking back into AR.
     expect(ar["model.desktopToolsAria"]).not.toBe(en["model.desktopToolsAria"]);
     expect(ar["model.discoveredModels"]).not.toBe(en["model.discoveredModels"]);

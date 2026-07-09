@@ -26,7 +26,7 @@ npm.cmd run db:backup -- path\to\my-backup.json
 npm.cmd run db:backup -- --dry-run
 ```
 
-Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). `--dry-run` resolves the source and destination paths and prints them without writing a file after confirming the live database parses. The CLI refuses to write onto the live database path and refuses to archive an invalid workspace. After a successful write, the CLI prints a pasteable restore recipe with the live database path and backup path filled in (there is no `npm run db:restore` script). Restore is deliberate: call `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database.
+Writes a validated copy to `data/backups/local-db-<timestamp>.json` (or the path you pass). `--dry-run` resolves the source and destination paths and prints them without writing a file after confirming the live database parses. The CLI refuses to write onto the live database path (including symlink aliases of that file) and refuses to archive an invalid workspace. After a successful write, the CLI prints a pasteable restore recipe with the live database path and backup path filled in (there is no `npm run db:restore` script). Restore is deliberate: call `JsonStore.restoreFrom(sourcePath)` from a Node REPL or small script so a bad backup cannot silently replace live data. Restore validates against the current schema before replacing the live database, and also refuses when the backup path is the live database (or a symlink to it).
 
 Example (paths from the CLI restore hint):
 

@@ -45,6 +45,8 @@ describe("repository production hygiene", () => {
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("npm run verify");
     expect(workflow).toContain("npm run smoke");
+    expect(workflow).toContain("Built-dist startup smoke (/health + /ready)");
+    expect(workflow).toContain('body.checks?.storage?.ok');
     expect(workflow).toContain("npm audit --audit-level=moderate");
   });
 

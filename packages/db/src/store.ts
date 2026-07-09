@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { realpathSync } from "node:fs";
 import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import type Database from "better-sqlite3";
@@ -26,10 +27,28 @@ function inferBackend(dbPath: string): StoreBackend {
   return dbPath.endsWith(".json") ? "json" : "sqlite";
 }
 
-/** True when two filesystem paths resolve to the same location (case-insensitive on Windows). */
+/**
+ * Canonicalize a path for same-file checks. Prefer realpath so a symlink alias
+ * of the live database is treated as the same file; fall back to resolve when
+ * the path does not exist yet (typical for a new backup destination).
+ */
+function canonicalizePathForIdentity(pathValue: string): string {
+  const resolved = resolve(pathValue);
+  try {
+    return realpathSync(resolved);
+  } catch {
+    return resolved;
+  }
+}
+
+/**
+ * True when two filesystem paths refer to the same location after resolve +
+ * realpath (case-insensitive on Windows). Catches symlink aliases of the live
+ * database so backup/restore cannot overwrite the source through a different path.
+ */
 export function pathsReferToSameFile(left: string, right: string): boolean {
-  const normalizedLeft = resolve(left);
-  const normalizedRight = resolve(right);
+  const normalizedLeft = canonicalizePathForIdentity(left);
+  const normalizedRight = canonicalizePathForIdentity(right);
   if (process.platform === "win32") {
     return normalizedLeft.toLowerCase() === normalizedRight.toLowerCase();
   }

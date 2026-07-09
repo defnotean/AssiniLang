@@ -48,4 +48,25 @@ describe("cookieValue", () => {
       cookieValue(requestWithCookie("assini_prototype_session="), "assini_prototype_session")
     ).toBeUndefined();
   });
+
+  it("prefers the last matching cookie when the header lists the same name twice", () => {
+    expect(
+      cookieValue(
+        requestWithCookie("assini_prototype_session=stale-session; other=1; assini_prototype_session=session-id-2"),
+        "assini_prototype_session"
+      )
+    ).toBe("session-id-2");
+    expect(
+      cookieValue(
+        requestWithCookie("assini_prototype_session=stale-session; assini_prototype_session="),
+        "assini_prototype_session"
+      )
+    ).toBeUndefined();
+    expect(
+      cookieValue(
+        requestWithCookie("assini_prototype_session=; assini_prototype_session=session%2Did%2D3"),
+        "assini_prototype_session"
+      )
+    ).toBe("session-id-3");
+  });
 });

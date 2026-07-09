@@ -137,6 +137,7 @@ describe("project documentation", () => {
         "uses the reviewer actor in the browser",
         "cookie `Max-Age` both refresh",
         "Empty or whitespace-only session cookie",
+        "last matching pair wins",
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
@@ -185,6 +186,7 @@ describe("project documentation", () => {
         "publicLanguageViews.ts",
         "--dry-run",
         "same path",
+        "symlink alias",
         "validates the live workspace"
       ],
       "docs/operator-recovery.md": [
@@ -194,6 +196,7 @@ describe("project documentation", () => {
         "npm.cmd run db:backup",
         "--dry-run",
         "refuses to archive an invalid workspace",
+        "symlink aliases",
         "JsonStore.restoreFrom",
         "source_asset.processing_recovered",
         "npm.cmd run seed"

@@ -1,8 +1,8 @@
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { JsonStore } from "./store.js";
+import { JsonStore, pathsReferToSameFile } from "./store.js";
 import { buildTestWorkspaceState } from "./testing.js";
 
 let dir: string;
@@ -99,6 +99,25 @@ it("rejects backup and restore when the source and live paths are the same file"
 
   await expect(store.backupTo(dbPath)).rejects.toThrow(/destination must differ/);
   await expect(store.restoreFrom(dbPath)).rejects.toThrow(/backup source must differ/);
+  expect(await store.read()).toEqual(before);
+});
+
+it("treats a symlink alias of the live database as the same file", async () => {
+  if (process.platform === "win32") {
+    // Creating file symlinks on Windows often needs elevated privileges.
+    return;
+  }
+
+  const dbPath = join(dir, "db.json");
+  const aliasPath = join(dir, "alias-db.json");
+  const store = new JsonStore(dbPath);
+  await store.write(buildTestWorkspaceState());
+  await symlink(dbPath, aliasPath);
+  const before = await store.read();
+
+  expect(pathsReferToSameFile(dbPath, aliasPath)).toBe(true);
+  await expect(store.backupTo(aliasPath)).rejects.toThrow(/destination must differ/);
+  await expect(store.restoreFrom(aliasPath)).rejects.toThrow(/backup source must differ/);
   expect(await store.read()).toEqual(before);
 });
 

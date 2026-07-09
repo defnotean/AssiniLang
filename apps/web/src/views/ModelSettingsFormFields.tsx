@@ -40,7 +40,7 @@ export function ModelSettingsFormFields({
           <input
             id="model-base-url"
             value={form.baseUrl}
-            placeholder="http://127.0.0.1:11434/v1"
+            placeholder={t("model.baseUrlPlaceholder")}
             disabled={isSavingSettings}
             onChange={(event) => setForm((current) => ({ ...current, baseUrl: event.target.value }))}
           />
@@ -50,7 +50,7 @@ export function ModelSettingsFormFields({
           <input
             id="model-name"
             value={form.model}
-            placeholder="irene-fusion"
+            placeholder={t("model.modelNamePlaceholder")}
             disabled={isSavingSettings}
             onChange={(event) => setForm((current) => ({ ...current, model: event.target.value }))}
           />
@@ -122,7 +122,7 @@ export function ModelSettingsFormFields({
             <input
               id="transcribe-base-url"
               value={form.transcriptionBaseUrl}
-              placeholder="http://127.0.0.1:9000/v1"
+              placeholder={t("model.transcriptionBaseUrlPlaceholder")}
               disabled={isSavingSettings}
               onChange={(event) => setForm((current) => ({ ...current, transcriptionBaseUrl: event.target.value }))}
             />
@@ -172,7 +172,7 @@ export function ModelSettingsFormFields({
             <input
               id="ocr-base-url"
               value={form.ocrBaseUrl}
-              placeholder="http://127.0.0.1:11434/v1"
+              placeholder={t("model.ocrBaseUrlPlaceholder")}
               disabled={isSavingSettings}
               onChange={(event) => setForm((current) => ({ ...current, ocrBaseUrl: event.target.value }))}
             />
