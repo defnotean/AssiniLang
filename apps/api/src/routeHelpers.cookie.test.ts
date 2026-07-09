@@ -37,6 +37,21 @@ describe("cookieValue", () => {
     ).toBeUndefined();
   });
 
+  it("does not let a trailing malformed cookie wipe a prior valid session id", () => {
+    expect(
+      cookieValue(
+        requestWithCookie("assini_prototype_session=session-id-1; assini_prototype_session=%E0%A4%A"),
+        "assini_prototype_session"
+      )
+    ).toBe("session-id-1");
+    expect(
+      cookieValue(
+        requestWithCookie("assini_prototype_session=%E0%A4%A; assini_prototype_session=session%2Did%2D2"),
+        "assini_prototype_session"
+      )
+    ).toBe("session-id-2");
+  });
+
   it("treats empty or whitespace-only cookie values as absent", () => {
     expect(
       cookieValue(requestWithCookie("assini_prototype_session=; other=ok"), "assini_prototype_session")

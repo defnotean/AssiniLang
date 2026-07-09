@@ -161,10 +161,11 @@ export function cookieValue(request: FastifyRequest, name: string): string | und
       try {
         const value = decodeURIComponent(rawValueParts.join("=")).trim();
         // Empty values (expired Max-Age=0 cookies, bare `name=`) are absent sessions.
+        // A trailing empty pair still clears a prior id (last-wins). Malformed
+        // percent-encoding skips this pair only so it cannot wipe a prior valid id.
         matched = value.length > 0 ? value : undefined;
       } catch {
-        // Malformed percent-encoding must not 500 auth paths; treat as absent.
-        matched = undefined;
+        // Malformed percent-encoding must not 500 auth paths; skip this pair.
       }
     }
   }

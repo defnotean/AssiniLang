@@ -440,6 +440,35 @@ describe("localizeApiError", () => {
     ).toBe("Choose a language before generating draft notes.");
   });
 
+  it("localizes review-disposition resolve negatives from message text when metadata is absent", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Review disposition not found: disp-missing", { status: 404 }),
+        t,
+        "governance.errReviewDispositionResolutionFailed"
+      )
+    ).toBe("That review disposition was not found. Refresh the Checks ledger and try again.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Review disposition is already resolved", { status: 400 }),
+        t,
+        "governance.errReviewDispositionResolutionFailed"
+      )
+    ).toBe("That review disposition is already resolved.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Review disposition is already resolved", {
+          status: 400,
+          i18nKey: "governance.errDispositionAlreadyResolved"
+        }),
+        t,
+        "governance.errReviewDispositionResolutionFailed"
+      )
+    ).toBe("That review disposition is already resolved.");
+  });
+
   it("localizes elder review negatives from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError(

@@ -1137,6 +1137,8 @@ export const ar: Record<MessageKey, string> = {
   "governance.errResolutionSummaryRequired": "ملخّص الحسم مطلوب.",
   "governance.msgReviewDispositionResolved": "تم حسم قرار المراجعة.",
   "governance.errReviewDispositionResolutionFailed": "فشل حسم قرار المراجعة",
+  "governance.errDispositionNotFound": "لم يُعثر على قرار المراجعة هذا. حدّث دفتر الشيكات ثم أعد المحاولة.",
+  "governance.errDispositionAlreadyResolved": "قرار المراجعة هذا محسوم بالفعل.",
   "governance.errSnapshotExportFailed": "فشل تصدير اللقطة",
   "governance.errEvaluationArtifactExportFailed": "فشل تصدير مُخرَج التقييم",
   "elderWs.errMissingCorrectionOrRationale": "يرجى وصف كل من التصحيح والمبرّر.",

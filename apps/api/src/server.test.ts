@@ -3047,6 +3047,36 @@ describe("api server", () => {
       resolutionSummary: "Elder confirmed the note can return to reviewer quorum."
     });
 
+    const alreadyResolved = await app.inject({
+      method: "PATCH",
+      url: "/review-dispositions/resolve",
+      headers: authHeaders("elder-1"),
+      payload: {
+        dispositionId,
+        resolutionSummary: "Second resolve should be rejected."
+      }
+    });
+    expect(alreadyResolved.statusCode).toBe(400);
+    expect(alreadyResolved.json()).toEqual({
+      error: "Review disposition is already resolved",
+      i18nKey: "governance.errDispositionAlreadyResolved"
+    });
+
+    const missingDisposition = await app.inject({
+      method: "PATCH",
+      url: "/review-dispositions/resolve",
+      headers: authHeaders("elder-1"),
+      payload: {
+        dispositionId: "missing-disposition",
+        resolutionSummary: "Unknown disposition should 404."
+      }
+    });
+    expect(missingDisposition.statusCode).toBe(404);
+    expect(missingDisposition.json()).toEqual({
+      error: "Review disposition not found: missing-disposition",
+      i18nKey: "governance.errDispositionNotFound"
+    });
+
     const note = await fetchReviewedNote(app);
     expect(note.status).toBe("under_review");
     expect(note.editHistory.at(-1)).toMatchObject({

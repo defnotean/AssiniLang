@@ -520,6 +520,12 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/Payload too large/i.test(normalized)) {
     return { i18nKey: "errors.payloadTooLarge" };
   }
+  if (/^Review disposition not found:/i.test(normalized)) {
+    return { i18nKey: "governance.errDispositionNotFound" };
+  }
+  if (/Review disposition is already resolved/i.test(normalized)) {
+    return { i18nKey: "governance.errDispositionAlreadyResolved" };
+  }
 
   return undefined;
 }

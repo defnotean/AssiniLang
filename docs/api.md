@@ -10,7 +10,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Health check. |
 | GET | `/ready` | Public | Readiness check for schema-valid persistence. |
-| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use (server `expiresAt` and cookie `Max-Age` both refresh); creating a session also sweeps expired session records. Orphan sessions whose `userId` no longer exists (for example after reseed) are evicted like expired ones. Empty or whitespace-only session cookie values are treated as absent (same as a missing cookie). When the Cookie header lists the same session name more than once, the last matching pair wins (so a stale earlier value cannot shadow a later valid session id). When prototype auth is off, returns `404` with `{ "error": "Prototype auth is disabled", "i18nKey": "errors.prototypeAuthDisabled" }`. |
+| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use (server `expiresAt` and cookie `Max-Age` both refresh); creating a session also sweeps expired session records. Orphan sessions whose `userId` no longer exists (for example after reseed) are evicted like expired ones. Empty or whitespace-only session cookie values are treated as absent (same as a missing cookie). When the Cookie header lists the same session name more than once, the last matching pair wins (so a stale earlier value cannot shadow a later valid session id); a trailing empty pair still clears a prior id, but a trailing malformed percent-encoded pair is skipped so it cannot wipe a prior valid session id. When prototype auth is off, returns `404` with `{ "error": "Prototype auth is disabled", "i18nKey": "errors.prototypeAuthDisabled" }`. |
 | DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie with the same Secure/HttpOnly/SameSite/Path rules as create (`ASSINI_COOKIE_SECURE` / production). Returns 204 even when no session exists. When prototype auth is off, returns `404` with the same `errors.prototypeAuthDisabled` payload as POST. |
 | GET | `/llm/status` | programmer, lead, admin | Sanitized LLM provider, transcription, and OCR readiness. |
 | GET | `/llm/settings` | programmer, lead, admin | Sanitized editable runtime settings for model, transcription, OCR, and URL-fetch behavior. |
@@ -57,8 +57,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/languages/:languageId/review-policy` | reviewer, elder, lead, admin | Review policy for one language. |
 | PUT | `/languages/:languageId/review-policy` | lead, admin (prototype-session reviewer exception) | Update assigned reviewers and threshold. |
 | GET | `/languages/:languageId/review-dispositions` | reviewer, elder, lead, admin | Review-disposition work records. |
-| PATCH | `/review-dispositions/resolve` | reviewer, elder, lead, admin | Resolve a disposition work record by request-body id. |
-| PATCH | `/review-dispositions/:dispositionId/resolve` | reviewer, elder, lead, admin | Legacy path-id resolver for disposition ids that are safe in URL paths. |
+| PATCH | `/review-dispositions/resolve` | reviewer, elder, lead, admin | Resolve a disposition work record by request-body id. Missing ids return `404` with `i18nKey: governance.errDispositionNotFound`; already-resolved records return `400` with `i18nKey: governance.errDispositionAlreadyResolved`. |
+| PATCH | `/review-dispositions/:dispositionId/resolve` | reviewer, elder, lead, admin | Legacy path-id resolver for disposition ids that are safe in URL paths. Same not-found / already-resolved `i18nKey` payloads as the body-id resolver. |
 | GET | `/audit/events` | lead, admin, programmer | Role-gated audit events; `?languageId=` filters. |
 | GET | `/languages/:languageId/elder-context` | elder, reviewer, lead, admin | Public context and correction ledger for elder review. |
 | GET | `/elder/corrections` | elder, reviewer, lead, admin | Correction records; `?languageId=` filters. |
@@ -266,7 +266,7 @@ Audit events are written by mutation routes, including language creation, source
 
 `PATCH /notes/:noteId/review`
 
-Reviewers can update note status and explanations. Contested, rejected, deferred, and escalated notes require a reviewer comment. Those dispositions create work records that can later be resolved by the assignee, leads, or admins.
+Reviewers can update note status and explanations. Contested, rejected, deferred, and escalated notes require a reviewer comment. Those dispositions create work records that can later be resolved by the assignee, leads, or admins. Resolving an unknown disposition id returns `404` with `i18nKey: governance.errDispositionNotFound`; resolving an already-resolved record returns `400` with `i18nKey: governance.errDispositionAlreadyResolved` (English `error` text remains for logs and older clients).
 
 If the same note already has an open work record for the requested disposition, the route updates that record's reason, assignee, and due date instead of creating a duplicate open disposition. The original opened attribution stays on the record, and a separate audit event records the update.
 

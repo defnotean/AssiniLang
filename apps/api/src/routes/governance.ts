@@ -120,7 +120,7 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     reply: FastifyReply,
     dispositionId: string,
     body: ReviewDispositionResolveBody
-  ): Promise<ReviewDisposition | { error: string }> {
+  ): Promise<ReviewDisposition | { error: string; i18nKey?: string }> {
     const current = await readState();
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
@@ -203,12 +203,18 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
 
     if (dispositionMissing) {
       reply.code(404);
-      return { error: `Review disposition not found: ${dispositionId}` };
+      return {
+        error: `Review disposition not found: ${dispositionId}`,
+        i18nKey: "governance.errDispositionNotFound"
+      };
     }
 
     if (dispositionAlreadyResolved) {
       reply.code(400);
-      return { error: "Review disposition is already resolved" };
+      return {
+        error: "Review disposition is already resolved",
+        i18nKey: "governance.errDispositionAlreadyResolved"
+      };
     }
 
     if (dispositionForbidden) {

@@ -1161,6 +1161,8 @@ export const en = {
   "governance.errResolutionSummaryRequired": "Resolution summary is required.",
   "governance.msgReviewDispositionResolved": "Review disposition resolved.",
   "governance.errReviewDispositionResolutionFailed": "Review disposition resolution failed",
+  "governance.errDispositionNotFound": "That review disposition was not found. Refresh the Checks ledger and try again.",
+  "governance.errDispositionAlreadyResolved": "That review disposition is already resolved.",
   "governance.errSnapshotExportFailed": "Snapshot export failed",
   "governance.errEvaluationArtifactExportFailed": "Evaluation artifact export failed",
   "elderWs.errMissingCorrectionOrRationale": "Please describe both the correction and the rationale.",

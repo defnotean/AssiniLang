@@ -143,6 +143,9 @@ describe("project documentation", () => {
         "same Secure/HttpOnly/SameSite/Path rules as create",
         "Empty or whitespace-only session cookie",
         "last matching pair wins",
+        "trailing malformed percent-encoded",
+        "governance.errDispositionNotFound",
+        "governance.errDispositionAlreadyResolved",
         "errors.noLanguagesToEvaluate",
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
@@ -168,6 +171,7 @@ describe("project documentation", () => {
         "Deterministic / no-model mode",
         "Empty or whitespace-only session cookie",
         "last matching pair wins",
+        "trailing malformed percent-encoded",
         "Relative segments"
       ],
       "docs/development.md": [
