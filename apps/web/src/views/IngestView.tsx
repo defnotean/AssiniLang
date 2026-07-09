@@ -419,7 +419,7 @@ export function IngestView({
                       </span>
                     ))}
                   </div>
-                  <strong>{extractionDraftSummary(draft)}</strong>
+                  <strong>{extractionDraftSummary(draft, t)}</strong>
                   {draft.rationale && <p>{draft.rationale}</p>}
                 </div>
                 <div className="correction-actions draft-actions">

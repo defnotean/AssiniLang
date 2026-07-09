@@ -3,7 +3,10 @@ import type { AiSession } from "@assini/db";
 import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
 import {
+  buildEvaluationArtifactDownload,
   buildSnapshotDownload,
+  extractionDraftSummary,
+  formatIntegrityLabel,
   formatMetric,
   formatMode,
   formatOrthographyMeta,
@@ -22,7 +25,7 @@ import {
 } from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
-import type { PublicExerciseSubmission } from "../api";
+import type { EvaluationArtifact, ExtractionDraft, PublicExerciseSubmission } from "../api";
 
 const t: Translate = (key, vars) => {
   let message: string = en[key];
@@ -158,6 +161,86 @@ describe("buildSnapshotDownload", () => {
     ]), t);
 
     expect(download.summary).toContain("1 note still needs review");
+    expect(download.summary).toContain("integrity sha256:0123456789ab");
+  });
+});
+
+describe("formatIntegrityLabel and evaluation artifact summaries", () => {
+  it("localizes integrity labels and evaluation artifact ready summaries", () => {
+    expect(formatIntegrityLabel({
+      algorithm: "sha256",
+      contentHash: "fedcba9876543210",
+      generatedBy: "assini-local-export-v1",
+      redactionPolicy: [...EXPORT_REDACTION_POLICY]
+    }, t)).toBe("integrity sha256:fedcba987654");
+
+    const artifact = {
+      exportVersion: "evaluation-artifact-v2",
+      exportedAt: "2026-06-06T00:00:00.000Z",
+      integrity: {
+        algorithm: "sha256",
+        contentHash: "fedcba9876543210",
+        generatedBy: "assini-local-export-v1",
+        redactionPolicy: [...EXPORT_REDACTION_POLICY]
+      },
+      summary: {
+        languages: 1,
+        totalRuns: 1,
+        latestRuns: 1,
+        failedLatestRuns: 0,
+        regressedLatestRuns: 0,
+        improvedLatestRuns: 0,
+        stableLatestRuns: 0,
+        singleRunLanguages: 1,
+        averageLatestScore: 0.85,
+        passed: true,
+        failureCount: 0
+      },
+      latestRuns: [],
+      runsByLanguage: {},
+      trends: [],
+      failureLines: []
+    } as EvaluationArtifact;
+
+    expect(buildEvaluationArtifactDownload(artifact, t).summary).toBe(
+      "Evaluation artifact ready: 1 latest run, 0 failed latest runs, 0 regressed latest runs, 0 failure lines, 85% average latest score, integrity sha256:fedcba987654."
+    );
+  });
+});
+
+describe("extractionDraftSummary", () => {
+  it("localizes missing payload placeholders for each draft kind", () => {
+    const base = {
+      id: "draft-1",
+      languageId: "avenik",
+      sourceAssetId: "src-1",
+      confidence: "medium" as const,
+      status: "proposed" as const,
+      createdAt: "2026-06-06T00:00:00.000Z",
+      payload: {
+        tags: [],
+        morphologicalSegmentation: [],
+        topicTags: []
+      }
+    };
+
+    expect(extractionDraftSummary({
+      ...base,
+      kind: "lexeme",
+      payload: { ...base.payload }
+    } as ExtractionDraft, t)).toBe("(no form) — (no gloss)");
+
+    expect(extractionDraftSummary({
+      ...base,
+      kind: "corpus_passage",
+      payload: { ...base.payload, textTarget: "mira talo" }
+    } as ExtractionDraft, t)).toBe("mira talo — (no translation)");
+
+    expect(extractionDraftSummary({
+      ...base,
+      kind: "grammar_note",
+      payload: { ...base.payload, topic: "verb chains", explanation: "Suffix chains." }
+    } as ExtractionDraft, t)).toBe("verb chains — Suffix chains.");
   });
 });
 

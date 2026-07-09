@@ -44,4 +44,12 @@ describe("locale catalogs", () => {
     expect(ar["model.desktopNoBackupsHint"]).toContain("نسخة احتياطية");
     expect(ar["model.restoreLatestBackup"]).toBe("استعادة أحدث نسخة احتياطية");
   });
+
+  it("localizes integrity and extraction-draft placeholder strings in Arabic", () => {
+    expect(ar["format.integrityLabel"]).toContain("{algorithm}");
+    expect(ar["format.integrityLabel"]).toContain("{hash}");
+    expect(ar["eval.artifactReadySummary"]).toContain("{summary}");
+    expect(ar["ingest.draftSummary.noForm"]).toBe("(لا صيغة)");
+    expect(ar["ingest.draftSummary.noGloss"]).toBe("(لا ترجمة)");
+  });
 });

@@ -273,7 +273,9 @@ export function ElderPage({
       <section className="elder-card" aria-label={t("elderPage.suggestionsHeading")}>
         <h2>{t("elderPage.suggestionsHeading")}</h2>
         {corrections.length === 0 ? (
-          <p className="elder-empty">{t("elderPage.noSuggestions")}</p>
+          <p className="elder-empty empty-state" role="status" aria-live="polite">
+            {t("elderPage.noSuggestions")}
+          </p>
         ) : (
           <ul className="elder-suggestions">
             {corrections.map((correction) => {
@@ -316,6 +318,7 @@ export function ElderPage({
                         type="button"
                         className="elder-primary"
                         disabled={isWorkflowBusy || isReviewing}
+                        aria-busy={isReviewing || isWorkflowBusy}
                         onClick={() => elder.handleReviewCorrection(correction.id, "accepted")}
                       >
                         {isReviewing ? t("elderPage.working") : t("elderPage.approve")}
@@ -324,6 +327,7 @@ export function ElderPage({
                         type="button"
                         className="elder-secondary danger"
                         disabled={isWorkflowBusy || isReviewing}
+                        aria-busy={isReviewing || isWorkflowBusy}
                         onClick={() => elder.handleReviewCorrection(correction.id, "rejected")}
                       >
                         {t("elderPage.cannotUse")}
@@ -351,6 +355,7 @@ export function ElderPage({
                         type="button"
                         className="elder-primary"
                         disabled={isWorkflowBusy || isApplying || !applyDraft.trim()}
+                        aria-busy={isApplying || isWorkflowBusy}
                         onClick={() => elder.handleApplyCorrection(correction.id, applyDraft)}
                       >
                         {isApplying ? t("elderPage.saving") : t("elderPage.saveIntoLesson")}

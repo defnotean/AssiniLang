@@ -332,7 +332,7 @@ export function useGovernanceWorkspace(
 
     try {
       const artifact = await fetchEvaluationArtifact();
-      setEvaluationArtifactDownload(buildEvaluationArtifactDownload(artifact));
+      setEvaluationArtifactDownload(buildEvaluationArtifactDownload(artifact, t));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("eval.exportFailed");
       setEvaluationArtifactError(message);

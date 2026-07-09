@@ -163,8 +163,29 @@ export function safeDomId(value: string): string {
   return value.replace(/[^a-z0-9_-]+/gi, "-");
 }
 
-export function formatIntegrityLabel(integrity: LanguageSnapshot["integrity"]): string {
-  return `integrity ${integrity.algorithm}:${integrity.contentHash.slice(0, 12)}`;
+export function formatIntegrityLabel(
+  integrity: LanguageSnapshot["integrity"],
+  t?: Translate
+): string {
+  const hash = integrity.contentHash.slice(0, 12);
+  if (t) {
+    return t("format.integrityLabel", { algorithm: integrity.algorithm, hash });
+  }
+  return `integrity ${integrity.algorithm}:${hash}`;
+}
+
+function formatLocalizedCount(
+  count: number,
+  oneKey: MessageKey,
+  manyKey: MessageKey,
+  englishSingular: string,
+  englishPlural: string | undefined,
+  t?: Translate
+): string {
+  if (t) {
+    return count === 1 ? t(oneKey, { count }) : t(manyKey, { count });
+  }
+  return formatCount(count, englishSingular, englishPlural);
 }
 
 export function formatSnapshotReviewAccountability(
@@ -185,14 +206,56 @@ export function buildSnapshotDownload(snapshot: LanguageSnapshot, t?: Translate)
   const safeLanguageId = snapshot.language.id.replace(/[^a-z0-9-]+/gi, "-").replace(/^-+|-+$/g, "") || "language";
   const reviewAccountability = formatSnapshotReviewAccountability(snapshot.notes, t);
   const summary = [
-    formatCount(snapshot.corpus.length, "corpus passage"),
-    formatCount(snapshot.notes.length, "note"),
+    formatLocalizedCount(
+      snapshot.corpus.length,
+      "format.count.corpusPassageOne",
+      "format.count.corpusPassageMany",
+      "corpus passage",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      snapshot.notes.length,
+      "format.count.noteOne",
+      "format.count.noteMany",
+      "note",
+      undefined,
+      t
+    ),
     reviewAccountability,
-    formatCount(snapshot.exercises.length, "exercise"),
-    formatCount(snapshot.linguisticProfile.stats.vocabularyItems, "vocabulary item"),
-    formatCount(snapshot.linguisticProfile.stats.grammarRules, "grammar rule"),
-    formatCount(snapshot.linguisticProfile.stats.sourceAssets, "source asset"),
-    formatIntegrityLabel(snapshot.integrity)
+    formatLocalizedCount(
+      snapshot.exercises.length,
+      "format.count.exerciseOne",
+      "format.count.exerciseMany",
+      "exercise",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      snapshot.linguisticProfile.stats.vocabularyItems,
+      "format.count.vocabularyItemOne",
+      "format.count.vocabularyItemMany",
+      "vocabulary item",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      snapshot.linguisticProfile.stats.grammarRules,
+      "format.count.grammarRuleOne",
+      "format.count.grammarRuleMany",
+      "grammar rule",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      snapshot.linguisticProfile.stats.sourceAssets,
+      "format.count.sourceAssetOne",
+      "format.count.sourceAssetMany",
+      "source asset",
+      undefined,
+      t
+    ),
+    formatIntegrityLabel(snapshot.integrity, t)
   ].filter(Boolean).join(", ");
 
   return {
@@ -205,20 +268,54 @@ export function buildSnapshotDownload(snapshot: LanguageSnapshot, t?: Translate)
   };
 }
 
-export function buildEvaluationArtifactDownload(artifact: EvaluationArtifact): SnapshotDownload {
+export function buildEvaluationArtifactDownload(
+  artifact: EvaluationArtifact,
+  t?: Translate
+): SnapshotDownload {
+  const percent = Math.round(artifact.summary.averageLatestScore * 100);
   const summary = [
-    formatCount(artifact.summary.latestRuns, "latest run"),
-    formatCount(artifact.summary.failedLatestRuns, "failed latest run"),
-    formatCount(artifact.summary.regressedLatestRuns, "regressed latest run"),
-    formatCount(artifact.summary.failureCount, "failure line"),
-    `${Math.round(artifact.summary.averageLatestScore * 100)}% average latest score`,
-    formatIntegrityLabel(artifact.integrity)
+    formatLocalizedCount(
+      artifact.summary.latestRuns,
+      "format.count.latestRunOne",
+      "format.count.latestRunMany",
+      "latest run",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      artifact.summary.failedLatestRuns,
+      "format.count.failedLatestRunOne",
+      "format.count.failedLatestRunMany",
+      "failed latest run",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      artifact.summary.regressedLatestRuns,
+      "format.count.regressedLatestRunOne",
+      "format.count.regressedLatestRunMany",
+      "regressed latest run",
+      undefined,
+      t
+    ),
+    formatLocalizedCount(
+      artifact.summary.failureCount,
+      "format.count.failureLineOne",
+      "format.count.failureLineMany",
+      "failure line",
+      undefined,
+      t
+    ),
+    t ? t("format.averageLatestScore", { percent }) : `${percent}% average latest score`,
+    formatIntegrityLabel(artifact.integrity, t)
   ].join(", ");
 
   return {
     fileName: "assini-evaluation-artifact.json",
     href: `data:application/json;charset=utf-8,${encodeURIComponent(JSON.stringify(artifact, null, 2))}`,
-    summary: `Evaluation artifact ready: ${summary}.`,
+    summary: t
+      ? t("eval.artifactReadySummary", { summary })
+      : `Evaluation artifact ready: ${summary}.`,
     exportedAt: artifact.exportedAt
   };
 }
@@ -280,14 +377,27 @@ export function trendVerb(status: EvaluationTrendStatus, t?: Translate): string 
   return t ? t("eval.trendHeldSteady") : "held steady";
 }
 
-export function extractionDraftSummary(draft: ExtractionDraft): string {
+export function extractionDraftSummary(draft: ExtractionDraft, t?: Translate): string {
+  const pair = (left: string, right: string) =>
+    t ? t("ingest.draftSummaryPair", { left, right }) : `${left} — ${right}`;
+  const missing = (key: MessageKey, fallback: string) => (t ? t(key) : fallback);
+
   if (draft.kind === "lexeme") {
-    return `${draft.payload.form ?? "(no form)"} — ${draft.payload.gloss ?? "(no gloss)"}`;
+    return pair(
+      draft.payload.form ?? missing("ingest.draftSummary.noForm", "(no form)"),
+      draft.payload.gloss ?? missing("ingest.draftSummary.noGloss", "(no gloss)")
+    );
   }
   if (draft.kind === "corpus_passage") {
-    return `${draft.payload.textTarget ?? "(no target text)"} — ${draft.payload.textTranslation ?? "(no translation)"}`;
+    return pair(
+      draft.payload.textTarget ?? missing("ingest.draftSummary.noTargetText", "(no target text)"),
+      draft.payload.textTranslation ?? missing("ingest.draftSummary.noTranslation", "(no translation)")
+    );
   }
-  return `${draft.payload.topic ?? "(no topic)"} — ${draft.payload.explanation ?? "(no explanation)"}`;
+  return pair(
+    draft.payload.topic ?? missing("ingest.draftSummary.noTopic", "(no topic)"),
+    draft.payload.explanation ?? missing("ingest.draftSummary.noExplanation", "(no explanation)")
+  );
 }
 
 function retryAfterSecondsFromMessage(message: string): number | undefined {
