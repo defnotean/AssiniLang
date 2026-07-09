@@ -18,11 +18,9 @@ const VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE =
 /**
  * Strips Windows extended-length path prefixes so realpath (\\?\...) and resolve(...) paths compare equal.
  * \\?\UNC\server\share -> \\server\share; \\?\C:\foo -> C:\foo
+ * Always applied (not platform-gated) so Linux CI can still validate Windows path strings.
  */
 export function stripWindowsExtendedPrefix(pathValue: string): string {
-  if (process.platform !== "win32") {
-    return pathValue;
-  }
   if (pathValue.startsWith("\\\\?\\UNC\\")) {
     return `\\\\${pathValue.slice("\\\\?\\UNC\\".length)}`;
   }
@@ -32,15 +30,37 @@ export function stripWindowsExtendedPrefix(pathValue: string): string {
   return pathValue;
 }
 
+function looksLikeWindowsAbsolutePath(pathValue: string): boolean {
+  const stripped = stripWindowsExtendedPrefix(pathValue);
+  return /^[A-Za-z]:[\\/]/.test(stripped) || stripped.startsWith("\\\\");
+}
+
 function normalizeForCompare(pathValue: string): string {
   const stripped = stripWindowsExtendedPrefix(pathValue);
-  return process.platform === "win32" ? stripped.toLowerCase() : stripped;
+  return process.platform === "win32" || looksLikeWindowsAbsolutePath(stripped)
+    ? stripped.replace(/\//g, "\\").toLowerCase()
+    : stripped;
 }
 
 /** True when candidate equals root or is a descendant of root (after resolve). */
 export function isPathInsideRoot(candidate: string, root: string): boolean {
-  const normalizedCandidate = resolvePath(candidate);
-  const normalizedRoot = resolvePath(root);
+  const strippedCandidate = stripWindowsExtendedPrefix(candidate);
+  const strippedRoot = stripWindowsExtendedPrefix(root);
+
+  // Windows-style absolute paths must not go through posix resolve on Linux CI hosts,
+  // or drive-letter paths get rewritten into the current working directory.
+  if (looksLikeWindowsAbsolutePath(strippedCandidate) || looksLikeWindowsAbsolutePath(strippedRoot)) {
+    const normalizedCandidate = normalizeForCompare(strippedCandidate);
+    const normalizedRoot = normalizeForCompare(strippedRoot);
+    if (normalizedCandidate === normalizedRoot) {
+      return true;
+    }
+    const prefix = normalizedRoot.endsWith("\\") ? normalizedRoot : `${normalizedRoot}\\`;
+    return normalizedCandidate.startsWith(prefix);
+  }
+
+  const normalizedCandidate = resolvePath(strippedCandidate);
+  const normalizedRoot = resolvePath(strippedRoot);
   if (normalizeForCompare(normalizedCandidate) === normalizeForCompare(normalizedRoot)) {
     return true;
   }
