@@ -1,7 +1,7 @@
 import type { SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
-import { extractionDraftSummary, formatCount, relativeAge, type RelativeAge } from "../lib/format";
+import { extractionDraftSummary, formatCount, localizeSourceProcessingError, relativeAge, type RelativeAge } from "../lib/format";
 import { useI18n, type Translate } from "../i18n";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
@@ -280,7 +280,11 @@ export function IngestView({
                       </p>
                     );
                   })()}
-                  {source.error && <p className="result-notice error">{source.error}</p>}
+                  {source.error && (
+                    <p className="result-notice error">
+                      {localizeSourceProcessingError(source.error, t, "ingest.sourceProcessingFailed")}
+                    </p>
+                  )}
                   {source.warnings && source.warnings.length > 0 && (
                     <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>
                       {source.warnings.map((warning, index) => (

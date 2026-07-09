@@ -1,4 +1,5 @@
 import type { AiSession } from "@assini/db";
+import { sourceProcessingErrorI18n } from "@assini/api-contract";
 import type {
   EvaluationArtifact,
   ExtractionDraft,
@@ -8,7 +9,9 @@ import type {
   ObservabilityData,
   PublicExerciseSubmission
 } from "../api";
+import type { MessageKey, Translate } from "../i18n";
 import type { EvaluationTrendStatus } from "../evaluationTrends";
+import { ApiError } from "./apiClient";
 import type { SnapshotDownload } from "./types";
 
 export function formatEvidenceLabel(count: number): string {
@@ -213,4 +216,57 @@ export function extractionDraftSummary(draft: ExtractionDraft): string {
     return `${draft.payload.textTarget ?? "(no target text)"} — ${draft.payload.textTranslation ?? "(no translation)"}`;
   }
   return `${draft.payload.topic ?? "(no topic)"} — ${draft.payload.explanation ?? "(no explanation)"}`;
+}
+
+function retryAfterSecondsFromMessage(message: string): number | undefined {
+  const match = message.match(/Retry after (\d+) second/);
+  if (!match) return undefined;
+  const seconds = Number(match[1]);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}
+
+/** Localizes API and persisted processing errors for operator-facing UI. */
+export function localizeApiError(error: unknown, t: Translate, fallback: MessageKey): string {
+  if (error instanceof ApiError) {
+    if (error.i18nKey) {
+      return t(error.i18nKey as MessageKey, error.i18nParams);
+    }
+    if (error.status === 429) {
+      const seconds = retryAfterSecondsFromMessage(error.message);
+      return seconds
+        ? t("app.rateLimitExceeded", { seconds })
+        : t("app.rateLimitExceededGeneric");
+    }
+    if (error.status === 503 && /offline/i.test(error.message)) {
+      return t("app.providerOffline");
+    }
+    const sourceI18n = sourceProcessingErrorI18n(error.message);
+    if (sourceI18n) {
+      return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
+    }
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    const sourceI18n = sourceProcessingErrorI18n(error.message);
+    if (sourceI18n) {
+      return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
+    }
+    return error.message;
+  }
+
+  return t(fallback);
+}
+
+export function localizeSourceProcessingError(
+  error: string | undefined,
+  t: Translate,
+  fallback: MessageKey
+): string {
+  if (!error) return t(fallback);
+  const sourceI18n = sourceProcessingErrorI18n(error);
+  if (sourceI18n) {
+    return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
+  }
+  return error;
 }

@@ -18,6 +18,7 @@ import { StatusScreen } from "./components/StatusScreen";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
 import { CompassMark, DiamondBand } from "./components/marks";
 import { getInitialView, getStoredLanguageId, persistWorkspaceSelection } from "./lib/persistence";
+import { localizeApiError } from "./lib/format";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
 import type {
   DashboardLoadState,
@@ -146,7 +147,12 @@ export function App() {
         if (isCurrent) setLoadState({ status: "ready", data });
       })
       .catch((error: Error) => {
-        if (isCurrent) setLoadState({ status: "error", message: error.message });
+        if (isCurrent) {
+          setLoadState({
+            status: "error",
+            message: localizeApiError(error, t, "app.workspaceUnavailable")
+          });
+        }
       });
 
     return () => {

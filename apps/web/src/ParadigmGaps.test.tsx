@@ -71,4 +71,30 @@ describe("paradigm gaps panel", () => {
       within(panel).getByText("No paradigm gaps detected - or not enough attested cells to infer paradigms yet.")
     ).toBeInTheDocument();
   });
+
+  it("renders lexicon and inventory empty states when the profile has no entries", () => {
+    render(<LanguageProfileView profileState={readyState(buildProfileFixture([]))} />);
+
+    const vocabularyPanel = screen.getByRole("region", { name: "Vocabulary inventory" });
+    expect(within(vocabularyPanel).getByText("0 entries")).toBeInTheDocument();
+    expect(
+      within(vocabularyPanel).getByText(
+        "No lexicon entries yet. Process sources in Build, accept lexeme drafts, or import a word list."
+      )
+    ).toHaveAttribute("role", "status");
+
+    const grammarPanel = screen.getByRole("region", { name: "Grammar inventory" });
+    expect(
+      within(grammarPanel).getByText(
+        "No grammar rules recorded yet. Accept grammar-note drafts from Build or author notes in Review."
+      )
+    ).toBeInTheDocument();
+
+    const morphemePanel = screen.getByRole("region", { name: "Morpheme inventory" });
+    expect(
+      within(morphemePanel).getByText(
+        "No morphemes inferred yet. Add corpus passages with segmentation to populate this inventory."
+      )
+    ).toBeInTheDocument();
+  });
 });

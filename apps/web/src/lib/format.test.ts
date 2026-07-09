@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { LanguageSnapshot } from "../api";
-import { buildSnapshotDownload, formatSnapshotReviewAccountability } from "./format";
+import { ApiError } from "./apiClient";
+import { buildSnapshotDownload, formatSnapshotReviewAccountability, localizeApiError, localizeSourceProcessingError } from "./format";
+import { en } from "../i18n/en";
+import type { Translate } from "../i18n";
+
+const t: Translate = (key, vars) => {
+  let message: string = en[key];
+  if (!vars) return message;
+  for (const [name, value] of Object.entries(vars)) {
+    message = message.replace(`{${name}}`, String(value));
+  }
+  return message;
+};
 
 const EXPORT_REDACTION_POLICY = [
   "answer-keys-omitted",
@@ -127,5 +139,39 @@ describe("buildSnapshotDownload", () => {
     ]));
 
     expect(download.summary).toContain("1 note still needs review");
+  });
+});
+
+describe("localizeApiError", () => {
+  it("localizes rate-limited API failures with retry guidance", () => {
+    const message = localizeApiError(
+      new ApiError("Request failed: /dashboard (429): Rate limit exceeded Retry after 9 seconds.", { status: 429 }),
+      t,
+      "app.workspaceUnavailable"
+    );
+
+    expect(message).toBe("Too many requests. Wait 9 seconds, then retry.");
+  });
+
+  it("localizes offline provider failures", () => {
+    const message = localizeApiError(
+      new ApiError("Request failed: /llm/status (503): LLM provider is offline", { status: 503 }),
+      t,
+      "app.workspaceUnavailable"
+    );
+
+    expect(message).toBe("The configured model provider is offline. Check Runtime settings or try again later.");
+  });
+
+  it("localizes OCR setup failures from persisted source errors", () => {
+    const message = localizeSourceProcessingError(
+      "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only).",
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "This document needs OCR. Set an OCR base URL in Runtime settings (Model tab), then process again."
+    );
   });
 });

@@ -4,8 +4,11 @@ import {
   DEFAULT_FORM,
   findStaleActiveModel,
   formFromSettings,
+  ocrLangCode,
+  optionalHttpUrl,
   positiveInteger,
-  syncFormWithDiscoveredModels
+  syncFormWithDiscoveredModels,
+  validateSettingsForm
 } from "./modelSettings";
 
 function discoveredModel(overrides: Partial<DiscoveredLlmModel> = {}): DiscoveredLlmModel {
@@ -104,6 +107,30 @@ describe("model settings helpers", () => {
     expect(positiveInteger("0")).toBeUndefined();
     expect(positiveInteger("1.5")).toBeUndefined();
     expect(positiveInteger("abc")).toBeUndefined();
+  });
+
+  it("accepts blank OCR base URLs and valid http(s) endpoints", () => {
+    expect(optionalHttpUrl("")).toBe("");
+    expect(optionalHttpUrl("http://127.0.0.1:11434/v1")).toBe("http://127.0.0.1:11434/v1");
+    expect(optionalHttpUrl("ftp://bad.example/v1")).toBeUndefined();
+  });
+
+  it("accepts common tesseract OCR language codes", () => {
+    expect(ocrLangCode("eng")).toBe("eng");
+    expect(ocrLangCode("ARA")).toBe("ara");
+    expect(ocrLangCode("english")).toBeUndefined();
+  });
+
+  it("rejects invalid OCR settings before save", () => {
+    expect(validateSettingsForm({
+      ...DEFAULT_FORM,
+      ocrLang: "english"
+    })).toEqual({ ok: false, errorKey: "model.ocrLangInvalid" });
+
+    expect(validateSettingsForm({
+      ...DEFAULT_FORM,
+      ocrBaseUrl: "not-a-url"
+    })).toEqual({ ok: false, errorKey: "model.ocrBaseUrlInvalid" });
   });
 
   it("auto-selects the only discovered model when no model is saved", () => {

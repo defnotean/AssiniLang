@@ -176,6 +176,7 @@ export function ModelSettingsFormFields({
               disabled={isSavingSettings}
               onChange={(event) => setForm((current) => ({ ...current, ocrBaseUrl: event.target.value }))}
             />
+            <small className="muted">{t("model.ocrBaseUrlHelp")}</small>
           </div>
           <div className="form-group">
             <label htmlFor="ocr-model">{t("model.ocrModel")}</label>
@@ -185,6 +186,7 @@ export function ModelSettingsFormFields({
               disabled={isSavingSettings}
               onChange={(event) => setForm((current) => ({ ...current, ocrModel: event.target.value }))}
             />
+            <small className="muted">{t("model.ocrModelHelp")}</small>
           </div>
           <div className="form-group">
             <label htmlFor="ocr-api-key">{t("model.replaceOcrApiKey")}</label>
@@ -225,6 +227,7 @@ export function ModelSettingsFormFields({
               disabled={isSavingSettings}
               onChange={(event) => setForm((current) => ({ ...current, ocrLang: event.target.value }))}
             />
+            <small className="muted">{t("model.ocrLanguageHelp")}</small>
           </div>
           <label className="checkbox-row settings-checkbox" htmlFor="allow-private-urls">
             <input

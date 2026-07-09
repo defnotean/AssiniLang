@@ -16,6 +16,7 @@ import {
   formatScanTime,
   positiveInteger,
   syncFormWithDiscoveredModels,
+  validateSettingsForm,
   type SettingsFormState
 } from "../lib/modelSettings";
 import { DesktopToolsPanel } from "./DesktopToolsPanel";
@@ -121,6 +122,12 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
     : null;
 
   function buildSettingsPayload(nextForm: SettingsFormState): RuntimeSettingsUpdate | null {
+    const validation = validateSettingsForm(nextForm);
+    if (!validation.ok) {
+      setFormError(t(validation.errorKey));
+      return null;
+    }
+
     const timeoutMs = positiveInteger(nextForm.timeoutMs);
     const maxTokens = positiveInteger(nextForm.maxTokens);
     if (!timeoutMs || !maxTokens) {

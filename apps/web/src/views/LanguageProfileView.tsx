@@ -120,7 +120,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </div>
         <div className="detail-list">
-          {grammarRules.map((rule) => (
+          {grammarRules.length === 0 ? (
+            <p className="empty-state" role="status">{t("profile.grammarEmptyState")}</p>
+          ) : grammarRules.map((rule) => (
             <article className="detail-row grammar-rule-row" key={rule.id}>
               <div>
                 <strong>{rule.topic}</strong>
@@ -145,7 +147,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </div>
         <div className="vocabulary-grid">
-          {vocabulary.map((item) => (
+          {vocabulary.length === 0 ? (
+            <p className="empty-state" role="status">{t("profile.vocabularyEmptyState")}</p>
+          ) : vocabulary.map((item) => (
             <article className="vocabulary-entry" key={item.id}>
               <code>{item.form}</code>
               <strong>{item.gloss}</strong>
@@ -168,7 +172,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </div>
         <div className="morpheme-grid">
-          {morphemeInventory.map((item, index) => (
+          {morphemeInventory.length === 0 ? (
+            <p className="empty-state" role="status">{t("profile.morphemeEmptyState")}</p>
+          ) : morphemeInventory.map((item, index) => (
             <article className="morpheme-entry" key={`${index}:${item.surface}:${item.lemma}`}>
               <div className="morpheme-entry-topline">
                 <code>{item.surface}</code>

@@ -8,11 +8,11 @@ import {
   processSource,
   registerSource,
   rejectExtractionDraft,
-  uploadSourceFile,
-  ApiError
+  uploadSourceFile
 } from "../api";
 import type { BulkReviewAction, ExtractionDraftView, SourceAsset, SourceRegistrationPayload } from "../api";
-import type { MessageKey, Translate } from "../i18n";
+import { localizeApiError, localizeSourceProcessingError } from "../lib/format";
+import type { Translate } from "../i18n";
 
 export const INGEST_POLL_INTERVAL_MS = 2500;
 export const INGEST_POLL_MAX_DURATION_MS = 10 * 60 * 1000;
@@ -276,7 +276,11 @@ export function useIngestExtraction(
           setProcessError(t("ingest.processingFailed", { title: sourceTitle }));
           setProcessWarnings([]);
         } else if (asset.status === "failed") {
-          setProcessError(asset.error ?? t("ingest.processingFailed", { title: sourceTitle }));
+          setProcessError(
+            asset.error
+              ? localizeSourceProcessingError(asset.error, t, "ingest.processingFailed")
+              : t("ingest.processingFailed", { title: sourceTitle })
+          );
           setProcessWarnings(asset.warnings ?? []);
         } else {
           setProcessNotice(t("ingest.processingFinished", { title: sourceTitle }));
@@ -309,12 +313,7 @@ export function useIngestExtraction(
       setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
       setPollingSource({ id: result.asset.id, title: result.asset.title });
     } catch (error) {
-      const message = error instanceof ApiError && error.i18nKey
-        ? t(error.i18nKey as MessageKey, error.i18nParams)
-        : error instanceof Error
-          ? error.message
-          : t("ingest.sourceProcessingFailed");
-      setProcessError(message);
+      setProcessError(localizeApiError(error, t, "ingest.sourceProcessingFailed"));
       setProcessingSourceId(null);
     }
   }

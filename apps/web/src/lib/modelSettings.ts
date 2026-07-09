@@ -79,6 +79,45 @@ export function positiveInteger(value: string): number | undefined {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+const OCR_LANG_PATTERN = /^[a-z]{2,3}$/i;
+
+export function ocrLangCode(value: string): string | undefined {
+  const trimmed = value.trim();
+  return OCR_LANG_PATTERN.test(trimmed) ? trimmed.toLowerCase() : undefined;
+}
+
+export function optionalHttpUrl(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return trimmed;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+export type SettingsValidationError =
+  | "model.settingsNumericError"
+  | "model.ocrLangInvalid"
+  | "model.ocrBaseUrlInvalid";
+
+export function validateSettingsForm(
+  form: SettingsFormState
+): { ok: true } | { ok: false; errorKey: SettingsValidationError } {
+  if (!positiveInteger(form.timeoutMs) || !positiveInteger(form.maxTokens)) {
+    return { ok: false, errorKey: "model.settingsNumericError" };
+  }
+  if (optionalHttpUrl(form.ocrBaseUrl) === undefined) {
+    return { ok: false, errorKey: "model.ocrBaseUrlInvalid" };
+  }
+  if (!ocrLangCode(form.ocrLang)) {
+    return { ok: false, errorKey: "model.ocrLangInvalid" };
+  }
+  return { ok: true };
+}
+
 function inputValue(formElement: HTMLFormElement, id: string, fallback: string): string {
   const control = formElement.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`);
   return control ? control.value : fallback;

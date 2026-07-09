@@ -5,6 +5,7 @@ import type { FastifyInstance } from "fastify";
 import {
   obsidianVaultImportPayloadSchema,
   sourceRegistrationPayloadSchema,
+  sourceProcessingErrorI18n,
   type ObsidianVaultImportPayload,
   type ObsidianVaultImportResponse,
   type SourceRegistrationPayload
@@ -654,7 +655,12 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (!extraction) {
       reply.code(422);
-      return { error: extractionError ?? "Source processing failed.", asset: output.updatedAsset };
+      const i18n = extractionError ? sourceProcessingErrorI18n(extractionError) : undefined;
+      return {
+        error: extractionError ?? "Source processing failed.",
+        asset: output.updatedAsset,
+        ...(i18n ? { i18nKey: i18n.i18nKey, i18nParams: i18n.i18nParams } : {})
+      };
     }
 
     return {
