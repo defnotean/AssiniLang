@@ -5,6 +5,7 @@ import type {
   LlmModelDiscoveryResponse
 } from "@assini/api-contract";
 import {
+  canonicalLlmEndpointIdentity,
   ensureV1BaseUrl,
   normalizeBaseUrl,
   normalizeHttpBaseUrl,
@@ -147,13 +148,11 @@ function configuredBaseUrl(env: Env): string | undefined {
 function apiKeyForTarget(env: Env, baseUrl: string, provider: DiscoveryProvider): string | undefined {
   const { explicitApiKey, remoteApiKey } = readLlmEnvConfig(env);
   const configured = configuredBaseUrl(env);
-  const normalized = normalizeHttpBaseUrl(baseUrl);
+  const configuredIdentity = canonicalLlmEndpointIdentity(configured);
+  const targetIdentity = canonicalLlmEndpointIdentity(baseUrl);
 
-  if (provider === "openai") return remoteApiKey;
-  if (configured && normalized && normalizeBaseUrl(configured) === normalizeBaseUrl(normalized)) {
-    return explicitApiKey;
-  }
-  return undefined;
+  if (!configuredIdentity || configuredIdentity !== targetIdentity) return undefined;
+  return provider === "openai" ? remoteApiKey : explicitApiKey;
 }
 
 function splitDiscoveryBaseUrls(value: string | undefined): string[] {

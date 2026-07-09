@@ -1452,15 +1452,15 @@ function desktopSmokeScript() {
         await waitFor("tour dismissed", () => !document.querySelector("[aria-label='Guided tour']"));
       }
 
-      if (!document.querySelector(".section-nav")) {
+      if (!document.querySelector(".language-nav-group")) {
         clickButton("New language");
         await waitFor("create language form", () => document.querySelector("form[aria-label='Create language']"));
-        setControlValue("Language name", "Bisaya Smoke");
-        setControlValue("Description", "Temporary Bisaya workspace for desktop smoke verification.");
+        setControlValue("Language name", "English Smoke");
+        setControlValue("Description", "Temporary English workspace for desktop smoke verification.");
         setControlValue("Orthography", "Latin");
         setControlValue("Typology", "agglutinative");
         clickButton("Create language", document.querySelector("form[aria-label='Create language']"));
-        await waitFor("created language workspace", () => document.body.innerText.includes("Bisaya Smoke / Start") && document.querySelector(".section-nav"));
+        await waitFor("created language workspace", () => document.body.innerText.includes("English Smoke / Start") && document.querySelector(".section-nav"));
         report.createdLanguage = true;
       }
 

@@ -10,6 +10,11 @@ export type SettingsFormState = {
   timeoutMs: string;
   maxTokens: string;
   jsonMode: boolean;
+  embeddingBaseUrl: string;
+  embeddingModel: string;
+  embeddingApiKey: string;
+  clearEmbeddingApiKey: boolean;
+  embeddingTimeoutMs: string;
   transcriptionBaseUrl: string;
   transcriptionModel: string;
   transcriptionApiKey: string;
@@ -38,6 +43,11 @@ export const DEFAULT_FORM: SettingsFormState = {
   timeoutMs: "180000",
   maxTokens: "4096",
   jsonMode: false,
+  embeddingBaseUrl: "",
+  embeddingModel: "",
+  embeddingApiKey: "",
+  clearEmbeddingApiKey: false,
+  embeddingTimeoutMs: "30000",
   transcriptionBaseUrl: "",
   transcriptionModel: "whisper-1",
   transcriptionApiKey: "",
@@ -61,6 +71,11 @@ export function formFromSettings(response: RuntimeSettingsResponse): SettingsFor
     timeoutMs: settings.timeoutMs.toString(),
     maxTokens: settings.maxTokens.toString(),
     jsonMode: settings.jsonMode,
+    embeddingBaseUrl: settings.embeddingBaseUrl ?? "",
+    embeddingModel: settings.embeddingModel ?? "",
+    embeddingApiKey: "",
+    clearEmbeddingApiKey: false,
+    embeddingTimeoutMs: String(settings.embeddingTimeoutMs ?? 30_000),
     transcriptionBaseUrl: settings.transcriptionBaseUrl,
     transcriptionModel: settings.transcriptionModel,
     transcriptionApiKey: "",
@@ -100,6 +115,8 @@ export function optionalHttpUrl(value: string): string | undefined {
 
 export type SettingsValidationError =
   | "model.settingsNumericError"
+  | "model.embeddingTimeoutInvalid"
+  | "model.embeddingBaseUrlInvalid"
   | "model.ocrLangInvalid"
   | "model.ocrBaseUrlInvalid";
 
@@ -108,6 +125,13 @@ export function validateSettingsForm(
 ): { ok: true } | { ok: false; errorKey: SettingsValidationError } {
   if (!positiveInteger(form.timeoutMs) || !positiveInteger(form.maxTokens)) {
     return { ok: false, errorKey: "model.settingsNumericError" };
+  }
+  const embeddingTimeoutMs = positiveInteger(form.embeddingTimeoutMs);
+  if (!embeddingTimeoutMs || embeddingTimeoutMs > 600_000) {
+    return { ok: false, errorKey: "model.embeddingTimeoutInvalid" };
+  }
+  if (optionalHttpUrl(form.embeddingBaseUrl) === undefined) {
+    return { ok: false, errorKey: "model.embeddingBaseUrlInvalid" };
   }
   if (optionalHttpUrl(form.ocrBaseUrl) === undefined) {
     return { ok: false, errorKey: "model.ocrBaseUrlInvalid" };
@@ -141,6 +165,19 @@ export function formStateFromControls(
     timeoutMs: inputValue(formElement, "model-timeout", fallback.timeoutMs),
     maxTokens: inputValue(formElement, "model-max-tokens", fallback.maxTokens),
     jsonMode: checkboxValue(formElement, "json-mode", fallback.jsonMode),
+    embeddingBaseUrl: inputValue(formElement, "embedding-base-url", fallback.embeddingBaseUrl),
+    embeddingModel: inputValue(formElement, "embedding-model", fallback.embeddingModel),
+    embeddingApiKey: inputValue(formElement, "embedding-api-key", fallback.embeddingApiKey),
+    clearEmbeddingApiKey: checkboxValue(
+      formElement,
+      "clear-embedding-key",
+      fallback.clearEmbeddingApiKey
+    ),
+    embeddingTimeoutMs: inputValue(
+      formElement,
+      "embedding-timeout",
+      fallback.embeddingTimeoutMs
+    ),
     transcriptionBaseUrl: inputValue(formElement, "transcribe-base-url", fallback.transcriptionBaseUrl),
     transcriptionModel: inputValue(formElement, "transcribe-model", fallback.transcriptionModel),
     transcriptionApiKey: inputValue(formElement, "transcribe-api-key", fallback.transcriptionApiKey),

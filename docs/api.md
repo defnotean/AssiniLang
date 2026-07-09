@@ -20,6 +20,10 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | PUT | `/llm/model-profiles/:profileId/activate` | programmer, lead, admin | Activate a saved model profile and hot-swap the active provider. |
 | DELETE | `/llm/model-profiles/:profileId` | programmer, lead, admin | Delete a saved model profile. |
 | POST | `/llm/health-check` | programmer, lead, admin | Actively probe the configured provider endpoint for reachability. |
+| GET | `/integrations/obsidian-mcp/settings` | programmer, lead, admin | Read sanitized MCP endpoint settings and token-configured state. |
+| PUT | `/integrations/obsidian-mcp/settings` | programmer, lead, admin | Atomically save MCP endpoint, write-only token, and timeout settings. |
+| POST | `/integrations/obsidian-mcp/test` | programmer, lead, admin | Connect, initialize MCP, list the first resource page, and return server identity/count/latency without exposing credentials. |
+| GET | `/integrations/obsidian-mcp/resources` | reviewer, programmer, lead, admin | List MCP resources; optional `?cursor=` continues server pagination. |
 | GET | `/users/me` | Any actor | Current prototype user. |
 | GET | `/languages` | Public | List languages. |
 | POST | `/languages` | reviewer, lead, admin | Create a language. Invalid bodies return `400` with `i18nKey: "errors.invalidLanguageBody"`. |
@@ -30,6 +34,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/languages/:languageId/sources` | reviewer, lead, admin, programmer | List source assets (the async-processing polling target). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/sources` | reviewer, lead, admin | Register a `text`, `wordlist`, or `url` source. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/sources/obsidian-vault` | reviewer, lead, admin | Import Markdown files from a local Obsidian vault path as pending text sources. Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
+| POST | `/languages/:languageId/sources/obsidian-mcp` | reviewer, lead, admin | Read up to 50 selected MCP resource URIs and import unique text resources as pending sources with URI provenance. |
 | POST | `/languages/:languageId/sources/upload` | reviewer, lead, admin | Upload a file source (multipart, 25 MB cap). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/sources/:sourceId/process` | reviewer, lead, admin | Run extraction; `{ "async": true }` for background mode. |
 | POST | `/sources/:sourceId/cancel-processing` | reviewer, lead, admin | Cancel a **pending** (not yet active) queued process job; marks the asset `failed` with a clear operator message. Active jobs return `409` with `i18nKey: "ingest.sourceProcessingCancelActive"`. |
@@ -100,7 +105,7 @@ Do not treat prototype auth as production security.
 
 `GET /health` is the cheapest liveness check. It returns `{ "ok": true }` when the API process can answer HTTP.
 
-`GET /ready` is the deeper readiness check. It reads the configured state store through the same schema-validation path used by normal API reads and reports safe job-queue counts. A ready server returns `200` with `{ "ok": true, "checks": { "storage": { "ok": true, "schemaVersion": 8 }, "jobQueue": { "ok": true, "pending": 0, "active": 0 } } }`. If storage cannot be read or validated, or if the queue status cannot be inspected, it returns `503` with sanitized check failures and does not expose local database paths, exception messages, job IDs, API keys, or workspace contents.
+`GET /ready` is the deeper readiness check. It reads the configured state store through the same schema-validation path used by normal API reads and reports safe job-queue counts. A ready server returns `200` with `{ "ok": true, "checks": { "storage": { "ok": true, "schemaVersion": 9 }, "jobQueue": { "ok": true, "pending": 0, "active": 0 } } }`. If storage cannot be read or validated, or if the queue status cannot be inspected, it returns `503` with sanitized check failures and does not expose local database paths, exception messages, job IDs, API keys, or workspace contents.
 
 `GET /observability/metrics` is a privileged operational snapshot for programmer, lead, and admin actors. It returns a small safe shape: `uptimeMs`, ISO `serverTime`, aggregate `requests` counts by status class, `jobQueue` pending/active counts, and sanitized `storage` status/schema version. It intentionally omits route paths, local filesystem paths, prompts, source text, model content, answer keys, learner answers, user PII, raw errors, and secret values. If storage cannot be read, the response reports `{ "storage": { "ok": false, "error": "Storage read failed" } }` without exposing the underlying exception.
 
@@ -137,7 +142,7 @@ Permanently removes the language and all workspace records scoped to it (corpus,
 - `url`: SSRF-guarded server-side fetch and HTML-to-text conversion, then extraction.
 - `image`: dedicated OCR model when `ASSINI_OCR_BASE_URL` is configured; otherwise vision-capable main LLM; otherwise local tesseract (`ASSINI_OCR_LANG`).
 - `audio`: transcription through `ASSINI_TRANSCRIBE_BASE_URL`, then text extraction.
-- `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing; scanned PDFs with no text layer attempt page-1 OCR when `ASSINI_OCR_BASE_URL` is configured (DOCX OCR remains unshipped), then extraction.
+- `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing; scanned PDFs with no text layer attempt OCR on pages 1..N, up to `ASSINI_OCR_PDF_MAX_PAGES` (default `10`), when `ASSINI_OCR_BASE_URL` is configured (DOCX OCR remains unshipped), then extraction.
 
 Successful processing marks the source `processed`, stores a summary (and transcript for audio), and returns the new `proposed` drafts plus warnings. Failures mark the source `failed` with a sanitized error and return `422`; the source can be reprocessed.
 

@@ -17,6 +17,8 @@ Uploads are multipart, one file, 25 MB cap, stored under `data/assets/<languageI
 
 Obsidian vault import is a bulk intake helper, not a separate persisted source kind. `POST /languages/:languageId/sources/obsidian-vault` reads local Markdown files from a vault folder, skips `.obsidian`, `.git`, and `node_modules`, strips common frontmatter and wikilinks, and registers each readable note as a pending `text` source. Notes larger than 1 MB are skipped (not imported) with an operator-facing reason localized as `ingest.vaultMarkdownTooLarge`. Those sources then use the same processing, warnings, draft review, and audit paths as pasted text. Vault folders must sit under `ASSINI_OBSIDIAN_VAULT_ROOTS` (fail-closed when unset); see [configuration](configuration.md#ingestion-safety-and-ocr).
 
+The optional Obsidian MCP bridge is a second intake path. Configure a Streamable HTTP endpoint and optional write-only bearer token in Settings, list resources through `GET /integrations/obsidian-mcp/resources`, then import up to 50 selected URIs with `POST /languages/:languageId/sources/obsidian-mcp`. Only supported non-empty text representations up to 1 MB are accepted. The resource URI is retained on the pending source for provenance and per-language duplicate detection; tokens are excluded from responses, source records, and audit metadata. Imported notes still require normal processing and explicit draft acceptance. This is not live synchronization or write-back.
+
 ## Processing flow
 
 ```mermaid

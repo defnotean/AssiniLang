@@ -44,6 +44,14 @@ describe("WorkspaceHeader", () => {
     expect(screen.getByText("archived workspace")).toBeInTheDocument();
   });
 
+  it("hides selected-language metadata and actions without a language", () => {
+    renderHeader({ selectedLanguage: null });
+
+    expect(screen.queryByLabelText("Selected language metadata")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate AI Drafts" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Draft notes with model" })).not.toBeInTheDocument();
+  });
+
   it("exposes aria-busy on drafting and evaluation actions while in flight", () => {
     const { rerender } = renderHeader({ isWorkflowBusy: true, isDrafting: true });
     expect(screen.getByRole("button", { name: "Drafting..." })).toHaveAttribute("aria-busy", "true");

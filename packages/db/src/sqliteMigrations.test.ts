@@ -62,6 +62,77 @@ describe("runSqliteMigrations", () => {
     expect(meta?.migrated_at).toBeTruthy();
   });
 
+  it("migrates v8 source processing metadata columns without changing existing rows", () => {
+    const dbPath = join(dir, "source-processing-v8.sqlite");
+    const setup = new Database(dbPath);
+    try {
+      setup.exec(`
+        CREATE TABLE source_assets (
+          id TEXT PRIMARY KEY,
+          language_id TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          title TEXT NOT NULL,
+          original_name TEXT,
+          mime_type TEXT,
+          file_path TEXT,
+          url TEXT,
+          raw_text TEXT,
+          transcript TEXT,
+          status TEXT NOT NULL,
+          error TEXT,
+          summary TEXT,
+          warnings TEXT,
+          created_by TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          processed_at TEXT
+        );
+      `);
+      setup.prepare(`
+        INSERT INTO source_assets (
+          id, language_id, kind, title, raw_text, status, created_by, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        "source-v8",
+        "language-v8",
+        "text",
+        "Legacy source",
+        "mira talo",
+        "pending",
+        "programmer-1",
+        "2026-06-06T00:00:00.000Z"
+      );
+    } finally {
+      setup.close();
+    }
+    setVersion(dbPath, 8);
+
+    const db = new Database(dbPath);
+    try {
+      runSqliteMigrations(db, dbPath);
+      const columns = db.prepare("PRAGMA table_info(source_assets)").all() as Array<{ name: string }>;
+      expect(columns.map((column) => column.name)).toEqual(expect.arrayContaining([
+        "processing_started_at",
+        "processing_attempts",
+        "processing_heartbeat_at"
+      ]));
+      expect(db.prepare(`
+        SELECT id, processing_started_at, processing_attempts, processing_heartbeat_at
+        FROM source_assets WHERE id = ?
+      `).get("source-v8")).toEqual({
+        id: "source-v8",
+        processing_started_at: null,
+        processing_attempts: null,
+        processing_heartbeat_at: null
+      });
+
+      runSqliteMigrations(db, dbPath);
+    } finally {
+      db.close();
+    }
+
+    expect(readMeta(dbPath)?.schema_version).toBe(9);
+  });
+
   it("applies a pending migration exactly once across re-opens", () => {
     const dbPath = join(dir, "pending.sqlite");
     setVersion(dbPath, 8);
@@ -158,7 +229,7 @@ describe("runSqliteMigrations", () => {
     setVersion(dbPath, 7);
     const db = new Database(dbPath);
     try {
-      expect(() => runSqliteMigrations(db, dbPath)).toThrow(/schema_version 7/);
+      expect(() => runSqliteMigrations(db, dbPath)).toThrow(/gap at version 7/);
     } finally {
       db.close();
     }
@@ -199,7 +270,7 @@ describe("JsonStore backend selection", () => {
     const jsonAtSqlitePath = new JsonStore(join(dir, "actually-json.sqlite"), { backend: "json" });
     expect(jsonAtSqlitePath.backend).toBe("json");
     await jsonAtSqlitePath.write(createEmptyState());
-    expect((await jsonAtSqlitePath.read()).schemaVersion).toBe(8);
+    expect((await jsonAtSqlitePath.read()).schemaVersion).toBe(9);
   });
 
   it("rejects an invalid backend value", () => {

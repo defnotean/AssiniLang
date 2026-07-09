@@ -121,9 +121,18 @@ describe("vectorSearch", () => {
       }
     ];
 
-    it("uses online embeddings when provider is configured", async () => {
+    function embeddingResponse(data: Array<{ index: number; embedding: number[] }>): Response {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ data })
+      } as Response;
+    }
+
+    it("uses online embeddings only with a dedicated endpoint and model", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
+        status: 200,
         json: async () => ({
           data: [
             { index: 0, embedding: [1, 0, 0] }, // query
@@ -131,50 +140,137 @@ describe("vectorSearch", () => {
             { index: 2, embedding: [0.1, 0.9, 0] } // p2
           ]
         })
-      });
-      vi.stubGlobal("fetch", mockFetch);
+      } as Response);
 
       const results = await retrieveTopKPassages(
         "cat query",
         passages,
         1,
         {
-          provider: "openai",
           baseUrl: "http://localhost/v1",
           apiKey: "test-key",
-          model: "text-embedding-3-small"
+          model: "text-embedding-3-small",
+          fetchFn: mockFetch
         }
       );
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
       expect(results.length).toBe(1);
       expect(results[0].id).toBe("p1");
-
-      vi.unstubAllGlobals();
     });
 
-    it("falls back to offline TF-IDF when online embedding API throws error", async () => {
-      const mockFetch = vi.fn().mockRejectedValue(new Error("API offline"));
-      vi.stubGlobal("fetch", mockFetch);
+    it("does not call embeddings for chat-only or partially configured embedding settings", async () => {
+      const mockFetch = vi.fn();
 
-      // Should fall back to TF-IDF offline matching, which will find "cat" in p1
+      expect(await retrieveTopKPassages("cat", passages, 1, {
+        baseUrl: "http://localhost/v1",
+        fetchFn: mockFetch
+      })).toEqual([passages[0]]);
+      expect(await retrieveTopKPassages("cat", passages, 1, {
+        model: "text-embedding-3-small",
+        fetchFn: mockFetch
+      })).toEqual([passages[0]]);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it("falls back to offline TF-IDF when the embedding API throws", async () => {
+      const mockFetch = vi.fn().mockRejectedValue(new Error("API offline"));
+
       const results = await retrieveTopKPassages(
         "cat",
         passages,
         1,
         {
-          provider: "openai",
           baseUrl: "http://localhost/v1",
           apiKey: "test-key",
-          model: "text-embedding-3-small"
+          model: "text-embedding-3-small",
+          fetchFn: mockFetch
         }
       );
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(results.length).toBe(1);
       expect(results[0].id).toBe("p1");
+    });
 
-      vi.unstubAllGlobals();
+    it.each([
+      {
+        name: "a missing response item",
+        data: [
+          { index: 0, embedding: [1, 0] },
+          { index: 1, embedding: [0.9, 0.1] }
+        ]
+      },
+      {
+        name: "duplicate indexes",
+        data: [
+          { index: 0, embedding: [1, 0] },
+          { index: 1, embedding: [0.9, 0.1] },
+          { index: 1, embedding: [0.1, 0.9] }
+        ]
+      },
+      {
+        name: "non-finite values",
+        data: [
+          { index: 0, embedding: [1, 0] },
+          { index: 1, embedding: [Number.NaN, 0.1] },
+          { index: 2, embedding: [0.1, 0.9] }
+        ]
+      },
+      {
+        name: "dimension mismatches",
+        data: [
+          { index: 0, embedding: [1, 0] },
+          { index: 1, embedding: [0.9] },
+          { index: 2, embedding: [0.1, 0.9] }
+        ]
+      }
+    ])("falls back for $name", async ({ data }) => {
+      const mockFetch = vi.fn().mockResolvedValue(embeddingResponse(data));
+
+      const results = await retrieveTopKPassages("cat", passages, 1, {
+        baseUrl: "http://localhost/v1",
+        model: "text-embedding-3-small",
+        fetchFn: mockFetch
+      });
+
+      expect(results).toEqual([passages[0]]);
+    });
+
+    it("bounds request time and falls back after a timeout", async () => {
+      vi.useFakeTimers();
+      try {
+        const mockFetch = vi.fn(() => new Promise<Response>(() => undefined));
+        const resultPromise = retrieveTopKPassages("cat", passages, 1, {
+          baseUrl: "http://localhost/v1",
+          model: "text-embedding-3-small",
+          timeoutMs: 25,
+          fetchFn: mockFetch
+        });
+
+        await vi.advanceTimersByTimeAsync(25);
+        await expect(resultPromise).resolves.toEqual([passages[0]]);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("blocks redirect following and falls back on redirect responses", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 302,
+        json: async () => ({})
+      } as Response);
+
+      const results = await retrieveTopKPassages("cat", passages, 1, {
+        baseUrl: "https://embeddings.example/v1",
+        model: "text-embedding-3-small",
+        fetchFn: mockFetch
+      });
+
+      expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
+      expect(results).toEqual([passages[0]]);
     });
   });
 });

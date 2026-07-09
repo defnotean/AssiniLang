@@ -20,21 +20,22 @@ export interface SqliteMigration {
 }
 
 /**
- * Ordered registry of SQLite schema migrations. Currently empty: version 8 is
- * the first SQLite-tracked version. When the schema moves to version 9, add an
- * entry following this pattern:
- *
- * ```ts
- * {
- *   from: 8,
- *   to: 9,
- *   migrate(db) {
- *     db.exec(`ALTER TABLE notes ADD COLUMN archived_at TEXT;`);
- *   }
- * }
- * ```
+ * Ordered registry of SQLite schema migrations. Version 8 was the first
+ * SQLite-tracked version.
  */
-export const SQLITE_MIGRATIONS: SqliteMigration[] = [];
+export const SQLITE_MIGRATIONS: SqliteMigration[] = [
+  {
+    from: 8,
+    to: 9,
+    migrate(db) {
+      db.exec(`
+        ALTER TABLE source_assets ADD COLUMN processing_started_at TEXT;
+        ALTER TABLE source_assets ADD COLUMN processing_attempts INTEGER;
+        ALTER TABLE source_assets ADD COLUMN processing_heartbeat_at TEXT;
+      `);
+    }
+  }
+];
 
 export interface RunSqliteMigrationsOptions {
   /** Override the migration registry (used by tests). Defaults to SQLITE_MIGRATIONS. */

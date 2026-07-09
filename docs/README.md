@@ -25,7 +25,7 @@ Pick the path that matches what you are doing:
 | [Operator Recovery Runbook](operator-recovery.md) | Local data paths, backup/restore, interrupted processing, corrupt DB handling, diagnostics, reset steps, and acceptance drills. |
 | [Audit / Export Drill](audit-export-drill.md) | Step-by-step local snapshot/artifact export, integrity check, and audit-receipt walkthrough using `fixtures/exports/`. |
 | [Troubleshooting](troubleshooting.md) | Symptom-cause-fix tables for ports, models, sources, and data problems. |
-| [UI Design Guide](ui-design.md) | How the `AssiniLang.html` design handoff maps to the real React app. |
+| [UI Design Guide](ui-design.md) | The implemented Atlas layout and visual system in the React app. |
 | [Roadmap](roadmap.md) | What must happen before real community language material can be used. |
 
 ## Historical design docs

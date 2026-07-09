@@ -324,7 +324,9 @@ export function App() {
 
   const currentTitle = t(`viewConfig.${view}.title`);
   const currentEyebrow = t(`viewConfig.${view}.eyebrow`);
-  const currentBreadcrumb = `${selectedLanguage?.name ?? t("common.language")} / ${t(`viewConfig.${view}.label`)}`;
+  const currentBreadcrumb = selectedLanguage
+    ? `${selectedLanguage.name} / ${t(`viewConfig.${view}.label`)}`
+    : t(`viewConfig.${view}.label`);
   const sectionCounts: Partial<Record<ViewMode, number>> = {
     profile: data.corpus.length + data.notes.length + data.exercises.length,
     ingest: data.notes.length,
@@ -346,6 +348,7 @@ export function App() {
           const main = document.getElementById("main-content");
           if (!main) return;
           event.preventDefault();
+          main.scrollTop = 0;
           main.focus({ preventScroll: false });
         }}
       >
@@ -382,7 +385,6 @@ export function App() {
           languages={data.languages}
           selectedLanguageId={selectedLanguageId}
           view={view}
-          isWorkflowBusy={isWorkflowBusy}
           sectionCounts={sectionCounts}
           onLanguageSelect={handleLanguageSelect}
           onViewSelect={handleViewSelect}
@@ -434,7 +436,7 @@ export function App() {
 
         <DiamondBand compact />
 
-        {view !== "elder" && (
+        {selectedLanguage && view !== "elder" && (
           <section className="stat-strip" aria-label={t("header.statStripAria")}>
             {overviewStats.map((stat) => (
               <div key={stat.label} className="stat-card">

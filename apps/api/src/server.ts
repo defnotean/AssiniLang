@@ -22,6 +22,7 @@ import {
 } from "./routeHelpers.js";
 import { censorLogSecret, redactErrorSecrets } from "./secretRedaction.js";
 import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
+import { createObsidianMcpSession, type ObsidianMcpSessionFactory } from "./obsidianMcpClient.js";
 import type { RequestStatusClass, RouteContext } from "./routes/context.js";
 import { registerAiSessionRoutes } from "./routes/aiSessions.js";
 import { registerAuthRoutes } from "./routes/auth.js";
@@ -36,6 +37,7 @@ import { registerLanguageRoutes } from "./routes/languages.js";
 import { registerLlmRoutes } from "./routes/llm.js";
 import { registerNoteRoutes } from "./routes/notes.js";
 import { registerObservabilityRoutes } from "./routes/observability.js";
+import { registerObsidianMcpRoutes } from "./routes/obsidianMcp.js";
 import {
   MAX_SOURCE_UPLOAD_BYTES,
   MAX_SOURCE_UPLOAD_TITLE_BYTES,
@@ -77,6 +79,8 @@ type ServerOptions = {
   ingestionFetch?: typeof fetch;
   /** Local settings file path. Defaults to the repo-root .env in normal dev runs. */
   settingsPath?: string;
+  /** MCP session constructor override for deterministic route tests. */
+  obsidianMcpSessionFactory?: ObsidianMcpSessionFactory;
   logger?: any;
   concurrency?: number;
   /** Optional job queue override for tests (e.g. failing getStatus). */
@@ -146,6 +150,7 @@ export function createServer(options: ServerOptions = {}) {
   const mutableLlmProvider = options.llmProvider ? undefined : createMutableLlmProvider(process.env, ingestionFetch);
   const llmProvider = options.llmProvider ?? mutableLlmProvider as LlmProvider;
   const settingsPath = options.settingsPath ?? resolveRuntimeSettingsPath({ moduleUrl: import.meta.url });
+  const obsidianMcpSessionFactory = options.obsidianMcpSessionFactory ?? createObsidianMcpSession;
   const rateLimitBuckets = new Map<string, number[]>();
   const requestMetrics: RouteContext["requestMetrics"] = {
     startedAtMs: now(),
@@ -299,6 +304,7 @@ export function createServer(options: ServerOptions = {}) {
     multipartFileSizeBytes,
     ingestionFetch,
     settingsPath,
+    obsidianMcpSessionFactory,
     reloadLlmProvider: mutableLlmProvider
       ? () => mutableLlmProvider.updateFromEnv(process.env)
       : undefined,
@@ -309,6 +315,7 @@ export function createServer(options: ServerOptions = {}) {
   registerSystemRoutes(app, ctx);
   registerAuthRoutes(app, ctx);
   registerLlmRoutes(app, ctx);
+  registerObsidianMcpRoutes(app, ctx);
   registerLanguageRoutes(app, ctx);
   registerSourceRoutes(app, ctx);
   registerExtractionDraftRoutes(app, ctx);

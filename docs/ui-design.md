@@ -1,10 +1,10 @@
 # UI design guide
 
-This guide documents how the `AssiniLang.html` design handoff maps into the real AssiniLang React app. Keep detailed UI notes here so the root README can stay concise.
+This guide documents the implemented design direction in the AssiniLang React app. Keep detailed UI notes here so the root README can stay concise.
 
-## Source handoff
+## Implemented direction
 
-The implemented direction is the final `AssiniLang.html` handoff from the design bundle. The design exploration settled on a dark, language-first research console, not a marketing page or generic dashboard.
+The design exploration settled on a dark, language-first research console, not a marketing page or generic dashboard. The React implementation is the source of truth for the current interface.
 
 The chosen design is the `Atlas layout`:
 

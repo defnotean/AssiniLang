@@ -9,8 +9,18 @@ export type LlmEnvConfig = {
   apiKeyConfigured: boolean;
 };
 
+export type EmbeddingEnvConfig = {
+  baseUrl?: string;
+  model?: string;
+  apiKey?: string;
+  timeoutMs: number;
+  configured: boolean;
+};
+
 export const DEFAULT_LLM_TIMEOUT_MS = 180_000;
 export const DEFAULT_LLM_MAX_TOKENS = 4096;
+export const DEFAULT_EMBEDDING_TIMEOUT_MS = 30_000;
+export const MAX_EMBEDDING_TIMEOUT_MS = 600_000;
 export const DEFAULT_TRANSCRIPTION_MODEL = "whisper-1";
 export const DEFAULT_OCR_MODEL = "llava";
 export const DEFAULT_OCR_LANG = "eng";
@@ -26,6 +36,15 @@ export function parsePositiveInteger(value: string | undefined, fallback: number
 
   const parsed = Number(trimmed);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function parseBoundedPositiveInteger(
+  value: string | undefined,
+  fallback: number,
+  maximum: number
+): number {
+  const parsed = parsePositiveInteger(value, fallback);
+  return Math.min(parsed, maximum);
 }
 
 export function parseBooleanFlag(value: string | undefined): boolean {
@@ -48,6 +67,22 @@ export function readLlmEnvConfig(env: Env = process.env): LlmEnvConfig {
     explicitApiKey,
     remoteApiKey,
     apiKeyConfigured: Boolean(remoteApiKey)
+  };
+}
+
+export function readEmbeddingEnvConfig(env: Env = process.env): EmbeddingEnvConfig {
+  const baseUrl = trimValue(env.ASSINI_EMBEDDING_BASE_URL);
+  const model = trimValue(env.ASSINI_EMBEDDING_MODEL);
+  return {
+    baseUrl,
+    model,
+    apiKey: trimValue(env.ASSINI_EMBEDDING_API_KEY),
+    timeoutMs: parseBoundedPositiveInteger(
+      env.ASSINI_EMBEDDING_TIMEOUT_MS,
+      DEFAULT_EMBEDDING_TIMEOUT_MS,
+      MAX_EMBEDDING_TIMEOUT_MS
+    ),
+    configured: Boolean(baseUrl && model)
   };
 }
 
@@ -75,6 +110,13 @@ export function normalizeHttpBaseUrl(value: string | undefined): string | undefi
   } catch {
     return undefined;
   }
+}
+
+/** Identifies one API endpoint regardless of whether its OpenAI-compatible /v1 suffix is explicit. */
+export function canonicalLlmEndpointIdentity(value: string | undefined): string | undefined {
+  const normalized = normalizeHttpBaseUrl(value);
+  if (!normalized) return undefined;
+  return normalizeBaseUrl(normalized.replace(/\/v1$/, ""));
 }
 
 export function resolveLlmTimeoutMs(env: Env = process.env, overrideMs?: number): number {

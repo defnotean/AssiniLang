@@ -474,7 +474,10 @@ export class JsonStore {
         warnings TEXT,
         created_by TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        processed_at TEXT
+        processed_at TEXT,
+        processing_started_at TEXT,
+        processing_attempts INTEGER,
+        processing_heartbeat_at TEXT
       );
       CREATE TABLE IF NOT EXISTS extraction_drafts (
         id TEXT PRIMARY KEY,

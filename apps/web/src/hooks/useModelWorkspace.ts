@@ -30,7 +30,7 @@ import {
 import type { AsyncState, ViewMode } from "../lib/types";
 import { useI18n } from "../i18n";
 
-const MODEL_DISCOVERY_REFRESH_INTERVAL_MS = 3_000;
+const MODEL_DISCOVERY_REFRESH_INTERVAL_MS = 30_000;
 
 function settingsNeedInitialModel(settings: RuntimeSettingsResponse["settings"]): boolean {
   return !settings.baseUrl.trim()
@@ -287,8 +287,8 @@ export function useModelWorkspace(
   useEffect(() => {
     if (view !== "model") return undefined;
 
-    const refreshIfIdle = () => {
-      if (!manualDiscoveryInFlightRef.current) {
+    const refreshIfVisibleAndIdle = () => {
+      if (document.visibilityState === "visible" && !manualDiscoveryInFlightRef.current) {
         void startModelDiscovery(configuredDiscoveryBaseUrlRef.current, {
           automatic: true,
           includeCommonTargets: true
@@ -297,17 +297,17 @@ export function useModelWorkspace(
     };
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") {
-        refreshIfIdle();
+        refreshIfVisibleAndIdle();
       }
     };
 
-    const interval = window.setInterval(refreshIfIdle, MODEL_DISCOVERY_REFRESH_INTERVAL_MS);
-    window.addEventListener("focus", refreshIfIdle);
+    const interval = window.setInterval(refreshIfVisibleAndIdle, MODEL_DISCOVERY_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refreshIfVisibleAndIdle);
     document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       window.clearInterval(interval);
-      window.removeEventListener("focus", refreshIfIdle);
+      window.removeEventListener("focus", refreshIfVisibleAndIdle);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [startModelDiscovery, view]);

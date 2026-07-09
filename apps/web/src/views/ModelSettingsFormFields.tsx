@@ -116,8 +116,83 @@ export function ModelSettingsFormFields({
         </div>
       </div>
 
-      <div className="settings-subsection">
-        <span className="detail-label">{t("model.transcriptionSettings")}</span>
+      <details className="settings-subsection settings-disclosure">
+        <summary>{t("model.embeddingSettings")}</summary>
+        <div className="settings-grid">
+          <div className="form-group">
+            <label htmlFor="embedding-base-url">{t("model.embeddingBaseUrl")}</label>
+            <input
+              id="embedding-base-url"
+              value={form.embeddingBaseUrl}
+              placeholder={t("model.embeddingBaseUrlPlaceholder")}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                embeddingBaseUrl: event.target.value
+              }))}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="embedding-model">{t("model.embeddingModel")}</label>
+            <input
+              id="embedding-model"
+              value={form.embeddingModel}
+              placeholder={t("model.embeddingModelPlaceholder")}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                embeddingModel: event.target.value
+              }))}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="embedding-api-key">{t("model.replaceEmbeddingApiKey")}</label>
+            <input
+              id="embedding-api-key"
+              type="password"
+              value={form.embeddingApiKey}
+              autoComplete="off"
+              disabled={isSavingSettings || form.clearEmbeddingApiKey}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                embeddingApiKey: event.target.value
+              }))}
+            />
+          </div>
+          <label className="checkbox-row settings-checkbox" htmlFor="clear-embedding-key">
+            <input
+              id="clear-embedding-key"
+              type="checkbox"
+              checked={form.clearEmbeddingApiKey}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                clearEmbeddingApiKey: event.target.checked,
+                embeddingApiKey: event.target.checked ? "" : current.embeddingApiKey
+              }))}
+            />
+            {t("model.clearEmbeddingApiKey")}
+          </label>
+          <div className="form-group">
+            <label htmlFor="embedding-timeout">{t("model.embeddingTimeout")}</label>
+            <input
+              id="embedding-timeout"
+              type="number"
+              min="1"
+              max="600000"
+              value={form.embeddingTimeoutMs}
+              disabled={isSavingSettings}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                embeddingTimeoutMs: event.target.value
+              }))}
+            />
+          </div>
+        </div>
+      </details>
+
+      <details className="settings-subsection settings-disclosure">
+        <summary>{t("model.transcriptionSettings")}</summary>
         <div className="settings-grid">
           <div className="form-group">
             <label htmlFor="transcribe-base-url">{t("model.transcriptionBaseUrl")}</label>
@@ -164,10 +239,10 @@ export function ModelSettingsFormFields({
             {t("model.clearTranscriptionApiKey")}
           </label>
         </div>
-      </div>
+      </details>
 
-      <div className="settings-subsection">
-        <span className="detail-label">{t("model.ocrSettings")}</span>
+      <details className="settings-subsection settings-disclosure">
+        <summary>{t("model.ocrSettings")}</summary>
         <div className="settings-grid">
           <div className="form-group">
             <label htmlFor="ocr-base-url">{t("model.ocrBaseUrl")}</label>
@@ -216,10 +291,10 @@ export function ModelSettingsFormFields({
             {t("model.clearOcrApiKey")}
           </label>
         </div>
-      </div>
+      </details>
 
-      <div className="settings-subsection">
-        <span className="detail-label">{t("model.ingestionSettings")}</span>
+      <details className="settings-subsection settings-disclosure">
+        <summary>{t("model.ingestionSettings")}</summary>
         <div className="settings-grid">
           <div className="form-group">
             <label htmlFor="ocr-lang">{t("model.ocrLanguage")}</label>
@@ -242,7 +317,7 @@ export function ModelSettingsFormFields({
             {t("model.allowPrivateUrls")}
           </label>
         </div>
-      </div>
+      </details>
     </>
   );
 }

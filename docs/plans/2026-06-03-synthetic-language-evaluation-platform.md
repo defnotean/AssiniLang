@@ -1,5 +1,7 @@
 # Synthetic Language Evaluation Platform Implementation Plan
 
+> **Status: historical and superseded.** This file preserves the original scaffold plan and its then-current file layout. Use the living handbook and [current roadmap](../roadmap.md) for contributor instructions and current implementation facts.
+
 **Goal:** Build a runnable local full-stack scaffold that seeds synthetic language corpora, runs answer-key evaluations, and exposes corpus, review, learner, and evaluation views in a web UI.
 
 **Architecture:** Use a TypeScript npm-workspaces monorepo with local JSON persistence. Packages define shared schemas, synthetic fixtures, and evaluation logic; a Fastify API serves that data; a Vite React app renders the prototype surfaces.

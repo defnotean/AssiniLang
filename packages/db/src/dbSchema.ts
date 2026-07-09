@@ -223,7 +223,10 @@ export const sourceAssets = sqliteTable("source_assets", {
   warnings: text("warnings", { mode: "json" }),
   createdBy: text("created_by").notNull(),
   createdAt: text("created_at").notNull(),
-  processedAt: text("processed_at")
+  processedAt: text("processed_at"),
+  processingStartedAt: text("processing_started_at"),
+  processingAttempts: integer("processing_attempts"),
+  processingHeartbeatAt: text("processing_heartbeat_at")
 });
 
 export const extractionDrafts = sqliteTable("extraction_drafts", {

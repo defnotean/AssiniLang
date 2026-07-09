@@ -174,7 +174,7 @@ describe("api server", () => {
       checks: {
         storage: {
           ok: true,
-          schemaVersion: 8
+          schemaVersion: 9
         },
         jobQueue: {
           ok: true,
@@ -271,7 +271,7 @@ describe("api server", () => {
       checks: {
         storage: {
           ok: true,
-          schemaVersion: 8
+          schemaVersion: 9
         },
         jobQueue: {
           ok: false,

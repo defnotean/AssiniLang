@@ -92,8 +92,9 @@ describe("LLM model discovery", () => {
     ]));
   });
 
-  it("uses configured API keys only for the matching discovery target", async () => {
-    const fetchStub: typeof fetch = async (_input, init) => {
+  it("uses a configured root API key for its normalized /v1 discovery target", async () => {
+    const fetchStub: typeof fetch = async (input, init) => {
+      expect(input.toString()).toBe("http://model-host:9000/v1/models");
       expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer local-secret");
       return new Response(JSON.stringify({
         data: [{ id: "configured-model" }]
@@ -106,7 +107,7 @@ describe("LLM model discovery", () => {
     const result = await discoverLlmModels({
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
-        ASSINI_LLM_BASE_URL: "http://model-host:9000/v1",
+        ASSINI_LLM_BASE_URL: "http://model-host:9000",
         ASSINI_LLM_API_KEY: "local-secret"
       },
       fetchFn: fetchStub,

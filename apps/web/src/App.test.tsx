@@ -33,6 +33,7 @@ const apiMock = vi.hoisted(() => ({
   fetchLanguageProfile: vi.fn(),
   fetchLanguageSnapshot: vi.fn(),
   fetchLlmStatus: vi.fn(),
+  fetchObsidianMcpSettings: vi.fn(),
   fetchObservability: vi.fn(),
   fetchRuntimeSettings: vi.fn(),
   fetchReviewDispositions: vi.fn(),
@@ -50,6 +51,8 @@ const apiMock = vi.hoisted(() => ({
   submitElderCorrection: vi.fn(),
   fetchElderContext: vi.fn(),
   submitExerciseAnswer: vi.fn(),
+  testObsidianMcpConnection: vi.fn(),
+  updateObsidianMcpSettings: vi.fn(),
   updateRuntimeSettings: vi.fn(),
   updateReviewPolicy: vi.fn(),
   updateLanguage: vi.fn(),
@@ -412,6 +415,10 @@ function createModelProfile(overrides: Record<string, unknown> = {}) {
     timeoutMs: 180000,
     maxTokens: 4096,
     jsonMode: false,
+    embeddingBaseUrl: "",
+    embeddingModel: "",
+    embeddingApiKeyConfigured: false,
+    embeddingTimeoutMs: 30000,
     transcriptionBaseUrl: "",
     transcriptionModel: "whisper-1",
     transcriptionApiKeyConfigured: false,
@@ -442,6 +449,10 @@ function createRuntimeSettingsResponse(
       timeoutMs: status.timeoutMs,
       maxTokens: 4096,
       jsonMode: false,
+      embeddingBaseUrl: "",
+      embeddingModel: "",
+      embeddingApiKeyConfigured: false,
+      embeddingTimeoutMs: 30000,
       transcriptionBaseUrl: "",
       transcriptionModel: "whisper-1",
       transcriptionApiKeyConfigured: false,
@@ -531,6 +542,21 @@ describe("App", () => {
     });
     apiMock.fetchLlmStatus.mockResolvedValue(createDeterministicLlmStatus());
     apiMock.fetchRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse());
+    apiMock.fetchObsidianMcpSettings.mockResolvedValue({
+      endpointUrl: "",
+      tokenConfigured: false,
+      timeoutMs: 15000
+    });
+    apiMock.updateObsidianMcpSettings.mockResolvedValue({
+      endpointUrl: "",
+      tokenConfigured: false,
+      timeoutMs: 15000
+    });
+    apiMock.testObsidianMcpConnection.mockResolvedValue({
+      configured: false,
+      connected: false,
+      detail: "Obsidian MCP endpoint is not configured."
+    });
     apiMock.fetchDiscoveredModels.mockResolvedValue(createModelDiscoveryResponse());
     apiMock.updateRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
     apiMock.activateModelProfile.mockResolvedValue(createRuntimeSettingsResponse(createRealLlmStatus()));
@@ -799,10 +825,12 @@ describe("App", () => {
     const skip = screen.getByRole("link", { name: "Skip to main content" });
     const main = document.getElementById("main-content");
     expect(main).not.toBeNull();
+    if (main) main.scrollTop = 240;
 
     fireEvent.click(skip);
 
     expect(document.activeElement).toBe(main);
+    expect(main).toHaveProperty("scrollTop", 0);
   });
 
   it("exposes section navigation as a labeled group without nested nav landmarks", async () => {
@@ -1054,6 +1082,35 @@ describe("App", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Data Stewardship Policy" })).toBeInTheDocument();
     expect(await screen.findByText("Only reviewers may approve community notes.")).toBeInTheDocument();
     expect(await screen.findByRole("region", { name: "LLM provider readiness" })).toBeInTheDocument();
+  });
+
+  it("keeps primary navigation reachable while hiding language-only chrome in an empty workspace", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue({
+      ...createDashboardData(),
+      languages: [],
+      corpus: [],
+      notes: [],
+      exercises: [],
+      evaluations: []
+    });
+    render(<App />);
+
+    expect(await screen.findByRole("group", { name: "Workspace overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Build" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Practice" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
+    expect(screen.queryByLabelText("Selected language metadata")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current language overview" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Build" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Generate AI Drafts" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Draft notes with model" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Settings" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run System Eval" })).not.toBeInTheDocument();
   });
 
   it("renders the simplified Start overview with saved examples", async () => {
@@ -2343,6 +2400,35 @@ describe("App", () => {
     });
   });
 
+  it("uses a restrained discovery polling interval and refreshes when Settings becomes visible", async () => {
+    const intervalSpy = vi.spyOn(window, "setInterval");
+    const visibilityDescriptor = Object.getOwnPropertyDescriptor(document, "visibilityState");
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible"
+    });
+    try {
+      await renderReady();
+
+      fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+      expect(await screen.findByLabelText("Discovered models")).toBeInTheDocument();
+      expect(intervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
+      const discoveryCalls = apiMock.fetchDiscoveredModels.mock.calls.length;
+
+      await act(async () => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+
+      await waitFor(() => expect(apiMock.fetchDiscoveredModels).toHaveBeenCalledTimes(discoveryCalls + 1));
+    } finally {
+      if (visibilityDescriptor) {
+        Object.defineProperty(document, "visibilityState", visibilityDescriptor);
+      } else {
+        Reflect.deleteProperty(document, "visibilityState");
+      }
+    }
+  });
+
   it("surfaces unloaded-model stale state when discovery no longer lists the saved model", async () => {
     const oldModelId = "lm-studio|http://127.0.0.1:1234/v1|old-loaded-model";
     apiMock.updateRuntimeSettings.mockResolvedValue(createRuntimeSettingsResponse({
@@ -2781,7 +2867,9 @@ describe("App", () => {
     const languageButton = await screen.findByRole("button", { name: /Avenik.*agglutinative/i });
     fireEvent.click(screen.getByRole("button", { name: "Generate AI Drafts" }));
 
-    await waitFor(() => expect(languageButton).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Drafting..." })).toBeDisabled());
+    expect(languageButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Drafting..." })).toBeDisabled();
 
     draftRun.resolve([]);
@@ -2833,7 +2921,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Draft notes with model" })).toBeEnabled();
   });
 
-  it("runs evaluation from the eval view and disables language switching while refresh is in flight", async () => {
+  it("runs evaluation while keeping workspace navigation available", async () => {
     const evaluationRun = createDeferred<unknown[]>();
     apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
     apiMock.runEvaluation.mockReturnValue(evaluationRun.promise);
@@ -2845,7 +2933,9 @@ describe("App", () => {
     const languageButton = screen.getByRole("button", { name: /Avenik.*agglutinative/i });
     fireEvent.click(screen.getByRole("button", { name: "Run System Eval" }));
 
-    await waitFor(() => expect(languageButton).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Evaluating..." })).toBeDisabled());
+    expect(languageButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Start" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Evaluating..." })).toBeDisabled();
 
     evaluationRun.resolve([]);
@@ -3137,7 +3227,7 @@ describe("App", () => {
     expect(within(detail).getByText("Added a second evidence passage.")).toBeInTheDocument();
   });
 
-  it("disables language switching while a note review refresh is in flight", async () => {
+  it("keeps workspace navigation available while a note review refresh is in flight", async () => {
     const review = createDeferred<unknown>();
     apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
     apiMock.reviewNote.mockReturnValue(review.promise);
@@ -3149,7 +3239,9 @@ describe("App", () => {
     const languageButton = await screen.findByRole("button", { name: /Avenik.*agglutinative/i });
     fireEvent.click(screen.getByRole("button", { name: "Approve verb chains" }));
 
-    await waitFor(() => expect(languageButton).toBeDisabled());
+    await waitFor(() => expect(apiMock.reviewNote).toHaveBeenCalled());
+    expect(languageButton).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Practice" })).toBeEnabled();
 
     review.resolve({});
 

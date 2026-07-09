@@ -20,9 +20,9 @@ If the route returns language data publicly, project it through `apps/api/src/pu
 
 The console is an App shell (`apps/web/src/App.tsx`: layout, sidebar, theme, top-level state) plus one module per view in `apps/web/src/views/`, shared presentational pieces in `apps/web/src/components/`, and pure helpers/constants/types in `apps/web/src/lib/`:
 
-1. Extend the `ViewMode` union in `lib/types.ts`, add `viewConfig.<mode>.{label,title,eyebrow}` keys in `i18n/en.ts` and `i18n/ar.ts`, and add the mode to `VIEW_ORDER` in `lib/viewConfig.ts` when it belongs in the primary sidebar. Optionally extend `ViewGlyph` and `sectionCounts`.
+1. Extend the `ViewMode` union in `lib/types.ts`, add `viewConfig.<mode>.{label,title,eyebrow}` keys in `i18n/en.ts`, and add the mode to `VIEW_ORDER` in `lib/viewConfig.ts` when it belongs in the primary sidebar. Optionally extend `ViewGlyph` and `sectionCounts`.
 2. Write the view component as a new file in `views/` following the existing ones (`IngestView`, `CorpusView`, ...): take the selected `languageId`, load through an `AsyncState<T>`, render loading/error/ready states, and mount it from the App shell.
-3. Add the client function in `apps/web/src/api.ts` next to its peers (`fetchSources`, `processSource`, ...). Client functions own route construction, the prototype-session actor choice, and payload shape.
+3. Add the client function to the matching domain client under `apps/web/src/api/` (`ingestApi.ts`, `languageApi.ts`, and so on), then export it from `apps/web/src/api.ts`. The top-level `api.ts` is the public barrel; domain clients own route construction, the prototype-session actor choice, and payload shape.
 4. Tests: route construction, actor/session behavior, and payload shape in `apps/web/src/api.test.ts`; the user workflow (navigate, fill, submit, assert rendered result and error states) in `apps/web/src/App.test.tsx`, which mocks the api module.
 5. Keep local form validation to obvious missing fields; the API is the source of truth for domain validation. Extract reusable form-parsing helpers into focused modules with direct tests (`apps/web/src/corpusImport.ts` + `corpusImport.test.ts` is the model).
 6. Browser-smoke the workflow after automated tests pass.
@@ -37,12 +37,12 @@ Seams in `apps/api/src/ingestion.ts`:
 
 ## Changing the persisted schema
 
-The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currently `schemaVersion: 8`).
+The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currently `schemaVersion: 9`). The existing 8 -> 9 SQLite migration in `packages/db/src/sqliteMigrations.ts` adds the `source_assets` columns `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at`.
 
-1. For an additive optional field, extend the relevant record schema with `.optional()` or `.default(...)`; no version bump needed.
-2. For a new collection or breaking change, bump the `schemaVersion` literal, keep the old version as a legacy schema (the v1-v7 schemas near the bottom of the file are the pattern), and extend `parseAppState` so legacy databases migrate forward on read.
+1. Extend the relevant Zod record schema and, when the record is stored in SQLite, its table definition in `packages/db/src/dbSchema.ts`.
+2. When a persisted SQLite table changes, bump `CURRENT_SCHEMA_VERSION`, keep the old app-state version as a legacy schema (the v1-v8 schemas near the bottom of `schema.ts` are the pattern), extend `parseAppState` for JSON reads, and add the ordered physical migration to `SQLITE_MIGRATIONS`.
 3. Add integrity checks in the `superRefine` block when the new data references other collections - corrupted local JSON must fail loudly, not leak into public views.
-4. Tests: `packages/db/src/store.test.ts` covers parse/migrate/reject paths; `packages/db/src/testing.ts` has state-building helpers. Add a migration test (old-version JSON parses and gains the new field/collection) and a rejection test (malformed new data fails with a useful message).
+4. Tests: `packages/db/src/store.test.ts` covers parse/migrate/reject paths, `packages/db/src/sqliteMigrations.test.ts` covers physical SQLite migrations and rollback, and `packages/db/src/testing.ts` has state-building helpers. Add a migration test (old-version JSON parses and gains the new field/collection), a SQLite migration test when tables change, and a rejection test (malformed new data fails with a useful message).
 5. Update the collections list in [architecture.md](architecture.md). The doc test derives the collection names from `appStateSchema` in `schema.ts` and fails if any of them is missing from architecture.md's collections list, and it asserts the `schemaVersion` literal in architecture.md matches the one in `schema.ts` - so adding a collection or bumping the version without touching architecture.md breaks the build.
 
 ## Backing up and restoring the local database

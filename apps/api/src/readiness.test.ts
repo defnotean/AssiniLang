@@ -9,7 +9,7 @@ describe("createReadinessReport", () => {
       checks: {
         storage: {
           ok: true,
-          schemaVersion: 8
+          schemaVersion: 9
         },
         jobQueue: {
           ok: true,
@@ -31,7 +31,7 @@ describe("createReadinessReport", () => {
       checks: {
         storage: {
           ok: true,
-          schemaVersion: 8
+          schemaVersion: 9
         },
         jobQueue: {
           ok: true,
@@ -78,7 +78,7 @@ describe("createReadinessReport", () => {
       checks: {
         storage: {
           ok: true,
-          schemaVersion: 8
+          schemaVersion: 9
         },
         jobQueue: {
           ok: false,

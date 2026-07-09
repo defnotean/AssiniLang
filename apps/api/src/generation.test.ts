@@ -331,17 +331,39 @@ describe("generateModelDraftNotes", () => {
     expect(result.warnings.some((warning) => warning.includes("ungrounded"))).toBe(true);
   });
 
-  it("does not forward OPENAI_API_KEY to local embedding retrieval", async () => {
+  it("does not call embeddings for chat-only configuration", async () => {
+    const mockFetch = vi.fn();
+    const { provider } = providerWithChat(JSON.stringify({ notes: [] }));
+
+    await generateModelDraftNotes({
+      language,
+      corpus,
+      lexemes,
+      existingNotes: notes,
+      provider,
+      fetchFn: mockFetch,
+      env: {
+        ASSINI_LLM_PROVIDER: "openai",
+        ASSINI_LLM_BASE_URL: "https://api.openai.com/v1",
+        ASSINI_LLM_MODEL: "gpt-chat-only",
+        OPENAI_API_KEY: "sk-chat-secret"
+      }
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it("does not forward OPENAI_API_KEY to a dedicated local embedding endpoint", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
+      status: 200,
       json: async () => ({
         data: [0, ...corpus.map((_, index) => index + 1)].map((index) => ({
           index,
           embedding: index === 0 ? [1, 0, 0] : [0.9, 0.1, 0]
         }))
       })
-    });
-    vi.stubGlobal("fetch", mockFetch);
+    } as Response);
     const { provider } = providerWithChat(JSON.stringify({
       notes: [
         {
@@ -359,20 +381,47 @@ describe("generateModelDraftNotes", () => {
       lexemes,
       existingNotes: notes,
       provider,
+      fetchFn: mockFetch,
       env: {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
         ASSINI_LLM_MODEL: "local-model",
+        ASSINI_EMBEDDING_BASE_URL: "http://127.0.0.1:8080/v1",
+        ASSINI_EMBEDDING_MODEL: "local-embedding-model",
+        ASSINI_EMBEDDING_API_KEY: "dedicated-embedding-secret",
+        ASSINI_ALLOW_PRIVATE_URLS: "1",
         OPENAI_API_KEY: "sk-remote-secret"
       }
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({
-      headers: { "Content-Type": "application/json" }
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer dedicated-embedding-secret"
+      }
     });
     expect(JSON.stringify(mockFetch.mock.calls[0]?.[1])).not.toContain("sk-remote-secret");
-    vi.unstubAllGlobals();
+  });
+
+  it("enforces outbound URL policy before calling a configured embedding endpoint", async () => {
+    const mockFetch = vi.fn();
+    const { provider } = providerWithChat(JSON.stringify({ notes: [] }));
+
+    await generateModelDraftNotes({
+      language,
+      corpus,
+      lexemes,
+      existingNotes: notes,
+      provider,
+      fetchFn: mockFetch,
+      env: {
+        ASSINI_EMBEDDING_BASE_URL: "http://127.0.0.1:8080/v1",
+        ASSINI_EMBEDDING_MODEL: "local-embedding-model"
+      }
+    });
+
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it("throws when the model returns unparseable output", async () => {

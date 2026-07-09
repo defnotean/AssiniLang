@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { DiscoveredLlmModel, LlmModelDiscoveryResponse } from "../api";
 import { useI18n } from "../i18n";
 import { discoveredModelLabel, modelDisplayName, sameModelBaseUrl } from "../lib/modelFormatting";
@@ -80,6 +81,39 @@ export function ModelDiscoveryPanel({
     return t("model.endpointConnectedNoModels", { baseUrl: endpoint.baseUrl });
   }
 
+  const visibleConnectedEndpoints = connectedEndpoints.slice(0, 2);
+  const visibleFailedEndpoints = failedEndpoints.slice(0, 2);
+  const visibleDiscoveryErrors = failedEndpoints.length === 0 && connectedEndpoints.length === 0
+    ? discoveryErrors.slice(0, 2)
+    : [];
+  const connectionAnnouncementSignature = visibleConnectedEndpoints
+    .map((endpoint) => connectedEndpointMessage(endpoint))
+    .join(" ");
+  const errorAnnouncementSignature = [
+    ...visibleFailedEndpoints.map((endpoint) => t("model.endpointConnectionFailed", {
+      baseUrl: endpoint.baseUrl,
+      detail: endpoint.detail ?? t("model.errModelDiscoveryFailed")
+    })),
+    ...visibleDiscoveryErrors.map((error) => t("model.endpointConnectionFailed", {
+      baseUrl: error.baseUrl,
+      detail: error.detail
+    }))
+  ].join(" ");
+  const [connectionAnnouncement, setConnectionAnnouncement] = useState("");
+  const [errorAnnouncement, setErrorAnnouncement] = useState("");
+
+  useEffect(() => {
+    setConnectionAnnouncement((current) => (
+      current === connectionAnnouncementSignature ? current : connectionAnnouncementSignature
+    ));
+  }, [connectionAnnouncementSignature]);
+
+  useEffect(() => {
+    setErrorAnnouncement((current) => (
+      current === errorAnnouncementSignature ? current : errorAnnouncementSignature
+    ));
+  }, [errorAnnouncementSignature]);
+
   return (
     <div className="form-group wide">
       <label htmlFor="discovered-model">{t("model.discoveredModels")}</label>
@@ -128,7 +162,7 @@ export function ModelDiscoveryPanel({
         </p>
       )}
       {modelDiscoveryState.status === "ready" && (
-        <p className="model-scan-meta" role="status" aria-live="polite">
+        <p className="model-scan-meta">
           {isAutoRefreshingModels
             ? t("model.autoRefreshingModels")
             : lastModelScan
@@ -136,12 +170,20 @@ export function ModelDiscoveryPanel({
               : t("model.autoDiscoveryActive")}
         </p>
       )}
-      {connectedEndpoints.slice(0, 2).map((endpoint) => (
+      {connectionAnnouncement && (
+        <p className="visually-hidden" role="status" aria-live="polite">
+          {t("model.discoveredModels")}: {connectionAnnouncement}
+        </p>
+      )}
+      {errorAnnouncement && (
+        <p className="visually-hidden" role="alert" aria-live="assertive">
+          {t("model.discoveredModels")}: {errorAnnouncement}
+        </p>
+      )}
+      {visibleConnectedEndpoints.map((endpoint) => (
         <p
           key={`connected:${endpoint.source}:${endpoint.baseUrl}`}
           className="result-notice"
-          role="status"
-          aria-live="polite"
           title={fullDiscoveredModelNamesForEndpoint(endpoint)}
         >
           {connectedEndpointMessage(endpoint)}
@@ -183,12 +225,10 @@ export function ModelDiscoveryPanel({
           </div>
         </div>
       )}
-      {failedEndpoints.slice(0, 2).map((endpoint) => (
+      {visibleFailedEndpoints.map((endpoint) => (
         <p
           key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`}
           className="inline-error"
-          role="alert"
-          aria-live="assertive"
         >
           {t("model.endpointConnectionFailed", {
             baseUrl: endpoint.baseUrl,
@@ -196,12 +236,10 @@ export function ModelDiscoveryPanel({
           })}
         </p>
       ))}
-      {failedEndpoints.length === 0 && connectedEndpoints.length === 0 && discoveryErrors.slice(0, 2).map((error) => (
+      {visibleDiscoveryErrors.map((error) => (
         <p
           key={`${error.source}:${error.baseUrl}:${error.detail}`}
           className="inline-error"
-          role="alert"
-          aria-live="assertive"
         >
           {t("model.endpointConnectionFailed", { baseUrl: error.baseUrl, detail: error.detail })}
         </p>

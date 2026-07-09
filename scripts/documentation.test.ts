@@ -131,7 +131,8 @@ describe("project documentation", () => {
         "[UI Design Guide](ui-design.md)",
         "[Audit / Export Drill](audit-export-drill.md)",
         "## Reading paths",
-        "## Doc index"
+        "## Doc index",
+        "kept as-is and not updated"
       ],
       "docs/api.md": [
         "verifyExportIntegrity",
@@ -208,7 +209,10 @@ describe("project documentation", () => {
         "empty-workspace guidance",
         "ASSINI_EVAL_REQUIRE_LANGUAGES",
         "A successful run also clears `processingAttempts`",
-        "capped asset stays blocked"
+        "capped asset stays blocked",
+        "ASSINI_OCR_PDF_MAX_PAGES",
+        "pages 1..N",
+        "\"schemaVersion\": 9"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -231,7 +235,12 @@ describe("project documentation", () => {
         "schemaVersion",
         "ASSINI_EVAL_REQUIRE_LANGUAGES",
         "empty seed cannot green-pass",
-        "OCR readiness"
+        "OCR readiness",
+        "schemaVersion: 9",
+        "8 -> 9 SQLite migration",
+        "processing_started_at",
+        "processing_attempts",
+        "processing_heartbeat_at"
       ],
       "docs/configuration.md": [
         "## Setup recipes",
@@ -316,7 +325,12 @@ describe("project documentation", () => {
         "refuses to replace live data if that safety backup fails",
         "dry-run still succeeds and prints a warning",
         "docs/audit-export-drill.md",
-        "docs/operator-recovery.md"
+        "docs/operator-recovery.md",
+        "`api.ts` is the public barrel",
+        "apps/web/src/api/",
+        "i18n/en.ts",
+        "schemaVersion: 9",
+        "SQLITE_MIGRATIONS"
       ],
       "docs/operator-recovery.md": [
         "## Local data paths",
@@ -406,7 +420,12 @@ describe("project documentation", () => {
         "interrupted-processing drill log",
         "corrupted-database loud-failure screenshot",
         "oversizedImportFailures.test.ts",
-        "ingest.vaultMarkdownTooLarge"
+        "ingest.vaultMarkdownTooLarge",
+        "ASSINI_OCR_PDF_MAX_PAGES",
+        "ModelSetupView.test.tsx",
+        "ModelDiscoveryPanel.test.tsx",
+        "schema 9",
+        "8 -> 9 SQLite migration"
       ],
       "docs/product-guide.md": [
         "leadless",
@@ -449,9 +468,11 @@ describe("project documentation", () => {
         "database file only",
         "could not create a safety backup",
         "disk full",
-        "newest **routine** backup"
+        "newest **routine** backup",
+        "ASSINI_OCR_PDF_MAX_PAGES",
+        "pages 1..N"
       ],
-      "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
+      "docs/ui-design.md": ["## Implemented direction", "source of truth", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };
 
     for (const [file, sentinels] of Object.entries(expectedContent)) {
@@ -583,5 +604,41 @@ describe("project documentation", () => {
       architectureDoc.includes(`schemaVersion: ${schemaVersion}`),
       `architecture.md should state schemaVersion: ${schemaVersion} to match schema.ts`
     ).toBe(true);
+  });
+
+  it("guards current OCR, web-client, model-operations, and persistence facts", async () => {
+    const docs = await readAllDocs();
+    const currentHandbook = [...docs.values()].join("\n");
+    const architecture = docs.get("docs/architecture.md") ?? "";
+    const maintenance = docs.get("docs/maintenance.md") ?? "";
+    const roadmap = docs.get("docs/roadmap.md") ?? "";
+
+    // Dated plans are deliberately outside DOC_FILES: their old intent is historical.
+    expect(currentHandbook).not.toContain("AssiniLang.html");
+    expect(currentHandbook).not.toContain("i18n/ar.ts");
+    expect(currentHandbook).not.toMatch(/\bpage[- ]1(?:-only)?\b/i);
+
+    for (const file of ["docs/api.md", "docs/ingestion.md", "docs/roadmap.md", "docs/troubleshooting.md"] as const) {
+      const content = docs.get(file) ?? "";
+      expect(content, `${file} should document the scanned-PDF page cap`).toContain(
+        "ASSINI_OCR_PDF_MAX_PAGES"
+      );
+      expect(content, `${file} should document the default scanned-PDF page cap`).toMatch(
+        /default `?10`?/
+      );
+    }
+
+    expect(maintenance).toContain("`api.ts` is the public barrel");
+    expect(maintenance).toContain("apps/web/src/api/");
+    expect(roadmap).toContain("saved-profile switch test is shipped");
+    expect(roadmap).toContain("unloaded-model stale-state tests are shipped");
+
+    const { schemaVersion } = await readAppStateShape();
+    expect(schemaVersion).toBe(9);
+    expect(architecture).toContain("The current schema version is 9");
+    expect(architecture).toContain("8 -> 9 SQLite migration");
+    expect(architecture).toContain("processing_started_at");
+    expect(architecture).toContain("processing_attempts");
+    expect(architecture).toContain("processing_heartbeat_at");
   });
 });

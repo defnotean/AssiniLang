@@ -3,6 +3,7 @@ import type { AppState, User } from "@assini/db";
 import type { JobQueue } from "../jobQueue.js";
 import type { LlmProvider } from "../llmProvider.js";
 import type { PrototypeSessionMap } from "../routeHelpers.js";
+import type { ObsidianMcpSessionFactory } from "../obsidianMcpClient.js";
 
 export type RequestStatusClass = "1xx" | "2xx" | "3xx" | "4xx" | "5xx";
 
@@ -46,6 +47,7 @@ export type RouteContext = {
   multipartFileSizeBytes: number;
   ingestionFetch: typeof fetch;
   settingsPath: string;
+  obsidianMcpSessionFactory: ObsidianMcpSessionFactory;
   reloadLlmProvider?: () => void;
   jobQueue: JobQueue;
   requestMetrics: RequestMetrics;

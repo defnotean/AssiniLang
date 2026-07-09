@@ -11,28 +11,37 @@ const emptyDiscovery: LlmModelDiscoveryResponse = {
   errors: []
 };
 
+function panelProps(overrides: Partial<Parameters<typeof ModelDiscoveryPanel>[0]> = {}) {
+  return {
+    connectedEndpoints: [],
+    discoveryErrors: [],
+    discoveredModels: [],
+    failedEndpoints: [],
+    formBaseUrl: "",
+    isAutoRefreshingModels: false,
+    isSavingSettings: false,
+    isScanningModels: false,
+    lastModelScan: null,
+    modelDiscoveryState: { status: "ready", data: emptyDiscovery } as const,
+    onApplyLoadedModel: vi.fn(),
+    onClearSavedModel: vi.fn(),
+    onDiscoveredModelChange: vi.fn(),
+    onRefreshModelDiscovery: vi.fn(),
+    selectedDiscoveredModelId: "",
+    staleActiveModel: null,
+    ...overrides
+  } satisfies Parameters<typeof ModelDiscoveryPanel>[0];
+}
+
 function renderPanel(overrides: Partial<Parameters<typeof ModelDiscoveryPanel>[0]> = {}) {
-  return render(
-    <ModelDiscoveryPanel
-      connectedEndpoints={[]}
-      discoveryErrors={[]}
-      discoveredModels={[]}
-      failedEndpoints={[]}
-      formBaseUrl=""
-      isAutoRefreshingModels={false}
-      isSavingSettings={false}
-      isScanningModels={false}
-      lastModelScan={null}
-      modelDiscoveryState={{ status: "ready", data: emptyDiscovery }}
-      onApplyLoadedModel={vi.fn()}
-      onClearSavedModel={vi.fn()}
-      onDiscoveredModelChange={vi.fn()}
-      onRefreshModelDiscovery={vi.fn()}
-      selectedDiscoveredModelId=""
-      staleActiveModel={null}
-      {...overrides}
-    />
-  );
+  const props = panelProps(overrides);
+  const rendered = render(<ModelDiscoveryPanel {...props} />);
+  return {
+    ...rendered,
+    rerenderPanel(nextOverrides: Partial<Parameters<typeof ModelDiscoveryPanel>[0]> = {}) {
+      rendered.rerender(<ModelDiscoveryPanel {...props} {...nextOverrides} />);
+    }
+  };
 }
 
 describe("ModelDiscoveryPanel connection errors", () => {
@@ -58,8 +67,8 @@ describe("ModelDiscoveryPanel connection errors", () => {
       ]
     });
 
-    const failedAlert = screen.getByText(/http:\/\/127\.0\.0\.1:11434/);
-    expect(failedAlert).toHaveAttribute("role", "alert");
+    const failedAlert = screen.getByRole("alert");
+    expect(failedAlert).toHaveTextContent("http://127.0.0.1:11434");
     expect(screen.queryByText(/http:\/\/127\.0\.0\.1:1234/)).not.toBeInTheDocument();
   });
 
@@ -74,7 +83,38 @@ describe("ModelDiscoveryPanel connection errors", () => {
       ]
     });
 
-    expect(screen.getByText(/http:\/\/127\.0\.0\.1:1234/)).toHaveAttribute("role", "alert");
+    expect(screen.getByRole("alert")).toHaveTextContent("http://127.0.0.1:1234");
+  });
+
+  it("does not re-announce unchanged endpoint failures from polling", () => {
+    const failedEndpoint = {
+      source: "ollama",
+      baseUrl: "http://127.0.0.1:11434",
+      provider: "ollama" as const,
+      providerLabel: "Ollama",
+      connected: false,
+      modelCount: 0,
+      detail: "Connection refused"
+    };
+    const { rerenderPanel } = renderPanel({ failedEndpoints: [failedEndpoint] });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("http://127.0.0.1:11434");
+    const observer = new MutationObserver(() => undefined);
+    observer.observe(alert, { attributes: true, childList: true, characterData: true, subtree: true });
+
+    rerenderPanel({ failedEndpoints: [{ ...failedEndpoint }], isAutoRefreshingModels: true });
+
+    expect(screen.getByRole("alert")).toBe(alert);
+    expect(observer.takeRecords()).toHaveLength(0);
+    observer.disconnect();
+  });
+
+  it("keeps routine automatic scan progress out of live regions", () => {
+    renderPanel({ isAutoRefreshingModels: true });
+
+    expect(screen.getByText("Checking for loaded or unloaded models...")).not.toHaveAttribute("role");
+    expect(screen.getByText("Checking for loaded or unloaded models...")).not.toHaveAttribute("aria-live");
   });
 });
 

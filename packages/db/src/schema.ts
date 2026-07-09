@@ -2790,7 +2790,7 @@ function duplicateReviewApprovalKey(
 }
 
 /** Current AppState schema version written and accepted by this package. */
-export const CURRENT_SCHEMA_VERSION = 8 as const;
+export const CURRENT_SCHEMA_VERSION = 9 as const;
 
 export const appStateSchema = z.object({
   schemaVersion: z.literal(CURRENT_SCHEMA_VERSION),
@@ -3017,6 +3017,29 @@ const legacyAppStateV7Schema = z.object({
   reviewDispositions: z.array(reviewDispositionSchema).default([])
 });
 
+const legacyAppStateV8Schema = z.object({
+  schemaVersion: z.literal(8),
+  languages: z.array(languageSchema),
+  corpus: z.array(corpusPassageSchema),
+  corpusAnswerKeys: z.array(corpusAnswerKeySchema).optional(),
+  noteAnswerKeys: z.array(noteSchema),
+  notes: z.array(noteSchema),
+  exercises: z.array(exerciseSchema),
+  exerciseSubmissions: z.array(exerciseSubmissionSchema),
+  evaluationRuns: z.array(evaluationRunSchema),
+  governance: z.array(governanceRecordSchema).default([]),
+  users: z.array(userSchema).default([]),
+  aiSessions: z.array(aiSessionSchema).default([]),
+  elderCorrections: z.array(elderCorrectionSchema).default([]),
+  auditEvents: z.array(auditEventSchema).default([]),
+  reviewPolicies: z.array(reviewPolicySchema).default([]),
+  reviewApprovals: z.array(reviewApprovalSchema).default([]),
+  reviewDispositions: z.array(reviewDispositionSchema).default([]),
+  lexemes: z.array(lexemeSchema).default([]),
+  sourceAssets: z.array(sourceAssetSchema).default([]),
+  extractionDrafts: z.array(extractionDraftSchema).default([])
+});
+
 function migrateLegacyNoteToAnswerKey(note: Note): Note {
   return {
     ...note,
@@ -3152,6 +3175,14 @@ export function parseAppState(input: unknown): AppState {
   if (legacyV7.success) {
     return ensureCorpusAnswerKeys(appStateSchema.parse({
       ...legacyV7.data,
+      schemaVersion: CURRENT_SCHEMA_VERSION
+    }));
+  }
+
+  const legacyV8 = legacyAppStateV8Schema.safeParse(input);
+  if (legacyV8.success) {
+    return ensureCorpusAnswerKeys(appStateSchema.parse({
+      ...legacyV8.data,
       schemaVersion: CURRENT_SCHEMA_VERSION
     }));
   }

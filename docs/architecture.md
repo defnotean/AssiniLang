@@ -23,6 +23,7 @@ flowchart LR
     subgraph External
         M[OpenAI-compatible LLM<br>Ollama / LM Studio / remote]
         T[Transcription server<br>/audio/transcriptions]
+        OX[Obsidian MCP server<br>Streamable HTTP resources]
         U[Public URLs<br>SSRF-guarded fetch]
     end
     W --> P
@@ -31,6 +32,7 @@ flowchart LR
     I --> O
     L --> M
     I --> T
+    A --> OX
     I --> U
     E[packages/eval<br>deterministic scoring] --> S
     D[packages/db<br>schemas + store] --> S
@@ -95,7 +97,7 @@ docs/                  The handbook, plus dated history under docs/specs and doc
 
 ## Data model
 
-The persisted app state (`appStateSchema` in `packages/db/src/schema.ts`, `schemaVersion: 8`) holds exactly these collections: `languages`, `corpus`, `corpusAnswerKeys`, `noteAnswerKeys`, `notes`, `exercises`, `exerciseSubmissions`, `evaluationRuns`, `governance`, `users`, `aiSessions`, `elderCorrections`, `auditEvents`, `reviewPolicies`, `reviewApprovals`, `reviewDispositions`, `lexemes`, `sourceAssets`, and `extractionDrafts`.
+The persisted app state (`appStateSchema` in `packages/db/src/schema.ts`, `schemaVersion: 9`) holds exactly these collections: `languages`, `corpus`, `corpusAnswerKeys`, `noteAnswerKeys`, `notes`, `exercises`, `exerciseSubmissions`, `evaluationRuns`, `governance`, `users`, `aiSessions`, `elderCorrections`, `auditEvents`, `reviewPolicies`, `reviewApprovals`, `reviewDispositions`, `lexemes`, `sourceAssets`, and `extractionDrafts`.
 
 ```mermaid
 erDiagram
@@ -148,9 +150,9 @@ The generated local database lives at `data/local-db.json` (override with `ASSIN
 
 Persisted source-asset file paths are validated before use. File-backed assets must stay under `assets/<languageId>/` inside the configured data directory; absolute paths, URL-like paths, drive/UNC paths, backslashes, traversal segments, and wrong-language prefixes are rejected on persisted reads and at ingestion resolution time.
 
-The current schema version is 8. Legacy v1-v7 local databases migrate forward automatically on read; older state gains empty `lexemes`, `sourceAssets`, and `extractionDrafts` collections and keeps its existing records.
+The current schema version is 9. Legacy v1-v8 JSON databases migrate forward automatically on read; older state gains collections introduced after its version and keeps its existing records. The v8 -> v9 app-state migration preserves source-processing metadata already present in JSON.
 
-The store backend can also be selected explicitly: `new JsonStore(path, { backend: "json" | "sqlite" })` (or the `openStore` factory) overrides the extension heuristic, and the resolved choice is exposed as the read-only `backend` property. SQLite databases carry a single-row `schema_meta` table (`schema_version`, `migrated_at`) stamped with the current schema version on first open. Pending entries in the `SQLITE_MIGRATIONS` registry run in order at open time, each inside its own transaction with the version bump committed atomically; a failing migration rolls back fully, and a database stamped with a newer version than the code understands is refused loudly.
+The store backend can also be selected explicitly: `new JsonStore(path, { backend: "json" | "sqlite" })` (or the `openStore` factory) overrides the extension heuristic, and the resolved choice is exposed as the read-only `backend` property. SQLite databases carry a single-row `schema_meta` table (`schema_version`, `migrated_at`) stamped with the current schema version on first open. The real 8 -> 9 SQLite migration adds `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at` to `source_assets` without changing existing rows. Pending entries in the `SQLITE_MIGRATIONS` registry run in order at open time, each inside its own transaction with the version bump committed atomically; a failing migration rolls back fully, and a database stamped with a newer version than the code understands is refused loudly.
 
 Persisted top-level records must keep stable nonblank unique IDs inside each app-state collection. The schema validates referential integrity during local JSON reads: language IDs on corpus, notes, exercises, lexemes, sourceAssets, extractionDrafts, and governance/review/audit records must resolve to existing languages; answer keys must point at existing same-language passages; actor attribution must use known local users in allowed roles; timestamps must stay parseable and chronologically consistent. Corrupted or manually edited local JSON fails loudly with the exact database path instead of leaking malformed records into public views.
 
@@ -241,7 +243,7 @@ Persisted evaluation runs must keep nonblank language IDs that reference an exis
 
 ## Health and readiness
 
-`GET /health` is the cheap liveness probe. `GET /ready` (via `readiness.ts`) reads the configured store through the same schema-validation path used by normal API reads and reports safe `jobQueue` pending/active counts. A ready response includes `schemaVersion` (currently 8) and never exposes database paths, exception messages, job IDs, or workspace contents. Privileged `GET /observability/metrics` returns a similarly sanitized operational snapshot (uptime, request status-class counts, job-queue counts, storage status).
+`GET /health` is the cheap liveness probe. `GET /ready` (via `readiness.ts`) reads the configured store through the same schema-validation path used by normal API reads and reports safe `jobQueue` pending/active counts. A ready response includes `schemaVersion` (currently 9) and never exposes database paths, exception messages, job IDs, or workspace contents. Privileged `GET /observability/metrics` returns a similarly sanitized operational snapshot (uptime, request status-class counts, job-queue counts, storage status).
 
 ## LLM provider boundary
 

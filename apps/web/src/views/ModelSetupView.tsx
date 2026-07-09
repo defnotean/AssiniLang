@@ -23,6 +23,7 @@ import { DesktopToolsPanel } from "./DesktopToolsPanel";
 import { ModelDiscoveryPanel } from "./ModelDiscoveryPanel";
 import { ModelObservabilityPanel } from "./ModelObservabilityPanel";
 import { ModelSettingsFormFields } from "./ModelSettingsFormFields";
+import { ObsidianMcpSettingsPanel } from "./ObsidianMcpSettingsPanel";
 import { ProviderReadinessPanel } from "./ProviderReadinessPanel";
 import { StatusScreen } from "../components/StatusScreen";
 
@@ -132,7 +133,8 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
 
     const timeoutMs = positiveInteger(nextForm.timeoutMs);
     const maxTokens = positiveInteger(nextForm.maxTokens);
-    if (!timeoutMs || !maxTokens) {
+    const embeddingTimeoutMs = positiveInteger(nextForm.embeddingTimeoutMs);
+    if (!timeoutMs || !maxTokens || !embeddingTimeoutMs) {
       setFormError(t("model.settingsNumericError"));
       return null;
     }
@@ -147,6 +149,11 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
       timeoutMs,
       maxTokens,
       jsonMode: nextForm.jsonMode,
+      embeddingBaseUrl: nextForm.embeddingBaseUrl.trim(),
+      embeddingModel: nextForm.embeddingModel.trim(),
+      embeddingApiKey: nextForm.embeddingApiKey || undefined,
+      clearEmbeddingApiKey: nextForm.clearEmbeddingApiKey || undefined,
+      embeddingTimeoutMs,
       transcriptionBaseUrl: nextForm.transcriptionBaseUrl.trim(),
       transcriptionModel: nextForm.transcriptionModel.trim(),
       transcriptionApiKey: nextForm.transcriptionApiKey || undefined,
@@ -187,6 +194,8 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
       ...current,
       apiKey: "",
       clearApiKey: false,
+      embeddingApiKey: "",
+      clearEmbeddingApiKey: false,
       transcriptionApiKey: "",
       clearTranscriptionApiKey: false,
       ocrApiKey: "",
@@ -425,6 +434,8 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
         observabilityState={observabilityState}
         onRetry={onRefreshModelObservability}
       />
+
+      <ObsidianMcpSettingsPanel />
 
       <section className="panel-card setup-card" aria-label={t("model.localSetupAria")}>
         <span className="detail-label">{t("model.localEndpoints")}</span>

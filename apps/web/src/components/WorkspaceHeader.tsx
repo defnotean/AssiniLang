@@ -46,63 +46,65 @@ export function WorkspaceHeader({
         <p className="breadcrumb">{currentBreadcrumb}</p>
         <p className="eyebrow">{currentEyebrow}</p>
         <h1>{currentTitle}</h1>
-        {view !== "elder" && (
+        {selectedLanguage && view !== "elder" && (
           <div className="language-metadata" aria-label={t("header.metadataAria")}>
-            <span>{formatTypology(selectedLanguage?.typology, t)}</span>
-            <span>{formatOrthographyMeta(selectedLanguage?.orthography, t)}</span>
+            <span>{formatTypology(selectedLanguage.typology, t)}</span>
+            <span>{formatOrthographyMeta(selectedLanguage.orthography, t)}</span>
             <span>
               {t("header.statusWorkspace", {
-                status: formatStatus(selectedLanguage?.status ?? "draft", t)
+                status: formatStatus(selectedLanguage.status, t)
               })}
             </span>
           </div>
         )}
       </div>
 
-      <div className="header-actions">
-        {view === "ingest" && (
-          <>
-            <button type="button" onClick={onGenerateDrafts} disabled={isWorkflowBusy} aria-busy={isDrafting}>
-              {isDrafting ? t("review.drafting") : t("review.generateAiDrafts")}
-            </button>
-            <button
-              type="button"
-              onClick={onGenerateModelDrafts}
-              disabled={isWorkflowBusy}
-              aria-busy={isModelDrafting}
-            >
-              {isModelDrafting ? t("review.draftingWithModel") : t("review.draftNotesWithModel")}
-            </button>
-            {modelDraftMessage && (
-              <p className="result-notice header-notice" role="status" aria-live="polite">
-                {modelDraftMessage}
-              </p>
-            )}
-            {modelDraftError && (
-              <p className="result-notice error header-notice" role="alert">
-                {modelDraftError}
-              </p>
-            )}
-            {actionError && (
-              <p className="result-notice error header-notice" role="alert">
-                {actionError}
-              </p>
-            )}
-          </>
-        )}
-        {view === "model" && (
-          <>
-            <button type="button" onClick={onRunEval} disabled={isWorkflowBusy} aria-busy={isEvaluating}>
-              {isEvaluating ? t("eval.evaluating") : t("eval.runSystemEval")}
-            </button>
-            {actionError && (
-              <p className="result-notice error header-notice" role="alert">
-                {actionError}
-              </p>
-            )}
-          </>
-        )}
-      </div>
+      {selectedLanguage && (
+        <div className="header-actions">
+          {view === "ingest" && (
+            <>
+              <button type="button" onClick={onGenerateDrafts} disabled={isWorkflowBusy} aria-busy={isDrafting}>
+                {isDrafting ? t("review.drafting") : t("review.generateAiDrafts")}
+              </button>
+              <button
+                type="button"
+                onClick={onGenerateModelDrafts}
+                disabled={isWorkflowBusy}
+                aria-busy={isModelDrafting}
+              >
+                {isModelDrafting ? t("review.draftingWithModel") : t("review.draftNotesWithModel")}
+              </button>
+              {modelDraftMessage && (
+                <p className="result-notice header-notice" role="status" aria-live="polite">
+                  {modelDraftMessage}
+                </p>
+              )}
+              {modelDraftError && (
+                <p className="result-notice error header-notice" role="alert">
+                  {modelDraftError}
+                </p>
+              )}
+              {actionError && (
+                <p className="result-notice error header-notice" role="alert">
+                  {actionError}
+                </p>
+              )}
+            </>
+          )}
+          {view === "model" && (
+            <>
+              <button type="button" onClick={onRunEval} disabled={isWorkflowBusy} aria-busy={isEvaluating}>
+                {isEvaluating ? t("eval.evaluating") : t("eval.runSystemEval")}
+              </button>
+              {actionError && (
+                <p className="result-notice error header-notice" role="alert">
+                  {actionError}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
     </section>
   );
 }

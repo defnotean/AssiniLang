@@ -44,7 +44,7 @@ describe("buildObservabilityMetricsSnapshot", () => {
         byStatusClass: { "1xx": 0, "2xx": 3, "3xx": 0, "4xx": 1, "5xx": 0 }
       },
       jobQueue: { pending: 2, active: 1 },
-      storage: { ok: true, schemaVersion: 8 }
+      storage: { ok: true, schemaVersion: 9 }
     });
   });
 
@@ -192,7 +192,7 @@ describe("GET /observability/metrics", () => {
       },
       storage: {
         ok: true,
-        schemaVersion: 8
+        schemaVersion: 9
       }
     });
     expect(Object.keys(body.requests).sort()).toEqual(["byStatusClass", "total"]);

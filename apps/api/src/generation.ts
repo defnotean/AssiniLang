@@ -1,9 +1,10 @@
 import { z } from "zod";
 import type { CorpusPassage, Exercise, Language, Lexeme, Note } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
-import { readLlmEnvConfig, type Env } from "./llmEnvShared.js";
+import { readEmbeddingEnvConfig, type Env } from "./llmEnvShared.js";
 import { parseModelJson } from "./modelJson.js";
-import { retrieveTopKPassages } from "@assini/eval";
+import { retrieveTopKPassages, type EmbeddingFetch } from "@assini/eval";
+import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 
 /**
  * Model-backed, GROUNDED generation of draft grammar notes and a draft
@@ -555,14 +556,25 @@ function isReasoningOnlyGenerationError(error: unknown): boolean {
   return error instanceof Error && REASONING_ONLY_PATTERN.test(error.message);
 }
 
-function buildRetrievalLlmConfig(env: Env) {
-  const { provider, baseUrl, model, explicitApiKey, remoteApiKey } = readLlmEnvConfig(env);
-  const isRemoteProvider = provider === "openai" || provider === "remote";
+async function buildRetrievalEmbeddingConfig(env: Env, fetchFn: EmbeddingFetch) {
+  const config = readEmbeddingEnvConfig(env);
+  if (!config.configured || !config.baseUrl || !config.model) return undefined;
+
+  try {
+    await assertOutboundHttpUrlAllowed(
+      `${config.baseUrl.replace(/\/+$/, "")}/embeddings`,
+      { env }
+    );
+  } catch {
+    return undefined;
+  }
+
   return {
-    baseUrl,
-    apiKey: isRemoteProvider ? remoteApiKey : explicitApiKey,
-    model,
-    provider
+    baseUrl: config.baseUrl,
+    model: config.model,
+    apiKey: config.apiKey,
+    timeoutMs: config.timeoutMs,
+    fetchFn
   };
 }
 
@@ -575,16 +587,20 @@ export async function generateModelDraftNotes(params: {
   existingNotes: Note[];
   provider: LlmProvider;
   env?: Env;
+  fetchFn?: EmbeddingFetch;
 }): Promise<NoteGenerationResult> {
   if (!params.provider.completeChat) {
     throw new ModelRequiredError();
   }
 
   const env = params.env ?? process.env;
-  const llmConfig = buildRetrievalLlmConfig(env);
+  const embeddingConfig = await buildRetrievalEmbeddingConfig(
+    env,
+    params.fetchFn ?? globalThis.fetch
+  );
 
   const query = `${params.language.name} ${params.language.description} ${params.language.orthography}`;
-  const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 4, llmConfig);
+  const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 4, embeddingConfig);
 
   const messages = buildNoteGenerationMessages(params.language, {
     corpus: retrievedCorpus,

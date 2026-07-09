@@ -321,7 +321,7 @@ describe("JsonStore", () => {
       const raw = JSON.parse(await readFile(dbPath, "utf8"));
 
       expect(loaded.languages[0]?.id).toBe("test-lang");
-      expect(raw.schemaVersion).toBe(8);
+      expect(raw.schemaVersion).toBe(9);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
@@ -367,7 +367,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(8);
+      expect(loaded.schemaVersion).toBe(9);
       expect(loaded.notes).toHaveLength(1);
       expect(loaded.noteAnswerKeys).toHaveLength(1);
       expect(loaded.exerciseSubmissions).toEqual([]);
@@ -398,7 +398,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(8);
+      expect(loaded.schemaVersion).toBe(9);
       expect(loaded.exerciseSubmissions).toEqual([]);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
@@ -435,7 +435,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(8);
+      expect(loaded.schemaVersion).toBe(9);
       expect(loaded.auditEvents).toEqual([]);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
@@ -457,7 +457,7 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(8);
+      expect(loaded.schemaVersion).toBe(9);
       expect(loaded.reviewPolicies).toEqual([]);
       expect(loaded.reviewApprovals).toEqual([]);
       expect(loaded.reviewDispositions).toEqual([]);
@@ -478,8 +478,46 @@ describe("JsonStore", () => {
 
       const loaded = await store.read();
 
-      expect(loaded.schemaVersion).toBe(8);
+      expect(loaded.schemaVersion).toBe(9);
       expect(loaded.reviewDispositions).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("migrates v8 state without changing persisted records", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const v8State = createEmptyState();
+      v8State.languages = [createTestLanguage()];
+      v8State.sourceAssets = [{
+        id: "source-v8-processing",
+        languageId: "avenik",
+        kind: "text",
+        title: "Legacy processing source",
+        rawText: "mira talo",
+        status: "failed",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
+        processingAttempts: 2,
+        error: "Processing interrupted by a server restart. Re-run processing.",
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      }];
+      await writeFile(dbPath, `${JSON.stringify({ ...v8State, schemaVersion: 8 })}\n`, "utf8");
+
+      const loaded = await store.read();
+
+      expect(loaded.schemaVersion).toBe(9);
+      expect(loaded.sourceAssets[0]).toMatchObject({
+        id: "source-v8-processing",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
+        processingAttempts: 2
+      });
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
@@ -3032,9 +3070,12 @@ describe("JsonStore", () => {
     }
   });
 
-  it("round-trips source asset processing metadata through the store", async () => {
+  it.each([
+    ["JSON", "local-db.json"],
+    ["SQLite", "local-db.sqlite"]
+  ])("round-trips source asset processing metadata through the %s store", async (_backend, fileName) => {
     const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
-    const dbPath = join(dir, "local-db.json");
+    const dbPath = join(dir, fileName);
 
     try {
       const store = new JsonStore(dbPath);

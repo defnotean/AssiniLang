@@ -1,19 +1,19 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 import { SidebarLanguageNav } from "./components/SidebarLanguageNav";
 
 describe("SidebarLanguageNav empty state", () => {
   it("shows next-step guidance when no languages exist yet", () => {
+    const onViewSelect = vi.fn();
     render(
       <SidebarLanguageNav
         languages={[]}
         selectedLanguageId={null}
         view="profile"
-        isWorkflowBusy={false}
         sectionCounts={{}}
         onLanguageSelect={() => undefined}
-        onViewSelect={() => undefined}
+        onViewSelect={onViewSelect}
       />
     );
 
@@ -24,5 +24,13 @@ describe("SidebarLanguageNav empty state", () => {
     expect(emptyState).toHaveTextContent(
       "Use New language below to start a workspace, then open Start to browse examples."
     );
+    expect(screen.getByRole("group", { name: "Workspace overview" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Practice" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
+    expect(document.querySelector(".workspace-section-nav .section-count")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Build" }));
+    expect(onViewSelect).toHaveBeenCalledWith("ingest");
   });
 });

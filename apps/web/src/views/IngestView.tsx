@@ -18,6 +18,7 @@ import {
 } from "../lib/format";
 import { useI18n, type Translate } from "../i18n";
 import { hasSegmentationConflict, SegmentationConflictPanel } from "./SegmentationConflictPanel";
+import { ObsidianMcpImportPanel } from "./ObsidianMcpImportPanel";
 
 const PROCESSING_STALE_MS = 10 * 60 * 1000;
 /** Matches API `MAX_SOURCE_PROCESSING_ATTEMPTS`. */
@@ -313,6 +314,8 @@ export function IngestView({
           {isImportingVault ? t("ingest.importingVault") : t("ingest.importVaultSources")}
         </button>
       </form>
+
+      <ObsidianMcpImportPanel languageId={languageId} onImported={onIntakeCommitted} />
 
       <form className="record-card form-panel compact" aria-label={t("ingest.uploadSourceFileAria")} onSubmit={handleUploadSource}>
         <div>

@@ -135,6 +135,35 @@ function renderCorpusView(corpus = createCorpus()) {
   );
 }
 
+const INTERACTIVE_GRAPH = {
+  languageId: "avenik",
+  nodes: [
+    { id: "language:avenik", type: "language", label: "Avenik", metadata: {} },
+    {
+      id: "corpus:avn-c001",
+      type: "corpus",
+      label: "mira talo-mi-na with a deliberately complete label",
+      metadata: {}
+    },
+    { id: "morpheme:avenik:mira", type: "morpheme", label: "mira", metadata: {} },
+    { id: "topic_tag:avenik:movement", type: "topic_tag", label: "movement", metadata: {} },
+    { id: "note:avenik:fieldwork", type: "note", label: "Fieldwork note", metadata: {} }
+  ],
+  edges: [
+    { source: "language:avenik", target: "corpus:avn-c001", relation: "has_corpus", weight: 1 },
+    { source: "corpus:avn-c001", target: "morpheme:avenik:mira", relation: "contains_morpheme", weight: 0.8 },
+    { source: "corpus:avn-c001", target: "topic_tag:avenik:movement", relation: "tagged", weight: 0.7 },
+    { source: "language:avenik", target: "note:avenik:fieldwork", relation: "has_note", weight: 1 }
+  ]
+};
+
+async function renderReadyGraph(graph = INTERACTIVE_GRAPH) {
+  fetchNeuralMapMock.mockResolvedValue(graph);
+  renderCorpusView();
+  fireEvent.click(screen.getByRole("button", { name: "Graph" }));
+  return waitFor(() => screen.getByRole("img", { name: "Corpus neural network" }));
+}
+
 beforeEach(() => {
   fetchNeuralMapMock.mockReset();
   validateCorpusImportMock.mockReset();
@@ -297,6 +326,99 @@ describe("CorpusView network graph mode", () => {
       "Fetching linked passages, notes, sources, and morphemes for this language."
     );
     expect(fetchNeuralMapMock).toHaveBeenCalledWith("avenik");
+  });
+
+  it("filters visible nodes and their connected links by node type", async () => {
+    const graph = await renderReadyGraph();
+    const passageFilter = screen.getByRole("checkbox", { name: "Passage, 1 available" });
+
+    expect(within(graph).getByRole("button", { name: /Passage: mira talo-mi-na/ })).toBeInTheDocument();
+    expect(passageFilter).toBeChecked();
+
+    fireEvent.click(passageFilter);
+
+    expect(passageFilter).not.toBeChecked();
+    expect(within(graph).queryByRole("button", { name: /Passage: mira talo-mi-na/ })).not.toBeInTheDocument();
+    expect(screen.getByText("4 nodes")).toBeInTheDocument();
+    expect(screen.getByText("1 links")).toBeInTheDocument();
+  });
+
+  it("selects SVG nodes by click and keyboard and shows complete node details", async () => {
+    const graph = await renderReadyGraph();
+    const details = screen.getByLabelText("Selected node details");
+    const passageNode = within(graph).getByRole("button", { name: /Passage: mira talo-mi-na/ });
+
+    expect(details).toHaveTextContent("Select a graph node to inspect its details.");
+    fireEvent.click(passageNode);
+
+    expect(passageNode).toHaveAttribute("aria-pressed", "true");
+    expect(within(details).getByText("mira talo-mi-na with a deliberately complete label")).toBeInTheDocument();
+    expect(within(details).getByText("Passage")).toBeInTheDocument();
+    expect(within(details).getByText("corpus:avn-c001")).toBeInTheDocument();
+    expect(within(details).getByText("Connected relations").nextElementSibling).toHaveTextContent("3");
+
+    const noteNode = within(graph).getByRole("button", { name: /Note: Fieldwork note/ });
+    fireEvent.keyDown(noteNode, { key: "Enter" });
+
+    expect(noteNode).toHaveAttribute("aria-pressed", "true");
+    expect(within(details).getByText("Fieldwork note")).toBeInTheDocument();
+    expect(within(details).getByText("note:avenik:fieldwork")).toBeInTheDocument();
+    expect(within(details).getByText("Connected relations").nextElementSibling).toHaveTextContent("1");
+  });
+
+  it("zooms the graph through its viewBox and resets without resizing the canvas", async () => {
+    const graph = await renderReadyGraph();
+    const initialViewBox = "0 0 920 540";
+    const zoomIn = screen.getByRole("button", { name: "Zoom in" });
+    const zoomOut = screen.getByRole("button", { name: "Zoom out" });
+    const reset = screen.getByRole("button", { name: "Reset zoom" });
+
+    expect(graph).toHaveAttribute("viewBox", initialViewBox);
+    expect(zoomIn).toHaveAttribute("title", "Zoom in");
+    expect(reset).toBeDisabled();
+
+    fireEvent.click(zoomIn);
+    expect(graph).not.toHaveAttribute("viewBox", initialViewBox);
+    expect(screen.getByText("Zoom: 125%")).toBeInTheDocument();
+
+    fireEvent.click(zoomOut);
+    expect(graph).toHaveAttribute("viewBox", initialViewBox);
+
+    fireEvent.click(zoomIn);
+    fireEvent.click(zoomIn);
+    expect(screen.getByText("Zoom: 150%")).toBeInTheDocument();
+    fireEvent.click(reset);
+
+    expect(graph).toHaveAttribute("viewBox", initialViewBox);
+    expect(screen.getByText("Zoom: 100%")).toBeInTheDocument();
+  });
+
+  it("prioritizes linguistic evidence over ancillary records at the node cap", async () => {
+    const ancillaryNodes = Array.from({ length: 96 }, (_, index) => ({
+      id: `note:${String(index).padStart(3, "0")}`,
+      type: "note",
+      label: `Note ${String(index).padStart(2, "0")}`,
+      metadata: {}
+    }));
+    const graph = await renderReadyGraph({
+      languageId: "avenik",
+      nodes: [
+        ...ancillaryNodes,
+        { id: "language:priority", type: "language", label: "Priority language", metadata: {} },
+        { id: "corpus:priority", type: "corpus", label: "Priority passage", metadata: {} },
+        { id: "morpheme:priority", type: "morpheme", label: "Priority morpheme", metadata: {} },
+        { id: "topic_tag:priority", type: "topic_tag", label: "Priority topic", metadata: {} }
+      ],
+      edges: []
+    });
+
+    expect(screen.getByText("96 nodes")).toBeInTheDocument();
+    expect(within(graph).getByRole("button", { name: /Language: Priority language/ })).toBeInTheDocument();
+    expect(within(graph).getByRole("button", { name: /Passage: Priority passage/ })).toBeInTheDocument();
+    expect(within(graph).getByRole("button", { name: /Morpheme: Priority morpheme/ })).toBeInTheDocument();
+    expect(within(graph).getByRole("button", { name: /Topic: Priority topic/ })).toBeInTheDocument();
+    expect(within(graph).queryByRole("button", { name: /Note: Note 95/ })).not.toBeInTheDocument();
+    expect(screen.getByText("Showing 96 of 100 nodes and 0 of 0 links.")).toBeInTheDocument();
   });
 
   it("shows an empty state with single and bulk import paths when the neural map has no nodes", async () => {

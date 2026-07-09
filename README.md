@@ -2,7 +2,7 @@
 
 A local-first workbench for documenting a language from raw materials and proving a language-learning AI workflow before any real community data is used.
 
-The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, allowlisted Obsidian Markdown vaults, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Extracted candidates enter a review queue: nothing reaches the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
+The workspace starts empty. You create a language, feed it raw sources - pasted text, word lists, URLs, allowlisted Obsidian Markdown vaults or selected resources from a connected Obsidian MCP server, images, audio, PDF/DOCX documents - and a local LLM (or offline fallbacks) extracts candidate lexemes, corpus passages, and grammar notes. Extracted candidates enter a review queue: nothing reaches the lexicon, corpus, or grammar data without an explicit human accept, and every corpus passage carries consent and provenance metadata.
 
 On top of the reviewed data sit learner exercises with private answer keys, a deterministic evaluation harness, review policies and dispositions, elder corrections, audit trails, sanitized SHA-256-integrity exports, and AI-session observability.
 
@@ -19,12 +19,12 @@ flowchart LR
 
 ## Features
 
-- Ingestion: six source kinds plus one-way Obsidian vault import (not live MCP sync), chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, crash recovery for interrupted processing.
+- Ingestion: six source kinds, allowlisted one-way Obsidian vault import, and selected read-only Obsidian MCP text-resource import (not live sync or write-back); chunked long-source processing, sync or async (202 + polling), SSRF-guarded URL fetch, PDF/DOCX parsing, OCR and transcription paths, duplicate and grounding flags on drafts, and crash recovery for interrupted processing.
 - Review and governance: single and bulk extraction-draft review, note review queue with per-language policies and approval thresholds, model-drafted notes with automatic grounding scores, review dispositions, elder corrections, audit events.
 - Learning and evaluation: server-graded exercises with private answer keys and adversarial probes, spaced-repetition practice recommendations, deterministic evaluation across seven categories, paradigm-gap detection as a fieldwork to-do.
 - AI Assistant: grounded chat with the configured local model - natural-language corrections, standing setup instructions, per-reply fallback labeling, conversations that survive reloads.
 - Console ergonomics: command palette (Ctrl+K), interlinear glossed text, concordance, and corpus graph in the examples browser, with persisted theme, view, and active language-project selection. The operator interface is English-only; documented target languages remain independent projects.
-- Model setup: discovers local/OpenAI-compatible models, saves named model profiles, hot-swaps the active provider, and keeps provider keys server-side.
+- Settings: discovers local/OpenAI-compatible models, saves named model profiles, hot-swaps the active provider, configures and tests a Streamable HTTP Obsidian MCP endpoint, and keeps provider/MCP credentials server-side.
 - Safety boundaries: public projection layer strips answer keys and internals, exports carry SHA-256 integrity manifests, provider keys never reach the browser, corrupted local data fails loudly, validated database backup/restore.
 
 ## Quick start
@@ -63,7 +63,7 @@ To verify that the packaged app really renders instead of opening to a white scr
 npm.cmd run desktop:smoke
 ```
 
-That command launches the packaged `.exe` with a temporary profile, creates a disposable synthetic workspace whose smoke data is labeled Bisaya, clicks through Start, Build, Practice, and Settings, verifies the model/provider controls, and writes `dist-desktop\desktop-smoke-report.json` plus `dist-desktop\desktop-smoke.png`. The fixture is test data, not a bundled Bisaya language pack or interface mode. Use `npm.cmd run desktop:package:smoke` when you want to rebuild the package and immediately run the visual smoke check.
+That command launches the packaged `.exe` with a temporary profile, creates a disposable English smoke workspace, clicks through Start, Build, Practice, and Settings, verifies the model/provider controls, and writes `dist-desktop\desktop-smoke-report.json` plus `dist-desktop\desktop-smoke.png`. The interface is English-only. Use `npm.cmd run desktop:package:smoke` when you want to rebuild the package and immediately run the visual smoke check.
 
 The Settings tab automatically probes common local OpenAI-compatible endpoints and lists every model they expose. Start or load a model, select it from the dropdown, and switch models without restarting the app. You can also configure a known endpoint before `npm.cmd run dev`:
 

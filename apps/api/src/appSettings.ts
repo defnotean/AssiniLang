@@ -4,11 +4,14 @@ import { z } from "zod";
 import {
   LLM_PROVIDERS,
   modelProfileSavePayloadSchema,
+  obsidianMcpSettingsPatchSchema,
   runtimeSettingsPatchSchema,
   type LlmModelProfile,
   type LlmProviderName,
   type LlmProviderReadiness,
   type ModelProfileSavePayload,
+  type ObsidianMcpSettings,
+  type ObsidianMcpSettingsPatch,
   type RuntimeSettings,
   type RuntimeSettingsPatch,
   type RuntimeSettingsResponse
@@ -17,6 +20,8 @@ import { describeLlmProviderFromEnv } from "./llmProvider.js";
 import { redactErrorSecrets } from "./secretRedaction.js";
 import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 import {
+  canonicalLlmEndpointIdentity,
+  DEFAULT_EMBEDDING_TIMEOUT_MS,
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_TIMEOUT_MS,
   DEFAULT_OCR_LANG,
@@ -26,14 +31,18 @@ import {
   envValue,
   parseBooleanFlag,
   parsePositiveInteger,
+  readEmbeddingEnvConfig,
   readLlmEnvConfig,
   trimValue
 } from "./llmEnvShared.js";
 
 export {
   modelProfileSavePayloadSchema,
+  obsidianMcpSettingsPatchSchema,
   runtimeSettingsPatchSchema,
   type ModelProfileSavePayload,
+  type ObsidianMcpSettings,
+  type ObsidianMcpSettingsPatch,
   type RuntimeSettings,
   type RuntimeSettingsPatch,
   type RuntimeSettingsResponse
@@ -48,6 +57,10 @@ const RUNTIME_ENV_KEYS = [
   "ASSINI_LLM_TIMEOUT_MS",
   "ASSINI_LLM_MAX_TOKENS",
   "ASSINI_LLM_JSON_MODE",
+  "ASSINI_EMBEDDING_BASE_URL",
+  "ASSINI_EMBEDDING_MODEL",
+  "ASSINI_EMBEDDING_API_KEY",
+  "ASSINI_EMBEDDING_TIMEOUT_MS",
   "ASSINI_TRANSCRIBE_BASE_URL",
   "ASSINI_TRANSCRIBE_MODEL",
   "ASSINI_TRANSCRIBE_API_KEY",
@@ -57,8 +70,13 @@ const RUNTIME_ENV_KEYS = [
   "ASSINI_OCR_LANG",
   "ASSINI_ALLOW_PRIVATE_URLS",
   "ASSINI_LLM_ACTIVE_PROFILE_ID",
-  "ASSINI_LLM_MODEL_PROFILES"
+  "ASSINI_LLM_MODEL_PROFILES",
+  "ASSINI_OBSIDIAN_MCP_ENDPOINT_URL",
+  "ASSINI_OBSIDIAN_MCP_TOKEN",
+  "ASSINI_OBSIDIAN_MCP_TIMEOUT_MS"
 ] as const;
+
+const DEFAULT_OBSIDIAN_MCP_TIMEOUT_MS = 15_000;
 
 let settingsWriteQueue: Promise<void> = Promise.resolve();
 
@@ -83,7 +101,12 @@ export class RuntimeSettingsUrlValidationError extends Error {
   }
 }
 
-type RuntimeSettingsUrlFieldLabel = "LLM base URL" | "transcription base URL" | "OCR base URL";
+type RuntimeSettingsUrlFieldLabel =
+  | "LLM base URL"
+  | "embedding base URL"
+  | "transcription base URL"
+  | "OCR base URL"
+  | "Obsidian MCP endpoint URL";
 
 function effectiveEnvForPatchValidation(patch: RuntimeSettingsPatch, env: Env): Env {
   if (patch.allowPrivateUrls === undefined) return env;
@@ -97,12 +120,37 @@ async function assertRuntimeSettingsUrlFieldAllowed(
   label: RuntimeSettingsUrlFieldLabel,
   url: string,
   env: Env
-): Promise<void> {
+): Promise<URL> {
   try {
-    await assertOutboundHttpUrlAllowed(url, { env });
+    return await assertOutboundHttpUrlAllowed(url, { env });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new RuntimeSettingsUrlValidationError(`Invalid ${label}: ${redactErrorSecrets(message)}`);
+  }
+}
+
+async function assertObsidianMcpEndpointAllowed(
+  endpointUrl: string,
+  env: Env,
+  token?: string
+): Promise<void> {
+  let parsed: URL;
+  try {
+    parsed = await assertRuntimeSettingsUrlFieldAllowed(
+      "Obsidian MCP endpoint URL",
+      endpointUrl,
+      env
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RuntimeSettingsUrlValidationError(
+      token ? message.split(token).join("[redacted-secret]") : message
+    );
+  }
+  if (parsed.username || parsed.password) {
+    throw new RuntimeSettingsUrlValidationError(
+      "Invalid Obsidian MCP endpoint URL: URL credentials are not allowed. Use the token field instead."
+    );
   }
 }
 
@@ -123,6 +171,13 @@ export async function assertRuntimeSettingsPatchUrlsAllowed(
     const transcriptionBaseUrl = trimValue(patch.transcriptionBaseUrl);
     if (transcriptionBaseUrl) {
       await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
+    }
+  }
+
+  if (patch.embeddingBaseUrl !== undefined) {
+    const embeddingBaseUrl = trimValue(patch.embeddingBaseUrl);
+    if (embeddingBaseUrl) {
+      await assertRuntimeSettingsUrlFieldAllowed("embedding base URL", embeddingBaseUrl, validationEnv);
     }
   }
 
@@ -151,6 +206,11 @@ async function assertStoredProfileUrlsAllowed(profile: StoredModelProfile, env: 
     await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
   }
 
+  const embeddingBaseUrl = trimValue(profile.embeddingBaseUrl);
+  if (embeddingBaseUrl) {
+    await assertRuntimeSettingsUrlFieldAllowed("embedding base URL", embeddingBaseUrl, validationEnv);
+  }
+
   const ocrBaseUrl = trimValue(profile.ocrBaseUrl);
   if (ocrBaseUrl) {
     await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
@@ -167,6 +227,10 @@ const storedModelProfileSchema = z.object({
   timeoutMs: z.number().int().positive(),
   maxTokens: z.number().int().positive(),
   jsonMode: z.boolean(),
+  embeddingBaseUrl: z.string().default(""),
+  embeddingModel: z.string().default(""),
+  embeddingApiKey: z.string().optional(),
+  embeddingTimeoutMs: z.number().int().positive().max(600_000).default(DEFAULT_EMBEDDING_TIMEOUT_MS),
   transcriptionBaseUrl: z.string().default(""),
   transcriptionModel: z.string().default(DEFAULT_TRANSCRIPTION_MODEL),
   transcriptionApiKey: z.string().optional(),
@@ -192,6 +256,10 @@ export function readRuntimeSettingsFromEnv(env: Env = process.env): RuntimeSetti
     timeoutMs: parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS),
     maxTokens: parsePositiveInteger(env.ASSINI_LLM_MAX_TOKENS, DEFAULT_LLM_MAX_TOKENS),
     jsonMode: parseBooleanFlag(env.ASSINI_LLM_JSON_MODE),
+    embeddingBaseUrl: envValue(env.ASSINI_EMBEDDING_BASE_URL),
+    embeddingModel: envValue(env.ASSINI_EMBEDDING_MODEL),
+    embeddingApiKeyConfigured: Boolean(trimValue(env.ASSINI_EMBEDDING_API_KEY)),
+    embeddingTimeoutMs: readEmbeddingEnvConfig(env).timeoutMs,
     transcriptionBaseUrl: envValue(env.ASSINI_TRANSCRIBE_BASE_URL),
     transcriptionModel: envValue(env.ASSINI_TRANSCRIBE_MODEL, DEFAULT_TRANSCRIPTION_MODEL),
     transcriptionApiKeyConfigured: Boolean(trimValue(env.ASSINI_TRANSCRIBE_API_KEY)),
@@ -200,6 +268,32 @@ export function readRuntimeSettingsFromEnv(env: Env = process.env): RuntimeSetti
     ocrApiKeyConfigured: Boolean(trimValue(env.ASSINI_OCR_API_KEY)),
     ocrLang: envValue(env.ASSINI_OCR_LANG, DEFAULT_OCR_LANG),
     allowPrivateUrls: parseBooleanFlag(env.ASSINI_ALLOW_PRIVATE_URLS)
+  };
+}
+
+export function readObsidianMcpSettingsFromEnv(env: Env = process.env): ObsidianMcpSettings {
+  const token = trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN);
+  const endpointUrl = envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL);
+  return {
+    endpointUrl: token ? endpointUrl.split(token).join("[redacted-secret]") : endpointUrl,
+    tokenConfigured: Boolean(token),
+    timeoutMs: parsePositiveInteger(
+      env.ASSINI_OBSIDIAN_MCP_TIMEOUT_MS,
+      DEFAULT_OBSIDIAN_MCP_TIMEOUT_MS
+    )
+  };
+}
+
+export function readObsidianMcpConnectionConfigFromEnv(env: Env = process.env): {
+  endpointUrl: string;
+  token?: string;
+  timeoutMs: number;
+} {
+  const settings = readObsidianMcpSettingsFromEnv(env);
+  return {
+    endpointUrl: envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL),
+    token: trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN),
+    timeoutMs: settings.timeoutMs
   };
 }
 
@@ -242,6 +336,10 @@ function profileToResponse(profile: StoredModelProfile): LlmModelProfile {
     timeoutMs: profile.timeoutMs,
     maxTokens: profile.maxTokens,
     jsonMode: profile.jsonMode,
+    embeddingBaseUrl: profile.embeddingBaseUrl,
+    embeddingModel: profile.embeddingModel,
+    embeddingApiKeyConfigured: Boolean(trimValue(profile.embeddingApiKey)),
+    embeddingTimeoutMs: profile.embeddingTimeoutMs,
     transcriptionBaseUrl: profile.transcriptionBaseUrl,
     transcriptionModel: profile.transcriptionModel,
     transcriptionApiKeyConfigured: Boolean(trimValue(profile.transcriptionApiKey)),
@@ -287,6 +385,107 @@ function providerFromValue(value: string | undefined): LlmProviderName {
   return LLM_PROVIDERS.includes(value as LlmProviderName) ? value as LlmProviderName : "deterministic";
 }
 
+const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
+
+function endpointIdentityForProvider(provider: string | undefined, baseUrl: string | undefined): string | undefined {
+  const configuredBaseUrl = trimValue(baseUrl);
+  if (configuredBaseUrl) return canonicalLlmEndpointIdentity(configuredBaseUrl);
+  if (provider === "openai" || provider === "remote") {
+    return canonicalLlmEndpointIdentity(DEFAULT_REMOTE_OPENAI_BASE_URL);
+  }
+  return undefined;
+}
+
+function currentLlmCredential(
+  env: Env
+): { apiKey?: string; endpointIdentity?: string; provider?: LlmProviderName } {
+  const llmEnv = readLlmEnvConfig(env);
+  const provider = llmEnv.provider;
+
+  if (provider === "openai" || provider === "remote") {
+    return {
+      apiKey: llmEnv.remoteApiKey,
+      endpointIdentity: endpointIdentityForProvider(provider, llmEnv.baseUrl),
+      provider
+    };
+  }
+
+  if (provider === "openai-compatible" || provider === "local" || provider === "ollama" || provider === "lm-studio") {
+    return {
+      apiKey: llmEnv.explicitApiKey,
+      endpointIdentity: endpointIdentityForProvider(provider, llmEnv.baseUrl),
+      provider
+    };
+  }
+
+  if (provider) return {};
+  if (llmEnv.baseUrl && llmEnv.model) return {};
+  if (!llmEnv.remoteApiKey) return {};
+  return {
+    apiKey: llmEnv.remoteApiKey,
+    endpointIdentity: canonicalLlmEndpointIdentity(llmEnv.baseUrl ?? DEFAULT_REMOTE_OPENAI_BASE_URL),
+    provider: "openai"
+  };
+}
+
+function inheritedProfileApiKey(
+  targetProvider: LlmProviderName,
+  targetBaseUrl: string,
+  existing: StoredModelProfile | undefined,
+  env: Env
+): string | undefined {
+  const targetIdentity = endpointIdentityForProvider(targetProvider, targetBaseUrl);
+  if (!targetIdentity) return undefined;
+
+  const existingIdentity = existing
+    ? endpointIdentityForProvider(existing.provider, existing.baseUrl)
+    : undefined;
+  const existingApiKey = trimValue(existing?.apiKey);
+  if (existingApiKey && existing?.provider === targetProvider && existingIdentity === targetIdentity) {
+    return existingApiKey;
+  }
+
+  const currentCredential = currentLlmCredential(env);
+  if (
+    currentCredential.apiKey
+    && currentCredential.provider === targetProvider
+    && currentCredential.endpointIdentity === targetIdentity
+  ) {
+    return currentCredential.apiKey;
+  }
+  return undefined;
+}
+
+function embeddingEndpointIdentity(baseUrl: string | undefined): string | undefined {
+  return canonicalLlmEndpointIdentity(baseUrl);
+}
+
+function inheritedProfileEmbeddingApiKey(
+  targetBaseUrl: string,
+  existing: StoredModelProfile | undefined,
+  env: Env
+): string | undefined {
+  const targetIdentity = embeddingEndpointIdentity(targetBaseUrl);
+  if (!targetIdentity) return undefined;
+
+  const existingApiKey = trimValue(existing?.embeddingApiKey);
+  if (
+    existingApiKey
+    && embeddingEndpointIdentity(existing?.embeddingBaseUrl) === targetIdentity
+  ) {
+    return existingApiKey;
+  }
+
+  const currentApiKey = trimValue(env.ASSINI_EMBEDDING_API_KEY);
+  if (
+    currentApiKey
+    && embeddingEndpointIdentity(env.ASSINI_EMBEDDING_BASE_URL) === targetIdentity
+  ) {
+    return currentApiKey;
+  }
+  return undefined;
+}
+
 function storedProfileFromPayload(
   payload: ModelProfileSavePayload,
   existing: StoredModelProfile | undefined,
@@ -295,21 +494,37 @@ function storedProfileFromPayload(
 ): StoredModelProfile {
   const currentSettings = readRuntimeSettingsFromEnv(env);
   const apiKey = trimValue(payload.apiKey);
+  const embeddingApiKey = trimValue(payload.embeddingApiKey);
   const transcriptionApiKey = trimValue(payload.transcriptionApiKey);
   const ocrApiKey = trimValue(payload.ocrApiKey);
+  const provider = providerFromValue(payload.provider ?? existing?.provider ?? currentSettings.provider);
+  const baseUrl = payload.baseUrl ?? existing?.baseUrl ?? currentSettings.baseUrl;
+  const embeddingBaseUrl = payload.embeddingBaseUrl
+    ?? existing?.embeddingBaseUrl
+    ?? currentSettings.embeddingBaseUrl;
 
   return {
     id: resolveStoredProfileId(payload.id, existing?.id, payload.name),
     name: payload.name,
-    provider: providerFromValue(payload.provider ?? existing?.provider ?? currentSettings.provider),
-    baseUrl: payload.baseUrl ?? existing?.baseUrl ?? currentSettings.baseUrl,
+    provider,
+    baseUrl,
     model: payload.model ?? existing?.model ?? currentSettings.model,
     apiKey: payload.clearApiKey
       ? undefined
-      : apiKey ?? existing?.apiKey ?? trimValue(env.ASSINI_LLM_API_KEY) ?? trimValue(env.OPENAI_API_KEY),
+      : apiKey ?? inheritedProfileApiKey(provider, baseUrl, existing, env),
     timeoutMs: payload.timeoutMs ?? existing?.timeoutMs ?? currentSettings.timeoutMs,
     maxTokens: payload.maxTokens ?? existing?.maxTokens ?? currentSettings.maxTokens,
     jsonMode: payload.jsonMode ?? existing?.jsonMode ?? currentSettings.jsonMode,
+    embeddingBaseUrl,
+    embeddingModel: payload.embeddingModel
+      ?? existing?.embeddingModel
+      ?? currentSettings.embeddingModel,
+    embeddingApiKey: payload.clearEmbeddingApiKey
+      ? undefined
+      : embeddingApiKey ?? inheritedProfileEmbeddingApiKey(embeddingBaseUrl, existing, env),
+    embeddingTimeoutMs: payload.embeddingTimeoutMs
+      ?? existing?.embeddingTimeoutMs
+      ?? currentSettings.embeddingTimeoutMs,
     transcriptionBaseUrl: payload.transcriptionBaseUrl
       ?? existing?.transcriptionBaseUrl
       ?? currentSettings.transcriptionBaseUrl,
@@ -345,6 +560,10 @@ function envUpdatesFromStoredProfile(profile: StoredModelProfile): Partial<Recor
     ASSINI_LLM_TIMEOUT_MS: profile.timeoutMs.toString(),
     ASSINI_LLM_MAX_TOKENS: profile.maxTokens.toString(),
     ASSINI_LLM_JSON_MODE: profile.jsonMode ? "1" : "",
+    ASSINI_EMBEDDING_BASE_URL: profile.embeddingBaseUrl,
+    ASSINI_EMBEDDING_MODEL: profile.embeddingModel,
+    ASSINI_EMBEDDING_API_KEY: trimValue(profile.embeddingApiKey) ?? "",
+    ASSINI_EMBEDDING_TIMEOUT_MS: profile.embeddingTimeoutMs.toString(),
     ASSINI_TRANSCRIBE_BASE_URL: profile.transcriptionBaseUrl,
     ASSINI_TRANSCRIBE_MODEL: profile.transcriptionModel,
     ASSINI_TRANSCRIBE_API_KEY: trimValue(profile.transcriptionApiKey) ?? "",
@@ -378,6 +597,10 @@ function envUpdatesForClearedActiveProfile(): Partial<Record<typeof RUNTIME_ENV_
     ASSINI_LLM_TIMEOUT_MS: String(DEFAULT_LLM_TIMEOUT_MS),
     ASSINI_LLM_MAX_TOKENS: String(DEFAULT_LLM_MAX_TOKENS),
     ASSINI_LLM_JSON_MODE: "",
+    ASSINI_EMBEDDING_BASE_URL: "",
+    ASSINI_EMBEDDING_MODEL: "",
+    ASSINI_EMBEDDING_API_KEY: "",
+    ASSINI_EMBEDDING_TIMEOUT_MS: String(DEFAULT_EMBEDDING_TIMEOUT_MS),
     ASSINI_TRANSCRIBE_BASE_URL: "",
     ASSINI_TRANSCRIBE_MODEL: DEFAULT_TRANSCRIPTION_MODEL,
     ASSINI_TRANSCRIBE_API_KEY: "",
@@ -390,7 +613,10 @@ function envUpdatesForClearedActiveProfile(): Partial<Record<typeof RUNTIME_ENV_
   };
 }
 
-function envUpdatesFromPatch(patch: RuntimeSettingsPatch): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
+function envUpdatesFromPatch(
+  patch: RuntimeSettingsPatch,
+  env: Env
+): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
   const updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> = {};
 
   if (patch.provider !== undefined) updates.ASSINI_LLM_PROVIDER = patch.provider;
@@ -399,6 +625,11 @@ function envUpdatesFromPatch(patch: RuntimeSettingsPatch): Partial<Record<typeof
   if (patch.timeoutMs !== undefined) updates.ASSINI_LLM_TIMEOUT_MS = patch.timeoutMs.toString();
   if (patch.maxTokens !== undefined) updates.ASSINI_LLM_MAX_TOKENS = patch.maxTokens.toString();
   if (patch.jsonMode !== undefined) updates.ASSINI_LLM_JSON_MODE = patch.jsonMode ? "1" : "";
+  if (patch.embeddingBaseUrl !== undefined) updates.ASSINI_EMBEDDING_BASE_URL = patch.embeddingBaseUrl;
+  if (patch.embeddingModel !== undefined) updates.ASSINI_EMBEDDING_MODEL = patch.embeddingModel;
+  if (patch.embeddingTimeoutMs !== undefined) {
+    updates.ASSINI_EMBEDDING_TIMEOUT_MS = patch.embeddingTimeoutMs.toString();
+  }
   if (patch.transcriptionBaseUrl !== undefined) updates.ASSINI_TRANSCRIBE_BASE_URL = patch.transcriptionBaseUrl;
   if (patch.transcriptionModel !== undefined) updates.ASSINI_TRANSCRIBE_MODEL = patch.transcriptionModel;
   if (patch.ocrBaseUrl !== undefined) updates.ASSINI_OCR_BASE_URL = patch.ocrBaseUrl;
@@ -407,14 +638,41 @@ function envUpdatesFromPatch(patch: RuntimeSettingsPatch): Partial<Record<typeof
   if (patch.allowPrivateUrls !== undefined) updates.ASSINI_ALLOW_PRIVATE_URLS = patch.allowPrivateUrls ? "1" : "";
 
   const apiKey = trimValue(patch.apiKey);
+  const embeddingApiKey = trimValue(patch.embeddingApiKey);
   const transcriptionApiKey = trimValue(patch.transcriptionApiKey);
   const ocrApiKey = trimValue(patch.ocrApiKey);
+  const currentProvider = providerFromValue(trimValue(env.ASSINI_LLM_PROVIDER));
+  const nextProvider = patch.provider ?? currentProvider;
+  const currentEndpointIdentity = endpointIdentityForProvider(currentProvider, env.ASSINI_LLM_BASE_URL);
+  const nextEndpointIdentity = endpointIdentityForProvider(
+    nextProvider,
+    patch.baseUrl ?? env.ASSINI_LLM_BASE_URL
+  );
+  const credentialBindingChanged = nextProvider !== currentProvider
+    || nextEndpointIdentity !== currentEndpointIdentity;
+  const currentEmbeddingIdentity = embeddingEndpointIdentity(env.ASSINI_EMBEDDING_BASE_URL);
+  const nextEmbeddingIdentity = embeddingEndpointIdentity(
+    patch.embeddingBaseUrl ?? env.ASSINI_EMBEDDING_BASE_URL
+  );
+  const embeddingCredentialBindingChanged = nextEmbeddingIdentity !== currentEmbeddingIdentity;
 
   if (patch.clearApiKey) {
     updates.ASSINI_LLM_API_KEY = "";
     updates.OPENAI_API_KEY = "";
   } else if (apiKey !== undefined) {
     updates.ASSINI_LLM_API_KEY = apiKey;
+    if (credentialBindingChanged) updates.OPENAI_API_KEY = "";
+  } else if (credentialBindingChanged) {
+    updates.ASSINI_LLM_API_KEY = "";
+    updates.OPENAI_API_KEY = "";
+  }
+
+  if (patch.clearEmbeddingApiKey) {
+    updates.ASSINI_EMBEDDING_API_KEY = "";
+  } else if (embeddingApiKey !== undefined) {
+    updates.ASSINI_EMBEDDING_API_KEY = embeddingApiKey;
+  } else if (embeddingCredentialBindingChanged) {
+    updates.ASSINI_EMBEDDING_API_KEY = "";
   }
 
   if (patch.clearTranscriptionApiKey) {
@@ -513,7 +771,7 @@ async function applyRuntimeSettingsPatchUnlocked(
 ): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
   await assertRuntimeSettingsPatchUrlsAllowed(params.patch, env);
-  const updates = envUpdatesFromPatch(params.patch);
+  const updates = envUpdatesFromPatch(params.patch, env);
   const existingText = await readOptionalText(params.settingsPath);
   await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
   applyUpdatesToEnv(updates, env);
@@ -537,6 +795,62 @@ export async function applyRuntimeSettingsPatch(
   }
 ): Promise<RuntimeSettingsResponse> {
   const operation = settingsWriteQueue.then(() => applyRuntimeSettingsPatchUnlocked(params));
+  settingsWriteQueue = operation.then(
+    () => undefined,
+    () => undefined
+  );
+  return operation;
+}
+
+function envUpdatesFromObsidianMcpPatch(
+  patch: ObsidianMcpSettingsPatch
+): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
+  const updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> = {};
+  if (patch.endpointUrl !== undefined) {
+    updates.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL = patch.endpointUrl;
+  }
+  if (patch.timeoutMs !== undefined) {
+    updates.ASSINI_OBSIDIAN_MCP_TIMEOUT_MS = String(patch.timeoutMs);
+  }
+  if (patch.clearToken) {
+    updates.ASSINI_OBSIDIAN_MCP_TOKEN = "";
+  } else if (patch.token !== undefined) {
+    updates.ASSINI_OBSIDIAN_MCP_TOKEN = patch.token;
+  }
+  return updates;
+}
+
+async function applyObsidianMcpSettingsPatchUnlocked(params: {
+  settingsPath: string;
+  patch: ObsidianMcpSettingsPatch;
+  env?: Env;
+}): Promise<ObsidianMcpSettings> {
+  const env = params.env ?? process.env;
+  const effectiveToken = params.patch.clearToken
+    ? undefined
+    : params.patch.token ?? trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN);
+  const effectiveEndpoint = params.patch.endpointUrl ?? envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL);
+  if (effectiveToken && effectiveEndpoint.includes(effectiveToken)) {
+    throw new RuntimeSettingsUrlValidationError(
+      "Invalid Obsidian MCP endpoint URL: configured tokens must use the token field only."
+    );
+  }
+  if (params.patch.endpointUrl) {
+    await assertObsidianMcpEndpointAllowed(params.patch.endpointUrl, env, effectiveToken);
+  }
+  const updates = envUpdatesFromObsidianMcpPatch(params.patch);
+  const existingText = await readOptionalText(params.settingsPath);
+  await writeEnvFileAtomically(params.settingsPath, updateEnvFileText(existingText, updates));
+  applyUpdatesToEnv(updates, env);
+  return readObsidianMcpSettingsFromEnv(env);
+}
+
+export async function applyObsidianMcpSettingsPatch(params: {
+  settingsPath: string;
+  patch: ObsidianMcpSettingsPatch;
+  env?: Env;
+}): Promise<ObsidianMcpSettings> {
+  const operation = settingsWriteQueue.then(() => applyObsidianMcpSettingsPatchUnlocked(params));
   settingsWriteQueue = operation.then(
     () => undefined,
     () => undefined

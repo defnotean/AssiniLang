@@ -4,26 +4,63 @@ import { VIEW_ORDER } from "../lib/viewConfig";
 import { useI18n } from "../i18n";
 import { TypologyMark, ViewGlyph } from "./marks";
 
+const EMPTY_SECTION_COUNTS: Partial<Record<ViewMode, number>> = {};
+
 interface SidebarLanguageNavProps {
   languages: Language[];
   selectedLanguageId: string | null;
   view: ViewMode;
-  isWorkflowBusy: boolean;
   sectionCounts: Partial<Record<ViewMode, number>>;
   onLanguageSelect: (languageId: string) => void;
   onViewSelect: (mode: ViewMode) => void;
+}
+
+function SectionNavigation({
+  ariaLabel,
+  className = "",
+  view,
+  sectionCounts,
+  onViewSelect
+}: {
+  ariaLabel: string;
+  className?: string;
+  view: ViewMode;
+  sectionCounts: Partial<Record<ViewMode, number>>;
+  onViewSelect: (mode: ViewMode) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className={`section-nav${className ? ` ${className}` : ""}`} role="group" aria-label={ariaLabel}>
+      {VIEW_ORDER.map((mode) => (
+        <button
+          type="button"
+          key={mode}
+          className={view === mode ? "active" : ""}
+          aria-current={view === mode ? "page" : undefined}
+          onClick={() => onViewSelect(mode)}
+        >
+          <ViewGlyph view={mode} />
+          <span>{t(`viewConfig.${mode}.label`)}</span>
+          {sectionCounts[mode] != null && (
+            <span className="section-count" aria-hidden="true">{sectionCounts[mode]}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function SidebarLanguageNav({
   languages,
   selectedLanguageId,
   view,
-  isWorkflowBusy,
   sectionCounts,
   onLanguageSelect,
   onViewSelect
 }: SidebarLanguageNavProps) {
   const { t } = useI18n();
+  const hasSelectedLanguage = languages.some((language) => language.id === selectedLanguageId);
 
   return (
     <nav className="language-nav" aria-label={t("sidebar.languagesNav")}>
@@ -41,7 +78,6 @@ export function SidebarLanguageNav({
               type="button"
               className={`language-button${isActive ? " active" : ""}`}
               aria-pressed={isActive}
-              disabled={isWorkflowBusy}
               onClick={() => onLanguageSelect(language.id)}
             >
               <span className="typology-frame">
@@ -54,30 +90,25 @@ export function SidebarLanguageNav({
             </button>
 
             {isActive && (
-              <div
-                className="section-nav"
-                role="group"
-                aria-label={t("sidebar.sectionsAria", { name: language.name })}
-              >
-                {VIEW_ORDER.map((mode) => (
-                  <button
-                    type="button"
-                    key={mode}
-                    className={view === mode ? "active" : ""}
-                    aria-current={view === mode ? "page" : undefined}
-                    disabled={isWorkflowBusy}
-                    onClick={() => onViewSelect(mode)}
-                  >
-                    <ViewGlyph view={mode} />
-                    <span>{t(`viewConfig.${mode}.label`)}</span>
-                    {sectionCounts[mode] != null && <span className="section-count" aria-hidden="true">{sectionCounts[mode]}</span>}
-                  </button>
-                ))}
-              </div>
+              <SectionNavigation
+                ariaLabel={t("sidebar.sectionsAria", { name: language.name })}
+                view={view}
+                sectionCounts={sectionCounts}
+                onViewSelect={onViewSelect}
+              />
             )}
           </div>
         );
       })}
+      {!hasSelectedLanguage && (
+        <SectionNavigation
+          ariaLabel={t("header.overviewAria")}
+          className="workspace-section-nav"
+          view={view}
+          sectionCounts={EMPTY_SECTION_COUNTS}
+          onViewSelect={onViewSelect}
+        />
+      )}
     </nav>
   );
 }

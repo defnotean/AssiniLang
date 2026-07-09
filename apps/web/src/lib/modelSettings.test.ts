@@ -53,6 +53,10 @@ function runtimeSettings(
     timeoutMs: 30000,
     maxTokens: 4096,
     jsonMode: false,
+    embeddingBaseUrl: "",
+    embeddingModel: "",
+    embeddingApiKeyConfigured: false,
+    embeddingTimeoutMs: 30000,
     transcriptionBaseUrl: "",
     transcriptionModel: "whisper-1",
     transcriptionApiKeyConfigured: false,
@@ -76,6 +80,10 @@ describe("model settings helpers", () => {
         timeoutMs: 30000,
         maxTokens: 8192,
         jsonMode: true,
+        embeddingBaseUrl: "http://127.0.0.1:8080/v1",
+        embeddingModel: "nomic-embed-text",
+        embeddingApiKeyConfigured: true,
+        embeddingTimeoutMs: 12000,
         transcriptionBaseUrl: "http://127.0.0.1:9000/v1",
         transcriptionModel: "whisper-large",
         transcriptionApiKeyConfigured: true,
@@ -92,6 +100,11 @@ describe("model settings helpers", () => {
       clearApiKey: false,
       timeoutMs: "30000",
       maxTokens: "8192",
+      embeddingBaseUrl: "http://127.0.0.1:8080/v1",
+      embeddingModel: "nomic-embed-text",
+      embeddingApiKey: "",
+      clearEmbeddingApiKey: false,
+      embeddingTimeoutMs: "12000",
       transcriptionApiKey: "",
       clearTranscriptionApiKey: false,
       ocrBaseUrl: "http://127.0.0.1:11434/v1",
@@ -131,6 +144,17 @@ describe("model settings helpers", () => {
       ...DEFAULT_FORM,
       ocrBaseUrl: "not-a-url"
     })).toEqual({ ok: false, errorKey: "model.ocrBaseUrlInvalid" });
+  });
+
+  it("validates dedicated embedding controls", () => {
+    expect(validateSettingsForm({
+      ...DEFAULT_FORM,
+      embeddingBaseUrl: "ftp://bad.example/v1"
+    })).toEqual({ ok: false, errorKey: "model.embeddingBaseUrlInvalid" });
+    expect(validateSettingsForm({
+      ...DEFAULT_FORM,
+      embeddingTimeoutMs: "600001"
+    })).toEqual({ ok: false, errorKey: "model.embeddingTimeoutInvalid" });
   });
 
   it("auto-selects the only discovered model when no model is saved", () => {
@@ -210,6 +234,10 @@ describe("model settings helpers", () => {
         timeoutMs: 30000,
         maxTokens: 4096,
         jsonMode: false,
+        embeddingBaseUrl: "",
+        embeddingModel: "",
+        embeddingApiKeyConfigured: false,
+        embeddingTimeoutMs: 30000,
         transcriptionBaseUrl: "",
         transcriptionModel: "whisper-1",
         transcriptionApiKeyConfigured: false,

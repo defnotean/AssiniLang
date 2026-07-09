@@ -388,11 +388,15 @@ describe("llm contract schemas", () => {
     expect(runtimeSettingsPatchSchema.parse({
       provider: "openai-compatible",
       apiKey: "secret",
-      clearApiKey: false
+      clearApiKey: false,
+      embeddingApiKey: "embedding-secret",
+      clearEmbeddingApiKey: false
     })).toEqual({
       provider: "openai-compatible",
       apiKey: "secret",
-      clearApiKey: false
+      clearApiKey: false,
+      embeddingApiKey: "embedding-secret",
+      clearEmbeddingApiKey: false
     });
 
     expect(runtimeSettingsPatchSchema.safeParse({
@@ -446,6 +450,10 @@ describe("llm contract schemas", () => {
         timeoutMs: 30_000,
         maxTokens: 1024,
         jsonMode: false,
+        embeddingBaseUrl: "",
+        embeddingModel: "",
+        embeddingApiKeyConfigured: false,
+        embeddingTimeoutMs: 30_000,
         transcriptionBaseUrl: "",
         transcriptionModel: "whisper-1",
         transcriptionApiKeyConfigured: false,

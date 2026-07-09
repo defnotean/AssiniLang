@@ -58,6 +58,10 @@ function createModelWorkspace(overrides: Partial<ModelWorkspace> = {}): ModelWor
           timeoutMs: status.timeoutMs,
           maxTokens: 4096,
           jsonMode: false,
+          embeddingBaseUrl: "",
+          embeddingModel: "",
+          embeddingApiKeyConfigured: false,
+          embeddingTimeoutMs: 30000,
           transcriptionBaseUrl: "",
           transcriptionModel: "whisper-1",
           transcriptionApiKeyConfigured: false,
@@ -144,6 +148,39 @@ describe("ModelSetupView settings save status", () => {
     expect(saveError).toHaveAttribute("aria-live", "assertive");
   });
 
+  it("submits dedicated embedding settings without reusing chat fields", async () => {
+    const handleSaveSettings = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ModelSetupView
+        model={createModelWorkspace({
+          handleSaveSettings,
+          settingsSaveResult: null
+        })}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText("Embedding base URL"), {
+      target: { value: "http://127.0.0.1:8080/v1" }
+    });
+    fireEvent.change(screen.getByLabelText("Embedding model"), {
+      target: { value: "nomic-embed-text" }
+    });
+    fireEvent.change(screen.getByLabelText("Replace embedding key"), {
+      target: { value: "embedding-secret" }
+    });
+    fireEvent.change(screen.getByLabelText("Embedding timeout"), {
+      target: { value: "15000" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
+
+    await waitFor(() => expect(handleSaveSettings).toHaveBeenCalledWith(expect.objectContaining({
+      embeddingBaseUrl: "http://127.0.0.1:8080/v1",
+      embeddingModel: "nomic-embed-text",
+      embeddingApiKey: "embedding-secret",
+      embeddingTimeoutMs: 15000
+    })));
+  });
+
   it("shows a next-step hint when no model profiles are saved yet", () => {
     render(<ModelSetupView model={createModelWorkspace({ settingsSaveResult: null })} />);
 
@@ -167,6 +204,10 @@ describe("ModelSetupView settings save status", () => {
         timeoutMs: 180000,
         maxTokens: 4096,
         jsonMode: false,
+        embeddingBaseUrl: "",
+        embeddingModel: "",
+        embeddingApiKeyConfigured: false,
+        embeddingTimeoutMs: 30000,
         transcriptionBaseUrl: "",
         transcriptionModel: "whisper-1",
         transcriptionApiKeyConfigured: false,
@@ -188,6 +229,10 @@ describe("ModelSetupView settings save status", () => {
         timeoutMs: 90000,
         maxTokens: 4096,
         jsonMode: false,
+        embeddingBaseUrl: "",
+        embeddingModel: "",
+        embeddingApiKeyConfigured: false,
+        embeddingTimeoutMs: 30000,
         transcriptionBaseUrl: "",
         transcriptionModel: "whisper-1",
         transcriptionApiKeyConfigured: false,
@@ -217,6 +262,10 @@ describe("ModelSetupView settings save status", () => {
                 timeoutMs: status.timeoutMs,
                 maxTokens: 4096,
                 jsonMode: false,
+                embeddingBaseUrl: "",
+                embeddingModel: "",
+                embeddingApiKeyConfigured: false,
+                embeddingTimeoutMs: 30000,
                 transcriptionBaseUrl: "",
                 transcriptionModel: "whisper-1",
                 transcriptionApiKeyConfigured: false,

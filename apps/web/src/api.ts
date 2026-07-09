@@ -121,6 +121,21 @@ export type { RuntimeSettingsUpdate } from "./api/llmApi";
 export type { ProcessSourceResponse, RuntimeSettingsPatch } from "@assini/api-contract";
 
 export {
+  fetchObsidianMcpResources,
+  fetchObsidianMcpSettings,
+  importObsidianMcpResources,
+  testObsidianMcpConnection,
+  updateObsidianMcpSettings
+} from "./api/mcpApi";
+export type {
+  ObsidianMcpConnectionStatus,
+  ObsidianMcpImportResponse,
+  ObsidianMcpResourceList,
+  ObsidianMcpSettings,
+  ObsidianMcpSettingsPatch
+} from "./api/mcpApi";
+
+export {
   generateDraftNotes,
   generateModelDraftNotes,
   importCorpusBulk,

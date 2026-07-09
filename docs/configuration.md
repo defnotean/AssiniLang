@@ -48,6 +48,19 @@ Auto-detect when `ASSINI_LLM_PROVIDER` is unset: base URL plus model means local
 | `OPENAI_API_KEY` | unset | secret string | Alias for `ASSINI_LLM_API_KEY`. |
 | `OPENAI_MODEL` | unset | model name string | Alias for `ASSINI_LLM_MODEL`. |
 
+## Embedding retrieval
+
+Embedding retrieval is opt-in and independent of the chat provider. It is enabled only when both `ASSINI_EMBEDDING_BASE_URL` and `ASSINI_EMBEDDING_MODEL` are configured. AssiniLang never substitutes the chat endpoint, chat model, `ASSINI_LLM_API_KEY`, or `OPENAI_API_KEY`. These values can be changed in Settings and are included in named model profiles; the embedding key remains write-only in API responses.
+
+| Variable | Default | Accepted values | Effect |
+| --- | --- | --- | --- |
+| `ASSINI_EMBEDDING_BASE_URL` | unset (offline TF-IDF retrieval) | http(s) URL | Base URL of a dedicated OpenAI-compatible `/embeddings` endpoint. The outbound URL policy is checked before each call, and redirects are not followed. |
+| `ASSINI_EMBEDDING_MODEL` | unset (offline TF-IDF retrieval) | embedding model name | Model sent to the dedicated endpoint. Both this value and the embedding base URL are required before any embedding request is attempted. |
+| `ASSINI_EMBEDDING_API_KEY` | unset | secret string | Optional bearer token sent only to the dedicated embedding endpoint. Chat credentials are never reused. |
+| `ASSINI_EMBEDDING_TIMEOUT_MS` | `30000` | integer `1..600000` | Per-request embedding timeout. Invalid values use the default and oversized values are capped. |
+
+Embedding responses must contain one non-empty finite vector per input, with complete unique indexes and equal dimensions. Any URL-policy rejection, timeout, redirect, transport error, malformed response, or vector mismatch falls back to deterministic local TF-IDF ranking.
+
 ## Verification scripts
 
 Read by the local driver scripts under `scripts/`. These are optional test harness controls and do not affect the running browser app unless the script explicitly saves runtime settings through the API.
@@ -96,6 +109,16 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | `ASSINI_ALLOW_PRIVATE_URLS` | enabled when `HOST` is loopback; disabled otherwise | `1`/`true` to allow, empty/`0`/`false` to block | Allows model endpoints and URL sources on localhost or private networks. AssiniLang Desktop and the default local dev server enable this so Ollama, LM Studio, Irene, and other LAN models work without editing code. An explicit value is always respected, and network-facing APIs remain guarded; see [ingestion](ingestion.md#ssrf-guard). |
 | `ASSINI_OBSIDIAN_VAULT_ROOTS` | unset (vault import disabled) | semicolon-separated absolute directory paths | Allowlist of roots for `POST /languages/:languageId/sources/obsidian-vault`. The resolved vault path must equal a root or sit under `root` + path separator. Fail-closed: when unset or empty, vault imports return `400`. Relative segments (for example `./vaults`) are dropped so the process CWD cannot silently widen the allowlist; if every entry is relative, imports return `400` with an absolute-path message. Prefer `realpath` so symlink escapes cannot leave an allowlisted root. Example: `C:\Users\you\Documents\Obsidian;D:\LanguageVaults`. |
 | `ASSINI_OCR_LANG` | `eng` | tesseract.js language code (`eng`, `spa`, `fra`, ...) | Language for the local tesseract.js fallback on image sources when neither the OCR model nor a vision-capable main LLM is configured. The first run per language downloads trained data (a few MB, internet required once) and caches it under `data/ocr-cache/`. |
+
+## Obsidian MCP
+
+These values can be changed from Settings without editing `.env`. The token is write-only: API responses expose only whether one is configured.
+
+| Variable | Default | Accepted values | Effect |
+| --- | --- | --- | --- |
+| `ASSINI_OBSIDIAN_MCP_ENDPOINT_URL` | unset | Streamable HTTP MCP endpoint URL | Enables read-only MCP resource browsing and selected text-note import. Every request is checked by the outbound URL policy; redirects and URL-embedded credentials are blocked. |
+| `ASSINI_OBSIDIAN_MCP_TOKEN` | unset | bearer token | Optional server-side token sent only to the configured MCP endpoint. It is redacted from responses, errors, imported sources, and audit metadata. |
+| `ASSINI_OBSIDIAN_MCP_TIMEOUT_MS` | `15000` | integer `1..120000` | Connection, resource-list, and resource-read timeout. |
 
 ## Ports, paths, and auth
 
