@@ -17,6 +17,7 @@ import {
   corpusTargetContainsSurface,
   requireActor
 } from "../routeHelpers.js";
+import { enrichSegmentationFromLexicon } from "../segmentationProposals.js";
 import type { RouteContext } from "./context.js";
 
 const BULK_REVIEW_MAX_IDS = 50;
@@ -24,13 +25,16 @@ const BULK_REVIEW_MAX_IDS = 50;
 /**
  * Ensures a corpus passage accepted from an extraction draft always has
  * full segmentation coverage: when the proposed morphemes do not cover
- * the target text, fall back to honest token-level "unanalyzed" pieces.
+ * the target text, try lexicon-based longest-match segmentation, then
+ * fall back to honest token-level "unanalyzed" pieces.
  */
 function ensureCorpusDraftSegmentation(
   textTarget: string,
-  proposed: CorpusPassage["morphologicalSegmentation"]
+  proposed: CorpusPassage["morphologicalSegmentation"],
+  lexemes: Lexeme[]
 ): CorpusPassage["morphologicalSegmentation"] {
-  const usable = proposed.filter((morpheme) =>
+  const candidate = enrichSegmentationFromLexicon(textTarget, proposed, lexemes);
+  const usable = candidate.filter((morpheme) =>
     morpheme.surface.trim().length > 0
     && morpheme.lemma.trim().length > 0
     && morpheme.gloss.trim().length > 0
@@ -157,7 +161,12 @@ function applyAcceptDraft(state: AppState, draftId: string, actor: User): Accept
     }
 
     const sourceAsset = state.sourceAssets.find((item) => item.id === draft.sourceAssetId);
-    const segmentation = ensureCorpusDraftSegmentation(textTarget, draft.payload.morphologicalSegmentation);
+    const languageLexemes = state.lexemes.filter((lexeme) => lexeme.languageId === draft.languageId);
+    const segmentation = ensureCorpusDraftSegmentation(
+      textTarget,
+      draft.payload.morphologicalSegmentation,
+      languageLexemes
+    );
     const passage: CorpusPassage = {
       id: `ingested-corpus-${draft.languageId}-${randomUUID()}`,
       languageId: draft.languageId,

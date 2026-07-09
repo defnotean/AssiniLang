@@ -45,6 +45,24 @@ npm.cmd run smoke
 
 `npm.cmd run smoke` exercises the ingestion workflow end to end against an in-memory server.
 
+### Deterministic evaluation baseline
+
+The committed fixture at `fixtures/eval/testlang-baseline.json` captures the expected category scores for the Testlang seed workspace (`buildTestWorkspaceState` / `ASSINI_SEED_FIXTURE=1`). `packages/eval/src/testlangBaseline.test.ts` runs scoring against that fixture and asserts the live scores still match the baseline exactly.
+
+### Beta verification and live-model checks
+
+`npm.cmd run verify` stays fully deterministic: no network calls, no live model required.
+
+`npm.cmd run verify:beta` is the optional beta gate for live-model verification. By default it prints a skip message and exits cleanly so CI stays green without a reachable model. To run the full `model:verify` pack locally, opt in explicitly:
+
+```powershell
+$env:ASSINI_VERIFY_MODEL="1"
+$env:ASSINI_VERIFY_MODEL_NAME="Irene"
+npm.cmd run verify:beta
+```
+
+`npm.cmd run model:verify` itself remains manual and opt-in. It needs a running API, reachable local model endpoint, and network access; do not wire it into default CI.
+
 ### Obsidian vault fixture
 
 The committed pack at `fixtures/obsidian-vault/` is a tiny synthetic Velmari vault (lexicon, grammar note, empty skippable note, and a stub `.obsidian/` folder). Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to the repo `fixtures/` directory, import `fixtures/obsidian-vault` in Build, and expect two language notes plus the README to register as pending text sources while `Language Notes/empty.md` is skipped. `apps/api/src/obsidianVaultFixture.test.ts` locks in those counts.

@@ -137,7 +137,13 @@ describe("project documentation", () => {
         "schemaVersion"
       ],
       "docs/configuration.md": ["## Setup recipes", "ASSINI_LLM_PROVIDER", "Deterministic / no-model mode"],
-      "docs/development.md": ["npm.cmd run verify", "Building a language from raw sources"],
+      "docs/development.md": [
+        "npm.cmd run verify",
+        "fixtures/eval/testlang-baseline.json",
+        "verify:beta",
+        "model:verify",
+        "Building a language from raw sources"
+      ],
       "docs/ingestion.md": ["## Source kinds", "## SSRF guard", "## Error catalogue", "## Duplicate flags on drafts", "```mermaid"],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
       "docs/operator-recovery.md": [
@@ -149,7 +155,7 @@ describe("project documentation", () => {
         "npm.cmd run seed"
       ],
       "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
-      "docs/roadmap.md": ["Non-negotiable gate", "First Nations"],
+      "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "First Nations"],
       "docs/troubleshooting.md": ["## Startup and ports", "ASSINI_TRANSCRIBE_BASE_URL", "ASSINI_ALLOW_PRIVATE_URLS", "data/local-db.json"],
       "docs/ui-design.md": ["AssiniLang.html", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
     };

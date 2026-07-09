@@ -1,0 +1,34 @@
+{
+  "baselineVersion": "testlang-baseline-v1",
+  "languageId": "testlang",
+  "languageName": "Testlang",
+  "systemVersion": "deterministic-study-loop-v1",
+  "fixtureVersion": "workspace-corpus-v1",
+  "source": "buildTestWorkspaceState",
+  "scores": {
+    "noteCoverage": 1,
+    "noteAccuracy": 1,
+    "evidenceAccuracy": 1,
+    "segmentationAccuracy": 1,
+    "translationAccuracy": 1,
+    "exerciseGrading": 1,
+    "generationPolicy": 1
+  },
+  "failureCount": 0,
+  "gate": {
+    "passed": true,
+    "exitCode": 0
+  },
+  "scorePolicy": {
+    "exactMatchCategories": [
+      "noteCoverage",
+      "noteAccuracy",
+      "evidenceAccuracy",
+      "segmentationAccuracy",
+      "translationAccuracy",
+      "exerciseGrading",
+      "generationPolicy"
+    ],
+    "tolerance": 0
+  }
+}

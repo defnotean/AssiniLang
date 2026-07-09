@@ -56,7 +56,8 @@ Read by the local driver scripts under `scripts/`. These are optional test harne
 | --- | --- | --- | --- |
 | `ASSINI_TEST_USER` | `reviewer-1` | user id string | Actor id used by `scripts/verifyDgxLanguage.mjs` when sending API requests. |
 | `ASSINI_VERIFY_LANGUAGE` | `Veridspark` | language name string | Language name used by `npm run model:verify` when creating or expanding the local model verification workspace. |
-| `ASSINI_VERIFY_MODEL` | `Irene` | model name string | Preferred model name for `npm run model:verify`; the script probes discovered models and falls back to another reachable model if this one is listed but cannot generate. |
+| `ASSINI_VERIFY_MODEL` | unset (skip) | `1`/`true` to opt in, or a model name string | When set to `1` or `true`, `npm run verify:beta` runs `npm run model:verify`. When set to a model name, it is the preferred model for `npm run model:verify`; the script probes discovered models and falls back to another reachable model if this one is listed but cannot generate. |
+| `ASSINI_VERIFY_MODEL_NAME` | `Irene` | model name string | Preferred model name used by `npm run model:verify` when `ASSINI_VERIFY_MODEL=1` enables the opt-in gate. |
 | `ASSINI_VERIFY_MODEL_BASE_URL` | unset | http(s) URL | Optional preferred base URL for `ASSINI_VERIFY_MODEL`, useful when several exposed endpoints list similarly named models. |
 | `ASSINI_VERIFY_AUTO_SWITCH_MODEL` | unset (enabled) | `false` to disable | Allows `npm run model:verify` to save the selected reachable model into runtime settings before running model-backed checks. |
 | `ASSINI_VERIFY_MAX_TOKENS` | `8192` | positive integer | Max token cap saved by `npm run model:verify` when it auto-switches the model. Raise this for reasoning-heavy local models that need more room to emit final JSON. |
