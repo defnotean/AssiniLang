@@ -974,6 +974,108 @@ describe("api server", () => {
     expect(after.json()).toEqual(before.json());
   });
 
+  const validCorpusImportPayload = {
+    source: "local-import",
+    sourceMetadata: {
+      author: "Local Reviewer",
+      year: 2026,
+      license: "local-test-data",
+      consentRecord: "local import consent"
+    },
+    textTarget: "saku nemi-na",
+    textTranslation: "The child teaches me.",
+    morphologicalSegmentation: [
+      { surface: "saku", lemma: "saku", gloss: "child", features: ["noun"] },
+      { surface: "nemi", lemma: "nemi", gloss: "teach", features: ["verb-root"] },
+      { surface: "-na", lemma: "-na", gloss: "1sg", features: ["person"] }
+    ],
+    topicTags: ["learning", "imported"],
+    consentStatus: {
+      use: "testing-only",
+      restrictions: ["local prototype import"]
+    }
+  };
+
+  it("dry-runs corpus import validation without persisting", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(buildTestWorkspaceState());
+    const app = createServer({ store });
+    const before = await store.read();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus?dryRun=1`,
+      headers: authHeaders("reviewer-1"),
+      payload: validCorpusImportPayload
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      errors: [],
+      warnings: [],
+      preview: validCorpusImportPayload
+    });
+
+    const after = await store.read();
+    expect(after.corpus).toEqual(before.corpus);
+    expect(after.auditEvents).toEqual(before.auditEvents);
+  });
+
+  it("dry-runs corpus import validation with body dryRun flag", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        ...validCorpusImportPayload,
+        dryRun: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ok: true,
+      errors: [],
+      preview: validCorpusImportPayload
+    });
+
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
+    expect(after.json()).toEqual(before.json());
+  });
+
+  it("returns validation errors from corpus dry-run without persisting", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/corpus?dryRun=1`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        ...validCorpusImportPayload,
+        morphologicalSegmentation: [
+          { surface: "ghost", lemma: "ghost", gloss: "ghost", features: ["noun"] }
+        ]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: false,
+      errors: ["Corpus segmentation surface is not present in target text: ghost"],
+      warnings: [],
+      preview: null
+    });
+
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/corpus` });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it.each(["corpus", "notes", "exercises"])("returns 404 for unknown language %s requests", async (resource) => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
 
@@ -4020,6 +4122,7 @@ describe("api server", () => {
         processingAttempts: 1
       });
       expect(typeof first.json().asset.processingStartedAt).toBe("string");
+      expect(typeof first.json().asset.processingHeartbeatAt).toBe("string");
 
       const second = await app.inject({
         method: "POST",
@@ -4033,6 +4136,7 @@ describe("api server", () => {
         processingAttempts: 2
       });
       expect(typeof second.json().asset.processingStartedAt).toBe("string");
+      expect(typeof second.json().asset.processingHeartbeatAt).toBe("string");
     });
 
     it("returns 409 for a concurrent synchronous process request", async () => {

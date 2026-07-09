@@ -118,9 +118,11 @@ export {
   generateDraftNotes,
   generateModelDraftNotes,
   importCorpusPassage,
-  reviewNote
+  reviewNote,
+  validateCorpusImport
 } from "./api/studyApi";
 export type {
+  CorpusImportDryRunResult,
   CorpusImportPayload,
   ModelDraftGrounding,
   ModelDraftGroundingCheck,

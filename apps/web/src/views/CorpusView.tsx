@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { fetchNeuralMap, type CorpusImportPayload, type NeuralMapResponse } from "../api";
+import { fetchNeuralMap, validateCorpusImport, type CorpusImportPayload, type NeuralMapResponse } from "../api";
 import {
   buildCorpusImportPayload,
   canSubmitCorpusImportDraft,
@@ -34,13 +34,20 @@ export function CorpusView({
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [isImportingCorpus, setIsImportingCorpus] = useState(false);
+  const [isValidatingCorpus, setIsValidatingCorpus] = useState(false);
   // Collapsed by default so the passage list gets the screen; the import form
   // is an occasional task while browsing is the everyday one.
   const [isImportOpen, setIsImportOpen] = useState(false);
   const normalized = search.trim().toLowerCase();
   const canImportPassage = canSubmitCorpusImportDraft(importDraft)
     && !isWorkflowBusy
-    && !isImportingCorpus;
+    && !isImportingCorpus
+    && !isValidatingCorpus;
+  const canValidatePassage = canSubmitCorpusImportDraft(importDraft)
+    && !isWorkflowBusy
+    && !isImportingCorpus
+    && !isValidatingCorpus
+    && Boolean(languageId);
   const filtered = useMemo(() => {
     if (!normalized) return corpus;
     return corpus.filter((passage) => {
@@ -95,6 +102,42 @@ export function CorpusView({
   function updateImportDraft(field: keyof CorpusImportDraft, value: string) {
     setImportDraft((current) => ({ ...current, [field]: value }));
     clearImportNotice();
+  }
+
+  async function handleValidateCorpus() {
+    const result = buildCorpusImportPayload(importDraft);
+    if (!result.ok) {
+      setImportMessage(null);
+      setImportError(result.error);
+      return;
+    }
+    if (!languageId) {
+      setImportMessage(null);
+      setImportError(t("corpus.validateNoLanguage"));
+      return;
+    }
+
+    setIsValidatingCorpus(true);
+    setImportMessage(null);
+    setImportError(null);
+    try {
+      const validation = await validateCorpusImport(languageId, result.payload);
+      if (validation.ok) {
+        const morphemeCount = validation.preview?.morphologicalSegmentation.length ?? 0;
+        const tagCount = validation.preview?.topicTags.length ?? 0;
+        const message = validation.warnings.length > 0
+          ? `${t("corpus.validateSuccess", { morphemeCount, tagCount })} ${validation.warnings.join(" ")}`
+          : t("corpus.validateSuccess", { morphemeCount, tagCount });
+        setImportMessage(message);
+      } else {
+        setImportError(validation.errors.join(" "));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("corpus.validateFailed");
+      setImportError(message);
+    } finally {
+      setIsValidatingCorpus(false);
+    }
   }
 
   async function handleImportCorpus(event: FormEvent) {
@@ -238,9 +281,19 @@ export function CorpusView({
         </div>
         )}
         {isImportOpen && (
-          <button type="submit" className="secondary" disabled={!canImportPassage}>
-            {isImportingCorpus ? t("corpus.importing") : t("corpus.importPassage")}
-          </button>
+          <div className="corpus-import-actions">
+            <button
+              type="button"
+              className="secondary"
+              disabled={!canValidatePassage}
+              onClick={() => void handleValidateCorpus()}
+            >
+              {isValidatingCorpus ? t("corpus.validating") : t("corpus.validatePassage")}
+            </button>
+            <button type="submit" className="secondary" disabled={!canImportPassage}>
+              {isImportingCorpus ? t("corpus.importing") : t("corpus.importPassage")}
+            </button>
+          </div>
         )}
         {importMessage && <p className="result-notice" role="status" aria-live="polite">{importMessage}</p>}
         {importError && <p className="result-notice error" role="alert">{importError}</p>}

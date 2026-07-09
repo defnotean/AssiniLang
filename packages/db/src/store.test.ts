@@ -3048,6 +3048,7 @@ describe("JsonStore", () => {
         rawText: "mira talo",
         status: "failed",
         processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
         processingAttempts: 2,
         error: "Processing interrupted by a server restart. Re-run processing.",
         createdBy: "programmer-1",
@@ -3060,6 +3061,7 @@ describe("JsonStore", () => {
 
       expect(loaded.sourceAssets[0]).toMatchObject({
         processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
         processingAttempts: 2
       });
     } finally {
@@ -3090,6 +3092,7 @@ describe("JsonStore", () => {
       const loaded = await store.read();
 
       expect(loaded.sourceAssets[0]?.processingStartedAt).toBeUndefined();
+      expect(loaded.sourceAssets[0]?.processingHeartbeatAt).toBeUndefined();
       expect(loaded.sourceAssets[0]?.processingAttempts).toBeUndefined();
     } finally {
       await rm(dir, { recursive: true, force: true });

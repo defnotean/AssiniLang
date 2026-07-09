@@ -37,7 +37,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/extraction-drafts/:draftId/reject` | reviewer, lead, admin | Reject a proposed draft. |
 | POST | `/languages/:languageId/extraction-drafts/bulk-review` | reviewer, lead, admin | Accept or reject up to 50 drafts in one request with per-item results. |
 | GET | `/languages/:languageId/corpus` | Public | Corpus passages for one language. |
-| POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. |
+| POST | `/languages/:languageId/corpus` | reviewer, lead, admin | Import a validated corpus passage. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
 | GET | `/languages/:languageId/notes` | Public | Public review notes. |
 | PATCH | `/notes/:noteId/review` | reviewer, lead, admin, elder | Review or edit one note. |
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. |
@@ -201,6 +201,8 @@ Important validation:
 - Duplicate target text is rejected per language.
 
 Successful imports create a `corpus.imported` audit event. The persisted app-state schema later re-verifies that passages and answer keys keep nonblank fields, valid language references, duplicate-free tags and features, and full segmentation coverage so manually edited local JSON cannot leave evaluation keys orphaned, malformed, or attached to the wrong language.
+
+Dry-run validation previews the same checks without persisting. Add `?dryRun=1` to the POST URL or include `"dryRun": true` in the JSON body (alongside the normal import fields). The response is `{ "ok": boolean, "errors": string[], "warnings": string[], "preview": CorpusImportBody | null }`. When `ok` is true, `preview` echoes the validated passage fields that would be stored; advisory `warnings` note skipped checks such as missing lexicon or phonology inventory. Dry-run requests still require reviewer, lead, or admin auth but do not append audit events or mutate corpus state.
 
 ## Exercise authoring
 

@@ -967,6 +967,12 @@ label,
   min-height: 4.4rem;
 }
 
+.corpus-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .corpus-list {
   display: flex;
   flex-direction: column;

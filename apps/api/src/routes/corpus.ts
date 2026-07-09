@@ -17,6 +17,52 @@ import {
 import type { RouteContext } from "./context.js";
 import { parseCorpusImportBody, type CorpusImportBody } from "./corpusParsing.js";
 
+export type CorpusImportDryRunResponse = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  preview: CorpusImportBody | null;
+};
+
+function isCorpusDryRunRequest(request: { query: unknown }, rawBody: unknown): boolean {
+  const query = request.query as Record<string, string | undefined>;
+  if (query.dryRun === "1" || query.dryRun === "true") {
+    return true;
+  }
+  if (rawBody && typeof rawBody === "object" && !Array.isArray(rawBody)) {
+    return (rawBody as Record<string, unknown>).dryRun === true;
+  }
+  return false;
+}
+
+function corpusImportPayloadFromRequest(rawBody: unknown): unknown {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return rawBody;
+  }
+  const { dryRun: _dryRun, ...rest } = rawBody as Record<string, unknown>;
+  return rest;
+}
+
+function corpusImportValidationWarnings(state: AppState, languageId: string): string[] {
+  const warnings: string[] = [];
+  const language = state.languages.find((item) => item.id === languageId);
+  if (!language) {
+    return warnings;
+  }
+
+  const lexemes = state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+  if (lexemes.length === 0) {
+    warnings.push(`Morpheme lexicon grounding is skipped because ${language.name} has no lexicon entries yet.`);
+  }
+
+  const phonology = language.phonology;
+  if (!phonology || (phonology.consonants.length === 0 && phonology.vowels.length === 0)) {
+    warnings.push(`Orthography validation is skipped because ${language.name} has no phonology inventory declared.`);
+  }
+
+  return warnings;
+}
+
 function corpusMorphemeGroundingError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) {
@@ -60,7 +106,12 @@ function corpusListValidationError(body: CorpusImportBody): string | undefined {
   return undefined;
 }
 
-function corpusImportValidationError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
+export function validateCorpusImport(
+  state: AppState,
+  languageId: string,
+  body: CorpusImportBody
+): { errors: string[]; warnings: string[] } {
+  const warnings = corpusImportValidationWarnings(state, languageId);
   const normalizedTarget = normalizeAuthoredAnswer(body.textTarget).toLowerCase();
   const duplicate = state.corpus.some((passage) => (
     passage.languageId === languageId
@@ -68,36 +119,49 @@ function corpusImportValidationError(state: AppState, languageId: string, body: 
   ));
 
   if (duplicate) {
-    return `Corpus passage already exists for target text: ${body.textTarget}`;
+    return {
+      errors: [`Corpus passage already exists for target text: ${body.textTarget}`],
+      warnings
+    };
   }
 
   for (const morpheme of body.morphologicalSegmentation) {
     if (!corpusTargetContainsSurface(body.textTarget, morpheme.surface)) {
-      return `Corpus segmentation surface is not present in target text: ${morpheme.surface}`;
+      return {
+        errors: [`Corpus segmentation surface is not present in target text: ${morpheme.surface}`],
+        warnings
+      };
     }
   }
 
   const listError = corpusListValidationError(body);
   if (listError) {
-    return listError;
+    return { errors: [listError], warnings };
   }
 
   const phonologyError = corpusPhonologyValidationError(state, languageId, body);
   if (phonologyError) {
-    return phonologyError;
+    return { errors: [phonologyError], warnings };
   }
 
   const uncoveredTargetToken = findUncoveredCorpusTargetTokens(body.textTarget, body.morphologicalSegmentation)[0];
   if (uncoveredTargetToken) {
-    return `Corpus segmentation does not cover target token: ${uncoveredTargetToken}`;
+    return {
+      errors: [`Corpus segmentation does not cover target token: ${uncoveredTargetToken}`],
+      warnings
+    };
   }
 
   const groundingError = corpusMorphemeGroundingError(state, languageId, body);
   if (groundingError) {
-    return groundingError;
+    return { errors: [groundingError], warnings };
   }
 
-  return undefined;
+  return { errors: [], warnings };
+}
+
+function corpusImportValidationError(state: AppState, languageId: string, body: CorpusImportBody): string | undefined {
+  return validateCorpusImport(state, languageId, body).errors[0];
 }
 
 export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): void {
@@ -115,8 +179,17 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
 
   app.post("/languages/:languageId/corpus", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
-    const body = parseCorpusImportBody(request.body ?? {});
+    const dryRun = isCorpusDryRunRequest(request, request.body ?? {});
+    const body = parseCorpusImportBody(corpusImportPayloadFromRequest(request.body ?? {}));
     if (!body) {
+      if (dryRun) {
+        return {
+          ok: false,
+          errors: ["Invalid corpus import body"],
+          warnings: [],
+          preview: null
+        } satisfies CorpusImportDryRunResponse;
+      }
       reply.code(400);
       return { error: "Invalid corpus import body" };
     }
@@ -125,6 +198,21 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    if (!current.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    if (dryRun) {
+      const validation = validateCorpusImport(current, languageId, body);
+      return {
+        ok: validation.errors.length === 0,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        preview: validation.errors.length === 0 ? body : null
+      } satisfies CorpusImportDryRunResponse;
+    }
 
     let languageMissing = false;
     let validationError: string | undefined;

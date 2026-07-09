@@ -531,12 +531,14 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       }
 
       const processingStartedAt = new Date().toISOString();
+      const processingHeartbeatAt = processingStartedAt;
       const processingAttempts = (stored.processingAttempts ?? 0) + 1;
       claimed = {
         ...stored,
         status: "processing",
         error: undefined,
         processingStartedAt,
+        processingHeartbeatAt,
         processingAttempts
       };
       return appendAuditEvent({
@@ -551,7 +553,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         summary: asyncRequested
           ? `Started background processing for source "${stored.title}".`
           : `Started processing for source "${stored.title}".`,
-        metadata: { kind: stored.kind, async: asyncRequested, processingAttempts, processingStartedAt }
+        metadata: { kind: stored.kind, async: asyncRequested, processingAttempts, processingStartedAt, processingHeartbeatAt }
       });
     });
 
@@ -568,6 +570,18 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const claimedAsset = claimed;
 
     if (asyncRequested) {
+      const touchProcessingHeartbeat = async () => {
+        const heartbeatAt = new Date().toISOString();
+        await updateState((state) => ({
+          ...state,
+          sourceAssets: state.sourceAssets.map((item) => (
+            item.id === sourceId && item.status === "processing"
+              ? { ...item, processingHeartbeatAt: heartbeatAt }
+              : item
+          ))
+        }));
+      };
+
       jobQueue.add(sourceId, async () => {
         let extraction: SourceExtractionResult | undefined;
         let extractionError: string | undefined;
@@ -577,7 +591,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
             language,
             provider: llmProvider,
             dataDir,
-            fetchFn: ingestionFetch
+            fetchFn: ingestionFetch,
+            onProgress: touchProcessingHeartbeat
           });
         } catch (error) {
           extractionError = redactErrorSecrets(error instanceof Error ? error.message : "Source processing failed.");

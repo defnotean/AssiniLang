@@ -45,7 +45,8 @@ export function recoverInterruptedSourcesState(state: AppState, recoveredAt = ne
       sourceId: asset.id,
       previousStatus: "processing",
       ...(asset.processingAttempts !== undefined ? { processingAttempts: asset.processingAttempts } : {}),
-      ...(asset.processingStartedAt !== undefined ? { processingStartedAt: asset.processingStartedAt } : {})
+      ...(asset.processingStartedAt !== undefined ? { processingStartedAt: asset.processingStartedAt } : {}),
+      ...(asset.processingHeartbeatAt !== undefined ? { processingHeartbeatAt: asset.processingHeartbeatAt } : {})
     }
   }));
 

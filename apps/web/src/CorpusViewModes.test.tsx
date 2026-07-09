@@ -5,12 +5,14 @@ import { CorpusView } from "./views/CorpusView";
 import type { CorpusPassage } from "./lib/types";
 
 const fetchNeuralMapMock = vi.fn();
+const validateCorpusImportMock = vi.fn();
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
   return {
     ...actual,
-    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args)
+    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args),
+    validateCorpusImport: (...args: unknown[]) => validateCorpusImportMock(...args)
   };
 });
 
@@ -89,6 +91,7 @@ function renderCorpusView(corpus = createCorpus()) {
 
 beforeEach(() => {
   fetchNeuralMapMock.mockReset();
+  validateCorpusImportMock.mockReset();
 });
 
 describe("CorpusView display modes", () => {
@@ -232,5 +235,40 @@ describe("CorpusView network graph mode", () => {
       expect(screen.getByText("1 nodes")).toBeInTheDocument();
     });
     expect(fetchNeuralMapMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("CorpusView import validation", () => {
+  it("calls dry-run validation and shows the server error without importing", async () => {
+    validateCorpusImportMock.mockResolvedValue({
+      ok: false,
+      errors: ["Corpus segmentation surface is not present in target text: ghost"],
+      warnings: [],
+      preview: null
+    });
+
+    renderCorpusView();
+    fireEvent.click(screen.getByRole("button", { name: /Add source passage/i }));
+
+    fireEvent.change(screen.getByLabelText("Corpus target text"), { target: { value: "saku nemi-na" } });
+    fireEvent.change(screen.getByLabelText("English translation"), { target: { value: "The child teaches me." } });
+    fireEvent.change(screen.getByLabelText("Source"), { target: { value: "local-import" } });
+    fireEvent.change(screen.getByLabelText("Author"), { target: { value: "Local Reviewer" } });
+    fireEvent.change(screen.getByLabelText("Year"), { target: { value: "2026" } });
+    fireEvent.change(screen.getByLabelText("License"), { target: { value: "local-test-data" } });
+    fireEvent.change(screen.getByLabelText("Consent record"), { target: { value: "local import consent" } });
+    fireEvent.change(screen.getByLabelText("Topic tags"), { target: { value: "learning" } });
+    fireEvent.change(screen.getByLabelText("Morpheme segmentation"), {
+      target: { value: "ghost|ghost|ghost|noun" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+
+    await waitFor(() => {
+      expect(validateCorpusImportMock).toHaveBeenCalledWith("avenik", expect.objectContaining({
+        textTarget: "saku nemi-na"
+      }));
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("ghost");
   });
 });

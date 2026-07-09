@@ -59,6 +59,7 @@ describe("recoverInterruptedSourcesState", () => {
     state.sourceAssets.push(buildSource({
       id: "source-interrupted",
       processingStartedAt: "2026-06-06T00:00:30.000Z",
+      processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
       processingAttempts: 2
     }));
 
@@ -69,7 +70,8 @@ describe("recoverInterruptedSourcesState", () => {
       sourceId: "source-interrupted",
       previousStatus: "processing",
       processingAttempts: 2,
-      processingStartedAt: "2026-06-06T00:00:30.000Z"
+      processingStartedAt: "2026-06-06T00:00:30.000Z",
+      processingHeartbeatAt: "2026-06-06T00:00:45.000Z"
     });
   });
 

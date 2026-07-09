@@ -2,6 +2,12 @@ import type { CorpusPassage, Note } from "@assini/db";
 import { actorJsonRequest, actorRequest, assertOk } from "../lib/apiClient";
 
 export type CorpusImportPayload = Omit<CorpusPassage, "id" | "languageId">;
+export type CorpusImportDryRunResult = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  preview: CorpusImportPayload | null;
+};
 export type ReviewNotePayload = Partial<Pick<Note, "status" | "explanation">> & {
   reviewerComment?: string;
   dispositionAssigneeId?: string;
@@ -72,4 +78,19 @@ export async function importCorpusPassage(
   await assertOk(response, "Corpus import failed");
 
   return response.json() as Promise<CorpusPassage>;
+}
+
+export async function validateCorpusImport(
+  languageId: string,
+  payload: CorpusImportPayload
+): Promise<CorpusImportDryRunResult> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/corpus?dryRun=1`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Corpus validation failed");
+
+  return response.json() as Promise<CorpusImportDryRunResult>;
 }

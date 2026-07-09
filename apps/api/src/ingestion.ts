@@ -827,6 +827,7 @@ export async function extractCandidatesForAsset(
     env?: Env;
     fetchFn?: FetchFn;
     lookupFn?: LookupFn;
+    onProgress?: () => void | Promise<void>;
   }
 ): Promise<SourceExtractionResult> {
   const env = params.env ?? process.env;
@@ -906,6 +907,7 @@ export async function extractCandidatesForAsset(
 
     const parsedParts: { candidates: ExtractionCandidate[]; summary: string }[] = [];
     for (const [index, chunk] of processable.entries()) {
+      await params.onProgress?.();
       const messages = buildTextExtractionMessages(language, asset.kind, chunk, {
         index: index + 1,
         total: processable.length

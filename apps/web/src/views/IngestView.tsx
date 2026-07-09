@@ -1,8 +1,17 @@
-import type { SourceRegistrationPayload } from "../api";
+import type { SourceAsset, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import { extractionDraftSummary, formatCount } from "../lib/format";
 import { useI18n } from "../i18n";
+
+const PROCESSING_STALE_MS = 10 * 60 * 1000;
+
+function isProcessingStale(source: SourceAsset, now = Date.now()): boolean {
+  if (source.status !== "processing") return false;
+  const marker = source.processingHeartbeatAt ?? source.processingStartedAt;
+  if (!marker) return false;
+  return now - Date.parse(marker) > PROCESSING_STALE_MS;
+}
 
 export function IngestView({
   languageId,
@@ -233,6 +242,9 @@ export function IngestView({
                     )}
                   </div>
                   <small className="muted">{t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}</small>
+                  {isProcessingStale(source) && (
+                    <p className="result-notice warning" role="status">{t("ingest.processingStaleWarning")}</p>
+                  )}
                   {source.error && <p className="result-notice error">{source.error}</p>}
                   {source.warnings && source.warnings.length > 0 && (
                     <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>

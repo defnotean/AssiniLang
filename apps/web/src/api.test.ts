@@ -19,6 +19,7 @@ import {
   createExercise,
   generateModelExercise,
   importCorpusPassage,
+  validateCorpusImport,
   createGovernanceRecord,
   updateReviewPolicy,
   resolveReviewDisposition,
@@ -262,6 +263,49 @@ describe("fetchDashboardData", () => {
 
     expectPrototypeSession(fetchMock, "reviewer-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/corpus", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify(payload)
+    });
+  });
+
+  it("posts corpus dry-run validation requests with the dryRun query flag", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        errors: [],
+        warnings: [],
+        preview: null
+      })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      source: "field-notebook",
+      sourceMetadata: {
+        author: "Local Reviewer",
+        year: 2026,
+        license: "user-provided",
+        consentRecord: "local import consent"
+      },
+      textTarget: "mira lumo-ke talo-mi-na",
+      textTranslation: "I walk by the river at the practice mat.",
+      morphologicalSegmentation: [
+        { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }
+      ],
+      topicTags: ["movement"],
+      consentStatus: {
+        use: "testing-only" as const,
+        restrictions: []
+      }
+    };
+
+    await validateCorpusImport("avenik/test language", payload);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/corpus?dryRun=1", {
       method: "POST",
       ...jsonRequest,
       body: JSON.stringify(payload)
