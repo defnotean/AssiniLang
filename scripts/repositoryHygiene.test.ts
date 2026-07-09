@@ -50,12 +50,17 @@ describe("repository production hygiene", () => {
 
   it("keeps a non-secret environment template aligned with documented configuration", async () => {
     const example = await readProjectFile(".env.example");
+    const configuration = await readProjectFile("docs/configuration.md");
 
     for (const variable of [
       "ASSINI_LLM_PROVIDER",
       "ASSINI_LLM_BASE_URL",
       "ASSINI_LLM_MODEL",
       "ASSINI_LLM_API_KEY",
+      "ASSINI_LLM_TIMEOUT_MS",
+      "ASSINI_LLM_MAX_TOKENS",
+      "ASSINI_LLM_JSON_MODE",
+      "ASSINI_LLM_DISCOVERY_BASE_URLS",
       "ASSINI_TRANSCRIBE_BASE_URL",
       "ASSINI_TRANSCRIBE_MODEL",
       "ASSINI_TRANSCRIBE_API_KEY",
@@ -78,6 +83,11 @@ describe("repository production hygiene", () => {
     ]) {
       expect(example, `.env.example should include ${variable}`).toContain(variable);
     }
+
+    // Documented default is 180000 ms; the example must not advertise a shorter stale value.
+    expect(configuration).toMatch(/`ASSINI_LLM_TIMEOUT_MS`\s*\|\s*`180000`/);
+    expect(example).toMatch(/ASSINI_LLM_TIMEOUT_MS=180000\b/);
+    expect(example).not.toMatch(/ASSINI_LLM_TIMEOUT_MS=30000\b/);
 
     expect(example).not.toMatch(/\bsk-[A-Za-z0-9._-]+/);
     expect(example).not.toMatch(/Bearer\s+\S+/i);

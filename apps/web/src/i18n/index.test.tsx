@@ -52,4 +52,22 @@ describe("locale catalogs", () => {
     expect(ar["ingest.draftSummary.noForm"]).toBe("(لا صيغة)");
     expect(ar["ingest.draftSummary.noGloss"]).toBe("(لا ترجمة)");
   });
+
+  it("localizes corpus graph chrome in Arabic instead of leaving English leftovers", () => {
+    expect(ar["corpus.network"]).toBe("رسم بياني");
+    expect(ar["corpus.networkLabel"]).toBe("شبكة المدوّنة العصبية");
+    expect(ar["corpus.networkInsights"]).toBe("رؤى رسم المدوّنة");
+    expect(ar["corpus.networkLegend"]).toBe("مفتاح رسم المدوّنة");
+    expect(ar["corpus.networkNodes"]).toBe("{count} عقدة");
+    expect(ar["corpus.networkEdges"]).toBe("{count} رابط");
+    expect(ar["corpus.networkLimited"]).toBe(
+      "عرض {nodes} من {totalNodes} عقدة و{edges} من {totalEdges} رابط."
+    );
+    expect(ar["corpus.networkInsight.sessions"]).toBe("جلسات الذكاء الاصطناعي");
+    expect(ar["corpus.networkKind.corpus"]).toBe("مقطع");
+    // Guard against the previous English copy leaking back into AR.
+    expect(ar["corpus.networkLabel"]).not.toBe(en["corpus.networkLabel"]);
+    expect(ar["corpus.networkInsights"]).not.toBe(en["corpus.networkInsights"]);
+    expect(ar["corpus.networkLegend"]).not.toBe(en["corpus.networkLegend"]);
+  });
 });

@@ -1097,6 +1097,30 @@ describe("api server", () => {
     expect(evaluations.json()).toHaveLength(1);
   });
 
+  it.each([
+    ["elders", "elder-1", 403, "Forbidden"],
+    ["learners", "learner-1", 403, "Forbidden"],
+    ["unknown users", "missing-user", 401, "Unauthorized"]
+  ])("rejects evaluation list and run from %s", async (_, userId, statusCode, error) => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const list = await app.inject({
+      method: "GET",
+      url: "/evaluations",
+      headers: authHeaders(userId)
+    });
+    expect(list.statusCode).toBe(statusCode);
+    expect(list.json()).toEqual({ error });
+
+    const run = await app.inject({
+      method: "POST",
+      url: "/evaluations/run",
+      headers: authHeaders(userId)
+    });
+    expect(run.statusCode).toBe(statusCode);
+    expect(run.json()).toEqual({ error });
+  });
+
   it("returns a client error for evaluations without languages and preserves prior runs", async () => {
     const initialState: AppState = {
       ...createEmptyState(),

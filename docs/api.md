@@ -48,8 +48,8 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
 | GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. |
 | POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
-| GET | `/evaluations` | lead, admin, programmer, reviewer | Previous evaluation runs. |
-| POST | `/evaluations/run` | lead, admin, programmer, reviewer | Run evaluation for all languages. |
+| GET | `/evaluations` | lead, admin, programmer, reviewer (not elder/learner) | Previous evaluation runs. |
+| POST | `/evaluations/run` | lead, admin, programmer, reviewer (not elder/learner) | Run evaluation for all languages. |
 | GET | `/exports/languages/:languageId/snapshot` | reviewer, elder, lead, admin | Sanitized language snapshot with integrity metadata. |
 | GET | `/exports/evaluations/artifact` | reviewer, lead, admin, programmer | Sanitized evaluation artifact. |
 | GET | `/governance` | lead, admin, programmer, reviewer | List governance records. |

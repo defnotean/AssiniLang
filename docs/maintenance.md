@@ -20,7 +20,7 @@ If the route returns language data publicly, project it through `apps/api/src/pu
 
 The console is an App shell (`apps/web/src/App.tsx`: layout, sidebar, theme, top-level state) plus one module per view in `apps/web/src/views/`, shared presentational pieces in `apps/web/src/components/`, and pure helpers/constants/types in `apps/web/src/lib/`:
 
-1. Extend the `ViewMode` union in `lib/types.ts`, add an entry to `VIEW_CONFIG` (label, title, eyebrow) and the mode to `VIEW_ORDER` in `lib/viewConfig.ts`. Optionally extend `ViewGlyph` and `sectionCounts`.
+1. Extend the `ViewMode` union in `lib/types.ts`, add `viewConfig.<mode>.{label,title,eyebrow}` keys in `i18n/en.ts` and `i18n/ar.ts`, and add the mode to `VIEW_ORDER` in `lib/viewConfig.ts` when it belongs in the primary sidebar. Optionally extend `ViewGlyph` and `sectionCounts`.
 2. Write the view component as a new file in `views/` following the existing ones (`IngestView`, `CorpusView`, ...): take the selected `languageId`, load through an `AsyncState<T>`, render loading/error/ready states, and mount it from the App shell.
 3. Add the client function in `apps/web/src/api.ts` next to its peers (`fetchSources`, `processSource`, ...). Client functions own route construction, the prototype-session actor choice, and payload shape.
 4. Tests: route construction, actor/session behavior, and payload shape in `apps/web/src/api.test.ts`; the user workflow (navigate, fill, submit, assert rendered result and error states) in `apps/web/src/App.test.tsx`, which mocks the api module.
