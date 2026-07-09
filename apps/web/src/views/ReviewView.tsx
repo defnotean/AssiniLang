@@ -53,16 +53,22 @@ export function ReviewView({
     if (filter === "all") return notes;
     return notes.filter((note) => matchesReviewFilter(note, filter));
   }, [filter, notes]);
+  // Hide detail when the selection is outside the active filter so Approve/etc.
+  // never apply to a note the queue is not listing.
+  const detailNote = useMemo(() => {
+    if (!selectedNote) return null;
+    return filteredNotes.some((note) => note.id === selectedNote.id) ? selectedNote : null;
+  }, [filteredNotes, selectedNote]);
   useEffect(() => {
-    setNoteExplanationDraft(selectedNote?.explanation ?? "");
+    setNoteExplanationDraft(detailNote?.explanation ?? "");
     setNoteEditMessage(null);
     setNoteEditError(null);
-  }, [selectedNote?.id, selectedNote?.explanation]);
+  }, [detailNote?.id, detailNote?.explanation]);
   const trimmedDraft = noteExplanationDraft.trim();
   const reviewActionsDisabled = reviewingNoteId !== null || isWorkflowBusy;
-  const canSaveExplanation = selectedNote !== null
+  const canSaveExplanation = detailNote !== null
     && trimmedDraft.length > 0
-    && trimmedDraft !== selectedNote.explanation
+    && trimmedDraft !== detailNote.explanation
     && !reviewActionsDisabled;
 
   async function handleSaveExplanation(event: FormEvent) {
@@ -140,20 +146,20 @@ export function ReviewView({
       </section>
 
       <section className="detail-panel note-detail-panel" aria-label={t("reviewView.noteDetailPanel")}>
-        {selectedNote ? (
+        {detailNote ? (
           <article className="record-card" aria-label={t("reviewView.selectedNoteDetail")}>
             <div className="record-topline">
               <div>
                 <span className="detail-label">{t("reviewView.selectedNote")}</span>
-                <h2>{selectedNote.topic}</h2>
+                <h2>{detailNote.topic}</h2>
               </div>
               <div className="pill-row">
-                <StatusBadge status={selectedNote.status} />
-                <ConfidenceBadge confidence={selectedNote.confidence} />
+                <StatusBadge status={detailNote.status} />
+                <ConfidenceBadge confidence={detailNote.confidence} />
               </div>
             </div>
 
-            <p className="explanation">{selectedNote.explanation}</p>
+            <p className="explanation">{detailNote.explanation}</p>
             <form className="note-edit-form" onSubmit={handleSaveExplanation}>
               <div className="form-group">
                 <label htmlFor="note-explanation-draft">{t("reviewView.revisedNoteExplanation")}</label>
@@ -172,9 +178,9 @@ export function ReviewView({
                 type="submit"
                 className="secondary"
                 disabled={!canSaveExplanation}
-                aria-busy={reviewingNoteId === selectedNote.id}
+                aria-busy={reviewingNoteId === detailNote.id}
               >
-                {reviewingNoteId === selectedNote.id ? t("reviewView.saving") : t("reviewView.saveNoteExplanation")}
+                {reviewingNoteId === detailNote.id ? t("reviewView.saving") : t("reviewView.saveNoteExplanation")}
               </button>
               {noteEditMessage && (
                 <p className="result-notice" role="status" aria-live="polite">
@@ -195,25 +201,25 @@ export function ReviewView({
             <dl className="detail-grid">
               <div>
                 <dt>{t("reviewView.evidence")}</dt>
-                <dd>{formatEvidenceLabel(selectedNote.evidenceCount, t)}</dd>
+                <dd>{formatEvidenceLabel(detailNote.evidenceCount, t)}</dd>
               </div>
               <div>
                 <dt>{t("reviewView.dialectScope")}</dt>
-                <dd>{selectedNote.dialectScope}</dd>
+                <dd>{detailNote.dialectScope}</dd>
               </div>
               <div>
                 <dt>{t("reviewView.lastReviewedBy")}</dt>
-                <dd>{selectedNote.reviewer.lastReviewedBy ?? t("reviewView.unreviewed")}</dd>
+                <dd>{detailNote.reviewer.lastReviewedBy ?? t("reviewView.unreviewed")}</dd>
               </div>
               <div>
                 <dt>{t("reviewView.lastReviewedAt")}</dt>
-                <dd>{selectedNote.reviewer.lastReviewedAt ?? t("reviewView.unreviewed")}</dd>
+                <dd>{detailNote.reviewer.lastReviewedAt ?? t("reviewView.unreviewed")}</dd>
               </div>
             </dl>
 
             <DetailBlock title={t("reviewView.evidenceCitations")}>
               <div className="pill-row">
-                {selectedNote.evidencePassageIds.map((passageId, index) => (
+                {detailNote.evidencePassageIds.map((passageId, index) => (
                   <span key={`${index}:${passageId}`} className="pill">
                     {passageId}
                   </span>
@@ -222,11 +228,11 @@ export function ReviewView({
             </DetailBlock>
 
             <DetailBlock title={t("reviewView.examples")}>
-              {selectedNote.examples.length === 0 ? (
+              {detailNote.examples.length === 0 ? (
                 <p className="inline-empty">{t("reviewView.noExamplesSupplied")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.examples.map((example, index) => (
+                  {detailNote.examples.map((example, index) => (
                     <div key={`${index}:${example.passageId}`} className="detail-row example-row">
                       <code>{example.target}</code>
                       <span>{example.translation}</span>
@@ -237,11 +243,11 @@ export function ReviewView({
             </DetailBlock>
 
             <DetailBlock title={t("reviewView.reviewerComments")}>
-              {selectedNote.reviewer.comments.length === 0 ? (
+              {detailNote.reviewer.comments.length === 0 ? (
                 <p className="inline-empty">{t("reviewView.noReviewerComments")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.reviewer.comments.map((comment, index) => (
+                  {detailNote.reviewer.comments.map((comment, index) => (
                     <p key={`${index}:${comment}`} className="detail-row">
                       {comment}
                     </p>
@@ -251,11 +257,11 @@ export function ReviewView({
             </DetailBlock>
 
             <DetailBlock title={t("reviewView.editHistory")}>
-              {selectedNote.editHistory.length === 0 ? (
+              {detailNote.editHistory.length === 0 ? (
                 <p className="inline-empty">{t("reviewView.noEditHistory")}</p>
               ) : (
                 <div className="detail-list">
-                  {selectedNote.editHistory.map((entry, index) => (
+                  {detailNote.editHistory.map((entry, index) => (
                     <div key={`${index}:${entry.at}:${entry.action}:${entry.summary}`} className="detail-row">
                       <strong>{entry.action}</strong>
                       <span>{entry.summary}</span>
@@ -267,11 +273,11 @@ export function ReviewView({
               )}
             </DetailBlock>
 
-            <div className="review-bar" aria-busy={reviewingNoteId === selectedNote.id}>
+            <div className="review-bar" aria-busy={reviewingNoteId === detailNote.id}>
               <button
                 type="button"
                 className="approve"
-                aria-label={t("reviewView.approveNote", { topic: selectedNote.topic })}
+                aria-label={t("reviewView.approveNote", { topic: detailNote.topic })}
                 disabled={reviewActionsDisabled}
                 onClick={() => onReview("approved")}
               >
@@ -280,7 +286,7 @@ export function ReviewView({
               <button
                 type="button"
                 className="contest"
-                aria-label={t("reviewView.contestNote", { topic: selectedNote.topic })}
+                aria-label={t("reviewView.contestNote", { topic: detailNote.topic })}
                 disabled={reviewActionsDisabled}
                 onClick={() => onReview("contested")}
               >
@@ -289,7 +295,7 @@ export function ReviewView({
               <button
                 type="button"
                 className="reject"
-                aria-label={t("reviewView.rejectNote", { topic: selectedNote.topic })}
+                aria-label={t("reviewView.rejectNote", { topic: detailNote.topic })}
                 disabled={reviewActionsDisabled}
                 onClick={() => onReview("rejected")}
               >
@@ -298,7 +304,7 @@ export function ReviewView({
               <button
                 type="button"
                 className="defer"
-                aria-label={t("reviewView.deferNote", { topic: selectedNote.topic })}
+                aria-label={t("reviewView.deferNote", { topic: detailNote.topic })}
                 disabled={reviewActionsDisabled}
                 onClick={() => onReview("deferred")}
               >
@@ -307,7 +313,7 @@ export function ReviewView({
               <button
                 type="button"
                 className="escalate"
-                aria-label={t("reviewView.escalateNote", { topic: selectedNote.topic })}
+                aria-label={t("reviewView.escalateNote", { topic: detailNote.topic })}
                 disabled={reviewActionsDisabled}
                 onClick={() => onReview("escalated")}
               >
@@ -317,8 +323,26 @@ export function ReviewView({
           </article>
         ) : (
           <div className="empty-state" role="status">
-            <p>{t("reviewView.noNotesForLanguage")}</p>
-            <p className="muted">{t("reviewView.noNotesForLanguageHint")}</p>
+            {notes.length === 0 ? (
+              <>
+                <p>{t("reviewView.noNotesForLanguage")}</p>
+                <p className="muted">{t("reviewView.noNotesForLanguageHint")}</p>
+              </>
+            ) : filteredNotes.length === 0 ? (
+              <>
+                <p>
+                  {filter === "all"
+                    ? t("reviewView.noNotesForLanguage")
+                    : t("reviewView.noNotesInFilterNamed", { filter: t(`reviewView.filter.${filter}`) })}
+                </p>
+                <p className="muted">{t("reviewView.noNotesInFilterHint")}</p>
+              </>
+            ) : (
+              <>
+                <p>{t("reviewView.selectNoteHint")}</p>
+                <p className="muted">{t("reviewView.selectNoteHintDetail")}</p>
+              </>
+            )}
           </div>
         )}
       </section>

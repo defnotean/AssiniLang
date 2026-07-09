@@ -381,6 +381,8 @@ export const ar: Record<MessageKey, string> = {
   "reviewView.escalate": "تصعيد",
   "reviewView.noNotesForLanguage": "لا توجد ملاحظات لهذه اللغة بعد.",
   "reviewView.noNotesForLanguageHint": "عالِج مصدرًا في البناء لاقتراح ملاحظات نحوية، ثم راجعها هنا.",
+  "reviewView.selectNoteHint": "اختر ملاحظة من القائمة لمراجعتها.",
+  "reviewView.selectNoteHintDetail": "اختر صفًا أعلاه، أو غيّر المرشّح إذا كانت الملاحظة التي تحتاجها مخفية.",
   "reviewView.evidenceLinkOne": "{count} رابط دليل",
   "reviewView.evidenceLinkMany": "{count} روابط دليل",
 

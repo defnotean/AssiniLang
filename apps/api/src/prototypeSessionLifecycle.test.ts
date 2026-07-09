@@ -1,5 +1,8 @@
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildTestWorkspaceState } from "@assini/db";
+import { buildTestWorkspaceState, JsonStore } from "@assini/db";
 import { createServer } from "./server.js";
 import {
   DEFAULT_PROTOTYPE_SESSION_TTL_MS,
@@ -65,6 +68,43 @@ describe("prototype session lifecycle", () => {
     expect(retried.statusCode).toBe(401);
   });
 
+  it("evicts orphan sessions when the cookie user no longer exists", async () => {
+    const clock = createClock();
+    const dir = await mkdtemp(join(tmpdir(), "assini-orphan-session-"));
+    const dbPath = join(dir, "local-db.json");
+    const store = new JsonStore(dbPath);
+    await store.write(buildTestWorkspaceState());
+
+    const app = createServer({
+      store,
+      enablePrototypeAuth: true,
+      rateLimit: false,
+      now: clock.now
+    });
+    const cookie = await openSession(app, "learner-1");
+
+    const before = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(before.statusCode).toBe(200);
+
+    // Simulate reseed / manual user edit: drop the session's user while the cookie remains.
+    await store.update((state) => ({
+      ...state,
+      users: state.users.filter((user) => user.id !== "learner-1")
+    }));
+
+    const orphaned = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(orphaned.statusCode).toBe(401);
+
+    // Orphan eviction: the map entry is gone, so a retry stays 401 (no zombie renewal).
+    const retried = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(retried.statusCode).toBe(401);
+
+    // Other users can still open a fresh session after the orphan was cleared.
+    const elderCookie = await openSession(app, "elder-1");
+    const elder = await app.inject({ method: "GET", url: "/users/me", headers: { cookie: elderCookie } });
+    expect(elder.statusCode).toBe(200);
+  });
+
   it("slides the session expiry forward on each successful use (documented sliding renewal)", async () => {
     const clock = createClock();
     const app = createSessionServer(clock);
@@ -125,6 +165,33 @@ describe("prototype session lifecycle", () => {
     // The server-side record is gone: the old cookie no longer authenticates.
     const afterLogout = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
     expect(afterLogout.statusCode).toBe(401);
+  });
+
+  it("expires the logout cookie with Secure when ASSINI_COOKIE_SECURE is enabled", async () => {
+    const previous = process.env.ASSINI_COOKIE_SECURE;
+    process.env.ASSINI_COOKIE_SECURE = "1";
+    try {
+      const clock = createClock();
+      const app = createSessionServer(clock);
+      const cookie = await openSession(app);
+
+      const logout = await app.inject({
+        method: "DELETE",
+        url: "/auth/prototype-session",
+        headers: { cookie }
+      });
+      expect(logout.statusCode).toBe(204);
+      const setCookie = logout.headers["set-cookie"];
+      const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+      expect(cookieHeader).toContain("Max-Age=0");
+      expect(cookieHeader).toContain("Secure");
+      expect(cookieHeader).toContain("HttpOnly");
+      expect(cookieHeader).toContain("SameSite=Strict");
+      expect(cookieHeader).toContain("Path=/");
+    } finally {
+      if (previous === undefined) delete process.env.ASSINI_COOKIE_SECURE;
+      else process.env.ASSINI_COOKIE_SECURE = previous;
+    }
   });
 
   it("treats logout as idempotent when no session exists", async () => {

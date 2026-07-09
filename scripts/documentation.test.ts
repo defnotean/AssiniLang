@@ -139,6 +139,8 @@ describe("project documentation", () => {
         "Evaluation artifact export",
         "uses the reviewer actor in the browser",
         "cookie `Max-Age` both refresh",
+        "Orphan sessions whose `userId` no longer exists",
+        "same Secure/HttpOnly/SameSite/Path rules as create",
         "Empty or whitespace-only session cookie",
         "last matching pair wins",
         "errors.noLanguagesToEvaluate",

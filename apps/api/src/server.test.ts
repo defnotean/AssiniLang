@@ -13,6 +13,7 @@ import {
   type Note
 } from "@assini/db";
 import { draftNotesForLanguage } from "@assini/eval";
+import { verifyExportIntegrity } from "./publicLanguageViews.js";
 import { resolveRuntimeDbPath } from "./runtimePath.js";
 import { createServer } from "./server.js";
 import type { LlmProvider } from "./llmProvider.js";
@@ -1865,6 +1866,12 @@ describe("api server", () => {
     expect(JSON.stringify(snapshot)).not.toContain("private grading explanation");
     expect(JSON.stringify(snapshot)).not.toContain("test-generator");
     expect(JSON.stringify(snapshot)).not.toContain("answer key");
+    expect(verifyExportIntegrity(snapshot)).toBe(true);
+    const tamperedSnapshot = {
+      ...snapshot,
+      language: { ...snapshot.language, status: "archived" }
+    };
+    expect(verifyExportIntegrity(tamperedSnapshot)).toBe(false);
   });
 
   it.each([
@@ -1974,15 +1981,22 @@ describe("api server", () => {
         })
       ]
     });
-    expect(response.json().integrity.contentHash).toMatch(SHA_256_HEX);
-    expect(Date.parse(response.json().exportedAt)).not.toBeNaN();
-    expect(JSON.stringify(response.json())).not.toContain("private learner answer");
-    expect(JSON.stringify(response.json())).not.toContain("private grading explanation");
-    expect(JSON.stringify(response.json())).not.toContain("answer key");
-    expect(response.json()).not.toHaveProperty("exerciseSubmissions");
-    expect(response.json()).not.toHaveProperty("noteAnswerKeys");
-    expect(response.json()).not.toHaveProperty("users");
-    expect(response.json()).not.toHaveProperty("aiSessions");
+    const artifact = response.json();
+    expect(artifact.integrity.contentHash).toMatch(SHA_256_HEX);
+    expect(Date.parse(artifact.exportedAt)).not.toBeNaN();
+    expect(JSON.stringify(artifact)).not.toContain("private learner answer");
+    expect(JSON.stringify(artifact)).not.toContain("private grading explanation");
+    expect(JSON.stringify(artifact)).not.toContain("answer key");
+    expect(artifact).not.toHaveProperty("exerciseSubmissions");
+    expect(artifact).not.toHaveProperty("noteAnswerKeys");
+    expect(artifact).not.toHaveProperty("users");
+    expect(artifact).not.toHaveProperty("aiSessions");
+    expect(verifyExportIntegrity(artifact)).toBe(true);
+    const tamperedArtifact = {
+      ...artifact,
+      summary: { ...artifact.summary, totalRuns: artifact.summary.totalRuns + 1 }
+    };
+    expect(verifyExportIntegrity(tamperedArtifact)).toBe(false);
   });
 
   it.each([

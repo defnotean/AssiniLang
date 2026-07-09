@@ -197,6 +197,8 @@ export function resolveActorContext(
           prototypeSession: { sessionId, ttlMs: prototypeSession.ttlMs }
         };
       }
+      // Orphan eviction: user removed (reseed/edit) while the cookie remains.
+      prototypeSessions.delete(sessionId);
     }
   }
 

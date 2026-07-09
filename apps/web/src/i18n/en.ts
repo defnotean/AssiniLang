@@ -405,6 +405,8 @@ export const en = {
   "reviewView.escalate": "Escalate",
   "reviewView.noNotesForLanguage": "No notes for this language yet.",
   "reviewView.noNotesForLanguageHint": "Process a source in Build to propose grammar notes, then review them here.",
+  "reviewView.selectNoteHint": "Select a note in the queue to review it.",
+  "reviewView.selectNoteHintDetail": "Choose a row above, or change the filter if the note you need is hidden.",
   "reviewView.evidenceLinkOne": "{count} evidence link",
   "reviewView.evidenceLinkMany": "{count} evidence links",
 
