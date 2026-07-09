@@ -94,4 +94,13 @@ describe("locale catalogs", () => {
     expect(ar["errors.noLanguagesToEvaluate"]).toBe("لا توجد لغات متاحة للتقييم");
     expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
   });
+
+  it("localizes elder apply negatives and desktop-only bridge notices in Arabic", () => {
+    expect(ar["errors.languageNotFound"]).not.toBe(en["errors.languageNotFound"]);
+    expect(ar["elderWs.errCorrectionMustBeAccepted"]).not.toBe(en["elderWs.errCorrectionMustBeAccepted"]);
+    expect(ar["elderWs.errCorrectionNotLinkedToNote"]).not.toBe(en["elderWs.errCorrectionNotLinkedToNote"]);
+    expect(ar["model.desktopOnlyActions"]).not.toBe(en["model.desktopOnlyActions"]);
+    expect(ar["model.desktopActionUnavailable"]).not.toBe(en["model.desktopActionUnavailable"]);
+  });
 });
+

@@ -2026,7 +2026,10 @@ describe("api server", () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: not-a-language" });
+    expect(response.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("authors validated exercises without exposing answer keys", async () => {
@@ -3872,7 +3875,8 @@ describe("api server", () => {
 
     expect(rejectedAfterAcceptance.statusCode).toBe(409);
     expect(rejectedAfterAcceptance.json()).toEqual({
-      error: `Elder correction is no longer pending review: ${created.json().id}`
+      error: `Elder correction is no longer pending review: ${created.json().id}`,
+      i18nKey: "elderWs.errCorrectionNotPending"
     });
 
     const context = await app.inject({
@@ -3981,7 +3985,8 @@ describe("api server", () => {
     });
     expect(applyPending.statusCode).toBe(409);
     expect(applyPending.json()).toEqual({
-      error: `Elder correction must be accepted before apply: ${pending.json().id}`
+      error: `Elder correction must be accepted before apply: ${pending.json().id}`,
+      i18nKey: "elderWs.errCorrectionMustBeAccepted"
     });
 
     const passageOnly = await app.inject({
@@ -4015,7 +4020,8 @@ describe("api server", () => {
     });
     expect(applyPassageOnly.statusCode).toBe(400);
     expect(applyPassageOnly.json()).toEqual({
-      error: `Elder correction is not linked to a note: ${passageOnly.json().id}`
+      error: `Elder correction is not linked to a note: ${passageOnly.json().id}`,
+      i18nKey: "elderWs.errCorrectionNotLinkedToNote"
     });
   });
 

@@ -133,7 +133,10 @@ describe("project documentation", () => {
         "Evaluation artifact export",
         "uses the reviewer actor in the browser",
         "cookie `Max-Age` both refresh",
-        "errors.noLanguagesToEvaluate"
+        "errors.noLanguagesToEvaluate",
+        "errors.languageNotFound",
+        "elderWs.errCorrectionMustBeAccepted",
+        "elderWs.errCorrectionNotPending"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",

@@ -1,4 +1,5 @@
 import type { DesktopBackupSummary, DesktopPreferences, DesktopShortcutSummary } from "../api";
+import type { MessageKey } from "../i18n";
 
 export type DesktopAction =
   | "openAppFolder"
@@ -20,6 +21,8 @@ export type DesktopActionResult = {
   diagnosticsDir?: string;
   diagnosticsPath?: string;
   ok: boolean;
+  /** Stable i18n key for bridge-unavailable / action-missing failures. */
+  i18nKey?: MessageKey;
   message?: string;
   shortcutSummary?: DesktopShortcutSummary;
 };
@@ -85,12 +88,20 @@ export function getDesktopBridgeInfo(): DesktopBridgeInfo | null {
 
 export async function runDesktopAction(action: DesktopAction): Promise<DesktopActionResult> {
   if (typeof window === "undefined" || !window.assiniDesktop) {
-    return { ok: false, message: "Desktop actions are available only in AssiniLang Desktop." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopOnlyActions",
+      message: "Desktop actions are available only in AssiniLang Desktop."
+    };
   }
 
   const runner = window.assiniDesktop[action];
   if (typeof runner !== "function") {
-    return { ok: false, message: "This desktop action is not available in this build." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopActionUnavailable",
+      message: "This desktop action is not available in this build."
+    };
   }
 
   return runner();
@@ -100,7 +111,11 @@ export async function setDesktopPreferences(
   patch: Partial<Pick<DesktopPreferences, "hideToTray" | "launchAtLogin">>
 ): Promise<DesktopPreferencesResult> {
   if (typeof window === "undefined" || !window.assiniDesktop?.setDesktopPreferences) {
-    return { ok: false, message: "Desktop preferences are available only in AssiniLang Desktop." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopOnlyPreferences",
+      message: "Desktop preferences are available only in AssiniLang Desktop."
+    };
   }
 
   return window.assiniDesktop.setDesktopPreferences(patch);
@@ -108,7 +123,11 @@ export async function setDesktopPreferences(
 
 export async function refreshDesktopBackupSummary(): Promise<DesktopActionResult> {
   if (typeof window === "undefined" || !window.assiniDesktop?.refreshBackupSummary) {
-    return { ok: false, message: "Desktop backup summary is available only in AssiniLang Desktop." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopOnlyBackupSummary",
+      message: "Desktop backup summary is available only in AssiniLang Desktop."
+    };
   }
 
   return window.assiniDesktop.refreshBackupSummary();
@@ -116,7 +135,11 @@ export async function refreshDesktopBackupSummary(): Promise<DesktopActionResult
 
 export async function refreshDesktopShortcutSummary(): Promise<DesktopActionResult> {
   if (typeof window === "undefined" || !window.assiniDesktop?.refreshShortcutSummary) {
-    return { ok: false, message: "Desktop shortcut summary is available only in AssiniLang Desktop." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopOnlyShortcutSummary",
+      message: "Desktop shortcut summary is available only in AssiniLang Desktop."
+    };
   }
 
   return window.assiniDesktop.refreshShortcutSummary();
@@ -124,7 +147,11 @@ export async function refreshDesktopShortcutSummary(): Promise<DesktopActionResu
 
 export async function saveDesktopDiagnosticsReport(text: string): Promise<DesktopActionResult> {
   if (typeof window === "undefined" || !window.assiniDesktop?.saveDiagnosticsReport) {
-    return { ok: false, message: "Desktop diagnostics reports are available only in AssiniLang Desktop." };
+    return {
+      ok: false,
+      i18nKey: "model.desktopOnlyDiagnostics",
+      message: "Desktop diagnostics reports are available only in AssiniLang Desktop."
+    };
   }
 
   return window.assiniDesktop.saveDiagnosticsReport(text);

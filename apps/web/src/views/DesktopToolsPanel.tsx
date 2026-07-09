@@ -205,7 +205,9 @@ export function DesktopToolsPanel({
       const result = await saveDesktopDiagnosticsReport(buildDiagnosticsText());
       setDesktopActionNotice({
         kind: result.ok ? "success" : "error",
-        message: result.message ?? (result.ok ? t("model.diagnosticsSaved") : t("model.diagnosticsSaveFailed"))
+        message: result.i18nKey
+          ? t(result.i18nKey)
+          : (result.message ?? (result.ok ? t("model.diagnosticsSaved") : t("model.diagnosticsSaveFailed")))
       });
     } catch (error) {
       setDesktopActionNotice({
@@ -230,7 +232,9 @@ export function DesktopToolsPanel({
       }
       setDesktopActionNotice({
         kind: result.ok ? "success" : "error",
-        message: result.message ?? (result.ok ? t("model.desktopPreferenceSaved") : t("model.desktopPreferenceFailed"))
+        message: result.i18nKey
+          ? t(result.i18nKey)
+          : (result.message ?? (result.ok ? t("model.desktopPreferenceSaved") : t("model.desktopPreferenceFailed")))
       });
     } catch (error) {
       setDesktopActionNotice({
@@ -255,7 +259,9 @@ export function DesktopToolsPanel({
       }
       setDesktopActionNotice({
         kind: result.ok ? "success" : "error",
-        message: result.message ?? (result.ok ? t("model.desktopActionComplete") : t("model.desktopActionFailed"))
+        message: result.i18nKey
+          ? t(result.i18nKey)
+          : (result.message ?? (result.ok ? t("model.desktopActionComplete") : t("model.desktopActionFailed")))
       });
     } catch (error) {
       setDesktopActionNotice({

@@ -168,7 +168,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const body = parseElderCorrectionReviewBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid elder correction review body" };
+      return {
+        error: "Invalid elder correction review body",
+        i18nKey: "elderWs.errInvalidReviewBody"
+      };
     }
 
     const current = await readState();
@@ -180,12 +183,18 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const existingCorrection = current.elderCorrections.find((correction) => correction.id === correctionId);
     if (!existingCorrection) {
       reply.code(404);
-      return { error: `Elder correction not found: ${correctionId}` };
+      return {
+        error: `Elder correction not found: ${correctionId}`,
+        i18nKey: "elderWs.errCorrectionNotFound"
+      };
     }
 
     if (existingCorrection.status !== "pending_review") {
       reply.code(409);
-      return { error: `Elder correction is no longer pending review: ${correctionId}` };
+      return {
+        error: `Elder correction is no longer pending review: ${correctionId}`,
+        i18nKey: "elderWs.errCorrectionNotPending"
+      };
     }
 
     let reviewedCorrection: ElderCorrection | undefined;
@@ -227,7 +236,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const body = parseElderCorrectionApplyBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid elder correction apply body" };
+      return {
+        error: "Invalid elder correction apply body",
+        i18nKey: "elderWs.errInvalidApplyBody"
+      };
     }
 
     const current = await readState();
@@ -239,17 +251,26 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const existingCorrection = current.elderCorrections.find((correction) => correction.id === correctionId);
     if (!existingCorrection) {
       reply.code(404);
-      return { error: `Elder correction not found: ${correctionId}` };
+      return {
+        error: `Elder correction not found: ${correctionId}`,
+        i18nKey: "elderWs.errCorrectionNotFound"
+      };
     }
 
     if (existingCorrection.status !== "accepted") {
       reply.code(409);
-      return { error: `Elder correction must be accepted before apply: ${correctionId}` };
+      return {
+        error: `Elder correction must be accepted before apply: ${correctionId}`,
+        i18nKey: "elderWs.errCorrectionMustBeAccepted"
+      };
     }
 
     if (!existingCorrection.noteId) {
       reply.code(400);
-      return { error: `Elder correction is not linked to a note: ${correctionId}` };
+      return {
+        error: `Elder correction is not linked to a note: ${correctionId}`,
+        i18nKey: "elderWs.errCorrectionNotLinkedToNote"
+      };
     }
 
     const linkedNoteId = existingCorrection.noteId;
@@ -258,7 +279,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     );
     if (!existingNote) {
       reply.code(400);
-      return { error: `Note not found for correction: ${existingCorrection.noteId}` };
+      return {
+        error: `Note not found for correction: ${existingCorrection.noteId}`,
+        i18nKey: "elderWs.errNoteNotFoundForCorrection"
+      };
     }
 
     let appliedCorrection: ElderCorrection | undefined;

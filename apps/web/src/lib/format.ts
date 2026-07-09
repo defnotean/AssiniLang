@@ -476,6 +476,39 @@ function vaultImportErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   return undefined;
 }
 
+/** Maps known elder/export API English errors when response metadata is absent. */
+function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefined {
+  const normalized = error.trim();
+  if (!normalized) return undefined;
+
+  if (/^Language not found:/i.test(normalized)) {
+    return { i18nKey: "errors.languageNotFound" };
+  }
+  if (/^Elder correction not found:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errCorrectionNotFound" };
+  }
+  if (/Elder correction is no longer pending review:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errCorrectionNotPending" };
+  }
+  if (/Elder correction must be accepted before apply:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errCorrectionMustBeAccepted" };
+  }
+  if (/Elder correction is not linked to a note:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errCorrectionNotLinkedToNote" };
+  }
+  if (/^Note not found for correction:/i.test(normalized)) {
+    return { i18nKey: "elderWs.errNoteNotFoundForCorrection" };
+  }
+  if (/Invalid elder correction apply body/i.test(normalized)) {
+    return { i18nKey: "elderWs.errInvalidApplyBody" };
+  }
+  if (/Invalid elder correction review body/i.test(normalized)) {
+    return { i18nKey: "elderWs.errInvalidReviewBody" };
+  }
+
+  return undefined;
+}
+
 /** Localizes Obsidian vault import failures for operator-facing UI. */
 export function localizeVaultImportError(error: unknown, t: Translate, fallback: MessageKey): string {
   if (error instanceof ApiError) {
@@ -515,6 +548,10 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     if (sourceI18n) {
       return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
     }
+    const operatorI18n = operatorApiErrorI18n(error.message);
+    if (operatorI18n) {
+      return t(operatorI18n.i18nKey);
+    }
     return error.message;
   }
 
@@ -522,6 +559,10 @@ export function localizeApiError(error: unknown, t: Translate, fallback: Message
     const sourceI18n = sourceProcessingErrorI18n(error.message);
     if (sourceI18n) {
       return t(sourceI18n.i18nKey as MessageKey, sourceI18n.i18nParams);
+    }
+    const operatorI18n = operatorApiErrorI18n(error.message);
+    if (operatorI18n) {
+      return t(operatorI18n.i18nKey);
     }
     return error.message;
   }

@@ -280,7 +280,7 @@ Stored approvals remain auditable after policy changes, but only reviewers eligi
 
 ## Sanitized exports
 
-Language snapshots (`language-snapshot-v2`) and evaluation artifacts (`evaluation-artifact-v2`) include SHA-256 integrity manifests. Snapshots carry the state-derived linguistic profile: phonology, lexicon vocabulary, derived morpheme inventory, grammar rules, and stats including source-asset and pending-draft counts. Evaluation artifacts include latest runs, run histories by language, trend records with category deltas, gate metadata, and failure lines. Both omit private fields such as answer keys, adversarial probes, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces.
+Language snapshots (`language-snapshot-v2`) and evaluation artifacts (`evaluation-artifact-v2`) include SHA-256 integrity manifests. Snapshots carry the state-derived linguistic profile: phonology, lexicon vocabulary, derived morpheme inventory, grammar rules, and stats including source-asset and pending-draft counts. Evaluation artifacts include latest runs, run histories by language, trend records with category deltas, gate metadata, and failure lines. Both omit private fields such as answer keys, adversarial probes, learner answers, learner submissions, AI sessions, local users, provider prompts, and hidden model traces. `GET /exports/languages/:languageId/snapshot` returns `404` with `{ "error": "Language not found: …", "i18nKey": "errors.languageNotFound" }` when the language id is unknown.
 
 ## Evaluation runs
 
@@ -296,11 +296,11 @@ Corrections can target a note, a corpus passage, or custom context text. Note an
 
 `PATCH /elder/corrections/:correctionId/review`
 
-Only pending corrections can be reviewed. Once a correction is accepted, rejected, or applied, later review attempts return `409` and preserve the existing status and attribution.
+Only pending corrections can be reviewed. Once a correction is accepted, rejected, or applied, later review attempts return `409` with `i18nKey: "elderWs.errCorrectionNotPending"` and preserve the existing status and attribution. Invalid review bodies return `400` with `i18nKey: "elderWs.errInvalidReviewBody"`; unknown correction ids return `404` with `i18nKey: "elderWs.errCorrectionNotFound"`.
 
 `PATCH /elder/corrections/:correctionId/apply`
 
-Only accepted note-linked corrections can be applied. Applying a correction requires a revised note explanation, moves the correction to `applied`, sets the linked note back to `under_review`, appends a note edit-history entry, and writes audit events for both the correction and the note.
+Only accepted note-linked corrections can be applied. Applying a correction requires a revised note explanation, moves the correction to `applied`, sets the linked note back to `under_review`, appends a note edit-history entry, and writes audit events for both the correction and the note. Operator-facing negatives include `i18nKey: "elderWs.errCorrectionMustBeAccepted"` (`409` when still pending), `i18nKey: "elderWs.errCorrectionNotLinkedToNote"` (`400` for passage/custom-context-only corrections), `i18nKey: "elderWs.errInvalidApplyBody"` (`400` for a blank explanation), and `i18nKey: "elderWs.errNoteNotFoundForCorrection"` when the linked note is missing.
 
 The persisted app-state schema enforces the same ledger invariants during local JSON reads: valid language/note/passage references, nonblank correction text and rationale, Elder/lead/admin attribution, chronological timestamps, no review attribution on pending corrections, and a note reference on applied corrections.
 

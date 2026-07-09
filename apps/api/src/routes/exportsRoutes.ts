@@ -15,7 +15,10 @@ export function registerExportRoutes(app: FastifyInstance, ctx: RouteContext): v
     const snapshot = toPublicLanguageSnapshot(state, languageId);
     if (!snapshot) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     return snapshot;

@@ -12,7 +12,7 @@ import {
   resolveReviewDisposition,
   updateReviewPolicy
 } from "../api";
-import { buildEvaluationArtifactDownload, buildSnapshotDownload, parseReviewerIds } from "../lib/format";
+import { buildEvaluationArtifactDownload, buildSnapshotDownload, localizeApiError, parseReviewerIds } from "../lib/format";
 import type { AsyncState, SnapshotDownload, ViewMode } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -318,8 +318,7 @@ export function useGovernanceWorkspace(
       const snapshot = await fetchLanguageSnapshot(selectedLanguageId);
       setSnapshotDownload(buildSnapshotDownload(snapshot, t));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("governance.errSnapshotExportFailed");
-      setSnapshotError(message);
+      setSnapshotError(localizeApiError(error, t, "governance.errSnapshotExportFailed"));
     } finally {
       setIsExportingSnapshot(false);
     }
@@ -334,8 +333,7 @@ export function useGovernanceWorkspace(
       const artifact = await fetchEvaluationArtifact();
       setEvaluationArtifactDownload(buildEvaluationArtifactDownload(artifact, t));
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("eval.exportFailed");
-      setEvaluationArtifactError(message);
+      setEvaluationArtifactError(localizeApiError(error, t, "eval.exportFailed"));
     } finally {
       setIsExportingEvaluationArtifact(false);
     }

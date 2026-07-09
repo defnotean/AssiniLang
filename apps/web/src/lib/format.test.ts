@@ -306,6 +306,58 @@ describe("localizeApiError", () => {
     expect(message).toBe("No languages available to evaluate");
   });
 
+  it("localizes unknown language snapshot exports from i18n metadata", () => {
+    const message = localizeApiError(
+      new ApiError("Language not found: not-a-language", {
+        status: 404,
+        i18nKey: "errors.languageNotFound"
+      }),
+      t,
+      "governance.errSnapshotExportFailed"
+    );
+
+    expect(message).toBe(
+      "That language was not found. Select another language or create one first."
+    );
+  });
+
+  it("localizes elder apply negatives from i18n metadata", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Elder correction must be accepted before apply: corr-1", {
+          status: 409,
+          i18nKey: "elderWs.errCorrectionMustBeAccepted"
+        }),
+        t,
+        "elderWs.errApplyFailed"
+      )
+    ).toBe("Accept the elder correction before applying it to a note.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Elder correction is not linked to a note: corr-2", {
+          status: 400,
+          i18nKey: "elderWs.errCorrectionNotLinkedToNote"
+        }),
+        t,
+        "elderWs.errApplyFailed"
+      )
+    ).toBe("Only note-linked elder corrections can be applied.");
+  });
+
+  it("localizes elder review negatives from message text when metadata is absent", () => {
+    const message = localizeApiError(
+      new ApiError(
+        "Request failed: /elder/corrections/corr-1/review (409): Elder correction is no longer pending review: corr-1",
+        { status: 409 }
+      ),
+      t,
+      "elderWs.errReviewFailed"
+    );
+
+    expect(message).toBe("That elder correction is no longer pending review.");
+  });
+
   it("localizes already-processing conflicts from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /sources/src-1/process (409): Source is already processing: src-1", {
