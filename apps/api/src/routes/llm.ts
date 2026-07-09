@@ -7,6 +7,7 @@ import {
   runtimeSettingsPatchSchema,
   RuntimeModelProfileNotFoundError,
   RuntimeModelProfilesCorruptError,
+  RuntimeSettingsUrlValidationError,
   runtimeSettingsResponse,
   saveRuntimeModelProfile
 } from "../appSettings.js";
@@ -107,11 +108,19 @@ export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void
       return { error: "Invalid runtime settings body" };
     }
 
-    return applyRuntimeSettingsPatch({
-      settingsPath,
-      patch,
-      reloadLlmProvider
-    });
+    try {
+      return await applyRuntimeSettingsPatch({
+        settingsPath,
+        patch,
+        reloadLlmProvider
+      });
+    } catch (error) {
+      if (error instanceof RuntimeSettingsUrlValidationError) {
+        reply.code(400);
+        return { error: error.message };
+      }
+      throw error;
+    }
   });
 
   app.post("/llm/model-profiles", async (request, reply) => {

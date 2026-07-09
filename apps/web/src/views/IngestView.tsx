@@ -223,6 +223,11 @@ export function IngestView({
                   <div className="pill-row">
                     <span className="pill">{source.kind}</span>
                     <StatusBadge status={source.status} />
+                    {(source.status === "processing" || source.status === "failed") &&
+                      source.processingAttempts !== undefined &&
+                      source.processingAttempts > 0 && (
+                      <span className="pill muted">{t("ingest.processingAttempts", { count: source.processingAttempts })}</span>
+                    )}
                     {source.kind === "audio" && (
                       <span className="pill">{source.transcript ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}</span>
                     )}

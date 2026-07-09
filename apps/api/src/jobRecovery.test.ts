@@ -54,6 +54,25 @@ describe("recoverInterruptedSourcesState", () => {
     expect(event?.metadata).toEqual({ sourceId: "source-interrupted", previousStatus: "processing" });
   });
 
+  it("includes processing metadata in recovery audit events when present", () => {
+    const state = buildTestWorkspaceState();
+    state.sourceAssets.push(buildSource({
+      id: "source-interrupted",
+      processingStartedAt: "2026-06-06T00:00:30.000Z",
+      processingAttempts: 2
+    }));
+
+    const recovered = recoverInterruptedSourcesState(state);
+
+    const event = recovered.auditEvents.find((item) => item.action === PROCESSING_RECOVERED_ACTION);
+    expect(event?.metadata).toEqual({
+      sourceId: "source-interrupted",
+      previousStatus: "processing",
+      processingAttempts: 2,
+      processingStartedAt: "2026-06-06T00:00:30.000Z"
+    });
+  });
+
   it("appends one audit event per interrupted source", () => {
     const state = buildTestWorkspaceState();
     state.sourceAssets.push(

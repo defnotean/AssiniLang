@@ -41,7 +41,12 @@ export function recoverInterruptedSourcesState(state: AppState, recoveredAt = ne
     entityId: asset.id,
     languageId: asset.languageId,
     summary: `Recovered source "${asset.title}" from an interrupted processing run; marked failed for re-processing.`,
-    metadata: { sourceId: asset.id, previousStatus: "processing" }
+    metadata: {
+      sourceId: asset.id,
+      previousStatus: "processing",
+      ...(asset.processingAttempts !== undefined ? { processingAttempts: asset.processingAttempts } : {}),
+      ...(asset.processingStartedAt !== undefined ? { processingStartedAt: asset.processingStartedAt } : {})
+    }
   }));
 
   return appendAuditEvents({

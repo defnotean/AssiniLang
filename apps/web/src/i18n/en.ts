@@ -423,6 +423,7 @@ export const en = {
   "ingest.addedByAt": "Added by {createdBy} at {createdAt}",
   "ingest.processingWarningsAria": "Processing warnings for {title}",
   "ingest.processing": "Processing...",
+  "ingest.processingAttempts": "Attempt {count}",
   "ingest.processSource": "Process {title}",
   "ingest.extractionDraftQueueAria": "Extraction draft queue",
   "ingest.extractionDrafts": "Extraction drafts",

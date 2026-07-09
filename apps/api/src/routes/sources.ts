@@ -530,7 +530,15 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         return state;
       }
 
-      claimed = { ...stored, status: "processing", error: undefined };
+      const processingStartedAt = new Date().toISOString();
+      const processingAttempts = (stored.processingAttempts ?? 0) + 1;
+      claimed = {
+        ...stored,
+        status: "processing",
+        error: undefined,
+        processingStartedAt,
+        processingAttempts
+      };
       return appendAuditEvent({
         ...state,
         sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? claimed as SourceAsset : item))
@@ -543,7 +551,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         summary: asyncRequested
           ? `Started background processing for source "${stored.title}".`
           : `Started processing for source "${stored.title}".`,
-        metadata: { kind: stored.kind, async: asyncRequested }
+        metadata: { kind: stored.kind, async: asyncRequested, processingAttempts, processingStartedAt }
       });
     });
 

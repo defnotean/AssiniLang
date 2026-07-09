@@ -11,6 +11,7 @@ import {
   ocrImageFile,
   ocrImageWithModel,
   ocrModelConfigured,
+  ocrScannedPdfFirstPage,
   parseExtractionResponse,
   splitTextIntoChunks,
   transcribeAudioFile
@@ -18,6 +19,15 @@ import {
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 
 const pdfStub = vi.hoisted(() => ({ text: "mira = river" }));
+const pdfOcrStub = vi.hoisted(() => ({
+  images: [] as Array<{
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+    channels: 1 | 3 | 4;
+    key: string;
+  }>
+}));
 const docxStub = vi.hoisted(() => ({ value: "saku = child" }));
 const ocrStub = vi.hoisted(() => ({
   text: "mira = river",
@@ -39,7 +49,8 @@ const ocrStub = vi.hoisted(() => ({
 }));
 
 vi.mock("unpdf", () => ({
-  extractText: vi.fn(async () => ({ totalPages: 1, text: pdfStub.text }))
+  extractText: vi.fn(async () => ({ totalPages: 1, text: pdfStub.text })),
+  extractImages: vi.fn(async () => pdfOcrStub.images)
 }));
 
 vi.mock("tesseract.js", () => ({
@@ -729,7 +740,7 @@ describe("extractCandidatesForAsset document support", () => {
     expect(result.candidates[0]?.payload.form).toBe("saku");
   });
 
-  it("explains when a PDF has no extractable text", async () => {
+  it("explains when a PDF has no extractable text and OCR is not configured", async () => {
     pdfStub.text = "   ";
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
@@ -738,7 +749,69 @@ describe("extractCandidatesForAsset document support", () => {
       language,
       provider: providerWithoutChat,
       dataDir
-    })).rejects.toThrow(/no extractable text/);
+    })).rejects.toThrow(/no extractable text.*ASSINI_OCR_BASE_URL/s);
+  });
+
+  it("reads scanned PDFs via OCR model when the text layer is empty", async () => {
+    pdfStub.text = "   ";
+    const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
+
+    const fetchStub = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "mira = river" } }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    pdfOcrStub.images = [{
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key: "page-image"
+    }];
+
+    const result = await extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(result.candidates).toHaveLength(1);
+    expect(result.candidates[0]?.payload.form).toBe("mira");
+    expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read scanned document (page 1)."))).toBe(true);
+  });
+
+  it("surfaces OCR failures for scanned PDFs when the model cannot read page 1", async () => {
+    pdfStub.text = "   ";
+    pdfOcrStub.images = [{
+      data: new Uint8ClampedArray([255, 0, 0, 255]),
+      width: 1,
+      height: 1,
+      channels: 4,
+      key: "page-image"
+    }];
+    const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
+
+    const fetchStub = (async () => new Response("down", { status: 503 })) as typeof fetch;
+
+    await expect(extractCandidatesForAsset({
+      asset,
+      language,
+      provider: providerWithoutChat,
+      dataDir,
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    })).rejects.toThrow(/Configured OCR model could not read the scanned PDF:.*status 503/);
   });
 
   it("explains when a DOCX has no extractable text", async () => {
@@ -751,6 +824,57 @@ describe("extractCandidatesForAsset document support", () => {
       provider: providerWithoutChat,
       dataDir
     })).rejects.toThrow(/no extractable text/);
+  });
+});
+
+describe("ocrScannedPdfFirstPage", () => {
+  it("OCRs the largest embedded image from page 1", async () => {
+    pdfOcrStub.images = [
+      {
+        data: new Uint8ClampedArray([0, 0, 0, 255]),
+        width: 1,
+        height: 1,
+        channels: 4,
+        key: "small"
+      },
+      {
+        data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255]),
+        width: 2,
+        height: 2,
+        channels: 4,
+        key: "large"
+      }
+    ];
+
+    const fetchStub = (async () => new Response(JSON.stringify({
+      choices: [{ message: { content: "mira = river" } }]
+    }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    })) as typeof fetch;
+
+    const text = await ocrScannedPdfFirstPage({
+      pdfBytes: new Uint8Array([1, 2, 3, 4]),
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      },
+      fetchFn: fetchStub
+    });
+
+    expect(text).toBe("mira = river");
+  });
+
+  it("fails clearly when page 1 has no embedded image to OCR", async () => {
+    pdfOcrStub.images = [];
+
+    await expect(ocrScannedPdfFirstPage({
+      pdfBytes: new Uint8Array([1, 2, 3, 4]),
+      env: {
+        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+        ASSINI_ALLOW_PRIVATE_URLS: "1"
+      }
+    })).rejects.toThrow(/no embedded page image to OCR/);
   });
 });
 

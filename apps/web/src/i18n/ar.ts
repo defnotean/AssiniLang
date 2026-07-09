@@ -400,6 +400,7 @@ export const ar: Record<MessageKey, string> = {
   "ingest.addedByAt": "أضافه {createdBy} في {createdAt}",
   "ingest.processingWarningsAria": "تحذيرات معالجة {title}",
   "ingest.processing": "جارٍ المعالجة...",
+  "ingest.processingAttempts": "المحاولة {count}",
   "ingest.processSource": "معالجة {title}",
   "ingest.extractionDraftQueueAria": "قائمة مسودات الاستخلاص",
   "ingest.extractionDrafts": "مسودات الاستخلاص",

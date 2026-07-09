@@ -3032,6 +3032,70 @@ describe("JsonStore", () => {
     }
   });
 
+  it("round-trips source asset processing metadata through the store", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.sourceAssets = [{
+        id: "source-asset-processing",
+        languageId: "avenik",
+        kind: "text",
+        title: "Retried source",
+        rawText: "mira talo",
+        status: "failed",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingAttempts: 2,
+        error: "Processing interrupted by a server restart. Re-run processing.",
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z",
+        processedAt: "2026-06-06T00:01:00.000Z"
+      }];
+
+      await store.write(state);
+      const loaded = await store.read();
+
+      expect(loaded.sourceAssets[0]).toMatchObject({
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingAttempts: 2
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("parses a source asset without processing metadata for back-compat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-store-"));
+    const dbPath = join(dir, "local-db.json");
+
+    try {
+      const store = new JsonStore(dbPath);
+      const state = createEmptyState();
+      state.languages = [createTestLanguage()];
+      state.sourceAssets = [{
+        id: "source-asset-legacy",
+        languageId: "avenik",
+        kind: "text",
+        title: "Legacy source",
+        rawText: "mira talo",
+        status: "pending",
+        createdBy: "programmer-1",
+        createdAt: "2026-06-06T00:00:00.000Z"
+      }];
+
+      await store.write(state);
+      const loaded = await store.read();
+
+      expect(loaded.sourceAssets[0]?.processingStartedAt).toBeUndefined();
+      expect(loaded.sourceAssets[0]?.processingAttempts).toBeUndefined();
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("round-trips state in SQLite mode when the path does not end in .json", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-store-sqlite-"));
     const dbPath = join(dir, "local-db.sqlite");

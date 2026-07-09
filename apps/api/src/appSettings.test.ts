@@ -9,6 +9,7 @@ import {
   normalizeProfileId,
   readRuntimeSettingsFromEnv,
   RuntimeModelProfilesCorruptError,
+  RuntimeSettingsUrlValidationError,
   saveRuntimeModelProfile,
   updateEnvFileText
 } from "./appSettings.js";
@@ -115,7 +116,8 @@ describe("runtime app settings", () => {
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\nOPENAI_API_KEY=legacy-key\n", "utf8");
     const env: Record<string, string | undefined> = {
       ASSINI_LLM_PROVIDER: "deterministic",
-      OPENAI_API_KEY: "legacy-key"
+      OPENAI_API_KEY: "legacy-key",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
     };
     let reloadCount = 0;
 
@@ -150,7 +152,10 @@ describe("runtime app settings", () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
     const settingsPath = join(dir, ".env");
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
-    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_PROVIDER: "deterministic",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
+    };
 
     await Promise.all([
       applyRuntimeSettingsPatch({
@@ -172,11 +177,120 @@ describe("runtime app settings", () => {
     expect(env.ASSINI_LLM_BASE_URL).toBe("http://127.0.0.1:8080/v1");
   });
 
-  it("saves, activates, and deletes redacted runtime model profiles", async () => {
+  it("rejects private runtime URLs when ASSINI_ALLOW_PRIVATE_URLS is unset", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
     const settingsPath = join(dir, ".env");
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
     const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+
+    await expect(applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: { baseUrl: "http://127.0.0.1:11434/v1" },
+      env
+    })).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
+
+    await expect(applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: { transcriptionBaseUrl: "http://127.0.0.1:9000/v1" },
+      env
+    })).rejects.toMatchObject({
+      message: expect.stringMatching(/Invalid transcription base URL:/)
+    });
+
+    await expect(applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: { ocrBaseUrl: "http://127.0.0.1:8080/v1" },
+      env
+    })).rejects.toMatchObject({
+      message: expect.stringMatching(/Invalid OCR base URL:/)
+    });
+
+    const persisted = await readFile(settingsPath, "utf8");
+    expect(persisted).not.toContain("ASSINI_LLM_BASE_URL=");
+    expect(persisted).not.toContain("ASSINI_TRANSCRIBE_BASE_URL=");
+    expect(persisted).not.toContain("ASSINI_OCR_BASE_URL=");
+    expect(env.ASSINI_LLM_BASE_URL).toBeUndefined();
+    expect(env.ASSINI_TRANSCRIBE_BASE_URL).toBeUndefined();
+    expect(env.ASSINI_OCR_BASE_URL).toBeUndefined();
+  });
+
+  it("accepts private runtime URLs when ASSINI_ALLOW_PRIVATE_URLS=1", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_PROVIDER: "deterministic",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
+    };
+
+    const response = await applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        transcriptionBaseUrl: "http://127.0.0.1:9000/v1",
+        ocrBaseUrl: "http://127.0.0.1:8080/v1"
+      },
+      env
+    });
+
+    const persisted = await readFile(settingsPath, "utf8");
+    expect(persisted).toContain("ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1");
+    expect(persisted).toContain("ASSINI_TRANSCRIBE_BASE_URL=http://127.0.0.1:9000/v1");
+    expect(persisted).toContain("ASSINI_OCR_BASE_URL=http://127.0.0.1:8080/v1");
+    expect(response.settings).toMatchObject({
+      baseUrl: "http://127.0.0.1:11434/v1",
+      transcriptionBaseUrl: "http://127.0.0.1:9000/v1",
+      ocrBaseUrl: "http://127.0.0.1:8080/v1"
+    });
+  });
+
+  it("allows empty runtime URLs to clear settings without validation", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(
+      settingsPath,
+      [
+        "ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1",
+        "ASSINI_TRANSCRIBE_BASE_URL=http://127.0.0.1:9000/v1",
+        "ASSINI_OCR_BASE_URL=http://127.0.0.1:8080/v1"
+      ].join("\n"),
+      "utf8"
+    );
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+      ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+      ASSINI_OCR_BASE_URL: "http://127.0.0.1:8080/v1"
+    };
+
+    const response = await applyRuntimeSettingsPatch({
+      settingsPath,
+      patch: {
+        baseUrl: "",
+        transcriptionBaseUrl: "",
+        ocrBaseUrl: ""
+      },
+      env
+    });
+
+    const persisted = await readFile(settingsPath, "utf8");
+    expect(persisted).toMatch(/ASSINI_LLM_BASE_URL=\s*(?:\n|$)/);
+    expect(persisted).toMatch(/ASSINI_TRANSCRIBE_BASE_URL=\s*(?:\n|$)/);
+    expect(persisted).toMatch(/ASSINI_OCR_BASE_URL=\s*(?:\n|$)/);
+    expect(response.settings).toMatchObject({
+      baseUrl: "",
+      transcriptionBaseUrl: "",
+      ocrBaseUrl: ""
+    });
+  });
+
+  it("saves, activates, and deletes redacted runtime model profiles", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+    const settingsPath = join(dir, ".env");
+    await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_PROVIDER: "deterministic",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
+    };
     let reloadCount = 0;
 
     const saved = await saveRuntimeModelProfile({
@@ -287,7 +401,10 @@ describe("runtime app settings", () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
     const settingsPath = join(dir, ".env");
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
-    const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
+    const env: Record<string, string | undefined> = {
+      ASSINI_LLM_PROVIDER: "deterministic",
+      ASSINI_ALLOW_PRIVATE_URLS: "1"
+    };
     let reloadCount = 0;
 
     await saveRuntimeModelProfile({

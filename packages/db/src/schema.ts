@@ -116,7 +116,9 @@ export const sourceAssetSchema = z.object({
   warnings: z.array(z.string()).optional(),
   createdBy: z.string().min(1),
   createdAt: z.string().min(1),
-  processedAt: z.string().min(1).optional()
+  processedAt: z.string().min(1).optional(),
+  processingStartedAt: z.string().min(1).optional(),
+  processingAttempts: z.number().int().nonnegative().optional()
 });
 
 export const extractionDraftKindSchema = z.enum(["lexeme", "corpus_passage", "grammar_note"]);

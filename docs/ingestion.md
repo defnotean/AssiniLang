@@ -11,7 +11,7 @@ This document explains how a raw source becomes reviewable extraction drafts. Th
 | `url` | Same route with a `url` | Public http(s) pages, capped at 2 MB | Server-side fetch, HTML converted to plain text, SSRF guard applied | Offline heuristic parsing of the fetched text |
 | `image` | `POST /languages/:languageId/sources/upload` (image MIME/extension) | Photos or scans of printed/handwritten material | OCR model (`ASSINI_OCR_BASE_URL`) when configured; else vision-capable main LLM; else local tesseract.js | OCR/tesseract text then offline heuristic parsing |
 | `audio` | Upload (audio MIME/extension) | Recordings | Transcribed via the `ASSINI_TRANSCRIBE_BASE_URL` endpoint; the transcript is stored on the asset and reused on reprocess | None - transcription endpoint is required |
-| `document` | Upload (everything else) | `txt`, `md`, `markdown`, `csv`, `tsv`, `json`, `text`, plus PDF (`unpdf`) and DOCX (`mammoth`) | File parsed to plain text | Offline heuristic parsing of the parsed text |
+| `document` | Upload (everything else) | `txt`, `md`, `markdown`, `csv`, `tsv`, `json`, `text`, plus PDF (`unpdf`) and DOCX (`mammoth`) | File parsed to plain text; scanned PDFs with no text layer use OCR model on page 1 when `ASSINI_OCR_BASE_URL` is set | Offline heuristic parsing of the parsed text |
 
 Uploads are multipart, one file, 25 MB cap, stored under `data/assets/<languageId>/`. The upload route detects the kind from MIME type and extension.
 
@@ -25,6 +25,10 @@ flowchart TD
     B -->|url| C[Fetch with SSRF guard<br>HTML to text]
     B -->|audio| D[Transcribe via<br>ASSINI_TRANSCRIBE_BASE_URL]
     B -->|document| E[Parse PDF / DOCX /<br>plain-text formats]
+    E --> E2{PDF text layer<br>empty?}
+    E2 -->|yes + OCR configured| E3[OCR model reads page 1<br>embedded image]
+    E2 -->|no or has text| J[Normalized text]
+    E3 --> J
     B -->|text / wordlist| F[Raw text]
     B -->|image| G{OCR model<br>configured?}
     G -->|yes| H[OCR model reads image<br>ASSINI_OCR_BASE_URL]
@@ -33,7 +37,6 @@ flowchart TD
     G2 -->|no| I[Local OCR<br>tesseract.js]
     C --> J[Normalized text]
     D --> J
-    E --> J
     F --> J
     I --> J
     H --> J
@@ -99,7 +102,18 @@ Image sources resolve text in priority order:
 - The first run for a given language downloads its trained data from the tesseract.js CDN (a few MB, internet required once) and caches it under `data/ocr-cache/`; later runs are offline.
 - OCR output feeds the same downstream extraction as pasted text, and the result carries the warning `No vision model configured; used local OCR (tesseract.js) to read the image.`
 
-OCR applies only to `image` sources. Scanned PDFs with no text layer fail with an explicit error; convert pages to images or run external OCR first.
+OCR applies to `image` sources and to scanned PDF `document` sources when the text layer is empty and `ASSINI_OCR_BASE_URL` is configured. For scanned PDFs, only page 1 is processed: `unpdf` extracts the largest embedded page image (typical for image-only scans), encodes it as PNG, and sends it to the OCR model. DOCX files with no text layer still fail closed.
+
+## Scanned PDF OCR (documents)
+
+When a PDF upload has no extractable text layer:
+
+1. If `ASSINI_OCR_BASE_URL` is set, page 1 is OCR'd via the same vision model path as images (`ocrScannedPdfFirstPage` in `apps/api/src/ingestion.ts`).
+2. The largest embedded image on page 1 is extracted with `unpdf` `extractImages`, written to a temporary PNG, and passed to `ocrImageWithModel`.
+3. OCR output continues through the normal text extraction pipeline and adds the warning `Used configured OCR model to read scanned document (page 1).`
+4. If the OCR model is not configured, processing fails with guidance to set `ASSINI_OCR_BASE_URL`.
+
+Limitations: only page 1 is read; PDFs that rasterize pages without embedded images cannot be OCR'd in-process (export page 1 as an image and upload it instead). DOCX OCR is not implemented yet.
 
 ## Transcription (audio)
 
@@ -149,7 +163,8 @@ Errors from processing mark the source `failed` with a sanitized message and ret
 | `Local OCR could not read the image: ...` | 422 | Tesseract fallback failed (often `OCR found no readable text in the image.`) | Provide a clearer image, set `ASSINI_OCR_LANG` to match the script, or configure `ASSINI_OCR_BASE_URL` / a vision-capable main LLM. |
 | `The configured model returned no usable result for this image. It may not be vision-capable. Configure a vision model (for example llava via Ollama) in ASSINI_LLM_MODEL, or configure ASSINI_OCR_BASE_URL, or rely on the local OCR fallback by leaving both unset.` | 422 | An image source was sent to a configured but non-vision main LLM with no OCR model | Configure `ASSINI_OCR_BASE_URL` with a vision model, set a vision-capable `ASSINI_LLM_MODEL`, or leave both unset so the image falls back to local tesseract. |
 | `The model response could not be parsed as extraction JSON. Try again or use a larger model.` | 422 | A vision model replied with non-JSON output | Retry, or use a model that follows JSON instructions. |
-| `The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Scanned/image-only PDF | Convert pages to images and upload those, or OCR externally. |
+| `Configured OCR model could not read the scanned PDF: ...` | 422 | Scanned PDF OCR model call failed or page 1 had no embedded image | Check `ASSINI_OCR_BASE_URL` / `ASSINI_OCR_MODEL`, confirm the vision model is loaded, or export page 1 as an image and upload it. |
+| `The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only).` | 422 | Scanned/image-only PDF and no OCR model configured | Set `ASSINI_OCR_BASE_URL` (for example a local llava server) or export pages as images and upload those. |
 | `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | 422 | Empty DOCX text layer | Same as above. |
 | `Document type .X is not supported yet. Upload a PDF, DOCX, plain-text, Markdown, or CSV file, or convert it first.` | 422 | Unsupported document extension | Convert to a supported format. |
 | `Text source asset has no content.` / `... has no stored file.` / `URL source asset has no URL.` | 422 | The asset record is incomplete (usually hand-edited state) | Re-register or re-upload the source. |
@@ -165,6 +180,7 @@ Warnings (extraction still succeeds, result is flagged). Processing warnings are
 | `Source text is very long; only the first 8 parts were processed and N characters were skipped.` | The source exceeded the chunk cap. |
 | `No vision model configured; used local OCR (tesseract.js) to read the image.` | The tesseract fallback path ran for an image source (no OCR model or vision LLM succeeded). |
 | `Used configured OCR model to read the image.` | The `ASSINI_OCR_BASE_URL` endpoint read the image successfully. |
+| `Used configured OCR model to read scanned document (page 1).` | A scanned PDF with no text layer was OCR'd via page 1's embedded image. |
 
 ## After extraction
 

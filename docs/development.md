@@ -45,6 +45,10 @@ npm.cmd run smoke
 
 `npm.cmd run smoke` exercises the ingestion workflow end to end against an in-memory server.
 
+### Obsidian vault fixture
+
+The committed pack at `fixtures/obsidian-vault/` is a tiny synthetic Velmari vault (lexicon, grammar note, empty skippable note, and a stub `.obsidian/` folder). Set `ASSINI_OBSIDIAN_VAULT_ROOTS` to the repo `fixtures/` directory, import `fixtures/obsidian-vault` in Build, and expect two language notes plus the README to register as pending text sources while `Language Notes/empty.md` is skipped. `apps/api/src/obsidianVaultFixture.test.ts` locks in those counts.
+
 ## Start the app
 
 ```powershell

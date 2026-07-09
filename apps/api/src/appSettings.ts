@@ -13,6 +13,7 @@ import {
   type RuntimeSettingsResponse
 } from "@assini/api-contract";
 import { describeLlmProviderFromEnv } from "./llmProvider.js";
+import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
 import {
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_TIMEOUT_MS,
@@ -70,6 +71,64 @@ export class RuntimeModelProfilesCorruptError extends Error {
   constructor() {
     super("Stored model profiles JSON is corrupt and must be repaired before profiles can be changed.");
     this.name = "RuntimeModelProfilesCorruptError";
+  }
+}
+
+export class RuntimeSettingsUrlValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeSettingsUrlValidationError";
+  }
+}
+
+type RuntimeSettingsUrlFieldLabel = "LLM base URL" | "transcription base URL" | "OCR base URL";
+
+function effectiveEnvForPatchValidation(patch: RuntimeSettingsPatch, env: Env): Env {
+  if (patch.allowPrivateUrls === undefined) return env;
+  return {
+    ...env,
+    ASSINI_ALLOW_PRIVATE_URLS: patch.allowPrivateUrls ? "1" : ""
+  };
+}
+
+async function assertRuntimeSettingsUrlFieldAllowed(
+  label: RuntimeSettingsUrlFieldLabel,
+  url: string,
+  env: Env
+): Promise<void> {
+  try {
+    await assertOutboundHttpUrlAllowed(url, { env });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new RuntimeSettingsUrlValidationError(`Invalid ${label}: ${message}`);
+  }
+}
+
+export async function assertRuntimeSettingsPatchUrlsAllowed(
+  patch: RuntimeSettingsPatch,
+  env: Env = process.env
+): Promise<void> {
+  const validationEnv = effectiveEnvForPatchValidation(patch, env);
+
+  if (patch.baseUrl !== undefined) {
+    const baseUrl = trimValue(patch.baseUrl);
+    if (baseUrl) {
+      await assertRuntimeSettingsUrlFieldAllowed("LLM base URL", baseUrl, validationEnv);
+    }
+  }
+
+  if (patch.transcriptionBaseUrl !== undefined) {
+    const transcriptionBaseUrl = trimValue(patch.transcriptionBaseUrl);
+    if (transcriptionBaseUrl) {
+      await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
+    }
+  }
+
+  if (patch.ocrBaseUrl !== undefined) {
+    const ocrBaseUrl = trimValue(patch.ocrBaseUrl);
+    if (ocrBaseUrl) {
+      await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
+    }
   }
 }
 
@@ -412,6 +471,7 @@ async function applyRuntimeSettingsPatchUnlocked(
   }
 ): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
+  await assertRuntimeSettingsPatchUrlsAllowed(params.patch, env);
   const updates = envUpdatesFromPatch(params.patch);
   const existingText = await readOptionalText(params.settingsPath);
   await writeFile(params.settingsPath, updateEnvFileText(existingText, updates), "utf8");

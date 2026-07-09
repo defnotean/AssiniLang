@@ -1,5 +1,7 @@
-import { mkdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { deflateSync } from "node:zlib";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 import { resolveSourceAssetFilePath, type ExtractionDraftKind, type ExtractionDraftPayload, type Language, type SourceAsset } from "@assini/db";
 import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
@@ -220,6 +222,128 @@ export async function transcribeAudioFile(
 
 export function ocrModelConfigured(env: Env = process.env): boolean {
   return Boolean(normalizeHttpBaseUrl(env.ASSINI_OCR_BASE_URL));
+}
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+
+function pngCrc32(buffer: Buffer): number {
+  let crc = 0xffffffff;
+  for (let index = 0; index < buffer.length; index += 1) {
+    crc ^= buffer[index]!;
+    for (let bit = 0; bit < 8; bit += 1) {
+      const mask = -(crc & 1);
+      crc = (crc >>> 1) ^ (0xedb88320 & mask);
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBuffer = Buffer.from(type, "ascii");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(data.length);
+  const checksum = Buffer.alloc(4);
+  checksum.writeUInt32BE(pngCrc32(Buffer.concat([typeBuffer, data])));
+  return Buffer.concat([length, typeBuffer, data, checksum]);
+}
+
+function encodeRawImageAsPng(
+  width: number,
+  height: number,
+  channels: 1 | 3 | 4,
+  pixels: Uint8ClampedArray
+): Buffer {
+  const colorType = channels === 1 ? 0 : channels === 3 ? 2 : 6;
+  const rowBytes = width * channels;
+  const raw = Buffer.alloc((rowBytes + 1) * height);
+  for (let row = 0; row < height; row += 1) {
+    const rowStart = row * (rowBytes + 1);
+    raw[rowStart] = 0;
+    for (let column = 0; column < rowBytes; column += 1) {
+      raw[rowStart + 1 + column] = pixels[row * rowBytes + column]!;
+    }
+  }
+
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header[8] = 8;
+  header[9] = colorType;
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk("IHDR", header),
+    pngChunk("IDAT", deflateSync(raw)),
+    pngChunk("IEND", Buffer.alloc(0))
+  ]);
+}
+
+type ExtractedPdfImage = {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+  channels: 1 | 3 | 4;
+  key: string;
+};
+
+function largestPdfPageImage(images: ExtractedPdfImage[]): ExtractedPdfImage | undefined {
+  let best: ExtractedPdfImage | undefined;
+  let bestArea = 0;
+  for (const image of images) {
+    const area = image.width * image.height;
+    if (area > bestArea) {
+      best = image;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
+/**
+ * Reads page 1 of a scanned PDF by extracting the largest embedded page image
+ * (typical for image-only PDFs) and sending it to the configured OCR model.
+ * Only page 1 is processed; multi-page scans are not merged.
+ */
+export async function ocrScannedPdfFirstPage(
+  params: {
+    pdfBytes: Uint8Array;
+    env?: Env;
+    fetchFn?: FetchFn;
+    tempDir?: string;
+  }
+): Promise<string> {
+  const { extractImages } = await import("unpdf");
+  const images = await extractImages(params.pdfBytes, 1);
+  const pageImage = largestPdfPageImage(images);
+  if (!pageImage) {
+    throw new Error(
+      "The PDF has no embedded page image to OCR. Export page 1 as an image and upload it, or OCR the document externally."
+    );
+  }
+
+  const pngBytes = encodeRawImageAsPng(
+    pageImage.width,
+    pageImage.height,
+    pageImage.channels,
+    pageImage.data
+  );
+  const workDir = params.tempDir ?? await mkdtemp(join(tmpdir(), "assini-pdf-ocr-"));
+  const imagePath = join(workDir, "page-1.png");
+  const shouldCleanup = params.tempDir === undefined;
+
+  try {
+    await writeFile(imagePath, pngBytes);
+    return await ocrImageWithModel({
+      filePath: imagePath,
+      mimeType: "image/png",
+      env: params.env,
+      fetchFn: params.fetchFn
+    });
+  } finally {
+    if (shouldCleanup) {
+      await rm(workDir, { recursive: true, force: true });
+    }
+  }
 }
 
 function parseOcrModelContent(content: unknown): string | undefined {
@@ -647,9 +771,27 @@ async function resolveAssetText(
     if (extension === "pdf") {
       const { extractText } = await import("unpdf");
       const data = await readFile(absolutePath);
-      const { text } = await extractText(new Uint8Array(data), { mergePages: true });
+      const pdfBytes = new Uint8Array(data);
+      const { text } = await extractText(pdfBytes, { mergePages: true });
       if (text.trim().length === 0) {
-        throw new Error("The PDF contains no extractable text — it may be a scanned image; OCR is not supported yet.");
+        if (!ocrModelConfigured(env)) {
+          throw new Error(
+            "The PDF contains no extractable text — it may be a scanned image. Configure ASSINI_OCR_BASE_URL with a vision-capable OCR model to read scanned PDFs (page 1 only)."
+          );
+        }
+        let ocrText: string;
+        try {
+          ocrText = await ocrScannedPdfFirstPage({
+            pdfBytes,
+            env,
+            fetchFn
+          });
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : String(error);
+          throw new Error(`Configured OCR model could not read the scanned PDF: ${reason}`);
+        }
+        warnings.push("Used configured OCR model to read scanned document (page 1).");
+        return { text: ocrText, warnings };
       }
       return { text, warnings };
     }

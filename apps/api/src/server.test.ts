@@ -450,6 +450,34 @@ describe("api server", () => {
       }
     });
 
+    it("rejects private runtime URLs with HTTP 400 when allow-private is off", async () => {
+      const previousAllowPrivate = process.env.ASSINI_ALLOW_PRIVATE_URLS;
+      delete process.env.ASSINI_ALLOW_PRIVATE_URLS;
+
+      const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
+      const settingsPath = join(dir, ".env");
+      await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
+      const app = createServer({
+        initialState: buildTestWorkspaceState(),
+        settingsPath
+      });
+
+      try {
+        const rejected = await app.inject({
+          method: "PUT",
+          url: "/llm/settings",
+          headers: authHeaders("programmer-1"),
+          payload: { ocrBaseUrl: "http://127.0.0.1:8080/v1" }
+        });
+
+        expect(rejected.statusCode).toBe(400);
+        expect(rejected.json().error).toMatch(/Invalid OCR base URL:/);
+        expect(await readFile(settingsPath, "utf8")).not.toContain("ASSINI_OCR_BASE_URL=");
+      } finally {
+        restoreEnv("ASSINI_ALLOW_PRIVATE_URLS", previousAllowPrivate);
+      }
+    });
+
     it("restricts settings updates to programmer, admin, and lead actors", async () => {
       const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
       const app = createServer({
@@ -3976,6 +4004,37 @@ describe("api server", () => {
       expect(Array.isArray(processed.json().warnings)).toBe(true);
     });
 
+    it("increments processingAttempts and sets processingStartedAt when a source is claimed", async () => {
+      const app = createServer({ initialState: buildTestWorkspaceState() });
+      const sourceId = await registerWordlistSource(app, "Attempt-tracked word list");
+
+      const first = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(first.statusCode).toBe(200);
+      expect(first.json().asset).toMatchObject({
+        id: sourceId,
+        status: "processed",
+        processingAttempts: 1
+      });
+      expect(typeof first.json().asset.processingStartedAt).toBe("string");
+
+      const second = await app.inject({
+        method: "POST",
+        url: `/sources/${sourceId}/process`,
+        headers: authHeaders("reviewer-1")
+      });
+      expect(second.statusCode).toBe(200);
+      expect(second.json().asset).toMatchObject({
+        id: sourceId,
+        status: "processed",
+        processingAttempts: 2
+      });
+      expect(typeof second.json().asset.processingStartedAt).toBe("string");
+    });
+
     it("returns 409 for a concurrent synchronous process request", async () => {
       let release: (value: string) => void = () => {};
       let markStarted: () => void = () => {};
@@ -4182,6 +4241,8 @@ describe("api server", () => {
         title: "Stuck word list",
         rawText: "mira = river",
         status: "processing",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingAttempts: 1,
         createdBy: "reviewer-1",
         createdAt: new Date().toISOString()
       });
@@ -4197,6 +4258,7 @@ describe("api server", () => {
       expect(processed.statusCode).toBe(200);
       expect(processed.json().asset.status).toBe("processed");
       expect(processed.json().asset.error).toBeUndefined();
+      expect(processed.json().asset.processingAttempts).toBe(2);
     });
   });
 });
