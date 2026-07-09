@@ -84,6 +84,25 @@ describe("prototype session lifecycle", () => {
     expect(expired.statusCode).toBe(401);
   });
 
+  it("refreshes Set-Cookie Max-Age on successful prototype-session use so browsers track sliding renewal", async () => {
+    const clock = createClock();
+    const ttlMs = 90_000;
+    const app = createSessionServer(clock, ttlMs);
+    const cookie = await openSession(app);
+
+    clock.advance(30_000);
+    const response = await app.inject({ method: "GET", url: "/users/me", headers: { cookie } });
+    expect(response.statusCode).toBe(200);
+
+    const setCookie = response.headers["set-cookie"];
+    const cookieHeader = Array.isArray(setCookie) ? setCookie[0] : setCookie;
+    expect(cookieHeader).toContain("assini_prototype_session=");
+    expect(cookieHeader).toContain("Max-Age=90");
+    expect(cookieHeader).toContain("HttpOnly");
+    expect(cookieHeader).toContain("SameSite=Strict");
+    expect(cookieHeader).toContain("Path=/");
+  });
+
   it("clears the session record and expires the cookie on logout", async () => {
     const clock = createClock();
     const app = createSessionServer(clock);

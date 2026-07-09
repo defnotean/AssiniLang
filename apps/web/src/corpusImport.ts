@@ -1,4 +1,5 @@
 import type { CorpusImportPayload } from "./api";
+import type { Translate } from "./i18n";
 
 export type CorpusConsentUse = CorpusImportPayload["consentStatus"]["use"];
 
@@ -29,12 +30,11 @@ export type CorpusImportDraft = {
   restrictions: string;
 };
 
+export type CorpusImportErrorCode = "incomplete" | "invalidConsentUse";
+
 type CorpusImportBuildResult =
   | { ok: true; payload: CorpusImportPayload }
-  | { ok: false; error: string };
-
-const INCOMPLETE_IMPORT_ERROR = "Please complete target text, translation, provenance, tags, and morphemes.";
-const INVALID_CONSENT_USE_ERROR = `Consent use must be one of: ${CORPUS_CONSENT_USE_VALUES.join(", ")}.`;
+  | { ok: false; errorCode: CorpusImportErrorCode };
 
 export const EMPTY_CORPUS_IMPORT_DRAFT: CorpusImportDraft = {
   target: "",
@@ -105,11 +105,11 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
     || topicTags.length === 0
     || !hasCompleteCorpusMorphemes(morphologicalSegmentation)
   ) {
-    return { ok: false, error: INCOMPLETE_IMPORT_ERROR };
+    return { ok: false, errorCode: "incomplete" };
   }
 
   if (!isCorpusConsentUse(consentUse)) {
-    return { ok: false, error: INVALID_CONSENT_USE_ERROR };
+    return { ok: false, errorCode: "invalidConsentUse" };
   }
 
   return {
@@ -136,4 +136,12 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
 
 export function canSubmitCorpusImportDraft(draft: CorpusImportDraft): boolean {
   return buildCorpusImportPayload(draft).ok;
+}
+
+/** Maps corpus import validation codes to localized operator-facing copy. */
+export function formatCorpusImportError(errorCode: CorpusImportErrorCode, t: Translate): string {
+  if (errorCode === "incomplete") {
+    return t("corpus.importIncomplete");
+  }
+  return t("corpus.consentUseInvalid", { values: CORPUS_CONSENT_USE_VALUES.join(", ") });
 }

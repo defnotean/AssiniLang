@@ -5,6 +5,7 @@ import {
   canSubmitCorpusImportDraft,
   CORPUS_CONSENT_USE_VALUES,
   EMPTY_CORPUS_IMPORT_DRAFT,
+  formatCorpusImportError,
   type CorpusImportDraft
 } from "../corpusImport";
 import { MorphChips } from "../components/MorphChips";
@@ -108,7 +109,7 @@ export function CorpusView({
     const result = buildCorpusImportPayload(importDraft);
     if (!result.ok) {
       setImportMessage(null);
-      setImportError(result.error);
+      setImportError(formatCorpusImportError(result.errorCode, t));
       return;
     }
     if (!languageId) {
@@ -146,7 +147,7 @@ export function CorpusView({
     const result = buildCorpusImportPayload(importDraft);
     if (!result.ok) {
       setImportMessage(null);
-      setImportError(result.error);
+      setImportError(formatCorpusImportError(result.errorCode, t));
       return;
     }
 

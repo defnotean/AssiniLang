@@ -3,6 +3,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 import {
   PROTOTYPE_SESSION_COOKIE,
   isPrototypeSessionActive,
+  serializePrototypeSessionCookie,
   type PrototypeSessionMap,
   type PrototypeSessionRecord
 } from "./prototypeSessions.js";
@@ -55,6 +56,8 @@ function redactAuditValue(value: unknown): unknown {
 export type ResolvedActor = {
   actor: User;
   authMethod: "prototype-session" | "server-token";
+  /** Present when authMethod is prototype-session; used to refresh cookie Max-Age on sliding renewal. */
+  prototypeSession?: { sessionId: string; ttlMs: number };
 };
 
 export type NeuralMapResponse = NeuralMap & {
@@ -178,7 +181,11 @@ export function resolveActorContext(
       if (sessionActor) {
         // Sliding renewal: each successful use within the TTL extends the deadline.
         prototypeSession.expiresAt = currentTime + prototypeSession.ttlMs;
-        return { actor: sessionActor, authMethod: "prototype-session" };
+        return {
+          actor: sessionActor,
+          authMethod: "prototype-session",
+          prototypeSession: { sessionId, ttlMs: prototypeSession.ttlMs }
+        };
       }
     }
   }
@@ -202,6 +209,23 @@ export function resolveActor(
   now?: () => number
 ): User | undefined {
   return resolveActorContext(state, request, authToken, prototypeSessions, now)?.actor;
+}
+
+/** Re-issues Set-Cookie so browser Max-Age tracks server-side sliding renewal. */
+export function refreshPrototypeSessionCookie(
+  reply: FastifyReply,
+  resolved: ResolvedActor
+): void {
+  if (resolved.authMethod !== "prototype-session" || !resolved.prototypeSession) {
+    return;
+  }
+  reply.header(
+    "Set-Cookie",
+    serializePrototypeSessionCookie(
+      resolved.prototypeSession.sessionId,
+      Math.ceil(resolved.prototypeSession.ttlMs / 1000)
+    )
+  );
 }
 
 export function actorCan(actor: User, allowedRoles: readonly UserRole[]): boolean {
@@ -233,6 +257,7 @@ export function requireActor(
     return undefined;
   }
 
+  refreshPrototypeSessionCookie(reply, resolved);
   return actor;
 }
 

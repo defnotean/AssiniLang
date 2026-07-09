@@ -106,7 +106,7 @@ The evaluation dashboard shows latest evaluation runs, category scores, regressi
 - Exercise grading.
 - Generation-policy checks.
 
-Programmers can export a sanitized evaluation artifact from this view. The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, and SHA-256 integrity metadata.
+Reviewers can export a sanitized evaluation artifact from this view (the API also allows lead, admin, and programmer). The export includes latest-run totals, failed/regressed run counts, average latest score, failure lines, trend deltas, and SHA-256 integrity metadata.
 
 ### Governance
 
@@ -161,8 +161,8 @@ The browser actor mapping is:
 
 - Learner: learner exercise submissions and learner-practice AI sessions.
 - Elder: governance records and elder-correction review/apply flows.
-- Reviewer: language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review policies, and review-disposition workflows.
-- Programmer: audit reads, evaluation artifacts, programmer-debug AI sessions, AI observability, and the corpus graph in the Start examples browser.
+- Reviewer: language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, evaluation artifact export, review policies, and review-disposition workflows.
+- Programmer: audit reads, programmer-debug AI sessions, AI observability, and the corpus graph in the Start examples browser.
 
 Lead and admin identities still exist in the local state for backend authorization, persisted review-policy authority, audit integrity, and future production-account design. Review-policy edits from the browser are audited as reviewer activity, while the stored policy updater remains the canonical lead/admin authority required by local database validation.
 

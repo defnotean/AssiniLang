@@ -376,6 +376,8 @@ export const ar: Record<MessageKey, string> = {
   // متصفّح المدوّنة.
   "corpus.importSuccess": "تم استيراد مقطع المدوّنة.",
   "corpus.importFailed": "فشل استيراد المدوّنة",
+  "corpus.importIncomplete": "أكمل نص الهدف والترجمة والمصدر والوسوم والمورفيمات.",
+  "corpus.consentUseInvalid": "يجب أن يكون استخدام الموافقة أحد القيم التالية: {values}.",
   "corpus.importFormLabel": "استيراد إلى المدوّنة",
   "corpus.importLabel": "استيراد إلى المدوّنة",
   "corpus.addSourcePassage": "إضافة مقطع مصدري",

@@ -400,6 +400,8 @@ export const en = {
   // Corpus browser.
   "corpus.importSuccess": "Corpus passage imported.",
   "corpus.importFailed": "Corpus import failed",
+  "corpus.importIncomplete": "Please complete target text, translation, provenance, tags, and morphemes.",
+  "corpus.consentUseInvalid": "Consent use must be one of: {values}.",
   "corpus.importFormLabel": "Corpus import",
   "corpus.importLabel": "Corpus import",
   "corpus.addSourcePassage": "Add source passage",

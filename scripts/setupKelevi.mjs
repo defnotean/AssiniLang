@@ -10,7 +10,7 @@
 //         ASSINI_DEV_AUTH_TOKEN (must match the running API)
 
 const BASE = process.env.ASSINI_API_URL ?? "http://127.0.0.1:4321";
-const TOKEN = process.env.ASSINI_DEV_AUTH_TOKEN ?? "kelevi-dev-token";
+const TOKEN = process.env.ASSINI_DEV_AUTH_TOKEN ?? "dev-local";
 const auth = { "x-assini-user-id": "reviewer-1", "x-assini-dev-token": TOKEN, "content-type": "application/json" };
 
 async function call(method, path, body, headers = auth) {

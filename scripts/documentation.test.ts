@@ -129,7 +129,10 @@ describe("project documentation", () => {
         "processingAttempts",
         "ingest.sourceMaxProcessingAttempts",
         "ingest.sourceAlreadyProcessing",
-        "ExerciseAuthoringBody"
+        "ExerciseAuthoringBody",
+        "Evaluation artifact export",
+        "uses the reviewer actor in the browser",
+        "cookie `Max-Age` both refresh"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -172,7 +175,12 @@ describe("project documentation", () => {
         "source_asset.processing_recovered",
         "npm.cmd run seed"
       ],
-      "docs/product-guide.md": ["leadless", "learner, Elder, reviewer, and programmer", "Build and sources & intake"],
+      "docs/product-guide.md": [
+        "leadless",
+        "learner, Elder, reviewer, and programmer",
+        "Build and sources & intake",
+        "evaluation artifact export"
+      ],
       "docs/roadmap.md": ["Non-negotiable gate", "testlang-baseline.json", "verify:beta", "groundingFailureCodes", "First Nations"],
       "docs/troubleshooting.md": [
         "## Startup and ports",

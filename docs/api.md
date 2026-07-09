@@ -10,7 +10,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | --- | --- | --- | --- |
 | GET | `/health` | Public | Health check. |
 | GET | `/ready` | Public | Readiness check for schema-valid persistence. |
-| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use; creating a session also sweeps expired session records. |
+| POST | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`; learner/elder/reviewer/programmer users only) | Open a local HTTP-only prototype session. Sessions expire after `ASSINI_PROTOTYPE_SESSION_TTL_MS` (default 8 hours) with sliding renewal on use (server `expiresAt` and cookie `Max-Age` both refresh); creating a session also sweeps expired session records. |
 | DELETE | `/auth/prototype-session` | Public (requires `ASSINI_ENABLE_PROTOTYPE_AUTH=true`) | Sign out of the prototype session: deletes the server-side record and expires the cookie. Returns 204 even when no session exists. |
 | GET | `/llm/status` | programmer, lead, admin | Sanitized LLM provider, transcription, and OCR readiness. |
 | GET | `/llm/settings` | programmer, lead, admin | Sanitized editable runtime settings for model, transcription, OCR, and URL-fetch behavior. |
@@ -87,7 +87,8 @@ The web app maps local UI actions to the narrowest useful prototype actor:
 - Learner practice and learner-mode AI sessions use the learner actor.
 - Language creation, source ingestion, extraction-draft review, corpus import, note review, exercise authoring, review-policy editing, and review-disposition workflows use the reviewer actor.
 - Governance writes and elder-correction review/apply flows use the Elder actor.
-- Audit reads, evaluation artifact reads, programmer AI sessions, operational metrics, AI observability, and the corpus graph in the Examples view use the programmer actor.
+- Audit reads, programmer AI sessions, operational metrics, AI observability, and the corpus graph in the Examples view use the programmer actor.
+- Evaluation artifact export (`GET /exports/evaluations/artifact`) uses the reviewer actor in the browser (the route also allows lead, admin, and programmer).
 
 Do not treat prototype auth as production security.
 

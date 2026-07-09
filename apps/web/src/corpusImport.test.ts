@@ -2,9 +2,25 @@ import { describe, expect, it } from "vitest";
 import {
   buildCorpusImportPayload,
   canSubmitCorpusImportDraft,
+  CORPUS_CONSENT_USE_VALUES,
   EMPTY_CORPUS_IMPORT_DRAFT,
+  formatCorpusImportError,
   parseCorpusMorphemeDraft
 } from "./corpusImport";
+import { createTranslator } from "./i18n";
+
+const completeDraft = {
+  ...EMPTY_CORPUS_IMPORT_DRAFT,
+  target: "mira talo-mi-na",
+  translation: "I walk by the river.",
+  source: "field-import",
+  author: "Local Reviewer",
+  year: "2026",
+  license: "cc-by",
+  consentRecord: "local import consent",
+  tags: "motion",
+  morphemes: "mira | mira | river | noun"
+};
 
 describe("corpus import helpers", () => {
   it("parses pipe-delimited morpheme rows with comma-delimited feature lists", () => {
@@ -72,22 +88,46 @@ describe("corpus import helpers", () => {
     ["incomplete morpheme", { morphemes: "mira | mira |" }]
   ])("rejects %s before payload creation", (_, overrides) => {
     const result = buildCorpusImportPayload({
-      ...EMPTY_CORPUS_IMPORT_DRAFT,
-      target: "mira talo-mi-na",
-      translation: "I walk by the river.",
-      source: "field-import",
-      author: "Local Reviewer",
-      year: "2026",
-      license: "cc-by",
-      consentRecord: "local import consent",
-      tags: "motion",
-      morphemes: "mira | mira | river | noun",
+      ...completeDraft,
       ...overrides
     });
 
     expect(result).toEqual({
       ok: false,
-      error: "Please complete target text, translation, provenance, tags, and morphemes."
+      errorCode: "incomplete"
     });
+  });
+
+  it("rejects invalid consent-use values with a stable error code", () => {
+    const result = buildCorpusImportPayload({
+      ...completeDraft,
+      consentUse: "not-a-real-consent-use"
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: "invalidConsentUse"
+    });
+  });
+
+  it("formats incomplete and consent-use errors through i18n catalogs", () => {
+    const en = createTranslator("en");
+    const ar = createTranslator("ar");
+
+    expect(formatCorpusImportError("incomplete", en)).toBe(
+      "Please complete target text, translation, provenance, tags, and morphemes."
+    );
+    expect(formatCorpusImportError("incomplete", ar)).toBe(
+      "أكمل نص الهدف والترجمة والمصدر والوسوم والمورفيمات."
+    );
+    expect(formatCorpusImportError("incomplete", ar)).not.toMatch(/Please complete/);
+
+    const allowed = CORPUS_CONSENT_USE_VALUES.join(", ");
+    expect(formatCorpusImportError("invalidConsentUse", en)).toBe(
+      `Consent use must be one of: ${allowed}.`
+    );
+    expect(formatCorpusImportError("invalidConsentUse", ar)).toBe(
+      `يجب أن يكون استخدام الموافقة أحد القيم التالية: ${allowed}.`
+    );
   });
 });

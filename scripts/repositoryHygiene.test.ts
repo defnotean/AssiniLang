@@ -67,7 +67,10 @@ describe("repository production hygiene", () => {
       "ASSINI_DEV_API_PORT",
       "ASSINI_DEV_WEB_PORT",
       "ASSINI_DB_PATH",
-      "ASSINI_ENABLE_PROTOTYPE_AUTH"
+      "ASSINI_ENABLE_PROTOTYPE_AUTH",
+      "ASSINI_PROTOTYPE_SESSION_TTL_MS",
+      "ASSINI_COOKIE_SECURE",
+      "ASSINI_DEV_AUTH_TOKEN"
     ]) {
       expect(example, `.env.example should include ${variable}`).toContain(variable);
     }
