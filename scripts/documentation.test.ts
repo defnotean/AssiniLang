@@ -124,6 +124,7 @@ describe("project documentation", () => {
         "verifyExportIntegrity",
         "unexpected `algorithm`/`generatedBy`",
         "mismatched `redactionPolicy`",
+        "case-insensitive",
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",

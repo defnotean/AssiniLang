@@ -215,7 +215,8 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
  * stripped (same stable key order used at export time). Returns false when the
  * manifest is missing, uses an unexpected algorithm or generator id, has a
- * mismatched redaction policy list, or the hash does not match.
+ * mismatched redaction policy list, or the hash does not match. Hex digests are
+ * compared case-insensitively so uppercase `contentHash` values still verify.
  */
 export function verifyExportIntegrity(exported: {
   integrity?: PublicExportIntegrity | null;
@@ -229,7 +230,8 @@ export function verifyExportIntegrity(exported: {
   ) {
     return false;
   }
-  if (typeof integrity.contentHash !== "string" || !/^[a-f0-9]{64}$/.test(integrity.contentHash)) {
+  // Accept upper- or lower-case hex; digests are compared in lowercase.
+  if (typeof integrity.contentHash !== "string" || !/^[a-fA-F0-9]{64}$/.test(integrity.contentHash)) {
     return false;
   }
   if (
@@ -242,7 +244,7 @@ export function verifyExportIntegrity(exported: {
 
   const { integrity: _omit, ...payload } = exported;
   const expected = createHash(EXPORT_INTEGRITY_ALGORITHM).update(stableStringify(payload)).digest("hex");
-  return expected === integrity.contentHash;
+  return expected === integrity.contentHash.toLowerCase();
 }
 
 function cloneEvaluationFailure(failure: EvaluationFailure): EvaluationFailure {

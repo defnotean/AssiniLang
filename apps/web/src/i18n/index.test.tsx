@@ -103,6 +103,12 @@ describe("locale catalogs", () => {
     expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
   });
 
+  it("keeps paradigm-gap empty-state next-step guidance localized", () => {
+    expect(en["profile.paradigmGapsEmptyState"]).toContain("Build or Corpus");
+    expect(ar["profile.paradigmGapsEmptyState"]).toContain("البناء أو المدوّنة");
+    expect(ar["profile.paradigmGapsEmptyState"]).not.toBe(en["profile.paradigmGapsEmptyState"]);
+  });
+
   it("localizes elder apply negatives and desktop-only bridge notices in Arabic", () => {
     expect(ar["errors.languageNotFound"]).not.toBe(en["errors.languageNotFound"]);
     expect(ar["errors.missingLanguageId"]).not.toBe(en["errors.missingLanguageId"]);

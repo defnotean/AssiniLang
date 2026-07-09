@@ -228,7 +228,7 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </div>
         </div>
         {paradigmGaps.length === 0 ? (
-          <p className="empty-state">
+          <p className="empty-state" role="status" aria-live="polite">
             {t("profile.paradigmGapsEmptyState")}
           </p>
         ) : (

@@ -1107,7 +1107,7 @@ export const ar: Record<MessageKey, string> = {
   "profile.morphemeInventory": "مخزون المورفيمات",
   "profile.morphemeEmptyState": "لم يُستنتَج أي مورفيم بعد. أضِف مقاطع مدوّنة مع تجزئة لتعبئة هذا المخزون.",
   "profile.paradigmGaps": "فجوات النموذج الصرفي",
-  "profile.paradigmGapsEmptyState": "لم تُكتشَف فجوات في النموذج الصرفي - أو لا توجد خلايا مُثبَتة كافية لاستنتاج النماذج بعد.",
+  "profile.paradigmGapsEmptyState": "لم تُكتشَف فجوات في النموذج الصرفي بعد — أو لا توجد خلايا مُثبَتة كافية لاستنتاج النماذج. أضِف مقاطع مدوّنة مجزّأة في البناء أو المدوّنة حتى تظهر خلايا الشخص والزمن كمهام ميدانية هنا.",
   "profile.missingCell": "مفقود: {cell}",
   "profile.ruleCountOne": "{count} قاعدة",
   "profile.ruleCountMany": "{count} قواعد",

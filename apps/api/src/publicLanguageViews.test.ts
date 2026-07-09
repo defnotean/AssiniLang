@@ -269,6 +269,15 @@ describe("public language views", () => {
     };
     expect(verifyExportIntegrity(shortHash)).toBe(false);
 
+    const uppercaseHash = {
+      ...snapshot!,
+      integrity: {
+        ...snapshot!.integrity,
+        contentHash: snapshot!.integrity.contentHash.toUpperCase()
+      }
+    };
+    expect(verifyExportIntegrity(uppercaseHash)).toBe(true);
+
     const missingIntegrity = { ...snapshot! };
     delete (missingIntegrity as { integrity?: unknown }).integrity;
     expect(verifyExportIntegrity(missingIntegrity)).toBe(false);

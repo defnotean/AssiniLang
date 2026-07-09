@@ -131,4 +131,33 @@ describe("JobQueue", () => {
     expect(stateEnd.pending).toEqual([]);
     expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
   });
+
+  it("frees the active slot after a job failure so the same id can be re-queued", async () => {
+    const errors: Array<{ id: string }> = [];
+    const queue = new JobQueue(1, {
+      error: (fields: { id: string }) => {
+        errors.push({ id: fields.id });
+      }
+    });
+
+    queue.add("src-fail", async () => {
+      throw new Error("simulated processing failure");
+    });
+
+    await sleep(20);
+
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
+    expect(queue.isQueuedOrActive("src-fail")).toBe(false);
+    expect(errors).toEqual([{ id: "src-fail" }]);
+
+    let ranAgain = false;
+    queue.add("src-fail", async () => {
+      ranAgain = true;
+    });
+
+    await sleep(20);
+
+    expect(ranAgain).toBe(true);
+    expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
+  });
 });

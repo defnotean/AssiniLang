@@ -1131,7 +1131,7 @@ export const en = {
   "profile.morphemeInventory": "Morpheme inventory",
   "profile.morphemeEmptyState": "No morphemes inferred yet. Add corpus passages with segmentation to populate this inventory.",
   "profile.paradigmGaps": "Paradigm gaps",
-  "profile.paradigmGapsEmptyState": "No paradigm gaps detected - or not enough attested cells to infer paradigms yet.",
+  "profile.paradigmGapsEmptyState": "No paradigm gaps detected yet — or not enough attested cells to infer paradigms. Add segmented corpus passages in Build or Corpus so person and tense cells can surface fieldwork to-dos here.",
   "profile.missingCell": "missing: {cell}",
   "profile.ruleCountOne": "{count} rule",
   "profile.ruleCountMany": "{count} rules",

@@ -62,14 +62,15 @@ describe("paradigm gaps panel", () => {
     expect(within(panel).getByText("2 linked passages")).toBeInTheDocument();
   });
 
-  it("renders the empty state when no gaps are reported", () => {
+  it("renders the empty state with a next-step hint when no gaps are reported", () => {
     render(<LanguageProfileView profileState={readyState(buildProfileFixture([]))} />);
 
     const panel = screen.getByRole("region", { name: "Paradigm gaps" });
     expect(within(panel).getByText("0 fieldwork to-dos")).toBeInTheDocument();
-    expect(
-      within(panel).getByText("No paradigm gaps detected - or not enough attested cells to infer paradigms yet.")
-    ).toBeInTheDocument();
+    const emptyState = within(panel).getByRole("status");
+    expect(emptyState).toHaveAttribute("aria-live", "polite");
+    expect(emptyState).toHaveTextContent(/No paradigm gaps detected yet/);
+    expect(emptyState).toHaveTextContent(/Add segmented corpus passages in Build or Corpus/);
   });
 
   it("renders lexicon and inventory empty states when the profile has no entries", () => {
