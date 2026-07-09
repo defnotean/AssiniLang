@@ -511,6 +511,9 @@ function operatorApiErrorI18n(error: string): { i18nKey: MessageKey } | undefine
   if (/Invalid elder correction review body/i.test(normalized)) {
     return { i18nKey: "elderWs.errInvalidReviewBody" };
   }
+  if (/Invalid elder correction body/i.test(normalized)) {
+    return { i18nKey: "elderWs.errInvalidCorrectionBody" };
+  }
 
   return undefined;
 }

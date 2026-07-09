@@ -85,12 +85,18 @@ export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteCont
 
     if (!query.languageId) {
       reply.code(400);
-      return { error: "Missing languageId" };
+      return {
+        error: "Missing languageId",
+        i18nKey: "errors.missingLanguageId"
+      };
     }
 
     if (!state.languages.some((language) => language.id === query.languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${query.languageId}` };
+      return {
+        error: `Language not found: ${query.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     return sanitizeNeuralMapForActor(buildNeuralMap(state, query.languageId), actor);

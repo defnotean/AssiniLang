@@ -73,7 +73,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${languageId}` };
+      return {
+        error: `Language not found: ${languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);

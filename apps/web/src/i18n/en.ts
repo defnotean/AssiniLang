@@ -1163,6 +1163,7 @@ export const en = {
   "elderWs.msgApplySuccess": "Elder correction applied to linked note.",
   "elderWs.errApplyFailed": "Elder correction apply failed",
   "elderWs.errContextLoadFailed": "Could not load elder corrections for this language.",
+  "elderWs.errInvalidCorrectionBody": "Provide a valid elder correction: language, correction text, rationale, and severity.",
   "elderWs.errInvalidReviewBody": "Choose accept or reject before reviewing this correction.",
   "elderWs.errInvalidApplyBody": "Provide a revised note explanation before applying this correction.",
   "elderWs.errCorrectionNotFound": "That elder correction was not found. Refresh the elder workspace and try again.",

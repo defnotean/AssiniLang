@@ -43,7 +43,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/study-loop/draft` | reviewer, lead, admin, elder | Generate deterministic draft notes. Invalid bodies return `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
-| GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). |
+| GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). Unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
 | POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
 | GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. |
@@ -62,7 +62,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | GET | `/audit/events` | lead, admin, programmer | Role-gated audit events; `?languageId=` filters. |
 | GET | `/languages/:languageId/elder-context` | elder, reviewer, lead, admin | Public context and correction ledger for elder review. |
 | GET | `/elder/corrections` | elder, reviewer, lead, admin | Correction records; `?languageId=` filters. |
-| POST | `/elder/corrections` | elder, lead, admin | Submit a pending correction. |
+| POST | `/elder/corrections` | elder, lead, admin | Submit a pending correction. Invalid bodies return `400` with `i18nKey: "elderWs.errInvalidCorrectionBody"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 | PATCH | `/elder/corrections/:correctionId/review` | elder, lead, admin | Accept or reject a pending correction. |
 | PATCH | `/elder/corrections/:correctionId/apply` | elder, lead, admin | Apply an accepted note-linked correction. |
 | POST | `/ai/sessions` | Mode-based: learner_practice = learner/elder/reviewer/lead/admin; elder_review = elder/lead/admin; programmer_debug = programmer/admin | Create an AI session with public language context. |
@@ -70,7 +70,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/ai/sessions/:sessionId/messages` | Session owner or admin (must also pass the same read gate as GET) | Append a follow-up message to an AI session. |
 | GET | `/observability/metrics` | programmer, admin, lead | Small safe server metrics snapshot. |
 | GET | `/observability/ai-sessions` | programmer, admin, lead | Sanitized AI-session observability. |
-| GET | `/observability/neural-map` | programmer, admin, lead | Role-gated sanitized context graph. |
+| GET | `/observability/neural-map` | programmer, admin, lead | Role-gated sanitized context graph. Missing `languageId` returns `400` with `i18nKey: "errors.missingLanguageId"`; unknown language ids return `404` with `i18nKey: "errors.languageNotFound"`. |
 
 ## Auth model
 

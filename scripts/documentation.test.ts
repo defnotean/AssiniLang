@@ -137,6 +137,7 @@ describe("project documentation", () => {
         "errors.languageNotFound",
         "errors.prototypeAuthDisabled",
         "errors.missingLanguageId",
+        "elderWs.errInvalidCorrectionBody",
         "elderWs.errCorrectionMustBeAccepted",
         "elderWs.errCorrectionNotPending"
       ],

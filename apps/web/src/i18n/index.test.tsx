@@ -99,6 +99,7 @@ describe("locale catalogs", () => {
     expect(ar["errors.languageNotFound"]).not.toBe(en["errors.languageNotFound"]);
     expect(ar["errors.missingLanguageId"]).not.toBe(en["errors.missingLanguageId"]);
     expect(ar["errors.prototypeAuthDisabled"]).not.toBe(en["errors.prototypeAuthDisabled"]);
+    expect(ar["elderWs.errInvalidCorrectionBody"]).not.toBe(en["elderWs.errInvalidCorrectionBody"]);
     expect(ar["elderWs.errCorrectionMustBeAccepted"]).not.toBe(en["elderWs.errCorrectionMustBeAccepted"]);
     expect(ar["elderWs.errCorrectionNotLinkedToNote"]).not.toBe(en["elderWs.errCorrectionNotLinkedToNote"]);
     expect(ar["model.desktopOnlyActions"]).not.toBe(en["model.desktopOnlyActions"]);

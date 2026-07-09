@@ -408,6 +408,40 @@ describe("localizeApiError", () => {
     expect(message).toBe("That elder correction is no longer pending review.");
   });
 
+  it("localizes invalid elder correction create bodies from i18n metadata and message text", () => {
+    expect(
+      localizeApiError(
+        new ApiError("Invalid elder correction body", {
+          status: 400,
+          i18nKey: "elderWs.errInvalidCorrectionBody"
+        }),
+        t,
+        "elderWs.errSubmitFailed"
+      )
+    ).toBe("Provide a valid elder correction: language, correction text, rationale, and severity.");
+
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /elder/corrections (400): Invalid elder correction body", {
+          status: 400
+        }),
+        t,
+        "elderWs.errSubmitFailed"
+      )
+    ).toBe("Provide a valid elder correction: language, correction text, rationale, and severity.");
+
+    // More-specific review/apply bodies must not collapse into the create-body key.
+    expect(
+      localizeApiError(
+        new ApiError("Request failed: /elder/corrections/corr-1/review (400): Invalid elder correction review body", {
+          status: 400
+        }),
+        t,
+        "elderWs.errReviewFailed"
+      )
+    ).toBe("Choose accept or reject before reviewing this correction.");
+  });
+
   it("localizes already-processing conflicts from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /sources/src-1/process (409): Source is already processing: src-1", {

@@ -3758,6 +3758,41 @@ describe("api server", () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await fetchReviewedNote(app);
 
+    const invalidBody = await app.inject({
+      method: "POST",
+      url: "/elder/corrections",
+      headers: authHeaders("elder-1"),
+      payload: {
+        languageId: TEST_LANGUAGE_ID,
+        correction: "",
+        rationale: "Missing correction text.",
+        severity: "major"
+      }
+    });
+    expect(invalidBody.statusCode).toBe(400);
+    expect(invalidBody.json()).toEqual({
+      error: "Invalid elder correction body",
+      i18nKey: "elderWs.errInvalidCorrectionBody"
+    });
+
+    const unknownLanguage = await app.inject({
+      method: "POST",
+      url: "/elder/corrections",
+      headers: authHeaders("elder-1"),
+      payload: {
+        languageId: "not-a-language",
+        correction: "Mention suffix order before approval.",
+        rationale: "Elder review found the explanation underspecified.",
+        severity: "major",
+        contextText: "Schema-valid body that still targets a missing language."
+      }
+    });
+    expect(unknownLanguage.statusCode).toBe(404);
+    expect(unknownLanguage.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
+
     const correction = await app.inject({
       method: "POST",
       url: "/elder/corrections",
@@ -4098,6 +4133,28 @@ describe("api server", () => {
       ])
     );
     expect(JSON.stringify(neuralMap.json())).not.toContain("expectedAnswers");
+
+    const neuralMapMissingLanguage = await app.inject({
+      method: "GET",
+      url: "/observability/neural-map",
+      headers: authHeaders("programmer-1")
+    });
+    expect(neuralMapMissingLanguage.statusCode).toBe(400);
+    expect(neuralMapMissingLanguage.json()).toEqual({
+      error: "Missing languageId",
+      i18nKey: "errors.missingLanguageId"
+    });
+
+    const neuralMapUnknownLanguage = await app.inject({
+      method: "GET",
+      url: "/observability/neural-map?languageId=not-a-language",
+      headers: authHeaders("programmer-1")
+    });
+    expect(neuralMapUnknownLanguage.statusCode).toBe(404);
+    expect(neuralMapUnknownLanguage.json()).toEqual({
+      error: "Language not found: not-a-language",
+      i18nKey: "errors.languageNotFound"
+    });
 
     const payload = { languageId: TEST_LANGUAGE_ID, mode: "learner_practice", seedPrompt: "Practice safely." };
     const first = await app.inject({ method: "POST", url: "/ai/sessions", headers: authHeaders("learner-1"), payload });

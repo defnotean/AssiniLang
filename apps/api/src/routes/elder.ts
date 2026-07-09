@@ -99,7 +99,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const body = parseElderCorrectionBody(request.body ?? {});
     if (!body) {
       reply.code(400);
-      return { error: "Invalid elder correction body" };
+      return {
+        error: "Invalid elder correction body",
+        i18nKey: "elderWs.errInvalidCorrectionBody"
+      };
     }
 
     const current = await readState();
@@ -109,7 +112,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
 
     if (!current.languages.some((language) => language.id === body.languageId)) {
       reply.code(404);
-      return { error: `Language not found: ${body.languageId}` };
+      return {
+        error: `Language not found: ${body.languageId}`,
+        i18nKey: "errors.languageNotFound"
+      };
     }
 
     if (body.noteId && !current.notes.some((note) => note.id === body.noteId && note.languageId === body.languageId)) {

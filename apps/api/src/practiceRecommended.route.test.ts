@@ -28,7 +28,10 @@ describe("GET /languages/:languageId/exercises/recommended", () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(response.json()).toEqual({ error: "Language not found: unknown-language" });
+    expect(response.json()).toEqual({
+      error: "Language not found: unknown-language",
+      i18nKey: "errors.languageNotFound"
+    });
   });
 
   it("returns redacted exercise projections with rationale entries", async () => {

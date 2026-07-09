@@ -1139,6 +1139,7 @@ export const ar: Record<MessageKey, string> = {
   "elderWs.msgApplySuccess": "تم تطبيق تصحيح الكبير على الملاحظة المرتبطة.",
   "elderWs.errApplyFailed": "فشل تطبيق تصحيح الكبير",
   "elderWs.errContextLoadFailed": "تعذّر تحميل تصحيحات الكبير لهذه اللغة.",
+  "elderWs.errInvalidCorrectionBody": "قدّم تصحيح كبير صالحًا: اللغة، ونص التصحيح، والمبرّر، والخطورة.",
   "elderWs.errInvalidReviewBody": "اختر قبولًا أو رفضًا قبل مراجعة هذا التصحيح.",
   "elderWs.errInvalidApplyBody": "قدّم شرحًا مُنقَّحًا للملاحظة قبل تطبيق هذا التصحيح.",
   "elderWs.errCorrectionNotFound": "لم يُعثر على تصحيح الكبير هذا. حدّث مساحة عمل الكبير ثم أعد المحاولة.",
