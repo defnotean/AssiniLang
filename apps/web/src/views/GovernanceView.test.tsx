@@ -83,6 +83,20 @@ describe("GovernanceView consent empty states", () => {
     expect(screen.getByText("No consent policy recorded yet. Add one above to document how corpus material may be used.")).toBeInTheDocument();
     expect(screen.queryByText("No governance policy records for this language yet.")).not.toBeInTheDocument();
   });
+
+  it("shows next-step hints for empty disposition and audit ledgers", () => {
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={createGovernanceWorkspace()}
+      />
+    );
+
+    expect(screen.getByText("No review disposition work for this language.")).toBeInTheDocument();
+    expect(screen.getByText(/Disposition work appears when reviewers contest/i)).toBeInTheDocument();
+    expect(screen.getByText("No audit events for this language yet.")).toBeInTheDocument();
+    expect(screen.getByText(/Audit events appear after policy changes/i)).toBeInTheDocument();
+  });
 });
 
 describe("GovernanceView export and disposition guards", () => {
@@ -120,6 +134,22 @@ describe("GovernanceView export and disposition guards", () => {
     );
 
     expect(screen.getByRole("button", { name: "Export review snapshot" })).toBeDisabled();
+  });
+
+  it("marks snapshot export busy while an export is in progress", () => {
+    const workspace = createGovernanceWorkspace();
+    workspace.isExportingSnapshot = true;
+
+    render(
+      <GovernanceView
+        selectedLanguageId="avenik"
+        governance={workspace}
+      />
+    );
+
+    const exportButton = screen.getByRole("button", { name: "Exporting..." });
+    expect(exportButton).toBeDisabled();
+    expect(exportButton).toHaveAttribute("aria-busy", "true");
   });
 
   it("disables other disposition resolve buttons while one resolution is in flight", () => {
@@ -172,7 +202,10 @@ describe("GovernanceView export and disposition guards", () => {
       />
     );
 
-    expect(screen.getByRole("button", { name: "Resolving disposition-1..." })).toBeDisabled();
+    const resolvingButton = screen.getByRole("button", { name: "Resolving disposition-1..." });
+    expect(resolvingButton).toBeDisabled();
+    expect(resolvingButton).toHaveAttribute("aria-busy", "true");
     expect(screen.getByRole("button", { name: "Resolve disposition-2" })).toBeDisabled();
+    expect(screen.getAllByText("open")).toHaveLength(2);
   });
 });

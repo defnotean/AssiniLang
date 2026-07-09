@@ -44,7 +44,7 @@ export function ProviderReadinessPanel({
       <dl className="detail-grid">
         <div>
           <dt>{t("model.mode")}</dt>
-          <dd>{formatMode(status.mode)}</dd>
+          <dd>{formatMode(status.mode, t)}</dd>
         </div>
         <div>
           <dt>{t("model.provider")}</dt>
@@ -78,10 +78,21 @@ export function ProviderReadinessPanel({
         </div>
       )}
       <div className="model-actions">
-        <button type="button" onClick={onSmokeTest} disabled={isTestingModel || isSavingSettings}>
+        <button
+          type="button"
+          onClick={onSmokeTest}
+          disabled={isTestingModel || isSavingSettings}
+          aria-busy={isTestingModel}
+        >
           {isTestingModel ? t("model.testingProvider") : t("model.runSmokeTest")}
         </button>
-        <button type="button" className="secondary" onClick={onTestConnection} disabled={isCheckingReachability || isSavingSettings}>
+        <button
+          type="button"
+          className="secondary"
+          onClick={onTestConnection}
+          disabled={isCheckingReachability || isSavingSettings}
+          aria-busy={isCheckingReachability}
+        >
           {isCheckingReachability ? t("model.testing") : t("model.testConnection")}
         </button>
       </div>

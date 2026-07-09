@@ -109,9 +109,35 @@ describe("EvaluationView", () => {
     });
 
     const trendPanel = screen.getByRole("region", { name: "Evaluation trends" });
+    expect(trendPanel).toHaveTextContent("0 comparisons");
     expect(trendPanel).toHaveTextContent("Run evaluations more than once to show score movement.");
     expect(trendPanel).toHaveTextContent(
       "Baseline captured. Run System Eval again after language changes to compare scores here, or export the artifact below for offline review."
     );
+  });
+
+  it("localizes trend point and metric labels when comparing runs", () => {
+    renderEvaluationView({
+      evaluations: [
+        createRun({
+          id: "eval-old",
+          createdAt: "2026-06-02T00:00:00.000Z",
+          scores: { corpusCoverage: 1, noteQuality: 0.9 }
+        }),
+        createRun({
+          id: "eval-latest",
+          createdAt: "2026-06-03T00:00:00.000Z",
+          scores: { corpusCoverage: 0.9, noteQuality: 0.8 }
+        })
+      ]
+    });
+
+    const trendPanel = screen.getByRole("region", { name: "Evaluation trends" });
+    expect(trendPanel).toHaveTextContent("1 comparison");
+    expect(trendPanel).toHaveTextContent("Avenik regressed by 10 pts since previous run.");
+    expect(trendPanel).toHaveTextContent("Note quality -10 pts");
+    expect(trendPanel).toHaveTextContent("Corpus coverage -10 pts");
+    expect(screen.getByRole("progressbar", { name: "Note quality" })).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Corpus coverage" })).toBeInTheDocument();
   });
 });

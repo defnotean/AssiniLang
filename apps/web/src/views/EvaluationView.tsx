@@ -8,7 +8,7 @@ import {
 } from "../evaluationTrends";
 import { ScoreBar } from "../components/ScoreBar";
 import { ScoreRing } from "../components/ScoreRing";
-import { formatCount, formatSignedTrendPoints, formatTrendPoints, scoreTone } from "../lib/format";
+import { formatMetric, formatSignedTrendPoints, formatTrendPoints, scoreTone } from "../lib/format";
 import { useI18n, type MessageKey } from "../i18n";
 import type { Language, SnapshotDownload } from "../lib/types";
 
@@ -131,7 +131,11 @@ export function EvaluationView({
       <section className="panel-card evaluation-trend-card" aria-label={t("eval.trendsAria")}>
         <div>
           <span className="detail-label">{t("eval.regressionWatch")}</span>
-          <h2>{formatCount(comparableTrends.length, "comparison")}</h2>
+          <h2>
+            {comparableTrends.length === 1
+              ? t("eval.comparisonCountOne", { count: comparableTrends.length })
+              : t("eval.comparisonCountMany", { count: comparableTrends.length })}
+          </h2>
         </div>
         {comparableTrends.length === 0 ? (
           <div className="empty-state" role="status">
@@ -150,14 +154,14 @@ export function EvaluationView({
                   <p>{t("eval.trendSentence", {
                     name: languageName,
                     verb: t(TREND_VERB_KEY[trend.status]),
-                    points: formatTrendPoints(trend.averageDelta)
+                    points: formatTrendPoints(trend.averageDelta, t)
                   })}</p>
                   <div className="pill-row">
                     {Object.entries(trend.categoryDeltas)
                       .filter(([, delta]) => delta.delta !== null)
                       .map(([category, delta]) => (
                         <span className="pill trend-pill" key={`${trend.languageId}-${category}`}>
-                          {category} {formatSignedTrendPoints(delta.delta)}
+                          {formatMetric(category, t)} {formatSignedTrendPoints(delta.delta, t)}
                         </span>
                       ))}
                   </div>

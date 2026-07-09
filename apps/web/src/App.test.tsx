@@ -2678,8 +2678,8 @@ describe("App", () => {
 
     expect(await screen.findByRole("region", { name: "Evaluation trends" })).toBeInTheDocument();
     expect(screen.getByText("Avenik regressed by 10 pts since previous run.")).toBeInTheDocument();
-    expect(screen.getByText("noteQuality -10 pts")).toBeInTheDocument();
-    expect(screen.getByText("corpusCoverage -10 pts")).toBeInTheDocument();
+    expect(screen.getByText("Note quality -10 pts")).toBeInTheDocument();
+    expect(screen.getByText("Corpus coverage -10 pts")).toBeInTheDocument();
   });
 
   it("reviews elder corrections from the correction ledger", async () => {

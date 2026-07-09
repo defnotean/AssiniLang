@@ -4,15 +4,21 @@ import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
 import {
   buildSnapshotDownload,
+  formatMetric,
+  formatMode,
   formatOrthographyMeta,
   formatReachability,
+  formatSignedTrendPoints,
   formatSnapshotReviewAccountability,
+  formatStatus,
   formatSubmissionStatus,
+  formatTrendPoints,
   latestAssistantMessage,
   localizeApiError,
   localizeSourceProcessingError,
   localizeSourceProcessingWarning,
-  localizeVaultImportError
+  localizeVaultImportError,
+  trendVerb
 } from "./format";
 import { en } from "../i18n/en";
 import type { Translate } from "../i18n";
@@ -317,5 +323,45 @@ describe("latestAssistantMessage", () => {
     expect(latestAssistantMessage(empty, t)).toBe(
       "Session created, but no assistant message was returned."
     );
+  });
+});
+
+describe("formatMode", () => {
+  it("localizes known provider modes and falls back to hyphen-stripped labels", () => {
+    expect(formatMode("local-openai-compatible", t)).toBe("local openai compatible");
+    expect(formatMode("remote-api", t)).toBe("remote api");
+    expect(formatMode("deterministic")).toBe("deterministic");
+    expect(formatMode("invalid", t)).toBe("invalid");
+  });
+});
+
+describe("formatMetric", () => {
+  it("localizes known evaluation metrics and title-cases unknown keys", () => {
+    expect(formatMetric("noteCoverage", t)).toBe("Note coverage");
+    expect(formatMetric("corpusCoverage", t)).toBe("Corpus coverage");
+    expect(formatMetric("customScore", t)).toBe("Custom Score");
+    expect(formatMetric("note_quality")).toBe("Note quality");
+  });
+});
+
+describe("formatTrendPoints", () => {
+  it("localizes absolute, signed, and new trend point labels", () => {
+    expect(formatTrendPoints(0.1, t)).toBe("10 pts");
+    expect(formatTrendPoints(null, t)).toBe("0 pts");
+    expect(formatSignedTrendPoints(-0.1, t)).toBe("-10 pts");
+    expect(formatSignedTrendPoints(0.05, t)).toBe("+5 pts");
+    expect(formatSignedTrendPoints(null, t)).toBe("new");
+    expect(formatTrendPoints(0.1)).toBe("10 pts");
+  });
+});
+
+describe("formatStatus and trendVerb", () => {
+  it("localizes disposition statuses and trend verbs", () => {
+    expect(formatStatus("open", t)).toBe("open");
+    expect(formatStatus("resolved", t)).toBe("resolved");
+    expect(formatStatus("under_review")).toBe("under review");
+    expect(trendVerb("improved", t)).toBe("improved");
+    expect(trendVerb("regressed", t)).toBe("regressed");
+    expect(trendVerb("stable", t)).toBe("held steady");
   });
 });

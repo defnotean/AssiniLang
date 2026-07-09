@@ -36,7 +36,15 @@ export function formatSubmissionStatus(submission: PublicExerciseSubmission, t?:
   return submission.accepted ? "Accepted" : "Needs review";
 }
 
-export function formatMode(mode: LlmStatus["mode"]): string {
+const MODE_MESSAGE_KEYS: Record<LlmStatus["mode"], MessageKey> = {
+  deterministic: "format.mode.deterministic",
+  "local-openai-compatible": "format.mode.localOpenaiCompatible",
+  "remote-api": "format.mode.remoteApi",
+  invalid: "format.mode.invalid"
+};
+
+export function formatMode(mode: LlmStatus["mode"], t?: Translate): string {
+  if (t) return t(MODE_MESSAGE_KEYS[mode]);
   return mode.replace(/-/g, " ");
 }
 
@@ -84,11 +92,30 @@ export function formatOrthographyMeta(value?: string, t?: Translate): string {
   return t ? t("header.orthographyNamed", { value }) : `${value} orthography`;
 }
 
-export function formatStatus(value: string): string {
+export function formatStatus(value: string, t?: Translate): string {
+  if (t) {
+    if (value === "open") return t("governance.dispositionStatus.open");
+    if (value === "resolved") return t("governance.dispositionStatus.resolved");
+  }
   return value.replace(/_/g, " ");
 }
 
-export function formatMetric(value: string): string {
+const METRIC_MESSAGE_KEYS: Record<string, MessageKey> = {
+  noteCoverage: "format.metric.noteCoverage",
+  noteAccuracy: "format.metric.noteAccuracy",
+  evidenceAccuracy: "format.metric.evidenceAccuracy",
+  segmentationAccuracy: "format.metric.segmentationAccuracy",
+  translationAccuracy: "format.metric.translationAccuracy",
+  exerciseGrading: "format.metric.exerciseGrading",
+  generationPolicy: "format.metric.generationPolicy",
+  corpusCoverage: "format.metric.corpusCoverage",
+  noteQuality: "format.metric.noteQuality",
+  exerciseQuality: "format.metric.exerciseQuality"
+};
+
+export function formatMetric(value: string, t?: Translate): string {
+  const key = METRIC_MESSAGE_KEYS[value];
+  if (t && key) return t(key);
   return value
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
@@ -229,21 +256,28 @@ export function scoreTone(score: number): "success" | "warning" | "danger" {
   return "danger";
 }
 
-export function formatTrendPoints(delta: number | null): string {
-  if (delta === null) return "0 pts";
-  return `${Math.round(Math.abs(delta) * 100)} pts`;
+export function formatTrendPoints(delta: number | null, t?: Translate): string {
+  const count = delta === null ? 0 : Math.round(Math.abs(delta) * 100);
+  return t ? t("format.trendPoints", { count }) : `${count} pts`;
 }
 
-export function formatSignedTrendPoints(delta: number | null): string {
-  if (delta === null) return "new";
+export function formatSignedTrendPoints(delta: number | null, t?: Translate): string {
+  if (delta === null) {
+    return t ? t("format.trendPointsNew") : "new";
+  }
   const points = Math.round(delta * 100);
-  return `${points > 0 ? "+" : ""}${points} pts`;
+  const signed = `${points > 0 ? "+" : ""}${points}`;
+  return t ? t("format.trendPointsSigned", { signed }) : `${signed} pts`;
 }
 
-export function trendVerb(status: EvaluationTrendStatus): string {
-  if (status === "improved") return "improved";
-  if (status === "regressed") return "regressed";
-  return "held steady";
+export function trendVerb(status: EvaluationTrendStatus, t?: Translate): string {
+  if (status === "improved") {
+    return t ? t("eval.trendImproved") : "improved";
+  }
+  if (status === "regressed") {
+    return t ? t("eval.trendRegressed") : "regressed";
+  }
+  return t ? t("eval.trendHeldSteady") : "held steady";
 }
 
 export function extractionDraftSummary(draft: ExtractionDraft): string {

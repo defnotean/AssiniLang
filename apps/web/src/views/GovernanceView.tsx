@@ -215,7 +215,10 @@ export function GovernanceView({
         )}
 
         {reviewDispositionState.status === "ready" && reviewDispositions.length === 0 && (
-          <p className="inline-empty">{t("governance.noReviewDispositionWork")}</p>
+          <div className="inline-empty" role="status">
+            <p>{t("governance.noReviewDispositionWork")}</p>
+            <p className="muted">{t("governance.noReviewDispositionWorkHint")}</p>
+          </div>
         )}
 
         {reviewDispositions.length > 0 && (
@@ -231,7 +234,7 @@ export function GovernanceView({
                       <span className="detail-label">{disposition.id}</span>
                       <h3>{t(`reviewDisposition.${disposition.disposition}`)}</h3>
                     </div>
-                    <span className={`status-badge ${disposition.status}`}>{formatStatus(disposition.status)}</span>
+                    <span className={`status-badge ${disposition.status}`}>{formatStatus(disposition.status, t)}</span>
                   </div>
                   <p>{disposition.reason}</p>
                   <div className="pill-row">
@@ -265,6 +268,7 @@ export function GovernanceView({
                           || isResolving
                           || resolutionDraft.trim().length === 0
                         }
+                        aria-busy={isResolving}
                         onClick={() => onResolveReviewDisposition(disposition.id)}
                       >
                         {isResolving ? t("governance.resolvingButton", { id: disposition.id }) : t("governance.resolveButton", { id: disposition.id })}
@@ -298,7 +302,10 @@ export function GovernanceView({
         )}
 
         {auditEventState.status === "ready" && auditEvents.length === 0 && (
-          <p className="inline-empty">{t("governance.noAuditEvents")}</p>
+          <div className="inline-empty" role="status">
+            <p>{t("governance.noAuditEvents")}</p>
+            <p className="muted">{t("governance.noAuditEventsHint")}</p>
+          </div>
         )}
 
         {auditEvents.length > 0 && (
@@ -339,6 +346,7 @@ export function GovernanceView({
               || isSubmittingReviewPolicy
               || resolvingReviewDispositionId !== null
             }
+            aria-busy={isExportingSnapshot}
             onClick={onExportSnapshot}
           >
             {isExportingSnapshot ? t("governance.exporting") : t("governance.exportReviewSnapshot")}
