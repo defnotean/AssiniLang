@@ -2012,6 +2012,97 @@ describe("api server", () => {
     ]));
   });
 
+  const validExerciseAuthoringPayload = {
+    type: "translate_to_target",
+    prompt: "Translate into Testlang: The child walks.",
+    allowedVocabulary: ["saku", "talo", "-ki"],
+    allowedRuleIds: ["testlang-note-basic-order"],
+    expectedAnswers: ["saku talo-ki"],
+    adversarialAnswers: [
+      { answer: "talo saku-ki", reason: "Reverses subject and verb order." },
+      { answer: "saku talo-na", reason: "Uses the first-person suffix for a third-person subject." }
+    ],
+    gradingExplanation: "Use saku for child, talo for walk, and -ki for third person singular."
+  };
+
+  it("dry-runs exercise authoring validation without persisting", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "assini-api-"));
+    const store = new JsonStore(join(tempDir, "local-db.json"));
+    await store.write(buildTestWorkspaceState());
+    const app = createServer({ store });
+    const before = await store.read();
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises?dryRun=1`,
+      headers: authHeaders("reviewer-1"),
+      payload: validExerciseAuthoringPayload
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: true,
+      errors: [],
+      warnings: [],
+      preview: validExerciseAuthoringPayload
+    });
+
+    const after = await store.read();
+    expect(after.exercises).toEqual(before.exercises);
+    expect(after.auditEvents).toEqual(before.auditEvents);
+  });
+
+  it("dry-runs exercise authoring validation with body dryRun flag", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        ...validExerciseAuthoringPayload,
+        dryRun: true
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      ok: true,
+      errors: [],
+      preview: validExerciseAuthoringPayload
+    });
+
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+    expect(after.json()).toEqual(before.json());
+  });
+
+  it("returns validation errors from exercise dry-run without persisting", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+    const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/languages/${TEST_LANGUAGE_ID}/exercises?dryRun=1`,
+      headers: authHeaders("reviewer-1"),
+      payload: {
+        ...validExerciseAuthoringPayload,
+        allowedRuleIds: ["missing-rule"]
+      }
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      ok: false,
+      errors: ["Exercise references unknown rule: missing-rule"],
+      warnings: [],
+      preview: null
+    });
+
+    const after = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });
+    expect(after.json()).toEqual(before.json());
+  });
+
   it("rejects invalid exercise authoring references without mutating exercises", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const before = await app.inject({ method: "GET", url: `/languages/${TEST_LANGUAGE_ID}/exercises` });

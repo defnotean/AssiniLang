@@ -500,6 +500,12 @@ export const en = {
   "learner.generateWithModel": "Generate with model",
   "learner.creating": "Creating...",
   "learner.createExercise": "Create exercise",
+  "learner.validateExercise": "Validate",
+  "learner.validateExerciseAria": "Validate exercise authoring",
+  "learner.validatingExercise": "Validating...",
+  "learner.validateExerciseSuccess": "Validation passed: {answerCount} expected answers and {probeCount} adversarial probes ready to save.",
+  "learner.validateExerciseFailed": "Exercise validation failed",
+  "learner.validateExerciseNoLanguage": "Select a language before validating exercise authoring.",
 
   // Governance & policy.
   "governance.deploymentPolicy": "Deployment policy",

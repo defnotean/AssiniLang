@@ -31,9 +31,11 @@ export {
   fetchExerciseSubmissions,
   fetchRecommendedExercises,
   generateModelExercise,
-  submitExerciseAnswer
+  submitExerciseAnswer,
+  validateExerciseAuthoring
 } from "./api/exerciseApi";
 export type {
+  ExerciseAuthoringDryRunResult,
   ExerciseAuthoringPayload,
   GeneratedExerciseDraft,
   PracticeRecommendationRationale,

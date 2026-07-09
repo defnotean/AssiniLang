@@ -20,6 +20,7 @@ import {
   generateModelExercise,
   importCorpusPassage,
   validateCorpusImport,
+  validateExerciseAuthoring,
   createGovernanceRecord,
   updateReviewPolicy,
   resolveReviewDisposition,
@@ -187,6 +188,53 @@ describe("fetchDashboardData", () => {
 
     expectPrototypeSession(fetchMock, "reviewer-1");
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/exercises", {
+      method: "POST",
+      ...jsonRequest,
+      body: JSON.stringify(payload)
+    });
+  });
+
+  it("posts exercise dry-run validation requests with the dryRun query flag", async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        errors: [],
+        warnings: [],
+        preview: {
+          type: "translate_to_target",
+          prompt: "Translate into Avenik: I walk by the river.",
+          allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+          allowedRuleIds: ["avn-rule-verb-chain"],
+          expectedAnswers: ["mira talo-mi-na"],
+          adversarialAnswers: [
+            { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+            { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+          ],
+          gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+        }
+      })
+    }));
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    const payload = {
+      type: "translate_to_target" as const,
+      prompt: "Translate into Avenik: I walk by the river.",
+      allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+      allowedRuleIds: ["avn-rule-verb-chain"],
+      expectedAnswers: ["mira talo-mi-na"],
+      adversarialAnswers: [
+        { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+        { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+      ],
+      gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+    };
+
+    await validateExerciseAuthoring("avenik/test language", payload);
+
+    expectPrototypeSession(fetchMock, "reviewer-1");
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/exercises?dryRun=1", {
       method: "POST",
       ...jsonRequest,
       body: JSON.stringify(payload)

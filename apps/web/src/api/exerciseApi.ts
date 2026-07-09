@@ -9,6 +9,13 @@ export type ExerciseAuthoringPayload = Pick<
   "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
 >;
 
+export type ExerciseAuthoringDryRunResult = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  preview: ExerciseAuthoringPayload | null;
+};
+
 export type GeneratedExerciseDraft = {
   type: string;
   prompt: string;
@@ -54,6 +61,21 @@ export async function fetchRecommendedExercises(languageId: string): Promise<Rec
 
 export async function fetchExerciseSubmissions(exerciseId: string): Promise<PublicExerciseSubmission[]> {
   return getJson<PublicExerciseSubmission[]>(`/exercises/${encodeURIComponent(exerciseId)}/submissions`, "learner");
+}
+
+export async function validateExerciseAuthoring(
+  languageId: string,
+  payload: ExerciseAuthoringPayload
+): Promise<ExerciseAuthoringDryRunResult> {
+  const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/exercises?dryRun=1`, {
+    method: "POST",
+    ...(await actorRequest("reviewer", true)),
+    body: JSON.stringify(payload)
+  });
+
+  await assertOk(response, "Exercise validation failed");
+
+  return response.json() as Promise<ExerciseAuthoringDryRunResult>;
 }
 
 export async function createExercise(

@@ -44,7 +44,7 @@ Every registered route. "Public" means no auth required; role lists mean the req
 | POST | `/languages/:languageId/study-loop/model-draft` | reviewer, lead, admin, elder | Generate grounded model-backed draft notes into the review queue (model-only; `400` without a model). |
 | GET | `/languages/:languageId/exercises` | Public | Learner exercises without answer keys. |
 | GET | `/languages/:languageId/exercises/recommended` | Any authenticated actor | Spaced-repetition practice recommendations (top 10 redacted exercises plus rationale). |
-| POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. |
+| POST | `/languages/:languageId/exercises` | reviewer, lead, admin | Author a validated exercise. Add `?dryRun=1` or body `dryRun: true` to validate without persisting. |
 | POST | `/languages/:languageId/exercises/generate` | reviewer, lead, admin | Preview a grounded model-backed draft exercise (model-only, not persisted; `400` without a model). |
 | GET | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Sanitized submission history. |
 | POST | `/exercises/:exerciseId/submissions` | learner, reviewer, lead, admin | Grade and persist a learner answer. |
@@ -132,7 +132,7 @@ Permanently removes the language and all workspace records scoped to it (corpus,
 - `url`: SSRF-guarded server-side fetch and HTML-to-text conversion, then extraction.
 - `image`: dedicated OCR model when `ASSINI_OCR_BASE_URL` is configured; otherwise vision-capable main LLM; otherwise local tesseract (`ASSINI_OCR_LANG`).
 - `audio`: transcription through `ASSINI_TRANSCRIBE_BASE_URL`, then text extraction.
-- `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing, then extraction.
+- `document`: PDF (`unpdf`), DOCX (`mammoth`), or plain-text parsing; scanned PDFs with no text layer attempt page-1 OCR when `ASSINI_OCR_BASE_URL` is configured (DOCX OCR remains unshipped), then extraction.
 
 Successful processing marks the source `processed`, stores a summary (and transcript for audio), and returns the new `proposed` drafts plus warnings. Failures mark the source `failed` with a sanitized error and return `422`; the source can be reprocessed.
 

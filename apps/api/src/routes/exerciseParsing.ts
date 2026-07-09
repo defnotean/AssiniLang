@@ -11,7 +11,7 @@ type ExerciseSubmissionBody = {
   answer: string;
 };
 
-type ExerciseAuthoringBody = Pick<
+export type ExerciseAuthoringBody = Pick<
   Exercise,
   "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
 >;
@@ -86,6 +86,35 @@ export function parseExerciseAuthoringBody(input: unknown): ExerciseAuthoringBod
     adversarialAnswers,
     gradingExplanation
   };
+}
+
+export function exerciseAuthoringValidationWarnings(state: AppState, languageId: string): string[] {
+  const warnings: string[] = [];
+  const language = state.languages.find((item) => item.id === languageId);
+  if (!language) {
+    return warnings;
+  }
+
+  const lexemes = state.lexemes.filter((lexeme) => lexeme.languageId === languageId);
+  if (lexemes.length === 0) {
+    warnings.push(`Vocabulary existence is skipped because ${language.name} has no lexicon entries yet.`);
+  }
+
+  return warnings;
+}
+
+export function validateExerciseAuthoring(
+  state: AppState,
+  languageId: string,
+  body: ExerciseAuthoringBody
+): { errors: string[]; warnings: string[] } {
+  const warnings = exerciseAuthoringValidationWarnings(state, languageId);
+  const validationError = exerciseAuthoringValidationError(state, languageId, body);
+  if (validationError) {
+    return { errors: [validationError], warnings };
+  }
+
+  return { errors: [], warnings };
 }
 
 export function exerciseAuthoringValidationError(state: AppState, languageId: string, body: ExerciseAuthoringBody): string | undefined {

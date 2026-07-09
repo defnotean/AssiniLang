@@ -45,7 +45,8 @@ const apiMock = vi.hoisted(() => ({
   fetchElderContext: vi.fn(),
   submitExerciseAnswer: vi.fn(),
   updateRuntimeSettings: vi.fn(),
-  updateReviewPolicy: vi.fn()
+  updateReviewPolicy: vi.fn(),
+  validateExerciseAuthoring: vi.fn()
 }));
 
 vi.mock("./api", () => apiMock);
@@ -2908,6 +2909,64 @@ describe("App", () => {
     expect(apiMock.fetchDashboardData).toHaveBeenLastCalledWith("avenik");
     expect(await screen.findByText("Exercise authored.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Translate into Avenik: I walk by the river./ })).toBeInTheDocument();
+  });
+
+  it("validates exercise authoring without creating it", async () => {
+    apiMock.fetchDashboardData.mockResolvedValue(createDashboardData());
+    apiMock.validateExerciseAuthoring.mockResolvedValue({
+      ok: false,
+      errors: ["Exercise references unknown rule: missing-rule"],
+      warnings: [],
+      preview: null
+    });
+
+    render(<App />);
+    await selectAvenik();
+    fireEvent.click(screen.getByRole("button", { name: "Practice" }));
+
+    fireEvent.change(await screen.findByLabelText("Exercise prompt"), {
+      target: { value: "Translate into Avenik: I walk by the river." }
+    });
+    fireEvent.change(screen.getByLabelText("Allowed vocabulary"), {
+      target: { value: "mira, talo, -mi, -na" }
+    });
+    fireEvent.change(screen.getByLabelText("Allowed rule IDs"), {
+      target: { value: "missing-rule" }
+    });
+    fireEvent.change(screen.getByLabelText("Expected answers"), {
+      target: { value: "mira talo-mi-na" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial answer 1"), {
+      target: { value: "talo-mi-na mira" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 1"), {
+      target: { value: "Moves the finite verb before the locative noun." }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial answer 2"), {
+      target: { value: "mira talo-na-mi" }
+    });
+    fireEvent.change(screen.getByLabelText("Adversarial reason 2"), {
+      target: { value: "Reverses tense and person suffix order." }
+    });
+    fireEvent.change(screen.getByLabelText("Grading explanation"), {
+      target: { value: "Use mira for river, talo for walk, -mi for present, and -na for first person singular." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Validate exercise authoring" }));
+
+    await waitFor(() => expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledWith("avenik", {
+      type: "translate_to_target",
+      prompt: "Translate into Avenik: I walk by the river.",
+      allowedVocabulary: ["mira", "talo", "-mi", "-na"],
+      allowedRuleIds: ["missing-rule"],
+      expectedAnswers: ["mira talo-mi-na"],
+      adversarialAnswers: [
+        { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." },
+        { answer: "mira talo-na-mi", reason: "Reverses tense and person suffix order." }
+      ],
+      gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
+    }));
+    expect(apiMock.createExercise).not.toHaveBeenCalled();
+    expect(await screen.findByRole("alert")).toHaveTextContent("missing-rule");
   });
 
   it("pre-fills the authoring form from a model-generated exercise draft without auto-creating it", async () => {

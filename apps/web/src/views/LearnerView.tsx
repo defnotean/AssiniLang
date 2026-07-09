@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
   fetchRecommendedExercises,
+  validateExerciseAuthoring,
+  type ExerciseAuthoringPayload,
   type RecommendedExercises
 } from "../api";
 import type { LearnerWorkspace } from "../hooks/useLearnerWorkspace";
@@ -50,6 +52,7 @@ export function LearnerView({
   const [authoringMessage, setAuthoringMessage] = useState<string | null>(null);
   const [authoringError, setAuthoringError] = useState<string | null>(null);
   const [isCreatingExercise, setIsCreatingExercise] = useState(false);
+  const [isValidatingExercise, setIsValidatingExercise] = useState(false);
   const [isGeneratingExercise, setIsGeneratingExercise] = useState(false);
   const [practiceState, setPracticeState] = useState<AsyncState<RecommendedExercises>>({ status: "idle" });
 
@@ -96,28 +99,64 @@ export function LearnerView({
     setAuthoringError(null);
   }
 
+  const canValidateExercise = canCreateExercise && !isValidatingExercise;
+
+  function buildAuthoringPayload(): ExerciseAuthoringPayload {
+    return {
+      type: authoringType,
+      prompt: authoringPrompt.trim(),
+      allowedVocabulary: parseAuthoringList(authoringVocabulary),
+      allowedRuleIds: parseAuthoringList(authoringRules),
+      expectedAnswers: parseAuthoringList(authoringAnswers),
+      adversarialAnswers: [
+        { answer: authoringAdversarialAnswerOne.trim(), reason: authoringAdversarialReasonOne.trim() },
+        { answer: authoringAdversarialAnswerTwo.trim(), reason: authoringAdversarialReasonTwo.trim() }
+      ],
+      gradingExplanation: authoringExplanation.trim()
+    };
+  }
+
+  async function handleValidateExercise() {
+    if (!canValidateExercise || !languageId) {
+      if (!languageId) {
+        setAuthoringMessage(null);
+        setAuthoringError(t("learner.validateExerciseNoLanguage"));
+      }
+      return;
+    }
+
+    setIsValidatingExercise(true);
+    setAuthoringMessage(null);
+    setAuthoringError(null);
+    try {
+      const validation = await validateExerciseAuthoring(languageId, buildAuthoringPayload());
+      if (validation.ok) {
+        const probeCount = validation.preview?.adversarialAnswers.length ?? 0;
+        const answerCount = validation.preview?.expectedAnswers.length ?? 0;
+        const message = validation.warnings.length > 0
+          ? `${t("learner.validateExerciseSuccess", { probeCount, answerCount })} ${validation.warnings.join(" ")}`
+          : t("learner.validateExerciseSuccess", { probeCount, answerCount });
+        setAuthoringMessage(message);
+      } else {
+        setAuthoringError(validation.errors.join(" "));
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("learner.validateExerciseFailed");
+      setAuthoringError(message);
+    } finally {
+      setIsValidatingExercise(false);
+    }
+  }
+
   async function handleCreateExercise(event: FormEvent) {
     event.preventDefault();
     if (!canCreateExercise) return;
-
-    const adversarialAnswers = [
-      { answer: authoringAdversarialAnswerOne.trim(), reason: authoringAdversarialReasonOne.trim() },
-      { answer: authoringAdversarialAnswerTwo.trim(), reason: authoringAdversarialReasonTwo.trim() }
-    ];
 
     setIsCreatingExercise(true);
     setAuthoringMessage(null);
     setAuthoringError(null);
     try {
-      await onCreateExercise({
-        type: authoringType,
-        prompt: authoringPrompt.trim(),
-        allowedVocabulary: parseAuthoringList(authoringVocabulary),
-        allowedRuleIds: parseAuthoringList(authoringRules),
-        expectedAnswers: parseAuthoringList(authoringAnswers),
-        adversarialAnswers,
-        gradingExplanation: authoringExplanation.trim()
-      });
+      await onCreateExercise(buildAuthoringPayload());
       setAuthoringMessage(t("learner.exerciseAuthored"));
     } catch (error) {
       const message = error instanceof Error ? error.message : t("learner.exerciseAuthoringFailed");
@@ -379,9 +418,18 @@ export function LearnerView({
               type="button"
               className="secondary"
               onClick={handleGenerateWithModel}
-              disabled={isWorkflowBusy || isCreatingExercise || isGeneratingExercise}
+              disabled={isWorkflowBusy || isCreatingExercise || isGeneratingExercise || isValidatingExercise}
             >
               {isGeneratingExercise ? t("learner.generating") : t("learner.generateWithModel")}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              aria-label={t("learner.validateExerciseAria")}
+              disabled={!canValidateExercise}
+              onClick={() => void handleValidateExercise()}
+            >
+              {isValidatingExercise ? t("learner.validatingExercise") : t("learner.validateExercise")}
             </button>
             <button type="submit" className="secondary" disabled={!canCreateExercise}>
               {isCreatingExercise ? t("learner.creating") : t("learner.createExercise")}

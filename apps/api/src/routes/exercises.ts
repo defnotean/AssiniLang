@@ -17,11 +17,39 @@ import {
 } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 import {
+  type ExerciseAuthoringBody,
   exerciseAuthoringValidationError,
   parseExerciseAuthoringBody,
   parseExerciseGenerationType,
-  parseExerciseSubmissionBody
+  parseExerciseSubmissionBody,
+  validateExerciseAuthoring
 } from "./exerciseParsing.js";
+
+export type ExerciseAuthoringDryRunResponse = {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+  preview: ExerciseAuthoringBody | null;
+};
+
+function isExerciseDryRunRequest(request: { query: unknown }, rawBody: unknown): boolean {
+  const query = request.query as Record<string, string | undefined>;
+  if (query.dryRun === "1" || query.dryRun === "true") {
+    return true;
+  }
+  if (rawBody && typeof rawBody === "object" && !Array.isArray(rawBody)) {
+    return (rawBody as Record<string, unknown>).dryRun === true;
+  }
+  return false;
+}
+
+function exerciseAuthoringPayloadFromRequest(rawBody: unknown): unknown {
+  if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) {
+    return rawBody;
+  }
+  const { dryRun: _dryRun, ...rest } = rawBody as Record<string, unknown>;
+  return rest;
+}
 
 export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { readState, updateState, checkRateLimit, authToken, prototypeSessions, llmProvider } = ctx;
@@ -65,8 +93,17 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
   app.post("/languages/:languageId/exercises", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
-    const body = parseExerciseAuthoringBody(request.body ?? {});
+    const dryRun = isExerciseDryRunRequest(request, request.body ?? {});
+    const body = parseExerciseAuthoringBody(exerciseAuthoringPayloadFromRequest(request.body ?? {}));
     if (!body) {
+      if (dryRun) {
+        return {
+          ok: false,
+          errors: ["Invalid exercise authoring body"],
+          warnings: [],
+          preview: null
+        } satisfies ExerciseAuthoringDryRunResponse;
+      }
       reply.code(400);
       return { error: "Invalid exercise authoring body" };
     }
@@ -75,6 +112,21 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!checkRateLimit(request, reply, actor)) return { error: "Rate limit exceeded" };
+
+    if (!current.languages.some((language) => language.id === languageId)) {
+      reply.code(404);
+      return { error: `Language not found: ${languageId}` };
+    }
+
+    if (dryRun) {
+      const validation = validateExerciseAuthoring(current, languageId, body);
+      return {
+        ok: validation.errors.length === 0,
+        errors: validation.errors,
+        warnings: validation.warnings,
+        preview: validation.errors.length === 0 ? body : null
+      } satisfies ExerciseAuthoringDryRunResponse;
+    }
 
     let languageMissing = false;
     let validationError: string | undefined;

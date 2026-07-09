@@ -477,6 +477,12 @@ export const ar: Record<MessageKey, string> = {
   "learner.generateWithModel": "توليد بالنموذج",
   "learner.creating": "جارٍ الإنشاء...",
   "learner.createExercise": "إنشاء تمرين",
+  "learner.validateExercise": "تحقق",
+  "learner.validateExerciseAria": "التحقق من تأليف التمرين",
+  "learner.validatingExercise": "جارٍ التحقق...",
+  "learner.validateExerciseSuccess": "نجح التحقق: {answerCount} إجابة متوقعة و{probeCount} مسبارًا عدائيًا جاهزًا للحفظ.",
+  "learner.validateExerciseFailed": "فشل التحقق من التمرين",
+  "learner.validateExerciseNoLanguage": "اختر لغة قبل التحقق من تأليف التمرين.",
 
   // الحوكمة والسياسات.
   "governance.deploymentPolicy": "سياسة النشر",
