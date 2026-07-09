@@ -37,7 +37,7 @@ Symptom-cause-fix tables for the problems you are most likely to hit locally. Co
 | DOCX fails with `The document contains no extractable text — it may be a scanned image; OCR is not supported yet.` | The file has no text layer; document OCR beyond scanned PDF page 1 is not implemented yet | Export pages as images and upload those (the image OCR fallback applies), or OCR the document externally and upload the text. |
 | A source shows `Processing interrupted by a server restart. Re-run processing.` | The API crashed or restarted mid-processing; the startup recovery sweep reset the asset from `processing` to `failed` and logged a `source_asset.processing_recovered` audit event | Re-run processing on the source. |
 | A source is stuck at `processing` while the API is still running | Async processing was claimed but the background task never persisted a result; recovery only runs at startup | Restart the API (the startup sweep resets it to `failed`), then reprocess. With seedable data, `npm.cmd run seed` resets the whole workspace. |
-| Processing returns `409 Source is already processing` | An async run is still in flight, or a crash left the asset stuck | Wait for polling to finish (the console polls every 2.5 s); if it never finishes, apply the stuck-`processing` fix above. |
+| Processing returns `409 Source is already processing` (`i18nKey: ingest.sourceAlreadyProcessing`) | An async run is still in flight, or a crash left the asset stuck | Wait for polling to finish (the console polls every 2.5 s); if it never finishes, apply the stuck-`processing` fix above. |
 
 ## Data and persistence
 

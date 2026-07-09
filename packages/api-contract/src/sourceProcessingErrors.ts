@@ -34,6 +34,10 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.ocrDocxUnsupported" };
   }
 
+  if (/Source is already processing/i.test(normalized)) {
+    return { i18nKey: "ingest.sourceAlreadyProcessing" };
+  }
+
   return undefined;
 }
 

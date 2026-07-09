@@ -4324,7 +4324,10 @@ describe("api server", () => {
         payload: { async: true }
       });
       expect(conflictAsync.statusCode).toBe(409);
-      expect(conflictAsync.json().error).toContain("already processing");
+      expect(conflictAsync.json()).toMatchObject({
+        error: expect.stringContaining("already processing"),
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      });
 
       const conflictSync = await app.inject({
         method: "POST",
@@ -4332,7 +4335,10 @@ describe("api server", () => {
         headers: authHeaders("reviewer-1")
       });
       expect(conflictSync.statusCode).toBe(409);
-      expect(conflictSync.json().error).toContain("already processing");
+      expect(conflictSync.json()).toMatchObject({
+        error: expect.stringContaining("already processing"),
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      });
 
       release(JSON.stringify({ summary: "Done.", lexemes: [{ form: "mira", gloss: "river" }] }));
 
@@ -4457,7 +4463,10 @@ describe("api server", () => {
         headers: authHeaders("reviewer-1")
       });
       expect(conflict.statusCode).toBe(409);
-      expect(conflict.json().error).toContain("already processing");
+      expect(conflict.json()).toMatchObject({
+        error: expect.stringContaining("already processing"),
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      });
 
       release(JSON.stringify({ summary: "Done.", lexemes: [{ form: "mira", gloss: "river" }] }));
       const processed = await firstRequest;

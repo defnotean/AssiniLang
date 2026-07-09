@@ -517,7 +517,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (asset.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
       reply.code(409);
-      return { error: `Source is already processing: ${sourceId}` };
+      return {
+        error: `Source is already processing: ${sourceId}`,
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      };
     }
 
     if ((asset.processingAttempts ?? 0) >= MAX_SOURCE_PROCESSING_ATTEMPTS) {
@@ -570,7 +573,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
 
     if (alreadyProcessing) {
       reply.code(409);
-      return { error: `Source is already processing: ${sourceId}` };
+      return {
+        error: `Source is already processing: ${sourceId}`,
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      };
     }
 
     if (!claimed) {

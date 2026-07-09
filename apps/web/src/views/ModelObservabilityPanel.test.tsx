@@ -66,6 +66,8 @@ describe("ModelObservabilityPanel", () => {
 
     const empty = screen.getByRole("status");
     expect(empty).toHaveAttribute("aria-live", "polite");
-    expect(empty).toHaveTextContent("No AI sessions recorded.");
+    expect(empty).toHaveTextContent(
+      "No AI sessions recorded yet. Open Chat to start a practice or review session, then return here to inspect it."
+    );
   });
 });

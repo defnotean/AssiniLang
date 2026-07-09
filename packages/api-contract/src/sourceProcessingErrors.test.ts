@@ -31,6 +31,11 @@ describe("sourceProcessingErrorI18n", () => {
     )).toEqual({ i18nKey: "ingest.ocrDocxUnsupported" });
   });
 
+  it("classifies already-processing conflicts", () => {
+    expect(sourceProcessingErrorI18n("Source is already processing: src-1"))
+      .toEqual({ i18nKey: "ingest.sourceAlreadyProcessing" });
+  });
+
   it("returns undefined for unrelated processing errors", () => {
     expect(sourceProcessingErrorI18n("Remote failure [redacted-secret]")).toBeUndefined();
   });

@@ -138,7 +138,7 @@ Successful processing marks the source `processed`, stores a summary (and transc
 
 Each claim increments `processingAttempts` and stamps `processingStartedAt` / `processingHeartbeatAt` on the asset (heartbeats continue while the job runs). After 5 failed or abandoned claims, further `POST /sources/:sourceId/process` calls return `409` with `i18nKey: "ingest.sourceMaxProcessingAttempts"` so operators can stop retry loops and inspect the asset instead of spinning forever.
 
-The route also supports background processing for long sources: send a JSON body of `{ "async": true }` and the server validates the same preconditions, marks the source `processing`, and returns `202` with the updated asset (and empty `drafts`/`warnings`). Extraction then runs in the background and persists the same results as the synchronous path: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset. Poll `GET /languages/:languageId/sources` until the asset leaves `processing`. A source that is already `processing` returns `409` in both modes.
+The route also supports background processing for long sources: send a JSON body of `{ "async": true }` and the server validates the same preconditions, marks the source `processing`, and returns `202` with the updated asset (and empty `drafts`/`warnings`). Extraction then runs in the background and persists the same results as the synchronous path: drafts plus `processed` status on success, or `failed` with a sanitized `error` on the asset. Poll `GET /languages/:languageId/sources` until the asset leaves `processing`. A source that is already `processing` returns `409` with `i18nKey: "ingest.sourceAlreadyProcessing"` in both modes.
 
 ## Extraction drafts
 

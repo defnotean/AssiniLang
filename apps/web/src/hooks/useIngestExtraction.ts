@@ -91,8 +91,8 @@ export function useIngestExtraction(
           setPollingSource({ id: inFlight.id, title: inFlight.title });
         }
       })
-      .catch((error: Error) => {
-        if (isCurrent) setIntakeError(error.message);
+      .catch((error: unknown) => {
+        if (isCurrent) setIntakeError(localizeApiError(error, t, "ingest.intakeLoadFailed"));
       })
       .finally(() => {
         if (isCurrent) setIsLoadingIntake(false);
@@ -101,7 +101,7 @@ export function useIngestExtraction(
     return () => {
       isCurrent = false;
     };
-  }, [languageId]);
+  }, [languageId, t]);
 
   async function refreshIntake() {
     const [loadedSources, loadedDrafts] = await Promise.all([
@@ -146,8 +146,7 @@ export function useIngestExtraction(
       setRegisterNotice(t("ingest.sourceRegistered", { title: registered.title }));
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.sourceRegistrationFailed");
-      setRegisterError(message);
+      setRegisterError(localizeApiError(error, t, "ingest.sourceRegistrationFailed"));
     } finally {
       setIsRegisteringSource(false);
     }
@@ -173,8 +172,7 @@ export function useIngestExtraction(
       setRegisterNotice(t("ingest.fileUploaded", { kind: uploaded.kind, title: uploaded.title }));
       await refreshIntake();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("ingest.sourceUploadFailed");
-      setRegisterError(message);
+      setRegisterError(localizeApiError(error, t, "ingest.sourceUploadFailed"));
     } finally {
       setIsUploadingSource(false);
     }

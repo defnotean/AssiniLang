@@ -195,7 +195,9 @@ describe("LearnerView practice next panel", () => {
     renderLearnerView({ exercises: [], selectedExercise: null });
 
     const exerciseList = screen.getByRole("region", { name: "Exercise selector" });
-    expect(within(exerciseList).getByText("No exercises available.")).toBeInTheDocument();
+    expect(within(exerciseList).getByText(
+      "No exercises yet. Author one below, or open Build to accept grammar drafts that can become practice tasks."
+    )).toBeInTheDocument();
     expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
 
     const detailPanel = screen.getByRole("region", { name: "Exercise detail panel" });

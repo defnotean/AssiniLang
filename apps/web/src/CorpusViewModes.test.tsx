@@ -219,7 +219,9 @@ describe("CorpusView network graph mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph" }));
 
     await waitFor(() => {
-      expect(screen.getByText("No graph records are available for this corpus.")).toBeInTheDocument();
+      expect(screen.getByText(
+        "No graph records yet. Process a source in Build and accept corpus or note drafts so the graph has passages to link."
+      )).toBeInTheDocument();
     });
   });
 

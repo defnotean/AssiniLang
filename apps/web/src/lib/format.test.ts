@@ -278,6 +278,35 @@ describe("localizeApiError", () => {
     );
   });
 
+  it("localizes already-processing conflicts from i18n metadata", () => {
+    const message = localizeApiError(
+      new ApiError("Source is already processing: src-1", {
+        status: 409,
+        i18nKey: "ingest.sourceAlreadyProcessing"
+      }),
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "This source is already processing. Wait for the current run to finish, or recover a stuck job after restart."
+    );
+  });
+
+  it("localizes already-processing conflicts from message text when metadata is absent", () => {
+    const message = localizeApiError(
+      new ApiError("Request failed: /sources/src-1/process (409): Source is already processing: src-1", {
+        status: 409
+      }),
+      t,
+      "ingest.sourceProcessingFailed"
+    );
+
+    expect(message).toBe(
+      "This source is already processing. Wait for the current run to finish, or recover a stuck job after restart."
+    );
+  });
+
   it("localizes vault allowlist failures with operator guidance", () => {
     const message = localizeVaultImportError(
       new Error(

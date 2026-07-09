@@ -128,6 +128,7 @@ describe("project documentation", () => {
         "duplicate",
         "processingAttempts",
         "ingest.sourceMaxProcessingAttempts",
+        "ingest.sourceAlreadyProcessing",
         "ExerciseAuthoringBody"
       ],
       "docs/architecture.md": [
@@ -153,7 +154,8 @@ describe("project documentation", () => {
         "## Error catalogue",
         "## Duplicate flags on drafts",
         "```mermaid",
-        "Source processing attempt limit reached"
+        "Source processing attempt limit reached",
+        "ingest.sourceAlreadyProcessing"
       ],
       "docs/maintenance.md": ["## Adding an API route", "## Documentation conventions", "publicLanguageViews.ts"],
       "docs/operator-recovery.md": [
