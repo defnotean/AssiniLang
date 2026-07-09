@@ -3,6 +3,7 @@ import type { ElderCorrection } from "@assini/db";
 import type { ElderContext, ElderCorrectionPayload, ElderCorrectionReviewStatus } from "../api";
 import { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "../api";
 import { useI18n } from "../i18n";
+import { localizeApiError } from "../lib/format";
 
 export interface ElderWorkspaceState {
   elderContext: ElderContext | null;
@@ -68,9 +69,9 @@ export function useElderWorkspace(
       .then((context) => {
         setElderContext(context);
       })
-      .catch((error: Error) => {
+      .catch((error: unknown) => {
         setElderContext(null);
-        setCorrectionError(error.message || t("elderWs.errContextLoadFailed"));
+        setCorrectionError(localizeApiError(error, t, "elderWs.errContextLoadFailed"));
       })
       .finally(() => {
         setIsLoadingElder(false);
@@ -94,10 +95,10 @@ export function useElderWorkspace(
       .then((context) => {
         if (isCurrent) setElderContext(context);
       })
-      .catch((error: Error) => {
+      .catch((error: unknown) => {
         if (!isCurrent) return;
         setElderContext(null);
-        setCorrectionError(error.message || t("elderWs.errContextLoadFailed"));
+        setCorrectionError(localizeApiError(error, t, "elderWs.errContextLoadFailed"));
       })
       .finally(() => {
         if (isCurrent) setIsLoadingElder(false);
@@ -162,8 +163,7 @@ export function useElderWorkspace(
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("elderWs.errSubmitFailed");
-      setCorrectionError(message);
+      setCorrectionError(localizeApiError(error, t, "elderWs.errSubmitFailed"));
     } finally {
       setIsSubmittingCorrection(false);
     }
@@ -180,8 +180,7 @@ export function useElderWorkspace(
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshModelObservability();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("elderWs.errReviewFailed");
-      setCorrectionError(message);
+      setCorrectionError(localizeApiError(error, t, "elderWs.errReviewFailed"));
     } finally {
       setReviewingCorrectionId(null);
     }
@@ -215,8 +214,7 @@ export function useElderWorkspace(
       setElderContext(await fetchElderContext(selectedLanguageId));
       await refreshDashboard();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("elderWs.errApplyFailed");
-      setCorrectionError(message);
+      setCorrectionError(localizeApiError(error, t, "elderWs.errApplyFailed"));
     } finally {
       setApplyingCorrectionId(null);
     }

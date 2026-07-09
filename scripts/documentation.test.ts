@@ -132,7 +132,8 @@ describe("project documentation", () => {
         "ExerciseAuthoringBody",
         "Evaluation artifact export",
         "uses the reviewer actor in the browser",
-        "cookie `Max-Age` both refresh"
+        "cookie `Max-Age` both refresh",
+        "errors.noLanguagesToEvaluate"
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",

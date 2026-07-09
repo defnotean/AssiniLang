@@ -89,4 +89,9 @@ describe("locale catalogs", () => {
     expect(ar["model.clearSavedModel"]).not.toBe(en["model.clearSavedModel"]);
     expect(ar["model.maxTokens"]).not.toBe(en["model.maxTokens"]);
   });
+
+  it("localizes empty-workspace evaluation errors in Arabic", () => {
+    expect(ar["errors.noLanguagesToEvaluate"]).toBe("لا توجد لغات متاحة للتقييم");
+    expect(ar["errors.noLanguagesToEvaluate"]).not.toBe(en["errors.noLanguagesToEvaluate"]);
+  });
 });

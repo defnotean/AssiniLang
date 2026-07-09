@@ -286,7 +286,7 @@ Language snapshots (`language-snapshot-v2`) and evaluation artifacts (`evaluatio
 
 `POST /evaluations/run`
 
-Evaluation runs are generated for existing languages against the workspace corpus (`fixtureVersion: "workspace-corpus-v1"`). Persisted runs are validated during local JSON reads: each run must keep a nonblank language ID that references an existing language, nonblank version and summary text, a parseable `createdAt`, and failure lines that match their parent run's language.
+Evaluation runs are generated for existing languages against the workspace corpus (`fixtureVersion: "workspace-corpus-v1"`). When the workspace has no languages, the route returns `400` with `{ "error": "No languages available to evaluate", "i18nKey": "errors.noLanguagesToEvaluate" }` and does not append runs. Persisted runs are validated during local JSON reads: each run must keep a nonblank language ID that references an existing language, nonblank version and summary text, a parseable `createdAt`, and failure lines that match their parent run's language.
 
 ## Elder corrections
 

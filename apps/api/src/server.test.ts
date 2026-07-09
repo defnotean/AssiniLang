@@ -1130,7 +1130,10 @@ describe("api server", () => {
 
     const response = await app.inject({ method: "POST", url: "/evaluations/run", headers: authHeaders("reviewer-1") });
     expect(response.statusCode).toBe(400);
-    expect(response.json()).toEqual({ error: "No languages available to evaluate" });
+    expect(response.json()).toEqual({
+      error: "No languages available to evaluate",
+      i18nKey: "errors.noLanguagesToEvaluate"
+    });
 
     const evaluations = await app.inject({ method: "GET", url: "/evaluations", headers: authHeaders("reviewer-1") });
     expect(evaluations.statusCode).toBe(200);
@@ -3951,6 +3954,69 @@ describe("api server", () => {
     const after = await fetchReviewedNote(app);
     expect(after.explanation).toBe(revisedExplanation);
     expect(after.editHistory).toHaveLength(before.editHistory.length + 1);
+  });
+
+  it("rejects apply for pending elder corrections and for accepted corrections without a note link", async () => {
+    const app = createServer({ initialState: buildTestWorkspaceState() });
+
+    const pending = await app.inject({
+      method: "POST",
+      url: "/elder/corrections",
+      headers: authHeaders("elder-1"),
+      payload: {
+        languageId: TEST_LANGUAGE_ID,
+        noteId: reviewedNoteId,
+        correction: "Mention suffix order before approval.",
+        rationale: "Elder review found the explanation underspecified.",
+        severity: "major"
+      }
+    });
+    expect(pending.statusCode).toBe(201);
+
+    const applyPending = await app.inject({
+      method: "PATCH",
+      url: `/elder/corrections/${encodeURIComponent(pending.json().id)}/apply`,
+      headers: authHeaders("lead-1"),
+      payload: { explanation: "Should not apply while still pending review." }
+    });
+    expect(applyPending.statusCode).toBe(409);
+    expect(applyPending.json()).toEqual({
+      error: `Elder correction must be accepted before apply: ${pending.json().id}`
+    });
+
+    const passageOnly = await app.inject({
+      method: "POST",
+      url: "/elder/corrections",
+      headers: authHeaders("elder-1"),
+      payload: {
+        languageId: TEST_LANGUAGE_ID,
+        passageId: "testlang-c001",
+        correction: "Clarify river-path morphology in the passage gloss.",
+        rationale: "Passage context needs a clearer gloss before learner use.",
+        severity: "minor"
+      }
+    });
+    expect(passageOnly.statusCode).toBe(201);
+    expect(passageOnly.json().noteId).toBeUndefined();
+
+    const acceptedPassageOnly = await app.inject({
+      method: "PATCH",
+      url: `/elder/corrections/${encodeURIComponent(passageOnly.json().id)}/review`,
+      headers: authHeaders("lead-1"),
+      payload: { status: "accepted" }
+    });
+    expect(acceptedPassageOnly.statusCode).toBe(200);
+
+    const applyPassageOnly = await app.inject({
+      method: "PATCH",
+      url: `/elder/corrections/${encodeURIComponent(passageOnly.json().id)}/apply`,
+      headers: authHeaders("lead-1"),
+      payload: { explanation: "Should not apply without a linked note." }
+    });
+    expect(applyPassageOnly.statusCode).toBe(400);
+    expect(applyPassageOnly.json()).toEqual({
+      error: `Elder correction is not linked to a note: ${passageOnly.json().id}`
+    });
   });
 
   it("returns a programmer-only neural map and rate limits protected writes", async () => {

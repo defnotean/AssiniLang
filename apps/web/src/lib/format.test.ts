@@ -293,6 +293,19 @@ describe("localizeApiError", () => {
     );
   });
 
+  it("localizes empty-workspace evaluation failures from i18n metadata", () => {
+    const message = localizeApiError(
+      new ApiError("No languages available to evaluate", {
+        status: 400,
+        i18nKey: "errors.noLanguagesToEvaluate"
+      }),
+      t,
+      "errors.evaluationRunFailed"
+    );
+
+    expect(message).toBe("No languages available to evaluate");
+  });
+
   it("localizes already-processing conflicts from message text when metadata is absent", () => {
     const message = localizeApiError(
       new ApiError("Request failed: /sources/src-1/process (409): Source is already processing: src-1", {
@@ -492,10 +505,16 @@ describe("formatSubmissionStatus", () => {
 });
 
 describe("formatOrthographyMeta", () => {
-  it("localizes default, named, and truncated orthography labels", () => {
+  it("localizes default and named orthography labels", () => {
     expect(formatOrthographyMeta(undefined, t)).toBe("Latin orthography");
     expect(formatOrthographyMeta("Latin", t)).toBe("Latin orthography");
-    expect(formatOrthographyMeta("x".repeat(35), t)).toBe("Latin morphology hyphenation");
+  });
+
+  it("truncates long orthography values instead of replacing them with placeholder copy", () => {
+    const long = "Latin morphology with hyphenation rules";
+    expect(formatOrthographyMeta(long, t)).toBe("Latin morphology with hyphenation… orthography");
+    expect(formatOrthographyMeta(long)).toBe("Latin morphology with hyphenation… orthography");
+    expect(formatOrthographyMeta("x".repeat(35), t)).toBe(`${"x".repeat(33)}… orthography`);
   });
 });
 

@@ -84,14 +84,17 @@ export function formatReachability(result: LlmReachability, t?: Translate): stri
   return t ? t("model.reachability.unreachable") : "Unreachable";
 }
 
+const ORTHOGRAPHY_META_MAX_CHARS = 34;
+
 export function formatOrthographyMeta(value?: string, t?: Translate): string {
   if (!value) {
     return t ? t("header.orthographyDefault") : "Latin orthography";
   }
-  if (value.length > 34) {
-    return t ? t("header.orthographyTruncated") : "Latin morphology hyphenation";
-  }
-  return t ? t("header.orthographyNamed", { value }) : `${value} orthography`;
+  const displayValue =
+    value.length > ORTHOGRAPHY_META_MAX_CHARS
+      ? `${value.slice(0, ORTHOGRAPHY_META_MAX_CHARS - 1)}…`
+      : value;
+  return t ? t("header.orthographyNamed", { value: displayValue }) : `${displayValue} orthography`;
 }
 
 const STATUS_MESSAGE_KEYS: Record<string, MessageKey> = {

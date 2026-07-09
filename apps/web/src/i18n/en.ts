@@ -57,7 +57,6 @@ export const en = {
   "header.statStripAria": "Current language overview",
   "header.statusWorkspace": "{status} workspace",
   "header.orthographyDefault": "Latin orthography",
-  "header.orthographyTruncated": "Latin morphology hyphenation",
   "header.orthographyNamed": "{value} orthography",
   "header.backToDashboard": "Back to dashboard",
   "header.elderWorkspace": "Elder workspace",
@@ -123,6 +122,7 @@ export const en = {
 
   // Errors surfaced to the operator (fallbacks when a workflow throws).
   "errors.evaluationRunFailed": "Evaluation run failed",
+  "errors.noLanguagesToEvaluate": "No languages available to evaluate",
   "errors.draftGenerationFailed": "Draft generation failed",
   "errors.modelDraftGenerationFailed": "Model draft generation failed",
   "errors.noteReviewFailed": "Note review failed",

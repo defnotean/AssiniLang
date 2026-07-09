@@ -89,7 +89,6 @@ export const ar: Record<MessageKey, string> = {
   "header.statStripAria": "نظرة عامة على اللغة الحالية",
   "header.statusWorkspace": "مساحة عمل {status}",
   "header.orthographyDefault": "إملاء لاتيني",
-  "header.orthographyTruncated": "وصل صرفي لاتيني",
   "header.orthographyNamed": "إملاء {value}",
   "header.backToDashboard": "العودة إلى اللوحة",
   "header.elderWorkspace": "مساحة عمل الكبير",
@@ -150,6 +149,7 @@ export const ar: Record<MessageKey, string> = {
   "palette.toggleTheme": "تبديل السمة",
 
   "errors.evaluationRunFailed": "فشلت جولة التقييم",
+  "errors.noLanguagesToEvaluate": "لا توجد لغات متاحة للتقييم",
   "errors.draftGenerationFailed": "فشل توليد المسودات",
   "errors.modelDraftGenerationFailed": "فشل توليد مسودات النموذج",
   "errors.noteReviewFailed": "فشلت مراجعة الملاحظة",
