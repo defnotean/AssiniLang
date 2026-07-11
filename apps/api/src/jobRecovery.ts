@@ -6,16 +6,14 @@ import { appendAuditEvents, usersForState, type AuditEventDraft } from "./routeH
  * was interrupted by a crash or restart. The asset moves back to "failed",
  * so /sources/:sourceId/process accepts it again.
  */
-export const INTERRUPTED_PROCESSING_ERROR =
-  "Processing interrupted by a server restart. Re-run processing.";
+export const INTERRUPTED_PROCESSING_ERROR = "Processing interrupted by a server restart. Re-run processing.";
 
 /**
  * Operator-visible error left when an in-flight processing run stops reporting
  * heartbeats (orphaned async job, hung extraction, or failed completion persist)
  * while the API process is still up.
  */
-export const STALE_PROCESSING_ERROR =
-  "Processing stalled without progress. Re-run processing.";
+export const STALE_PROCESSING_ERROR = "Processing stalled without progress. Re-run processing.";
 
 export const PROCESSING_RECOVERED_ACTION = "source_asset.processing_recovered";
 
@@ -55,11 +53,7 @@ export function isProcessingHeartbeatStale(
   return nowMs - parsed > staleMs;
 }
 
-function markRecoveredAsset(
-  asset: SourceAsset,
-  recoveredAt: string,
-  error: string
-): SourceAsset {
+function markRecoveredAsset(asset: SourceAsset, recoveredAt: string, error: string): SourceAsset {
   return {
     ...asset,
     status: "failed" as const,
@@ -111,7 +105,7 @@ export function recoverInterruptedSourcesState(state: AppState, recoveredAt = ne
 
   const actor = recoveryActor(state);
   const interruptedIds = new Set(interrupted.map((asset) => asset.id));
-  const drafts: AuditEventDraft[] = interrupted.map((asset) => (
+  const drafts: AuditEventDraft[] = interrupted.map((asset) =>
     recoveryAuditDraft(
       actor,
       asset,
@@ -119,16 +113,17 @@ export function recoverInterruptedSourcesState(state: AppState, recoveredAt = ne
       `Recovered source "${asset.title}" from an interrupted processing run; marked failed for re-processing.`,
       { reason: "interrupted_restart" }
     )
-  ));
+  );
 
-  return appendAuditEvents({
-    ...state,
-    sourceAssets: state.sourceAssets.map((asset) => (
-      interruptedIds.has(asset.id)
-        ? markRecoveredAsset(asset, recoveredAt, INTERRUPTED_PROCESSING_ERROR)
-        : asset
-    ))
-  }, drafts);
+  return appendAuditEvents(
+    {
+      ...state,
+      sourceAssets: state.sourceAssets.map((asset) =>
+        interruptedIds.has(asset.id) ? markRecoveredAsset(asset, recoveredAt, INTERRUPTED_PROCESSING_ERROR) : asset
+      )
+    },
+    drafts
+  );
 }
 
 export type RecoverStaleProcessingOptions = {
@@ -177,14 +172,15 @@ export function recoverStaleProcessingSourcesState(
     );
   });
 
-  return appendAuditEvents({
-    ...state,
-    sourceAssets: state.sourceAssets.map((asset) => (
-      staleIds.has(asset.id)
-        ? markRecoveredAsset(asset, recoveredAt, STALE_PROCESSING_ERROR)
-        : asset
-    ))
-  }, drafts);
+  return appendAuditEvents(
+    {
+      ...state,
+      sourceAssets: state.sourceAssets.map((asset) =>
+        staleIds.has(asset.id) ? markRecoveredAsset(asset, recoveredAt, STALE_PROCESSING_ERROR) : asset
+      )
+    },
+    drafts
+  );
 }
 
 /**
@@ -217,10 +213,9 @@ export async function recoverStaleProcessingSources(
   const nowMs = options.nowMs ?? Date.now();
   const staleMs = options.staleMs ?? DEFAULT_PROCESSING_STALE_MS;
   await store.update((state) => {
-    recoveredCount = state.sourceAssets.filter((asset) => (
-      !(options.skipIds?.has(asset.id))
-      && isProcessingHeartbeatStale(asset, nowMs, staleMs)
-    )).length;
+    recoveredCount = state.sourceAssets.filter(
+      (asset) => !options.skipIds?.has(asset.id) && isProcessingHeartbeatStale(asset, nowMs, staleMs)
+    ).length;
     return recoverStaleProcessingSourcesState(state, { ...options, nowMs, staleMs });
   });
   return recoveredCount;

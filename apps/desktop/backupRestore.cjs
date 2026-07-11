@@ -13,16 +13,13 @@ const LEGACY_SAFETY_BACKUP_PREFIX = "safety-before-restore";
  * longer by prune.
  */
 function isRestorableBackupName(name) {
-  return typeof name === "string" && (
-    name.startsWith("backup-") ||
-    name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`)
-  );
+  return typeof name === "string" && (name.startsWith("backup-") || name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`));
 }
 
 function isSafetyBackupName(name) {
-  return typeof name === "string" && (
-    name.startsWith(`${SAFETY_BACKUP_PREFIX}-`) ||
-    name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`)
+  return (
+    typeof name === "string" &&
+    (name.startsWith(`${SAFETY_BACKUP_PREFIX}-`) || name.startsWith(`${LEGACY_SAFETY_BACKUP_PREFIX}-`))
   );
 }
 
@@ -79,9 +76,7 @@ function assertBackupDistinctFromLive(backupDir, liveDataDir) {
     isPathInsideOrSame(backupRoot, liveRoot) ||
     isPathInsideOrSame(backupData, liveRoot)
   ) {
-    throw new Error(
-      `Refusing restore: backup folder ${backupRoot} overlaps the live data directory ${liveRoot}.`
-    );
+    throw new Error(`Refusing restore: backup folder ${backupRoot} overlaps the live data directory ${liveRoot}.`);
   }
 
   return { backupRoot, liveRoot };
@@ -160,10 +155,7 @@ function mapManifestDbPathToBackupData(dataDir, rawDbPath) {
     relativeSegments = [segments[segments.length - 1]];
   }
 
-  if (
-    relativeSegments.length === 0 ||
-    relativeSegments.some((segment) => segment === "." || segment === "..")
-  ) {
+  if (relativeSegments.length === 0 || relativeSegments.some((segment) => segment === "." || segment === "..")) {
     return null;
   }
 
@@ -200,9 +192,7 @@ function resolveBackupDbFile(backupDir, manifest = null) {
     if (mapped && existsSync(mapped.candidate)) {
       return mapped.candidate;
     }
-    const label = mapped?.label
-      ?? splitManifestPathSegments(parsed.dbPath).at(-1)
-      ?? parsed.dbPath.trim();
+    const label = mapped?.label ?? splitManifestPathSegments(parsed.dbPath).at(-1) ?? parsed.dbPath.trim();
     // Manifest named a database file that is missing — do not silently fall back
     // to local-db.* (that could restore the wrong workspace).
     throw new Error(
@@ -239,10 +229,9 @@ async function assertDesktopLiveDbReadable(dbPath, { readWorkspace } = {}) {
     await readWorkspace(dbPath);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Cannot create backup: live database at ${dbPath} is not a valid workspace: ${message}`,
-      { cause: error }
-    );
+    throw new Error(`Cannot create backup: live database at ${dbPath} is not a valid workspace: ${message}`, {
+      cause: error
+    });
   }
   return dbPath;
 }
@@ -277,12 +266,9 @@ async function assertSafetyBackupBeforeRestore(createSafetyBackup) {
   }
   const safety = await createSafetyBackup();
   if (!safety || safety.ok !== true) {
-    const detail = safety && typeof safety.message === "string" && safety.message.trim()
-      ? ` ${safety.message.trim()}`
-      : "";
-    throw new Error(
-      `Refusing restore: could not create a safety backup before replacing live data.${detail}`
-    );
+    const detail =
+      safety && typeof safety.message === "string" && safety.message.trim() ? ` ${safety.message.trim()}` : "";
+    throw new Error(`Refusing restore: could not create a safety backup before replacing live data.${detail}`);
   }
   return safety;
 }
@@ -333,9 +319,8 @@ function replaceLiveDesktopDataFromBackup({
     return { recoveredFromSafety: false };
   } catch (error) {
     const original = error instanceof Error ? error.message : String(error);
-    const safetyRoot = typeof safetyBackupDir === "string" && safetyBackupDir.trim()
-      ? path.resolve(safetyBackupDir)
-      : null;
+    const safetyRoot =
+      typeof safetyBackupDir === "string" && safetyBackupDir.trim() ? path.resolve(safetyBackupDir) : null;
     const safetyData = safetyRoot ? path.join(safetyRoot, "data") : null;
 
     if (safetyRoot && safetyData && existsSync(safetyData)) {
@@ -352,9 +337,7 @@ function replaceLiveDesktopDataFromBackup({
         if (recoveryError && recoveryError.recoveredFromSafety) {
           throw recoveryError;
         }
-        const recoveryMessage = recoveryError instanceof Error
-          ? recoveryError.message
-          : String(recoveryError);
+        const recoveryMessage = recoveryError instanceof Error ? recoveryError.message : String(recoveryError);
         throw new Error(
           `Restore failed after wiping live data, and safety recovery also failed. Original error: ${original}. Recovery error: ${recoveryMessage}`,
           { cause: error }

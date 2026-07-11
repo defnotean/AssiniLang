@@ -26,8 +26,9 @@ describe("corpus validation helpers", () => {
   it("reports missing corpus import languages with the existing error text", () => {
     const state = buildTestWorkspaceState();
 
-    expect(corpusPhonologyValidationError(state, "missing-language", { textTarget: "mira" }))
-      .toBe("Corpus import language not found: missing-language");
+    expect(corpusPhonologyValidationError(state, "missing-language", { textTarget: "mira" })).toBe(
+      "Corpus import language not found: missing-language"
+    );
   });
 
   it("skips orthography validation when no phonology inventory is declared", () => {
@@ -48,7 +49,8 @@ describe("corpus validation helpers", () => {
   it("reports target text outside the language phonology with the existing error text", () => {
     const state = buildTestWorkspaceState();
 
-    expect(corpusPhonologyValidationError(state, TEST_LANGUAGE_ID, { textTarget: "mira-z talo-na" }))
-      .toBe("Corpus target text uses z outside Testlang phonology inventory: mira-z talo-na");
+    expect(corpusPhonologyValidationError(state, TEST_LANGUAGE_ID, { textTarget: "mira-z talo-na" })).toBe(
+      "Corpus target text uses z outside Testlang phonology inventory: mira-z talo-na"
+    );
   });
 });

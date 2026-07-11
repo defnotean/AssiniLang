@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AiSession } from "@assini/db";
+import type { AiSession } from "@assini/api-contract";
 import { composeSeedPrompt, useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
 import { createTranslator, I18nProvider } from "./i18n";
 import { ApiError } from "./lib/apiClient";
@@ -52,7 +52,10 @@ function buildSession(options: { fallback?: boolean; reply?: string } = {}): AiS
         summary: "Generated a safe response.",
         referencedIds: [],
         warnings: fallback
-          ? ["Hidden chain-of-thought is not exposed.", "Deterministic fallback response: no LLM provider is configured."]
+          ? [
+              "Hidden chain-of-thought is not exposed.",
+              "Deterministic fallback response: no LLM provider is configured."
+            ]
           : ["Hidden chain-of-thought is not exposed."]
       }
     ],
@@ -133,19 +136,21 @@ describe("AssistantView", () => {
     expect(apiMock.createAiSession).toHaveBeenCalledWith(
       expect.objectContaining({
         seedPrompt:
-          "Conversation setup - follow these instructions for every reply in this session: "
-          + "Always gloss morphemes with Leipzig abbreviations.\n\nWhat does ka mean?"
+          "Conversation setup - follow these instructions for every reply in this session: " +
+          "Always gloss morphemes with Leipzig abbreviations.\n\nWhat does ka mean?"
       })
     );
-  });  it("disables sending and shows a thinking indicator while a reply is pending", async () => {
+  });
+  it("disables sending and shows a thinking indicator while a reply is pending", async () => {
     render(<Harness />);
     await startConversation();
 
     let resolveReply: (session: AiSession) => void = () => undefined;
     apiMock.continueAiSession.mockImplementation(
-      () => new Promise<AiSession>((resolve) => {
-        resolveReply = resolve;
-      })
+      () =>
+        new Promise<AiSession>((resolve) => {
+          resolveReply = resolve;
+        })
     );
 
     fireEvent.change(screen.getByLabelText("Message the assistant"), { target: { value: "And case particles?" } });
@@ -156,7 +161,11 @@ describe("AssistantView", () => {
     expect(sendButton).toBeDisabled();
     expect(sendButton).toHaveAttribute("aria-busy", "true");
     expect(screen.getByLabelText("Message the assistant")).toBeDisabled();
-    expect(apiMock.continueAiSession).toHaveBeenCalledWith("ai-session-avenik-1", "And case particles?", "learner_practice");
+    expect(apiMock.continueAiSession).toHaveBeenCalledWith(
+      "ai-session-avenik-1",
+      "And case particles?",
+      "learner_practice"
+    );
 
     resolveReply(buildSession({ reply: "Case particles attach last." }));
     expect(await screen.findByText("Case particles attach last.")).toBeInTheDocument();
@@ -169,9 +178,10 @@ describe("AssistantView", () => {
   it("marks start busy while creating a session, then surfaces create errors as alerts", async () => {
     let rejectCreate: (error: Error) => void = () => undefined;
     apiMock.createAiSession.mockImplementation(
-      () => new Promise<AiSession>((_resolve, reject) => {
-        rejectCreate = reject;
-      })
+      () =>
+        new Promise<AiSession>((_resolve, reject) => {
+          rejectCreate = reject;
+        })
     );
 
     render(<Harness />);

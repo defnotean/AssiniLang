@@ -4,7 +4,7 @@ import type { LlmChatMessage, LlmProvider } from "./llmProvider.js";
 import { readEmbeddingEnvConfig, type Env } from "./llmEnvShared.js";
 import { parseModelJson } from "./modelJson.js";
 import { retrieveTopKPassages, type EmbeddingFetch } from "@assini/eval";
-import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
+import { createOutboundHttpFetch } from "./urlSafety.js";
 
 /**
  * Model-backed, GROUNDED generation of draft grammar notes and a draft
@@ -91,12 +91,16 @@ const REASONING_ONLY_PATTERN = /reasoning_content/i;
 const confidenceSchema = z.enum(["low", "medium", "high"]).catch("medium");
 
 const generatedNotesSchema = z.object({
-  notes: z.array(z.object({
-    topic: z.string(),
-    explanation: z.string(),
-    evidencePassageIds: z.array(z.string()).optional(),
-    confidence: confidenceSchema.optional()
-  })).optional()
+  notes: z
+    .array(
+      z.object({
+        topic: z.string(),
+        explanation: z.string(),
+        evidencePassageIds: z.array(z.string()).optional(),
+        confidence: confidenceSchema.optional()
+      })
+    )
+    .optional()
 });
 
 const generatedExerciseSchema = z.object({
@@ -105,10 +109,14 @@ const generatedExerciseSchema = z.object({
   allowedVocabulary: z.array(z.string()).optional(),
   allowedRuleIds: z.array(z.string()).optional(),
   expectedAnswers: z.array(z.string()).optional(),
-  adversarialAnswers: z.array(z.object({
-    answer: z.string(),
-    reason: z.string()
-  })).optional(),
+  adversarialAnswers: z
+    .array(
+      z.object({
+        answer: z.string(),
+        reason: z.string()
+      })
+    )
+    .optional(),
   gradingExplanation: z.string().optional()
 });
 
@@ -195,7 +203,9 @@ function serializeContext(context: GenerationContext): string {
     })),
     topicTags: passage.topicTags
   }));
-  sections.push(`Approved corpus passages (the ONLY passages you may cite as evidence, by id):\n${JSON.stringify(passages)}`);
+  sections.push(
+    `Approved corpus passages (the ONLY passages you may cite as evidence, by id):\n${JSON.stringify(passages)}`
+  );
 
   const lexicon = context.lexemes.slice(0, MAX_CONTEXT_LEXEMES).map((lexeme) => ({
     form: lexeme.form,
@@ -208,7 +218,9 @@ function serializeContext(context: GenerationContext): string {
     id: note.id,
     topic: note.topic
   }));
-  sections.push(`Existing grammar notes (do NOT duplicate these topics; cite ids as rules):\n${JSON.stringify(existingNotes)}`);
+  sections.push(
+    `Existing grammar notes (do NOT duplicate these topics; cite ids as rules):\n${JSON.stringify(existingNotes)}`
+  );
 
   const joined = sections.join("\n\n");
   return joined.length > MAX_CONTEXT_CHARS ? `${joined.slice(0, MAX_CONTEXT_CHARS - 3)}...` : joined;
@@ -222,7 +234,7 @@ export function buildNoteGenerationMessages(language: Language, context: Generat
     "- Use ONLY forms that appear in the supplied corpus or lexicon. Never invent words, affixes, or translations.",
     "- Every note MUST cite one or more evidencePassageIds drawn from the supplied passage ids. A note with no real evidence is useless and will be discarded.",
     "- Do not restate an existing note topic.",
-    "- Generate exactly 1 concise note when you see a non-duplicate grounded pattern. If nothing is safely new, return {\"notes\":[]}.",
+    '- Generate exactly 1 concise note when you see a non-duplicate grounded pattern. If nothing is safely new, return {"notes":[]}.',
     ...describeLanguage(language),
     "Respond with a single JSON object and nothing else, using exactly this shape:",
     JSON.stringify({
@@ -256,7 +268,7 @@ function buildCompactNoteGenerationMessages(language: Language, context: Generat
       role: "system",
       content: [
         "Return visible JSON only. Do not include analysis, markdown, or hidden-only reasoning.",
-        "If you cannot safely create one new grounded note, return exactly {\"notes\":[]}.",
+        'If you cannot safely create one new grounded note, return exactly {"notes":[]}.',
         "Use only the supplied passage ids as evidencePassageIds.",
         ...describeLanguage(language),
         "Required JSON shape:",
@@ -400,9 +412,8 @@ export function parseGeneratedNotes(content: string, grounding: NoteGrounding): 
       continue;
     }
 
-    const { kept: validEvidence, dropped: droppedEvidence } = partitionGroundedStrings(
-      raw.evidencePassageIds,
-      (id) => grounding.passageIds.has(id)
+    const { kept: validEvidence, dropped: droppedEvidence } = partitionGroundedStrings(raw.evidencePassageIds, (id) =>
+      grounding.passageIds.has(id)
     );
     if (validEvidence.length === 0) {
       warnings.push(
@@ -411,12 +422,16 @@ export function parseGeneratedNotes(content: string, grounding: NoteGrounding): 
       continue;
     }
     if (droppedEvidence.length > 0) {
-      warnings.push(`Generated note "${topic}" cited ${droppedEvidence.length} unknown evidence passage id(s) that were dropped: ${droppedEvidence.join(", ")}.`);
+      warnings.push(
+        `Generated note "${topic}" cited ${droppedEvidence.length} unknown evidence passage id(s) that were dropped: ${droppedEvidence.join(", ")}.`
+      );
     }
 
     const normalizedTopic = normalizeTopic(topic);
     if (seenTopics.has(normalizedTopic)) {
-      warnings.push(`Dropped generated note "${topic}" because its topic duplicates an existing or already-generated note.`);
+      warnings.push(
+        `Dropped generated note "${topic}" because its topic duplicates an existing or already-generated note.`
+      );
       continue;
     }
     seenTopics.add(normalizedTopic);
@@ -473,15 +488,18 @@ export function parseGeneratedExercise(content: string, grounding: ExerciseGroun
     (form) => grounding.lexemeForms.has(normalizeForm(form))
   );
   if (droppedVocabulary.length > 0) {
-    warnings.push(`Dropped ${droppedVocabulary.length} hallucinated vocabulary form(s) not in the approved lexicon: ${droppedVocabulary.join(", ")}.`);
+    warnings.push(
+      `Dropped ${droppedVocabulary.length} hallucinated vocabulary form(s) not in the approved lexicon: ${droppedVocabulary.join(", ")}.`
+    );
   }
 
-  const { kept: allowedRuleIds, dropped: droppedRuleIds } = partitionGroundedStrings(
-    raw.allowedRuleIds,
-    (id) => grounding.noteIds.has(id)
+  const { kept: allowedRuleIds, dropped: droppedRuleIds } = partitionGroundedStrings(raw.allowedRuleIds, (id) =>
+    grounding.noteIds.has(id)
   );
   if (droppedRuleIds.length > 0) {
-    warnings.push(`Dropped ${droppedRuleIds.length} rule id(s) that do not match an existing note: ${droppedRuleIds.join(", ")}.`);
+    warnings.push(
+      `Dropped ${droppedRuleIds.length} rule id(s) that do not match an existing note: ${droppedRuleIds.join(", ")}.`
+    );
   }
 
   const expectedAnswers = dedupeStrings(raw.expectedAnswers ?? []).slice(0, MAX_GENERATED_EXPECTED_ANSWERS);
@@ -556,25 +574,23 @@ function isReasoningOnlyGenerationError(error: unknown): boolean {
   return error instanceof Error && REASONING_ONLY_PATTERN.test(error.message);
 }
 
-async function buildRetrievalEmbeddingConfig(env: Env, fetchFn: EmbeddingFetch) {
+async function buildRetrievalEmbeddingConfig(env: Env, fetchFn?: EmbeddingFetch) {
   const config = readEmbeddingEnvConfig(env);
   if (!config.configured || !config.baseUrl || !config.model) return undefined;
-
-  try {
-    await assertOutboundHttpUrlAllowed(
-      `${config.baseUrl.replace(/\/+$/, "")}/embeddings`,
-      { env }
-    );
-  } catch {
-    return undefined;
-  }
 
   return {
     baseUrl: config.baseUrl,
     model: config.model,
     apiKey: config.apiKey,
     timeoutMs: config.timeoutMs,
-    fetchFn
+    fetchFn: createOutboundHttpFetch({
+      env,
+      fetchFn,
+      timeoutMs: config.timeoutMs,
+      maxResponseBytes: 32 * 1024 * 1024,
+      operation: "Embedding request",
+      secrets: [config.apiKey]
+    })
   };
 }
 
@@ -594,10 +610,7 @@ export async function generateModelDraftNotes(params: {
   }
 
   const env = params.env ?? process.env;
-  const embeddingConfig = await buildRetrievalEmbeddingConfig(
-    env,
-    params.fetchFn ?? globalThis.fetch
-  );
+  const embeddingConfig = await buildRetrievalEmbeddingConfig(env, params.fetchFn);
 
   const query = `${params.language.name} ${params.language.description} ${params.language.orthography}`;
   const retrievedCorpus = await retrieveTopKPassages(query, params.corpus, 4, embeddingConfig);
@@ -623,11 +636,13 @@ export async function generateModelDraftNotes(params: {
     "Model returned only reasoning_content for draft-note generation; retried with a smaller JSON-only prompt."
   ];
   try {
-    const retryContent = await params.provider.completeChat(buildCompactNoteGenerationMessages(params.language, {
-      corpus: retrievedCorpus,
-      lexemes: params.lexemes,
-      notes: params.existingNotes
-    }));
+    const retryContent = await params.provider.completeChat(
+      buildCompactNoteGenerationMessages(params.language, {
+        corpus: retrievedCorpus,
+        lexemes: params.lexemes,
+        notes: params.existingNotes
+      })
+    );
     const retryResult = parseGeneratedNotes(retryContent, grounding);
     return { notes: retryResult.notes, warnings: [...retryWarnings, ...retryResult.warnings] };
   } catch (retryError) {
@@ -676,11 +691,13 @@ export async function generateModelExercise(params: {
     "Model returned only reasoning_content for exercise generation; retried with a smaller JSON-only prompt."
   ];
   try {
-    const retryContent = await params.provider.completeChat(buildCompactExerciseGenerationMessages(
-      params.language,
-      { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
-      { type: params.type }
-    ));
+    const retryContent = await params.provider.completeChat(
+      buildCompactExerciseGenerationMessages(
+        params.language,
+        { corpus: params.corpus, lexemes: params.lexemes, notes: params.notes },
+        { type: params.type }
+      )
+    );
     const retryResult = parseGeneratedExercise(retryContent, grounding);
     return {
       exercise: retryResult.exercise,

@@ -145,12 +145,8 @@ function desktopIpcFailure(errorSpec, extras = {}) {
     ok: false,
     code: spec.code,
     i18nKey: spec.i18nKey,
-    message: typeof extras.message === "string" && extras.message.trim()
-      ? extras.message
-      : spec.message,
-    ...Object.fromEntries(
-      Object.entries(extras).filter(([key]) => key !== "message")
-    )
+    message: typeof extras.message === "string" && extras.message.trim() ? extras.message : spec.message,
+    ...Object.fromEntries(Object.entries(extras).filter(([key]) => key !== "message"))
   };
 }
 

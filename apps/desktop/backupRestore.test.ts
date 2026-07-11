@@ -22,10 +22,7 @@ const {
 } = require("./backupRestore.cjs") as {
   LEGACY_SAFETY_BACKUP_PREFIX: string;
   SAFETY_BACKUP_PREFIX: string;
-  assertBackupDistinctFromLive: (
-    backupDir: string,
-    liveDataDir: string
-  ) => { backupRoot: string; liveRoot: string };
+  assertBackupDistinctFromLive: (backupDir: string, liveDataDir: string) => { backupRoot: string; liveRoot: string };
   assertDesktopBackupReadable: (
     backupDir: string,
     options: { readWorkspace: (dbPath: string) => Promise<unknown> }
@@ -142,9 +139,7 @@ describe("desktop backup restore validation", () => {
       throw new Error("Unexpected token");
     });
 
-    await expect(assertDesktopBackupReadable(dir, { readWorkspace })).rejects.toThrow(
-      /not a valid workspace/
-    );
+    await expect(assertDesktopBackupReadable(dir, { readWorkspace })).rejects.toThrow(/not a valid workspace/);
     expect(readWorkspace).toHaveBeenCalledOnce();
   });
 

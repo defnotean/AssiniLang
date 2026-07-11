@@ -199,9 +199,11 @@ describe("ModelDiscoveryPanel unloaded-model stale state", () => {
       }
     });
 
-    expect(screen.getByText(
-      "Saved model unloaded-model is no longer loaded at http://127.0.0.1:1234/v1. The form now shows newly-loaded-model; apply it to switch immediately."
-    )).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Saved model unloaded-model is no longer loaded at http://127.0.0.1:1234/v1. The form now shows newly-loaded-model; apply it to switch immediately."
+      )
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply loaded model" }));
     expect(onApplyLoadedModel).toHaveBeenCalledWith(replacement);

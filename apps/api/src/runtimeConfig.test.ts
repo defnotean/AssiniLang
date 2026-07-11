@@ -13,13 +13,15 @@ describe("readRuntimeConfig", () => {
   });
 
   it("parses deploy-time host, port, CORS, body limit, and logger overrides", () => {
-    expect(readRuntimeConfig({
-      HOST: "0.0.0.0",
-      PORT: "8080",
-      ASSINI_ALLOWED_ORIGINS: "https://app.example.test, https://admin.example.test ",
-      ASSINI_BODY_LIMIT_BYTES: "131072",
-      ASSINI_API_LOGGER: "true"
-    })).toEqual({
+    expect(
+      readRuntimeConfig({
+        HOST: "0.0.0.0",
+        PORT: "8080",
+        ASSINI_ALLOWED_ORIGINS: "https://app.example.test, https://admin.example.test ",
+        ASSINI_BODY_LIMIT_BYTES: "131072",
+        ASSINI_API_LOGGER: "true"
+      })
+    ).toEqual({
       host: "0.0.0.0",
       port: 8080,
       allowedOrigins: ["https://app.example.test", "https://admin.example.test"],
@@ -31,11 +33,13 @@ describe("readRuntimeConfig", () => {
   it.each(["127.0.0.1", "127.0.0.42", "localhost", "::1", "[::1]"])(
     "allows local prototype authentication on loopback host %s",
     (host) => {
-      expect(readRuntimeConfig({
-        HOST: host,
-        ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
-        ASSINI_DEV_AUTH_TOKEN: "dev-local"
-      }).host).toBe(host);
+      expect(
+        readRuntimeConfig({
+          HOST: host,
+          ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
+          ASSINI_DEV_AUTH_TOKEN: "dev-local"
+        }).host
+      ).toBe(host);
     }
   );
 
@@ -51,27 +55,33 @@ describe("readRuntimeConfig", () => {
   });
 
   it("requires an explicit override for intentionally isolated development networks", () => {
-    expect(readRuntimeConfig({
-      HOST: "0.0.0.0",
-      ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
-      ASSINI_DEV_AUTH_TOKEN: "dev-local",
-      ASSINI_ALLOW_INSECURE_NETWORK_AUTH: "true"
-    }).host).toBe("0.0.0.0");
+    expect(
+      readRuntimeConfig({
+        HOST: "0.0.0.0",
+        ASSINI_ENABLE_PROTOTYPE_AUTH: "true",
+        ASSINI_DEV_AUTH_TOKEN: "dev-local",
+        ASSINI_ALLOW_INSECURE_NETWORK_AUTH: "true"
+      }).host
+    ).toBe("0.0.0.0");
   });
 
   it("allows a network-facing API when prototype auth is disabled and the server token is not predictable", () => {
-    expect(readRuntimeConfig({
-      HOST: "192.168.1.20",
-      ASSINI_DEV_AUTH_TOKEN: "a-long-random-operator-secret"
-    }).host).toBe("192.168.1.20");
+    expect(
+      readRuntimeConfig({
+        HOST: "192.168.1.20",
+        ASSINI_DEV_AUTH_TOKEN: "a-long-random-operator-secret"
+      }).host
+    ).toBe("192.168.1.20");
   });
 
   it("treats blank HOST and empty origin lists as defaults", () => {
-    expect(readRuntimeConfig({
-      HOST: "   ",
-      ASSINI_ALLOWED_ORIGINS: " , , ",
-      ASSINI_API_LOGGER: "yes"
-    })).toMatchObject({
+    expect(
+      readRuntimeConfig({
+        HOST: "   ",
+        ASSINI_ALLOWED_ORIGINS: " , , ",
+        ASSINI_API_LOGGER: "yes"
+      })
+    ).toMatchObject({
       host: "127.0.0.1",
       allowedOrigins: ["http://localhost:5173", "http://127.0.0.1:5173"],
       logger: false
@@ -106,11 +116,7 @@ describe("readRuntimeConfig", () => {
     expect(() => readRuntimeConfig({ ASSINI_ALLOWED_ORIGINS: origin })).toThrow("ASSINI_ALLOWED_ORIGINS");
   });
 
-  it.each([
-    "http://bad host",
-    "http://127.0.0.1:4321",
-    "0.0.0.0/24"
-  ])("rejects invalid HOST %s", (host) => {
+  it.each(["http://bad host", "http://127.0.0.1:4321", "0.0.0.0/24"])("rejects invalid HOST %s", (host) => {
     expect(() => readRuntimeConfig({ HOST: host })).toThrow("HOST");
   });
 });

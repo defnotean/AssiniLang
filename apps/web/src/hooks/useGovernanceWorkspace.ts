@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import type { AuditEvent, GovernanceRecord, ReviewDisposition, ReviewPolicy } from "@assini/db";
+import type { AuditEvent, GovernanceRecord, ReviewDisposition, ReviewPolicy } from "@assini/api-contract";
 import type { GovernancePayload, ReviewPolicyPayload } from "../api";
 import {
   createGovernanceRecord,
@@ -12,7 +12,12 @@ import {
   resolveReviewDisposition,
   updateReviewPolicy
 } from "../api";
-import { buildEvaluationArtifactDownload, buildSnapshotDownload, localizeApiError, parseReviewerIds } from "../lib/format";
+import {
+  buildEvaluationArtifactDownload,
+  buildSnapshotDownload,
+  localizeApiError,
+  parseReviewerIds
+} from "../lib/format";
 import type { AsyncState, SnapshotDownload, ViewMode } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -84,7 +89,9 @@ export function useGovernanceWorkspace(
   const [reviewPolicySuccess, setReviewPolicySuccess] = useState<string | null>(null);
   const [reviewPolicyError, setReviewPolicyError] = useState<string | null>(null);
   const [isSubmittingReviewPolicy, setIsSubmittingReviewPolicy] = useState(false);
-  const [reviewDispositionState, setReviewDispositionState] = useState<AsyncState<ReviewDisposition[]>>({ status: "idle" });
+  const [reviewDispositionState, setReviewDispositionState] = useState<AsyncState<ReviewDisposition[]>>({
+    status: "idle"
+  });
   const [reviewDispositionDrafts, setReviewDispositionDrafts] = useState<Record<string, string>>({});
   const [reviewDispositionSuccess, setReviewDispositionSuccess] = useState<string | null>(null);
   const [reviewDispositionError, setReviewDispositionError] = useState<string | null>(null);
@@ -136,8 +143,8 @@ export function useGovernanceWorkspace(
           message: localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
         });
       });
-    void Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest])
-      .then(() => fetchAuditEvents(selectedLanguageId)
+    void Promise.allSettled([reviewPolicyRequest, reviewDispositionRequest]).then(() =>
+      fetchAuditEvents(selectedLanguageId)
         .then((events) => {
           setAuditEventState({ status: "ready", data: events });
         })
@@ -146,7 +153,8 @@ export function useGovernanceWorkspace(
             status: "error",
             message: localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
           });
-        }));
+        })
+    );
   }, [selectedLanguageId, t]);
 
   useEffect(() => {
@@ -298,17 +306,12 @@ export function useGovernanceWorkspace(
     setReviewDispositionError(null);
     try {
       await resolveReviewDisposition(dispositionId, resolutionSummary);
-      const [dispositions] = await Promise.all([
-        fetchReviewDispositions(selectedLanguageId),
-        refreshDashboard()
-      ]);
+      const [dispositions] = await Promise.all([fetchReviewDispositions(selectedLanguageId), refreshDashboard()]);
       setReviewDispositionState({ status: "ready", data: dispositions });
       setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: "" }));
       setReviewDispositionSuccess(t("governance.msgReviewDispositionResolved"));
     } catch (error) {
-      setReviewDispositionError(
-        localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed")
-      );
+      setReviewDispositionError(localizeApiError(error, t, "governance.errReviewDispositionResolutionFailed"));
     } finally {
       setResolvingReviewDispositionId(null);
     }

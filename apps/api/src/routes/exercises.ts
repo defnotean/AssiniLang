@@ -1,20 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import {
-  EXERCISE_SUBMISSION_ACTOR_ROLES,
-  type Exercise,
-  type ExerciseSubmission
-} from "@assini/db";
+import { EXERCISE_SUBMISSION_ACTOR_ROLES, type Exercise, type ExerciseSubmission } from "@assini/db";
 import { gradeExerciseAnswer } from "@assini/eval";
 import { generateModelExercise, ModelRequiredError, type GeneratedExerciseDraft } from "../generation.js";
 import { rankExercisesForPractice } from "../practiceScheduler.js";
 import { toPublicExercise, toPublicExerciseSubmission } from "../publicLanguageViews.js";
-import {
-  appendAuditEvent,
-  MODEL_REQUIRED_MESSAGE,
-  redactErrorSecrets,
-  requireActor
-} from "../routeHelpers.js";
+import { appendAuditEvent, MODEL_REQUIRED_MESSAGE, redactErrorSecrets, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 import {
   type ExerciseAuthoringBody,
@@ -83,8 +74,10 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
     }
 
     const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
-    const ranked = rankExercisesForPractice(languageExercises, state.exerciseSubmissions, actor.id, new Date())
-      .slice(0, 10);
+    const ranked = rankExercisesForPractice(languageExercises, state.exerciseSubmissions, actor.id, new Date()).slice(
+      0,
+      10
+    );
 
     return {
       exercises: ranked.map((entry) => toPublicExercise(entry.exercise)),
@@ -163,25 +156,28 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
         ...body
       };
 
-      return appendAuditEvent({
-        ...state,
-        exercises: [...state.exercises, exercise]
-      }, {
-        actor,
-        at: createdAt,
-        action: "exercise.created",
-        entityType: "exercise",
-        entityId: exercise.id,
-        languageId,
-        summary: `Created exercise ${exercise.id}.`,
-        metadata: {
-          exerciseType: exercise.type,
-          allowedRuleCount: exercise.allowedRuleIds.length,
-          allowedVocabularyCount: exercise.allowedVocabulary.length,
-          expectedAnswerCount: exercise.expectedAnswers.length,
-          adversarialAnswerCount: exercise.adversarialAnswers.length
+      return appendAuditEvent(
+        {
+          ...state,
+          exercises: [...state.exercises, exercise]
+        },
+        {
+          actor,
+          at: createdAt,
+          action: "exercise.created",
+          entityType: "exercise",
+          entityId: exercise.id,
+          languageId,
+          summary: `Created exercise ${exercise.id}.`,
+          metadata: {
+            exerciseType: exercise.type,
+            allowedRuleCount: exercise.allowedRuleIds.length,
+            allowedVocabularyCount: exercise.allowedVocabulary.length,
+            expectedAnswerCount: exercise.expectedAnswers.length,
+            adversarialAnswerCount: exercise.adversarialAnswers.length
+          }
         }
-      });
+      );
     });
 
     if (languageMissing) {
@@ -279,23 +275,26 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
         learnerId: actor.id
       };
 
-      return appendAuditEvent({
-        ...state,
-        exerciseSubmissions: [...state.exerciseSubmissions, submission as ExerciseSubmission]
-      }, {
-        actor,
-        at: submittedAt,
-        action: "exercise_submission.created",
-        entityType: "exercise_submission",
-        entityId: submission.id,
-        languageId: exercise.languageId,
-        summary: `Graded exercise submission for ${exercise.id}.`,
-        metadata: {
-          exerciseId: exercise.id,
-          exerciseType: exercise.type,
-          accepted: graded.accepted
+      return appendAuditEvent(
+        {
+          ...state,
+          exerciseSubmissions: [...state.exerciseSubmissions, submission as ExerciseSubmission]
+        },
+        {
+          actor,
+          at: submittedAt,
+          action: "exercise_submission.created",
+          entityType: "exercise_submission",
+          entityId: submission.id,
+          languageId: exercise.languageId,
+          summary: `Graded exercise submission for ${exercise.id}.`,
+          metadata: {
+            exerciseId: exercise.id,
+            exerciseType: exercise.type,
+            accepted: graded.accepted
+          }
         }
-      });
+      );
     });
 
     if (exerciseMissing) {
@@ -343,7 +342,14 @@ export function registerExerciseRoutes(app: FastifyInstance, ctx: RouteContext):
 
     let generation: { exercise: GeneratedExerciseDraft; warnings: string[] };
     try {
-      generation = await generateModelExercise({ language, lexemes, notes, corpus, type: requestedType, provider: llmProvider });
+      generation = await generateModelExercise({
+        language,
+        lexemes,
+        notes,
+        corpus,
+        type: requestedType,
+        provider: llmProvider
+      });
     } catch (error) {
       if (error instanceof ModelRequiredError) {
         reply.code(400);

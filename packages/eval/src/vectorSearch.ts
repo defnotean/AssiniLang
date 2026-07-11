@@ -75,16 +75,10 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 // Offline fallback RAG
-export function retrieveTopKPassagesOffline(
-  query: string,
-  passages: CorpusPassage[],
-  k: number
-): CorpusPassage[] {
+export function retrieveTopKPassagesOffline(query: string, passages: CorpusPassage[], k: number): CorpusPassage[] {
   if (passages.length === 0) return [];
 
-  const passageTexts = passages.map(
-    (p) => `${p.textTarget} ${p.textTranslation} ${p.topicTags.join(" ")}`
-  );
+  const passageTexts = passages.map((p) => `${p.textTarget} ${p.textTranslation} ${p.topicTags.join(" ")}`);
 
   const { vectors, vectorize } = computeTfidfVectors(passageTexts);
   const queryVector = vectorize(query);
@@ -152,9 +146,9 @@ function parseEmbeddingResponse(payload: unknown, expectedCount: number): number
       throw new Error("Embedding response contains a duplicate index");
     }
     if (
-      !Array.isArray(embedding)
-      || embedding.length === 0
-      || !embedding.every((value) => typeof value === "number" && Number.isFinite(value))
+      !Array.isArray(embedding) ||
+      embedding.length === 0 ||
+      !embedding.every((value) => typeof value === "number" && Number.isFinite(value))
     ) {
       throw new Error("Embedding vectors must be non-empty and finite");
     }
@@ -180,7 +174,7 @@ export async function fetchOnlineEmbeddings(
     model: string;
     apiKey?: string;
     timeoutMs?: number;
-    fetchFn?: EmbeddingFetch;
+    fetchFn: EmbeddingFetch;
   }
 ): Promise<number[][]> {
   const baseUrl = config.baseUrl.trim();
@@ -208,7 +202,7 @@ export async function fetchOnlineEmbeddings(
   let response: Response;
   try {
     response = await Promise.race([
-      (config.fetchFn ?? globalThis.fetch)(url, {
+      config.fetchFn(url, {
         method: "POST",
         headers,
         body: JSON.stringify({ input: texts, model }),
@@ -238,23 +232,20 @@ export async function retrieveTopKPassages(
 
   const baseUrl = embeddingConfig?.baseUrl?.trim();
   const model = embeddingConfig?.model?.trim();
-  const isOnline = Boolean(baseUrl && model);
+  // The eval package never opens a server-side network path by itself. Its API
+  // caller must inject the repository's guarded outbound transport.
+  const isOnline = Boolean(baseUrl && model && embeddingConfig?.fetchFn);
 
   if (isOnline) {
     try {
-      const passageTexts = passages.map(
-        (p) => `${p.textTarget} ${p.textTranslation} ${p.topicTags.join(" ")}`
-      );
-      const embeddings = await fetchOnlineEmbeddings(
-        [query, ...passageTexts],
-        {
-          baseUrl: baseUrl!,
-          model: model!,
-          apiKey: embeddingConfig?.apiKey,
-          timeoutMs: embeddingConfig?.timeoutMs,
-          fetchFn: embeddingConfig?.fetchFn
-        }
-      );
+      const passageTexts = passages.map((p) => `${p.textTarget} ${p.textTranslation} ${p.topicTags.join(" ")}`);
+      const embeddings = await fetchOnlineEmbeddings([query, ...passageTexts], {
+        baseUrl: baseUrl!,
+        model: model!,
+        apiKey: embeddingConfig?.apiKey,
+        timeoutMs: embeddingConfig?.timeoutMs,
+        fetchFn: embeddingConfig!.fetchFn!
+      });
       const queryEmbedding = embeddings[0];
       const passageEmbeddings = embeddings.slice(1);
 

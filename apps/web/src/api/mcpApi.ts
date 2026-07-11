@@ -12,9 +12,7 @@ export async function fetchObsidianMcpSettings(): Promise<ObsidianMcpSettings> {
   return getJson<ObsidianMcpSettings>("/integrations/obsidian-mcp/settings", "programmer");
 }
 
-export async function updateObsidianMcpSettings(
-  patch: ObsidianMcpSettingsPatch
-): Promise<ObsidianMcpSettings> {
+export async function updateObsidianMcpSettings(patch: ObsidianMcpSettingsPatch): Promise<ObsidianMcpSettings> {
   return actorJsonRequest<ObsidianMcpSettings>(
     "programmer",
     "/api/integrations/obsidian-mcp/settings",
@@ -36,11 +34,9 @@ export async function fetchObsidianMcpResources(cursor?: string): Promise<Obsidi
   const query = new URLSearchParams();
   if (cursor) query.set("cursor", cursor);
   const suffix = query.size > 0 ? `?${query.toString()}` : "";
-  return getJson<ObsidianMcpResourceList>(
-    `/integrations/obsidian-mcp/resources${suffix}`,
-    "reviewer",
-    { cache: "no-store" }
-  );
+  return getJson<ObsidianMcpResourceList>(`/integrations/obsidian-mcp/resources${suffix}`, "reviewer", {
+    cache: "no-store"
+  });
 }
 
 export async function importObsidianMcpResources(

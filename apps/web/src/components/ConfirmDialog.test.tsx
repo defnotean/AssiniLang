@@ -4,13 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ConfirmDialog } from "./ConfirmDialog";
 
-function ConfirmDialogHarness({
-  onCancel,
-  onConfirm = vi.fn()
-}: {
-  onCancel: () => void;
-  onConfirm?: () => void;
-}) {
+function ConfirmDialogHarness({ onCancel, onConfirm = vi.fn() }: { onCancel: () => void; onConfirm?: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -45,13 +39,7 @@ function openFromTrigger() {
 
 describe("ConfirmDialog", () => {
   it("exposes the confirmation message to assistive tech via aria-describedby", () => {
-    render(
-      <ConfirmDialog
-        message="Delete this language?"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />
-    );
+    render(<ConfirmDialog message="Delete this language?" onConfirm={vi.fn()} onCancel={vi.fn()} />);
 
     const dialog = screen.getByRole("dialog", { name: "Confirmation" });
     expect(dialog).toHaveAttribute("aria-describedby", "confirm-dialog-message");
@@ -85,11 +73,7 @@ describe("ConfirmDialog", () => {
   it("cancels when the overlay is clicked", () => {
     const onCancel = vi.fn();
     const { container } = render(
-      <ConfirmDialog
-        message="Delete this language?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />
+      <ConfirmDialog message="Delete this language?" onConfirm={vi.fn()} onCancel={onCancel} />
     );
 
     fireEvent.click(container.querySelector(".confirm-overlay")!);
@@ -99,13 +83,7 @@ describe("ConfirmDialog", () => {
 
   it("confirms when the confirm button is clicked", () => {
     const onConfirm = vi.fn();
-    render(
-      <ConfirmDialog
-        message="Delete this language?"
-        onConfirm={onConfirm}
-        onCancel={vi.fn()}
-      />
-    );
+    render(<ConfirmDialog message="Delete this language?" onConfirm={onConfirm} onCancel={vi.fn()} />);
 
     fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
 

@@ -5,9 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { buildTestLanguage, type SourceAsset } from "@assini/db";
 import {
   extractCandidatesForAsset,
-  fetchUrlText,
   heuristicExtractFromText,
-  htmlToText,
   ocrImageFile,
   ocrImageWithModel,
   ocrModelConfigured,
@@ -91,10 +89,6 @@ const language = buildTestLanguage();
 const assetPath = (fileName: string) => `assets/${language.id}/${fileName}`;
 
 const publicLookup = async () => ({ address: "93.184.216.34", family: 4 });
-const privateLookup = async () => ({ address: "10.0.0.5", family: 4 });
-const failingLookup = async (): Promise<{ address: string; family: number }> => {
-  throw new Error("ENOTFOUND");
-};
 
 function makeAsset(overrides: Partial<SourceAsset>): SourceAsset {
   return {
@@ -190,11 +184,13 @@ describe("parseExtractionResponse", () => {
       JSON.stringify({
         summary: "A short word list.",
         lexemes: [{ form: "mira", gloss: "river", partOfSpeech: "noun", tags: ["place", "place"], confidence: "high" }],
-        passages: [{
-          textTarget: "mira talo-na",
-          textTranslation: "I walk by the river.",
-          morphemes: [{ surface: "mira" }, { surface: "talo", lemma: "talo", gloss: "walk" }]
-        }],
+        passages: [
+          {
+            textTarget: "mira talo-na",
+            textTranslation: "I walk by the river.",
+            morphemes: [{ surface: "mira" }, { surface: "talo", lemma: "talo", gloss: "walk" }]
+          }
+        ],
         grammarNotes: [{ topic: "syntax/order", explanation: "Subjects come first." }]
       }),
       "```"
@@ -204,11 +200,7 @@ describe("parseExtractionResponse", () => {
 
     expect(parsed).toBeDefined();
     expect(parsed?.summary).toBe("A short word list.");
-    expect(parsed?.candidates.map((candidate) => candidate.kind)).toEqual([
-      "lexeme",
-      "corpus_passage",
-      "grammar_note"
-    ]);
+    expect(parsed?.candidates.map((candidate) => candidate.kind)).toEqual(["lexeme", "corpus_passage", "grammar_note"]);
 
     const lexeme = parsed?.candidates[0];
     expect(lexeme?.payload.tags).toEqual(["place"]);
@@ -223,7 +215,9 @@ describe("parseExtractionResponse", () => {
   });
 
   it("finds a JSON object embedded in prose", () => {
-    const parsed = parseExtractionResponse('Sure! {"summary":"x","lexemes":[{"form":"a","gloss":"b"}]} Hope that helps.');
+    const parsed = parseExtractionResponse(
+      'Sure! {"summary":"x","lexemes":[{"form":"a","gloss":"b"}]} Hope that helps.'
+    );
 
     expect(parsed?.candidates).toHaveLength(1);
     expect(parsed?.candidates[0]?.payload.form).toBe("a");
@@ -234,115 +228,38 @@ describe("parseExtractionResponse", () => {
   });
 
   it("drops candidates with blank required fields", () => {
-    const parsed = parseExtractionResponse(JSON.stringify({
-      lexemes: [{ form: " ", gloss: "x" }],
-      passages: [{ textTarget: "a b", textTranslation: " " }],
-      grammarNotes: [{ topic: "t", explanation: "explained" }]
-    }));
+    const parsed = parseExtractionResponse(
+      JSON.stringify({
+        lexemes: [{ form: " ", gloss: "x" }],
+        passages: [{ textTarget: "a b", textTranslation: " " }],
+        grammarNotes: [{ topic: "t", explanation: "explained" }]
+      })
+    );
 
     expect(parsed?.candidates).toHaveLength(1);
     expect(parsed?.candidates[0]?.kind).toBe("grammar_note");
   });
 });
 
-describe("htmlToText", () => {
-  it("strips markup, scripts, and decodes entities", () => {
-    const text = htmlToText(
-      "<html><head><style>p{}</style><script>var x=1;</script></head>" +
-      "<body><p>mira &amp; saku</p><div>talo&nbsp;walks</div></body></html>"
-    );
-
-    expect(text).toContain("mira & saku");
-    expect(text).toContain("talo walks");
-    expect(text).not.toContain("var x");
-  });
-});
-
-describe("fetchUrlText", () => {
-  it("extracts text from an HTML response", async () => {
-    const fetchStub = (async () => new Response("<html><body><p>mira = river</p></body></html>", {
-      status: 200,
-      headers: { "content-type": "text/html" }
-    })) as typeof fetch;
-
-    const text = await fetchUrlText("https://example.test/words", fetchStub, { env: {}, lookupFn: publicLookup });
-    expect(text).toContain("mira = river");
-  });
-
-  it("rejects non-http URLs", async () => {
-    await expect(fetchUrlText("file:///etc/passwd")).rejects.toThrow(/http or https/);
-  });
-
-  it("rejects failing responses", async () => {
-    const fetchStub = (async () => new Response("nope", { status: 404 })) as typeof fetch;
-    await expect(fetchUrlText("https://example.test/missing", fetchStub, { env: {}, lookupFn: publicLookup }))
-      .rejects.toThrow(/status 404/);
-  });
-
-  it("rejects private IPv4 literal URLs before fetching", async () => {
-    const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(fetchUrlText("http://192.168.1.10/words", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    await expect(fetchUrlText("http://10.0.0.1/words", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    await expect(fetchUrlText("http://169.254.169.254/latest/meta-data", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    expect(fetchStub).not.toHaveBeenCalled();
-  });
-
-  it("rejects localhost and loopback URLs before fetching", async () => {
-    const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(fetchUrlText("http://localhost:4321/words", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    await expect(fetchUrlText("http://127.0.0.1/words", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    await expect(fetchUrlText("http://[::1]/words", fetchStub, { env: {} }))
-      .rejects.toThrow(/private or local network/);
-    expect(fetchStub).not.toHaveBeenCalled();
-  });
-
-  it("rejects public-looking hostnames that resolve to private addresses", async () => {
-    const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(fetchUrlText("https://internal.example.com/words", fetchStub, { env: {}, lookupFn: privateLookup }))
-      .rejects.toThrow(/resolves to a private or local network/);
-    expect(fetchStub).not.toHaveBeenCalled();
-  });
-
-  it("rejects unresolvable hostnames before fetching", async () => {
-    const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(fetchUrlText("https://nowhere.example.com/words", fetchStub, { env: {}, lookupFn: failingLookup }))
-      .rejects.toThrow(/could not be resolved and was blocked/);
-    expect(fetchStub).not.toHaveBeenCalled();
-  });
-
-  it("allows private URLs when ASSINI_ALLOW_PRIVATE_URLS is set", async () => {
-    const fetchStub = (async () => new Response("mira = river", {
-      status: 200,
-      headers: { "content-type": "text/plain" }
-    })) as typeof fetch;
-
-    const text = await fetchUrlText("http://127.0.0.1:9000/list", fetchStub, {
-      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" }
-    });
-    expect(text).toContain("mira = river");
-  });
-});
-
 describe("transcribeAudioFile", () => {
   it("fails with setup guidance when no transcription endpoint is configured", async () => {
-    await expect(transcribeAudioFile({
-      filePath: "irrelevant.wav",
-      env: {}
-    })).rejects.toThrow(/ASSINI_TRANSCRIBE_BASE_URL/);
+    await expect(
+      transcribeAudioFile({
+        filePath: "irrelevant.wav",
+        env: {}
+      })
+    ).rejects.toThrow(/ASSINI_TRANSCRIBE_BASE_URL/);
   });
 
   it("blocks private metadata transcription URLs when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
     const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(transcribeAudioFile({
-      filePath: "irrelevant.wav",
-      env: { ASSINI_TRANSCRIBE_BASE_URL: "http://169.254.169.254/latest" },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/private or local network/);
+    await expect(
+      transcribeAudioFile({
+        filePath: "irrelevant.wav",
+        env: { ASSINI_TRANSCRIBE_BASE_URL: "http://169.254.169.254/latest" },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/private or local network/);
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
@@ -354,15 +271,17 @@ describe("transcribeAudioFile", () => {
       throw new Error("connect failed with Bearer whisper-secret-value");
     }) as typeof fetch;
 
-    await expect(transcribeAudioFile({
-      filePath,
-      env: {
-        ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_TRANSCRIBE_API_KEY: "whisper-secret-value",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/Transcription request failed:.*\[redacted-secret\]/);
+    await expect(
+      transcribeAudioFile({
+        filePath,
+        env: {
+          ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_TRANSCRIBE_API_KEY: "whisper-secret-value",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/Transcription request failed:.*\[redacted-secret\]/);
 
     try {
       await transcribeAudioFile({
@@ -383,19 +302,22 @@ describe("transcribeAudioFile", () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-ingest-transcribe-json-"));
     const filePath = join(dir, "clip.wav");
     await writeFile(filePath, Buffer.from([1, 2, 3, 4]));
-    const fetchStub = (async () => new Response("not-json", {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response("not-json", {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
 
-    await expect(transcribeAudioFile({
-      filePath,
-      env: {
-        ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/Transcription endpoint returned invalid JSON/);
+    await expect(
+      transcribeAudioFile({
+        filePath,
+        env: {
+          ASSINI_TRANSCRIBE_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/Transcription endpoint returned invalid JSON/);
   });
 
   it("posts the audio file to an OpenAI-compatible transcription endpoint", async () => {
@@ -442,19 +364,23 @@ describe("ocrModelConfigured", () => {
 
 describe("ocrImageWithModel", () => {
   it("fails with setup guidance when no OCR endpoint is configured", async () => {
-    await expect(ocrImageWithModel({
-      filePath: "irrelevant.png",
-      env: {}
-    })).rejects.toThrow(/ASSINI_OCR_BASE_URL/);
+    await expect(
+      ocrImageWithModel({
+        filePath: "irrelevant.png",
+        env: {}
+      })
+    ).rejects.toThrow(/ASSINI_OCR_BASE_URL/);
   });
 
   it("blocks private OCR base URLs when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
     const fetchStub = vi.fn() as unknown as typeof fetch;
-    await expect(ocrImageWithModel({
-      filePath: "irrelevant.png",
-      env: { ASSINI_OCR_BASE_URL: "http://169.254.169.254/latest" },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/private or local network/);
+    await expect(
+      ocrImageWithModel({
+        filePath: "irrelevant.png",
+        env: { ASSINI_OCR_BASE_URL: "http://169.254.169.254/latest" },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/private or local network/);
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
@@ -466,16 +392,18 @@ describe("ocrImageWithModel", () => {
       throw new Error("ECONNREFUSED with Bearer ocr-net-secret");
     }) as typeof fetch;
 
-    await expect(ocrImageWithModel({
-      filePath,
-      mimeType: "image/png",
-      env: {
-        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_OCR_API_KEY: "ocr-net-secret",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/OCR model request failed:.*\[redacted-secret\]/);
+    await expect(
+      ocrImageWithModel({
+        filePath,
+        mimeType: "image/png",
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_OCR_API_KEY: "ocr-net-secret",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/OCR model request failed:.*\[redacted-secret\]/);
 
     try {
       await ocrImageWithModel({
@@ -506,12 +434,15 @@ describe("ocrImageWithModel", () => {
       requestedUrl = String(url);
       requestedInit = init;
       requestedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
-      return new Response(JSON.stringify({
-        choices: [{ message: { content: "mira = river" } }]
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "mira = river" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
     }) as typeof fetch;
 
     const text = await ocrImageWithModel({
@@ -544,10 +475,12 @@ describe("ocrImageWithModel", () => {
 
 describe("extractCandidatesForAsset", () => {
   it("uses the model when completeChat is available", async () => {
-    const provider = providerWithChat(JSON.stringify({
-      summary: "Model extraction.",
-      lexemes: [{ form: "mira", gloss: "river" }]
-    }));
+    const provider = providerWithChat(
+      JSON.stringify({
+        summary: "Model extraction.",
+        lexemes: [{ form: "mira", gloss: "river" }]
+      })
+    );
 
     const result = await extractCandidatesForAsset({
       asset: makeAsset({ rawText: "mira = river" }),
@@ -595,9 +528,7 @@ describe("extractCandidatesForAsset", () => {
       const result = await extractCandidatesForAsset({
         asset: makeAsset({ rawText: "mira = river" }),
         language,
-        provider: providerWithChatError(
-          new Error("timed out after Bearer plain-provider-secret api_key=query-leak")
-        ),
+        provider: providerWithChatError(new Error("timed out after Bearer plain-provider-secret api_key=query-leak")),
         dataDir: tmpdir()
       });
 
@@ -630,16 +561,18 @@ describe("extractCandidatesForAsset", () => {
     const outsidePath = join(dir, "outside.txt");
     await writeFile(outsidePath, "mira = river", "utf8");
 
-    await expect(extractCandidatesForAsset({
-      asset: makeAsset({
-        kind: "text",
-        rawText: undefined,
-        filePath: relativePath ?? outsidePath
-      }),
-      language,
-      provider: providerWithoutChat,
-      dataDir: join(dir, "data")
-    })).rejects.toThrow(/Unsafe source asset file path/);
+    await expect(
+      extractCandidatesForAsset({
+        asset: makeAsset({
+          kind: "text",
+          rawText: undefined,
+          filePath: relativePath ?? outsidePath
+        }),
+        language,
+        provider: providerWithoutChat,
+        dataDir: join(dir, "data")
+      })
+    ).rejects.toThrow(/Unsafe source asset file path/);
   });
 
   it("routes image sources through local OCR when the provider has no vision support", async () => {
@@ -661,19 +594,22 @@ describe("extractCandidatesForAsset", () => {
   });
 
   it("rejects unsupported document types with conversion guidance", async () => {
-    await expect(extractCandidatesForAsset({
-      asset: makeAsset({ kind: "document", filePath: assetPath("notes.epub"), originalName: "notes.epub" }),
-      language,
-      provider: providerWithoutChat,
-      dataDir: tmpdir()
-    })).rejects.toThrow(/not supported yet/);
+    await expect(
+      extractCandidatesForAsset({
+        asset: makeAsset({ kind: "document", filePath: assetPath("notes.epub"), originalName: "notes.epub" }),
+        language,
+        provider: providerWithoutChat,
+        dataDir: tmpdir()
+      })
+    ).rejects.toThrow(/not supported yet/);
   });
 
   it("processes URL sources through the injected fetch", async () => {
-    const fetchStub = (async () => new Response("<p>saku = child</p>", {
-      status: 200,
-      headers: { "content-type": "text/html" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response("<p>saku = child</p>", {
+        status: 200,
+        headers: { "content-type": "text/html" }
+      })) as typeof fetch;
 
     const result = await extractCandidatesForAsset({
       asset: makeAsset({ kind: "url", url: "https://example.test/list", rawText: undefined }),
@@ -711,18 +647,26 @@ describe("splitTextIntoChunks", () => {
 
 describe("extractCandidatesForAsset chunked processing", () => {
   function longText(lineCount: number): string {
-    return Array.from({ length: lineCount }, (_, index) => `word-${index} = gloss-${index} ${"x".repeat(80)}`).join("\n");
+    return Array.from({ length: lineCount }, (_, index) => `word-${index} = gloss-${index} ${"x".repeat(80)}`).join(
+      "\n"
+    );
   }
 
   it("calls the model once per chunk and merges deduped candidates", async () => {
     const { provider, calls } = providerWithChatQueue([
       JSON.stringify({
         summary: "Part one items.",
-        lexemes: [{ form: "mira", gloss: "river" }, { form: "saku", gloss: "child" }]
+        lexemes: [
+          { form: "mira", gloss: "river" },
+          { form: "saku", gloss: "child" }
+        ]
       }),
       JSON.stringify({
         summary: "Part two items.",
-        lexemes: [{ form: "Mira", gloss: "RIVER" }, { form: "talo", gloss: "walk" }],
+        lexemes: [
+          { form: "Mira", gloss: "RIVER" },
+          { form: "talo", gloss: "walk" }
+        ],
         grammarNotes: [{ topic: "syntax/order", explanation: "Subjects come first." }]
       })
     ]);
@@ -765,7 +709,10 @@ describe("extractCandidatesForAsset chunked processing", () => {
     const { provider, calls } = providerWithChatQueue([
       JSON.stringify({
         summary: "Model extraction.",
-        lexemes: [{ form: "mira", gloss: "river" }, { form: "mira", gloss: "river" }]
+        lexemes: [
+          { form: "mira", gloss: "river" },
+          { form: "mira", gloss: "river" }
+        ]
       })
     ]);
 
@@ -863,12 +810,14 @@ describe("extractCandidatesForAsset document support", () => {
     pdfStub.text = "   ";
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
-    await expect(extractCandidatesForAsset({
-      asset,
-      language,
-      provider: providerWithoutChat,
-      dataDir
-    })).rejects.toThrow(/no extractable text.*ASSINI_OCR_BASE_URL/s);
+    await expect(
+      extractCandidatesForAsset({
+        asset,
+        language,
+        provider: providerWithoutChat,
+        dataDir
+      })
+    ).rejects.toThrow(/no extractable text.*ASSINI_OCR_BASE_URL/s);
   });
 
   it("reads scanned PDFs via OCR model when the text layer is empty", async () => {
@@ -877,20 +826,26 @@ describe("extractCandidatesForAsset document support", () => {
     pdfOcrStub.imagesByPage = undefined;
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
-    const fetchStub = (async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "mira = river" } }]
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "mira = river" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )) as typeof fetch;
 
-    pdfOcrStub.images = [{
-      data: new Uint8ClampedArray([255, 0, 0, 255]),
-      width: 1,
-      height: 1,
-      channels: 4,
-      key: "page-image"
-    }];
+    pdfOcrStub.images = [
+      {
+        data: new Uint8ClampedArray([255, 0, 0, 255]),
+        width: 1,
+        height: 1,
+        channels: 4,
+        key: "page-image"
+      }
+    ];
 
     const result = await extractCandidatesForAsset({
       asset,
@@ -906,9 +861,11 @@ describe("extractCandidatesForAsset document support", () => {
 
     expect(result.candidates).toHaveLength(1);
     expect(result.candidates[0]?.payload.form).toBe("mira");
-    expect(result.warnings.some((warning) =>
-      warning.includes("Used configured OCR model to read scanned document (1 of 1 pages).")
-    )).toBe(true);
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes("Used configured OCR model to read scanned document (1 of 1 pages).")
+      )
+    ).toBe(true);
   });
 
   it("OCRs multiple pages of a scanned PDF and concatenates with page markers", async () => {
@@ -932,12 +889,15 @@ describe("extractCandidatesForAsset document support", () => {
     const fetchStub = (async () => {
       call += 1;
       const content = call === 1 ? "mira = river" : call === 2 ? "saku = child" : "tora = forest";
-      return new Response(JSON.stringify({
-        choices: [{ message: { content } }]
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
     }) as typeof fetch;
 
     const result = await extractCandidatesForAsset({
@@ -953,13 +913,15 @@ describe("extractCandidatesForAsset document support", () => {
     });
 
     expect(call).toBe(3);
-    expect(result.warnings.some((warning) =>
-      warning.includes("Used configured OCR model to read scanned document (3 of 3 pages).")
-    )).toBe(true);
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes("Used configured OCR model to read scanned document (3 of 3 pages).")
+      )
+    ).toBe(true);
     expect(result.warnings.some((warning) => /only the first \d+ pages were OCR'd/i.test(warning))).toBe(false);
-    expect(result.candidates.some((candidate) =>
-      candidate.kind === "lexeme" && candidate.payload.form === "mira"
-    )).toBe(true);
+    expect(
+      result.candidates.some((candidate) => candidate.kind === "lexeme" && candidate.payload.form === "mira")
+    ).toBe(true);
     pdfStub.totalPages = 1;
     pdfOcrStub.imagesByPage = undefined;
   });
@@ -970,20 +932,26 @@ describe("extractCandidatesForAsset document support", () => {
     pdfOcrStub.imagesByPage = undefined;
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
-    const fetchStub = (async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "mira = river" } }]
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "mira = river" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )) as typeof fetch;
 
-    pdfOcrStub.images = [{
-      data: new Uint8ClampedArray([255, 0, 0, 255]),
-      width: 1,
-      height: 1,
-      channels: 4,
-      key: "page-image"
-    }];
+    pdfOcrStub.images = [
+      {
+        data: new Uint8ClampedArray([255, 0, 0, 255]),
+        width: 1,
+        height: 1,
+        channels: 4,
+        key: "page-image"
+      }
+    ];
 
     const result = await extractCandidatesForAsset({
       asset,
@@ -998,9 +966,9 @@ describe("extractCandidatesForAsset document support", () => {
       fetchFn: fetchStub
     });
 
-    expect(result.warnings.some((warning) =>
-      warning.includes("PDF has 4 pages; only the first 2 pages were OCR'd.")
-    )).toBe(true);
+    expect(
+      result.warnings.some((warning) => warning.includes("PDF has 4 pages; only the first 2 pages were OCR'd."))
+    ).toBe(true);
     pdfStub.totalPages = 1;
   });
 
@@ -1026,12 +994,15 @@ describe("extractCandidatesForAsset document support", () => {
       call += 1;
       if (call === 2) return new Response("down", { status: 503 });
       const content = call === 1 ? "mira = river" : "tora = forest";
-      return new Response(JSON.stringify({
-        choices: [{ message: { content } }]
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
     }) as typeof fetch;
 
     const result = await extractCandidatesForAsset({
@@ -1046,12 +1017,14 @@ describe("extractCandidatesForAsset document support", () => {
       fetchFn: fetchStub
     });
 
-    expect(result.warnings.some((warning) =>
-      warning.includes("OCR failed for page 2; continuing with remaining pages.")
-    )).toBe(true);
-    expect(result.warnings.some((warning) =>
-      warning.includes("Used configured OCR model to read scanned document (2 of 3 pages).")
-    )).toBe(true);
+    expect(
+      result.warnings.some((warning) => warning.includes("OCR failed for page 2; continuing with remaining pages."))
+    ).toBe(true);
+    expect(
+      result.warnings.some((warning) =>
+        warning.includes("Used configured OCR model to read scanned document (2 of 3 pages).")
+      )
+    ).toBe(true);
     pdfStub.totalPages = 1;
     pdfOcrStub.imagesByPage = undefined;
   });
@@ -1060,28 +1033,32 @@ describe("extractCandidatesForAsset document support", () => {
     pdfStub.text = "   ";
     pdfStub.totalPages = 1;
     pdfOcrStub.imagesByPage = undefined;
-    pdfOcrStub.images = [{
-      data: new Uint8ClampedArray([255, 0, 0, 255]),
-      width: 1,
-      height: 1,
-      channels: 4,
-      key: "page-image"
-    }];
+    pdfOcrStub.images = [
+      {
+        data: new Uint8ClampedArray([255, 0, 0, 255]),
+        width: 1,
+        height: 1,
+        channels: 4,
+        key: "page-image"
+      }
+    ];
     const { asset, dataDir } = await makeDocumentAsset("scan.pdf");
 
     const fetchStub = (async () => new Response("down", { status: 503 })) as typeof fetch;
 
-    await expect(extractCandidatesForAsset({
-      asset,
-      language,
-      provider: providerWithoutChat,
-      dataDir,
-      env: {
-        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      },
-      fetchFn: fetchStub
-    })).rejects.toThrow(/Configured OCR model could not read the scanned PDF:.*status 503/);
+    await expect(
+      extractCandidatesForAsset({
+        asset,
+        language,
+        provider: providerWithoutChat,
+        dataDir,
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        },
+        fetchFn: fetchStub
+      })
+    ).rejects.toThrow(/Configured OCR model could not read the scanned PDF:.*status 503/);
   });
 
   it("preserves page-image guidance when a scanned PDF has no embeddable page images", async () => {
@@ -1091,16 +1068,18 @@ describe("extractCandidatesForAsset document support", () => {
     pdfOcrStub.images = [];
     const { asset, dataDir } = await makeDocumentAsset("scan-no-image.pdf");
 
-    await expect(extractCandidatesForAsset({
-      asset,
-      language,
-      provider: providerWithoutChat,
-      dataDir,
-      env: {
-        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      }
-    })).rejects.toThrow(/no embedded page image to OCR/);
+    await expect(
+      extractCandidatesForAsset({
+        asset,
+        language,
+        provider: providerWithoutChat,
+        dataDir,
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        }
+      })
+    ).rejects.toThrow(/no embedded page image to OCR/);
 
     try {
       await extractCandidatesForAsset({
@@ -1122,12 +1101,14 @@ describe("extractCandidatesForAsset document support", () => {
     docxStub.value = "";
     const { asset, dataDir } = await makeDocumentAsset("empty.docx");
 
-    await expect(extractCandidatesForAsset({
-      asset,
-      language,
-      provider: providerWithoutChat,
-      dataDir
-    })).rejects.toThrow(/no extractable text/);
+    await expect(
+      extractCandidatesForAsset({
+        asset,
+        language,
+        provider: providerWithoutChat,
+        dataDir
+      })
+    ).rejects.toThrow(/no extractable text/);
   });
 });
 
@@ -1157,12 +1138,15 @@ describe("ocrScannedPdfPages", () => {
     let call = 0;
     const fetchStub = (async () => {
       call += 1;
-      return new Response(JSON.stringify({
-        choices: [{ message: { content: call === 1 ? "page one text" : "page two text" } }]
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: call === 1 ? "page one text" : "page two text" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      );
     }) as typeof fetch;
 
     const result = await ocrScannedPdfPages({
@@ -1196,12 +1180,16 @@ describe("ocrScannedPdfPages", () => {
       2: [pageImage("p2")]
     };
 
-    const fetchStub = (async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "page two text" } }]
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "page two text" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )) as typeof fetch;
 
     const result = await ocrScannedPdfPages({
       pdfBytes: new Uint8Array([1, 2, 3, 4]),
@@ -1214,9 +1202,9 @@ describe("ocrScannedPdfPages", () => {
     });
 
     expect(result.pagesSucceeded).toBe(1);
-    expect(result.warnings.some((warning) =>
-      warning.includes("OCR skipped page 1 (no embedded page image).")
-    )).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("OCR skipped page 1 (no embedded page image)."))).toBe(
+      true
+    );
     expect(result.text).toContain("page two text");
     pdfOcrStub.imagesByPage = undefined;
   });
@@ -1242,12 +1230,16 @@ describe("ocrScannedPdfFirstPage", () => {
       }
     ];
 
-    const fetchStub = (async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "mira = river" } }]
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "mira = river" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )) as typeof fetch;
 
     const text = await ocrScannedPdfFirstPage({
       pdfBytes: new Uint8Array([1, 2, 3, 4]),
@@ -1265,13 +1257,15 @@ describe("ocrScannedPdfFirstPage", () => {
     pdfOcrStub.imagesByPage = undefined;
     pdfOcrStub.images = [];
 
-    await expect(ocrScannedPdfFirstPage({
-      pdfBytes: new Uint8Array([1, 2, 3, 4]),
-      env: {
-        ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
-        ASSINI_ALLOW_PRIVATE_URLS: "1"
-      }
-    })).rejects.toThrow(/no embedded page image to OCR/);
+    await expect(
+      ocrScannedPdfFirstPage({
+        pdfBytes: new Uint8Array([1, 2, 3, 4]),
+        env: {
+          ASSINI_OCR_BASE_URL: "http://127.0.0.1:9000/v1",
+          ASSINI_ALLOW_PRIVATE_URLS: "1"
+        }
+      })
+    ).rejects.toThrow(/no embedded page image to OCR/);
   });
 });
 
@@ -1298,8 +1292,9 @@ describe("ocrImageFile", () => {
   it("fails clearly when OCR finds no readable text", async () => {
     ocrStub.reset("   \n  ");
 
-    await expect(ocrImageFile({ filePath: "img.png", env: {} }))
-      .rejects.toThrow(/OCR found no readable text in the image/);
+    await expect(ocrImageFile({ filePath: "img.png", env: {} })).rejects.toThrow(
+      /OCR found no readable text in the image/
+    );
     expect(ocrStub.terminateCalls).toBe(1);
   });
 
@@ -1327,12 +1322,16 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
       })
     ]);
 
-    const fetchStub = (async () => new Response(JSON.stringify({
-      choices: [{ message: { content: "mira = river" } }]
-    }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "mira = river" } }]
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )) as typeof fetch;
 
     const result = await extractCandidatesForAsset({
       asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
@@ -1348,7 +1347,9 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
 
     expect(result.summary).toBe("Text extraction after OCR.");
     expect(result.candidates[0]?.payload.form).toBe("mira");
-    expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read the image."))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("Used configured OCR model to read the image."))).toBe(
+      true
+    );
     expect(ocrStub.createWorkerCalls).toBe(0);
     expect(calls).toHaveLength(1);
     const userMessage = calls[0]?.find((message) => message.role === "user");
@@ -1362,10 +1363,12 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
     await mkdir(join(dataDir, "assets", language.id), { recursive: true });
     await writeFile(join(dataDir, "assets", language.id, "photo.png"), Buffer.from([1, 2, 3, 4]));
 
-    const provider = providerWithChat(JSON.stringify({
-      summary: "Vision extraction.",
-      lexemes: [{ form: "talo", gloss: "walk" }]
-    }));
+    const provider = providerWithChat(
+      JSON.stringify({
+        summary: "Vision extraction.",
+        lexemes: [{ form: "talo", gloss: "walk" }]
+      })
+    );
 
     const result = await extractCandidatesForAsset({
       asset: makeAsset({ kind: "image", filePath: assetPath("photo.png"), mimeType: "image/png" }),
@@ -1423,12 +1426,14 @@ describe("extractCandidatesForAsset image OCR fallback", () => {
   it("surfaces both remedies when OCR finds no text in deterministic mode", async () => {
     ocrStub.reset("   ");
 
-    await expect(extractCandidatesForAsset({
-      asset: makeAsset({ kind: "image", filePath: assetPath("blank.png") }),
-      language,
-      provider: providerWithoutChat,
-      dataDir: tmpdir()
-    })).rejects.toThrow(/OCR found no readable text in the image.*ASSINI_LLM_PROVIDER/s);
+    await expect(
+      extractCandidatesForAsset({
+        asset: makeAsset({ kind: "image", filePath: assetPath("blank.png") }),
+        language,
+        provider: providerWithoutChat,
+        dataDir: tmpdir()
+      })
+    ).rejects.toThrow(/OCR found no readable text in the image.*ASSINI_LLM_PROVIDER/s);
   });
 
   it("redacts configured OCR API keys from model OCR failure messages", async () => {

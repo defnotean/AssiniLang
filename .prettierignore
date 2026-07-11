@@ -1,0 +1,14 @@
+node_modules/
+coverage/
+dist/
+dist-desktop/
+apps/*/dist/
+packages/*/dist/
+data/
+logs/
+test-results/
+playwright-report/
+blob-report/
+fixtures/
+*.tsbuildinfo
+package-lock.json

@@ -27,7 +27,8 @@ function failedDocumentSource(error: string): SourceAsset {
     createdBy: "reviewer-1",
     createdAt: "2026-06-11T00:00:00.000Z",
     error,
-    processingAttempts: 1
+    processingAttempts: 1,
+    transcriptAvailable: false
   };
 }
 
@@ -99,14 +100,10 @@ describe("IngestView multi-page OCR warnings", () => {
     const warnings = await screen.findByRole("list", {
       name: "Processing warnings for Multi-page field notes"
     });
-    expect(warnings).toHaveTextContent(
-      "Used configured OCR model to read scanned document (2 of 2 pages)."
-    );
+    expect(warnings).toHaveTextContent("Used configured OCR model to read scanned document (2 of 2 pages).");
     expect(warnings).toHaveTextContent(
       "PDF has 14 pages; only the first 10 pages were OCR'd. Raise the OCR page cap or split remaining pages into separate sources if you need them."
     );
-    expect(warnings).toHaveTextContent(
-      "OCR failed for page 2; continuing with remaining pages."
-    );
+    expect(warnings).toHaveTextContent("OCR failed for page 2; continuing with remaining pages.");
   });
 });

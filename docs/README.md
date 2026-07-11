@@ -9,24 +9,27 @@ Pick the path that matches what you are doing:
 - Using the app: [Product Guide](product-guide.md), then the "Building a language from raw sources" walkthrough in the [Development Guide](development.md), with the [Ingestion Deep Dive](ingestion.md) when a source, Obsidian vault import, or corpus graph looks wrong.
 - Configuring models: [Configuration Reference](configuration.md) for variables, saved model profiles, discovery URLs, and recipes; [Troubleshooting](troubleshooting.md) when readiness warnings appear; [Ingestion Deep Dive](ingestion.md) for which model each source kind needs.
 - Developing: [Development Guide](development.md) for setup and the quality gate, [Architecture And Data](architecture.md) for how the pieces fit, [API Reference](api.md) for route behavior.
-- Maintaining and extending: [Maintenance Guide](maintenance.md) for change recipes and documentation conventions, [Operator Recovery Runbook](operator-recovery.md) for local backup/restore and stuck-processing drills, [Audit / Export Drill](audit-export-drill.md) for review-accountability export receipts, plus [Architecture And Data](architecture.md) for the data model you are changing.
+- Maintaining and extending: [Maintenance Guide](maintenance.md) for change recipes and documentation conventions, [Operator Recovery Runbook](operator-recovery.md) for local backup/restore and stuck-processing drills, [Local Incident Response](incident-response.md) for sanitized triage and escalation, [Audit / Export Drill](audit-export-drill.md) for review-accountability export receipts, plus [Architecture And Data](architecture.md) for the data model you are changing.
+- Making architectural changes: read the [Architecture Decision Records](decisions/README.md) before changing deployment, security, contracts, persistence, or data-governance boundaries.
 
 ## Doc index
 
-| Doc | One line |
-| --- | --- |
-| [Product Guide](product-guide.md) | What the prototype does and how each workspace is meant to be used. |
-| [Configuration Reference](configuration.md) | Every environment variable, defaults, accepted values, and setup recipes. |
-| [Ingestion Deep Dive](ingestion.md) | Source kinds, processing flow, chunking, SSRF guard, OCR, transcription, duplicate flags, error catalogue. |
-| [API Reference](api.md) | Full route index, auth model, mutation rules, payload shapes. |
-| [Architecture And Data](architecture.md) | Component diagram, data model, persistence, validation, projection, evaluation. |
-| [Development Guide](development.md) | Setup, commands, quality gate, browser verification, and the build-a-language walkthrough. |
-| [Maintenance Guide](maintenance.md) | Recipes for adding routes, views, source kinds, schema changes, and keeping docs honest. |
-| [Operator Recovery Runbook](operator-recovery.md) | Local data paths, backup/restore, interrupted processing, corrupt DB handling, diagnostics, reset steps, and acceptance drills. |
-| [Audit / Export Drill](audit-export-drill.md) | Step-by-step local snapshot/artifact export, integrity check, and audit-receipt walkthrough using `fixtures/exports/`. |
-| [Troubleshooting](troubleshooting.md) | Symptom-cause-fix tables for ports, models, sources, and data problems. |
-| [UI Design Guide](ui-design.md) | The implemented Atlas layout and visual system in the React app. |
-| [Roadmap](roadmap.md) | What must happen before real community language material can be used. |
+| Doc                                                     | One line                                                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| [Product Guide](product-guide.md)                       | What the prototype does and how each workspace is meant to be used.                                                             |
+| [Configuration Reference](configuration.md)             | Every environment variable, defaults, accepted values, and setup recipes.                                                       |
+| [Ingestion Deep Dive](ingestion.md)                     | Source kinds, processing flow, chunking, SSRF guard, OCR, transcription, duplicate flags, error catalogue.                      |
+| [API Reference](api.md)                                 | Full route index, auth model, mutation rules, payload shapes.                                                                   |
+| [Architecture And Data](architecture.md)                | Component diagram, data model, persistence, validation, projection, evaluation.                                                 |
+| [Development Guide](development.md)                     | Setup, commands, quality gate, browser verification, and the build-a-language walkthrough.                                      |
+| [Maintenance Guide](maintenance.md)                     | Recipes for adding routes, views, source kinds, schema changes, and keeping docs honest.                                        |
+| [Large-file Exception Ledger](large-file-exceptions.md) | Enforced source-size limits, temporary budgets, and decomposition exit criteria.                                                |
+| [Operator Recovery Runbook](operator-recovery.md)       | Local data paths, backup/restore, interrupted processing, corrupt DB handling, diagnostics, reset steps, and acceptance drills. |
+| [Local Incident Response](incident-response.md)         | Five-minute triage, safe signal interpretation, structured event catalog, incident procedures, and closure checks.              |
+| [Audit / Export Drill](audit-export-drill.md)           | Step-by-step local snapshot/artifact export, integrity check, and audit-receipt walkthrough using `fixtures/exports/`.          |
+| [Troubleshooting](troubleshooting.md)                   | Symptom-cause-fix tables for ports, models, sources, and data problems.                                                         |
+| [UI Design Guide](ui-design.md)                         | The implemented Atlas layout and visual system in the React app.                                                                |
+| [Roadmap](roadmap.md)                                   | What must happen before real community language material can be used.                                                           |
 
 ## Historical design docs
 

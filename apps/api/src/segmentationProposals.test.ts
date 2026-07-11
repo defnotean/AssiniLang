@@ -14,17 +14,11 @@ describe("isSegmentationEmptyOrAllUnanalyzed", () => {
   });
 
   it("treats all-unanalyzed glosses as incomplete", () => {
-    expect(isSegmentationEmptyOrAllUnanalyzed([
-      { gloss: "unanalyzed" },
-      { gloss: "Unanalyzed" }
-    ])).toBe(true);
+    expect(isSegmentationEmptyOrAllUnanalyzed([{ gloss: "unanalyzed" }, { gloss: "Unanalyzed" }])).toBe(true);
   });
 
   it("keeps partially analyzed segmentation intact", () => {
-    expect(isSegmentationEmptyOrAllUnanalyzed([
-      { gloss: "river" },
-      { gloss: "unanalyzed" }
-    ])).toBe(false);
+    expect(isSegmentationEmptyOrAllUnanalyzed([{ gloss: "river" }, { gloss: "unanalyzed" }])).toBe(false);
   });
 });
 

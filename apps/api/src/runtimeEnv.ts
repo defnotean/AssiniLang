@@ -5,7 +5,7 @@ type Env = Record<string, string | undefined>;
 function parseEnvValue(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if ((trimmed.startsWith("\"") && trimmed.endsWith("\"")) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
     try {
       return JSON.parse(trimmed);
     } catch {

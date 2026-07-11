@@ -21,18 +21,22 @@ describe("audit event redaction", () => {
     if (!actor) throw new Error("Expected admin prototype user");
 
     const state = buildTestWorkspaceState();
-    const event = buildAuditEvent(state, {
-      actor,
-      action: "source_asset.process_failed",
-      entityType: "source_asset",
-      entityId: "source-1",
-      languageId: "testlang",
-      summary: "Processing failed with configured-secret",
-      metadata: {
-        reason: "Bearer clear-token ASSINI_TRANSCRIBE_API_KEY=xyz",
-        nested: { detail: "retry with transcribe-secret-value" }
-      }
-    }, 0);
+    const event = buildAuditEvent(
+      state,
+      {
+        actor,
+        action: "source_asset.process_failed",
+        entityType: "source_asset",
+        entityId: "source-1",
+        languageId: "testlang",
+        summary: "Processing failed with configured-secret",
+        metadata: {
+          reason: "Bearer clear-token ASSINI_TRANSCRIBE_API_KEY=xyz",
+          nested: { detail: "retry with transcribe-secret-value" }
+        }
+      },
+      0
+    );
 
     expect(event.summary).toBe("Processing failed with [redacted-secret]");
     expect(event.metadata).toEqual({

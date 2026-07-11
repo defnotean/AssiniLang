@@ -49,7 +49,8 @@ apps/
                          evaluations, governance, studyLoop, aiSessions, elder, observability,
                          exports, llm, auth, system) plus context.ts (shared RouteContext type).
     src/routeHelpers.ts  Cross-domain helpers: audit builders, actor resolution, redaction.
-    src/ingestion.ts     Raw-source extraction pipeline (chunking, OCR, transcription, fallbacks).
+    src/ingestion.ts     Candidate parsing, chunking, retry-aware extraction orchestration.
+    src/ingestionMedia.ts URL/document/OCR/transcription source resolvers.
     src/jobQueue.ts      In-process async job queue (pending/active counts for /ready and metrics).
     src/jobRecovery.ts   Interrupted-processing and stale-heartbeat recovery sweeps.
     src/readiness.ts     Storage + job-queue readiness report for GET /ready.
@@ -57,7 +58,8 @@ apps/
     src/publicLanguageViews.ts  Public projection and redaction.
     src/segmentationProposals.ts  Lexicon longest-match proposals on draft accept.
     src/draftGrounding.ts  Model-draft grounding checks and scores.
-    src/llmProvider.ts   LLM/transcription/OCR provider wiring.
+    src/llmProvider.ts   LLM completion client, context projection, probing, and mutable provider lifecycle.
+    src/llmProviderReadiness.ts Provider configuration and sanitized readiness projection.
     src/llmDiscovery.ts  Model endpoint discovery for Model Setup.
     src/appSettings.ts   Runtime settings read/write (.env persistence).
     src/runtimeConfig.ts / runtimeEnv.ts / runtimeEnvLoader.ts / runtimeLifecycle.ts
@@ -65,7 +67,7 @@ apps/
     src/observabilityMetrics.ts  Privileged /observability/metrics snapshot shaping.
     src/secretRedaction.ts / serverLogRedaction.ts  Secret scrubbing for errors, audit, logs.
     src/vaultPathSafety.ts  Obsidian vault path allowlist / containment.
-    src/urlSafety.ts     SSRF guard shared by ingestion and model discovery.
+    src/urlSafety.ts     Unified outbound HTTP boundary (SSRF, DNS pinning, redirects, deadlines, response caps).
     src/llmEnvShared.ts  Shared env parsing and URL normalization helpers.
   web/                 React research console.
     src/App.tsx          App shell: layout, sidebar, theme, top-level state and data fetching.
@@ -97,7 +99,7 @@ docs/                  The handbook, plus dated history under docs/specs and doc
 
 ## Data model
 
-The persisted app state (`appStateSchema` in `packages/db/src/schema.ts`, `schemaVersion: 9`) holds exactly these collections: `languages`, `corpus`, `corpusAnswerKeys`, `noteAnswerKeys`, `notes`, `exercises`, `exerciseSubmissions`, `evaluationRuns`, `governance`, `users`, `aiSessions`, `elderCorrections`, `auditEvents`, `reviewPolicies`, `reviewApprovals`, `reviewDispositions`, `lexemes`, `sourceAssets`, and `extractionDrafts`.
+The persisted app state (`appStateSchema` in the compatibility facade `packages/db/src/schema.ts`, `schemaVersion: 9`) holds exactly these collections: `languages`, `corpus`, `corpusAnswerKeys`, `noteAnswerKeys`, `notes`, `exercises`, `exerciseSubmissions`, `evaluationRuns`, `governance`, `users`, `aiSessions`, `elderCorrections`, `auditEvents`, `reviewPolicies`, `reviewApprovals`, `reviewDispositions`, `lexemes`, `sourceAssets`, and `extractionDrafts`. Record-level Zod definitions live in `schemaDomains.ts`; bounded `schemaIntegrity*.ts` modules provide cross-record refinements; the facade composes them and retains every public schema/type export plus legacy v1-v8 migration parsing.
 
 ```mermaid
 erDiagram
@@ -129,13 +131,13 @@ Ingestion-facing collections:
 - `languages`: user-created language records. `status` is `active`, `draft`, or `archived`. Each language may carry an optional `phonology` object (`consonants`, `vowels`, optional `syllableTemplate` and `stress`, `notes`) plus optional `createdBy` and `createdAt` fields.
 - `lexemes`: the per-language lexicon. Each lexeme keeps `form`, `gloss`, `partOfSpeech`, `tags`, and `sourceAssetIds` linking it back to the raw materials it came from.
 - `sourceAssets`: registered raw materials. `kind` is `text`, `wordlist`, `url`, `image`, `audio`, or `document`; `status` is `pending`, `processing`, `processed`, `failed`, or `archived`. Assets store `rawText`, `url`, or a canonical `filePath` under `assets/<languageId>/` inside the configured data directory, plus an optional `transcript` for audio. While a claim is in flight, assets may also carry `processingStartedAt`, `processingHeartbeatAt`, and `processingAttempts` (cleared on success; kept on failure/recovery so the five-attempt cap still applies).
-- `extractionDrafts`: reviewable extraction output. `kind` is `lexeme`, `corpus_passage`, or `grammar_note`; each draft carries a `payload`, a `confidence` level, an optional `rationale`, and a `status` of `proposed`, `accepted`, or `rejected` with `reviewedBy`/`reviewedAt` and a `committedEntityId` once accepted.
+- `extractionDrafts`: reviewable extraction output. `kind` is `lexeme`, `corpus_passage`, or `grammar_note`; each draft carries a `payload`, a `confidence` level, an optional `rationale`, and a `status` of `proposed`, `accepted`, or `rejected` with `reviewedBy`/`reviewedAt` and a `committedEntityId` once accepted. Source completion uses the same semantic identity as duplicate surfacing (lexeme form+gloss, corpus target text, grammar topic) so explicit retries cannot multiply equivalent proposals or erase reviewed decisions.
 
 `consentStatus.use` on corpus passages is an enum (`CONSENT_USE_VALUES`): `testing-only`, `community-approved`, `personal-study`, `research`, `public-domain`, `licensed`, or `pending-review`.
 
 ## Ingestion pipeline
 
-Source processing lives in `apps/api/src/ingestion.ts` and is driven by the server-side LLM provider. The [Ingestion Deep Dive](ingestion.md) covers per-kind behavior, chunking and merge rules, sync vs async processing, the SSRF guard, OCR, transcription, duplicate flags, and the error catalogue in detail. The architectural points:
+Source processing is orchestrated by `apps/api/src/ingestion.ts`; media and source-text resolution lives in `apps/api/src/ingestionMedia.ts`; both are driven by the server-side LLM provider. The [Ingestion Deep Dive](ingestion.md) covers per-kind behavior, chunking and merge rules, sync vs async processing, the SSRF guard, OCR, transcription, duplicate flags, and the error catalogue in detail. The architectural points:
 
 - Per-kind text resolution (URL fetch, transcription, document parsing, OCR) is isolated in the pipeline; the route handler only validates, claims status, and persists results.
 - Long sources are chunked (~12,000 characters, up to 8 chunks) and per-chunk results are merged and deduplicated; nothing is silently truncated without a warning.
@@ -152,7 +154,7 @@ Persisted source-asset file paths are validated before use. File-backed assets m
 
 The current schema version is 9. Legacy v1-v8 JSON databases migrate forward automatically on read; older state gains collections introduced after its version and keeps its existing records. The v8 -> v9 app-state migration preserves source-processing metadata already present in JSON.
 
-The store backend can also be selected explicitly: `new JsonStore(path, { backend: "json" | "sqlite" })` (or the `openStore` factory) overrides the extension heuristic, and the resolved choice is exposed as the read-only `backend` property. SQLite databases carry a single-row `schema_meta` table (`schema_version`, `migrated_at`) stamped with the current schema version on first open. The real 8 -> 9 SQLite migration adds `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at` to `source_assets` without changing existing rows. Pending entries in the `SQLITE_MIGRATIONS` registry run in order at open time, each inside its own transaction with the version bump committed atomically; a failing migration rolls back fully, and a database stamped with a newer version than the code understands is refused loudly.
+The store backend can also be selected explicitly: `new JsonStore(path, { backend: "json" | "sqlite" })` (or the `openStore` factory) overrides the extension heuristic, and the resolved choice is exposed as the read-only `backend` property. `store.ts` remains the compatibility facade; `storeConfig.ts`, `storeFileIdentity.ts`, and `storeState.ts` isolate backend selection, same-file/atomic-replacement safety, and empty-state construction without changing the `JsonStore` API. SQLite databases carry a single-row `schema_meta` table (`schema_version`, `migrated_at`) stamped with the current schema version on first open. The real 8 -> 9 SQLite migration adds `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at` to `source_assets` without changing existing rows. Pending entries in the `SQLITE_MIGRATIONS` registry run in order at open time, each inside its own transaction with the version bump committed atomically; a failing migration rolls back fully, and a database stamped with a newer version than the code understands is refused loudly.
 
 Persisted top-level records must keep stable nonblank unique IDs inside each app-state collection. The schema validates referential integrity during local JSON reads: language IDs on corpus, notes, exercises, lexemes, sourceAssets, extractionDrafts, and governance/review/audit records must resolve to existing languages; answer keys must point at existing same-language passages; actor attribution must use known local users in allowed roles; timestamps must stay parseable and chronologically consistent. Corrupted or manually edited local JSON fails loudly with the exact database path instead of leaking malformed records into public views.
 
@@ -243,11 +245,13 @@ Persisted evaluation runs must keep nonblank language IDs that reference an exis
 
 ## Health and readiness
 
-`GET /health` is the cheap liveness probe. `GET /ready` (via `readiness.ts`) reads the configured store through the same schema-validation path used by normal API reads and reports safe `jobQueue` pending/active counts. A ready response includes `schemaVersion` (currently 9) and never exposes database paths, exception messages, job IDs, or workspace contents. Privileged `GET /observability/metrics` returns a similarly sanitized operational snapshot (uptime, request status-class counts, job-queue counts, storage status).
+`GET /health` is the cheap liveness probe. `GET /ready` (via `readiness.ts`) reads the configured store through the same schema-validation path used by normal API reads and reports safe `jobQueue` pending/active counts plus startup-recovery status. A ready response requires the startup sweep to have succeeded, includes `schemaVersion` (currently 9), and never exposes database paths, exception messages, job IDs, or workspace contents. Privileged `GET /observability/metrics` returns a similarly sanitized operational snapshot: uptime, request status/error counts and fixed latency buckets, queue counts, aggregate job outcomes/durations, recovery outcomes, and storage status. These are in-memory process-lifetime diagnostics; durable recovery evidence remains in audit events.
 
 ## LLM provider boundary
 
 LLM provider configuration is server-only. The browser can view readiness status but must never receive provider API keys. All provider, transcription, OCR, and URL-guard environment variables are documented in the [Configuration Reference](configuration.md).
+
+All production server-side HTTP egress flows through `fetchOutboundHttp` in `apps/api/src/urlSafety.ts`. The boundary resolves and validates the destination, pins the approved DNS result into the connection, blocks redirects and URL-embedded credentials, combines caller cancellation with an operation deadline, caps streamed response bytes, and redacts configured secrets from transport errors. The eval package can perform online embedding retrieval only when the API injects this guarded transport; it has no global-fetch fallback. `outboundHttpArchitecture.test.ts` rejects new raw HTTP-client imports and direct fetch calls outside the boundary.
 
 `GET /llm/status` reports provider readiness, transcription readiness, and OCR readiness without exposing keys. Provider errors are sanitized (and secret-looking values redacted) before returning to clients or storing observable session records.
 

@@ -1,4 +1,4 @@
-import type { GovernanceRecord } from "@assini/db";
+import type { GovernanceRecord } from "@assini/api-contract";
 import type { GovernanceWorkspace } from "../hooks/useGovernanceWorkspace";
 import {
   formatActorRole,
@@ -55,18 +55,23 @@ export function GovernanceView({
     reloadGovernanceData: onReloadGovernanceData
   } = governance;
   const { t } = useI18n();
-  const records = governanceState.status === "ready"
-    ? governanceState.data.filter((record) => record.languageId === selectedLanguageId)
-    : [];
+  const records =
+    governanceState.status === "ready"
+      ? governanceState.data.filter((record) => record.languageId === selectedLanguageId)
+      : [];
   const consentRecords = records.filter((record) => record.policyType === "consent");
-  const reviewDispositions = reviewDispositionState.status === "ready"
-    ? reviewDispositionState.data.filter((disposition) => disposition.languageId === selectedLanguageId)
-    : [];
-  const auditEvents = auditEventState.status === "ready"
-    ? auditEventState.data.filter((event) => event.languageId === selectedLanguageId)
-    : [];
+  const reviewDispositions =
+    reviewDispositionState.status === "ready"
+      ? reviewDispositionState.data.filter((disposition) => disposition.languageId === selectedLanguageId)
+      : [];
+  const auditEvents =
+    auditEventState.status === "ready"
+      ? auditEventState.data.filter((event) => event.languageId === selectedLanguageId)
+      : [];
   const loadedReviewPolicy = reviewPolicyState.status === "ready" ? reviewPolicyState.data : null;
-  const reviewPolicySummary = loadedReviewPolicy ? t("governance.approvalsRequired", { count: loadedReviewPolicy.approvalThreshold }) : null;
+  const reviewPolicySummary = loadedReviewPolicy
+    ? t("governance.approvalsRequired", { count: loadedReviewPolicy.approvalThreshold })
+    : null;
 
   function onReviewDispositionDraftChange(dispositionId: string, summary: string) {
     setReviewDispositionDrafts((drafts) => ({ ...drafts, [dispositionId]: summary }));
@@ -78,7 +83,8 @@ export function GovernanceView({
         <p className="eyebrow">{t("governance.deploymentPolicy")}</p>
         <h2>{t("governance.dataStewardshipPolicy")}</h2>
         <p>
-          {t("governance.dataStewardshipIntroBefore")} <strong>{t("governance.localDataStewardshipPolicy")}</strong>{t("governance.dataStewardshipIntroAfter")}
+          {t("governance.dataStewardshipIntroBefore")} <strong>{t("governance.localDataStewardshipPolicy")}</strong>
+          {t("governance.dataStewardshipIntroAfter")}
         </p>
       </section>
 
@@ -171,7 +177,9 @@ export function GovernanceView({
             <p className="review-policy-summary">
               <strong>{reviewPolicySummary}</strong>
               <span>
-                {loadedReviewPolicy?.requiresAssignedReviewer ? t("governance.assignedReviewersOnly") : t("governance.authorizedReviewers")}
+                {loadedReviewPolicy?.requiresAssignedReviewer
+                  ? t("governance.assignedReviewersOnly")
+                  : t("governance.authorizedReviewers")}
               </span>
             </p>
           )}
@@ -270,20 +278,28 @@ export function GovernanceView({
                   <p>{disposition.reason}</p>
                   <div className="pill-row">
                     <span className="pill">{t("governance.notePill", { noteId: disposition.noteId })}</span>
-                    <span className="pill">{t("governance.assignedToPill", { assignedTo: disposition.assignedTo })}</span>
-                    {disposition.dueAt && <span className="pill">{t("governance.duePill", { dueAt: disposition.dueAt })}</span>}
+                    <span className="pill">
+                      {t("governance.assignedToPill", { assignedTo: disposition.assignedTo })}
+                    </span>
+                    {disposition.dueAt && (
+                      <span className="pill">{t("governance.duePill", { dueAt: disposition.dueAt })}</span>
+                    )}
                     <span className="pill">{t("governance.openedByPill", { openedBy: disposition.openedBy })}</span>
                   </div>
 
                   {disposition.status === "resolved" ? (
                     <div className="resolution-summary">
-                      {disposition.resolvedBy && <strong>{t("governance.resolvedBy", { resolvedBy: disposition.resolvedBy })}</strong>}
+                      {disposition.resolvedBy && (
+                        <strong>{t("governance.resolvedBy", { resolvedBy: disposition.resolvedBy })}</strong>
+                      )}
                       {disposition.resolutionSummary && <p>{disposition.resolutionSummary}</p>}
                     </div>
                   ) : (
                     <div className="resolution-form">
                       <div className="form-group">
-                        <label htmlFor={resolutionInputId}>{t("governance.resolutionSummaryFor", { id: disposition.id })}</label>
+                        <label htmlFor={resolutionInputId}>
+                          {t("governance.resolutionSummaryFor", { id: disposition.id })}
+                        </label>
                         <textarea
                           id={resolutionInputId}
                           value={resolutionDraft}
@@ -295,14 +311,14 @@ export function GovernanceView({
                         type="button"
                         className="secondary"
                         disabled={
-                          resolvingReviewDispositionId !== null
-                          || isResolving
-                          || resolutionDraft.trim().length === 0
+                          resolvingReviewDispositionId !== null || isResolving || resolutionDraft.trim().length === 0
                         }
                         aria-busy={isResolving}
                         onClick={() => onResolveReviewDisposition(disposition.id)}
                       >
-                        {isResolving ? t("governance.resolvingButton", { id: disposition.id }) : t("governance.resolveButton", { id: disposition.id })}
+                        {isResolving
+                          ? t("governance.resolvingButton", { id: disposition.id })
+                          : t("governance.resolveButton", { id: disposition.id })}
                       </button>
                     </div>
                   )}
@@ -341,22 +357,26 @@ export function GovernanceView({
 
         {auditEvents.length > 0 && (
           <div className="audit-event-list">
-            {auditEvents.slice().reverse().slice(0, 12).map((event) => (
-              <article key={event.id} className="audit-event-card">
-                <div className="record-topline">
-                  <div>
-                    <span className="detail-label">{event.at}</span>
-                    <h3>{formatAuditAction(event.action, t)}</h3>
+            {auditEvents
+              .slice()
+              .reverse()
+              .slice(0, 12)
+              .map((event) => (
+                <article key={event.id} className="audit-event-card">
+                  <div className="record-topline">
+                    <div>
+                      <span className="detail-label">{event.at}</span>
+                      <h3>{formatAuditAction(event.action, t)}</h3>
+                    </div>
+                    <span className="status-badge under_review">{formatActorRole(event.actorRole, t)}</span>
                   </div>
-                  <span className="status-badge under_review">{formatActorRole(event.actorRole, t)}</span>
-                </div>
-                <p>{formatAuditSummary(event.summary, t)}</p>
-                <div className="pill-row">
-                  <span className="pill">{event.actorId}</span>
-                  <span className="pill">{formatAuditEntityPill(event.entityType, event.entityId, t)}</span>
-                </div>
-              </article>
-            ))}
+                  <p>{formatAuditSummary(event.summary, t)}</p>
+                  <div className="pill-row">
+                    <span className="pill">{event.actorId}</span>
+                    <span className="pill">{formatAuditEntityPill(event.entityType, event.entityId, t)}</span>
+                  </div>
+                </article>
+              ))}
           </div>
         )}
       </section>
@@ -364,18 +384,16 @@ export function GovernanceView({
       <section className="policy-card snapshot-card">
         <p className="eyebrow">{t("governance.reviewExport")}</p>
         <h2>{t("governance.languageSnapshot")}</h2>
-        <p>
-          {t("governance.languageSnapshotDescription")}
-        </p>
+        <p>{t("governance.languageSnapshotDescription")}</p>
         <div className="snapshot-actions">
           <button
             type="button"
             className="secondary"
             disabled={
-              isExportingSnapshot
-              || isSubmittingGovernance
-              || isSubmittingReviewPolicy
-              || resolvingReviewDispositionId !== null
+              isExportingSnapshot ||
+              isSubmittingGovernance ||
+              isSubmittingReviewPolicy ||
+              resolvingReviewDispositionId !== null
             }
             aria-busy={isExportingSnapshot}
             onClick={onExportSnapshot}
@@ -394,7 +412,11 @@ export function GovernanceView({
             <p className="muted">{snapshotDownload.summary}</p>
           </div>
         )}
-        {snapshotError && <p className="result-notice error" role="alert">{snapshotError}</p>}
+        {snapshotError && (
+          <p className="result-notice error" role="alert">
+            {snapshotError}
+          </p>
+        )}
       </section>
 
       <div className="table-card">
@@ -423,7 +445,9 @@ export function GovernanceView({
         )}
 
         {governanceState.status === "ready" && records.length > 0 && consentRecords.length === 0 && (
-          <p className="inline-empty consent-gap" role="status">{t("governance.noConsentPolicyRecords")}</p>
+          <p className="inline-empty consent-gap" role="status">
+            {t("governance.noConsentPolicyRecords")}
+          </p>
         )}
 
         {records.length > 0 && (

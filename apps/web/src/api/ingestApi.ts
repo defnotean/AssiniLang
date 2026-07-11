@@ -1,4 +1,4 @@
-import type { CorpusPassage, ExtractionDraft, Lexeme, Note, SourceAsset } from "@assini/db";
+import type { CorpusPassage, ExtractionDraft, Lexeme, Note, SourceAsset } from "@assini/api-contract";
 import type {
   ObsidianVaultImportPayload,
   ObsidianVaultImportResponse,
@@ -14,9 +14,7 @@ export type ProcessSourceResult = ProcessSourceResponse;
 export type ProcessingQueuePhase = "queued" | "active";
 
 /** Source asset as returned by intake list/process/cancel routes. */
-export type SourceAssetView = SourceAsset & {
-  processingQueuePhase?: ProcessingQueuePhase;
-};
+export type SourceAssetView = SourceAsset;
 
 /**
  * Read-time duplicate flag computed by the API when listing extraction
@@ -125,10 +123,7 @@ export async function importObsidianVault(
   return response.json() as Promise<ObsidianVaultImportResponse>;
 }
 
-export async function processSource(
-  sourceId: string,
-  options?: { async?: boolean }
-): Promise<ProcessSourceResult> {
+export async function processSource(sourceId: string, options?: { async?: boolean }): Promise<ProcessSourceResult> {
   const useAsync = options?.async === true;
   const response = await fetch(`/api/sources/${encodeURIComponent(sourceId)}/process`, {
     method: "POST",
@@ -167,9 +162,9 @@ export async function acceptExtractionDraft(
   draftId: string,
   options?: AcceptExtractionDraftOptions
 ): Promise<AcceptExtractionDraftResult> {
-  const hasOverride = options?.preferLexiconSegmentation === true
-    || (options?.morphologicalSegmentation !== undefined
-      && options.morphologicalSegmentation.length > 0);
+  const hasOverride =
+    options?.preferLexiconSegmentation === true ||
+    (options?.morphologicalSegmentation !== undefined && options.morphologicalSegmentation.length > 0);
   const response = await fetch(`/api/extraction-drafts/${encodeURIComponent(draftId)}/accept`, {
     method: "POST",
     ...(await actorRequest("reviewer", hasOverride)),

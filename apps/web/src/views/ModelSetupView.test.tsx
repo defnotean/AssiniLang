@@ -173,12 +173,16 @@ describe("ModelSetupView settings save status", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Save settings" }));
 
-    await waitFor(() => expect(handleSaveSettings).toHaveBeenCalledWith(expect.objectContaining({
-      embeddingBaseUrl: "http://127.0.0.1:8080/v1",
-      embeddingModel: "nomic-embed-text",
-      embeddingApiKey: "embedding-secret",
-      embeddingTimeoutMs: 15000
-    })));
+    await waitFor(() =>
+      expect(handleSaveSettings).toHaveBeenCalledWith(
+        expect.objectContaining({
+          embeddingBaseUrl: "http://127.0.0.1:8080/v1",
+          embeddingModel: "nomic-embed-text",
+          embeddingApiKey: "embedding-secret",
+          embeddingTimeoutMs: 15000
+        })
+      )
+    );
   });
 
   it("shows a next-step hint when no model profiles are saved yet", () => {
@@ -317,9 +321,7 @@ describe("ModelSetupView settings save status", () => {
     );
 
     expect(screen.getByRole("alert")).toHaveTextContent("Runtime settings could not be loaded");
-    expect(
-      screen.getByText(/Check that the local API is running, then retry/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Check that the local API is running, then retry/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 

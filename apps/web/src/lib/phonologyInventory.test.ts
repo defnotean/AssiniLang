@@ -19,13 +19,15 @@ describe("phonologyInventory helpers", () => {
 
   it("builds drafts from language phonology and detects empty inventories", () => {
     expect(draftFromLanguage({ phonology: undefined })).toEqual({ consonants: [], vowels: [] });
-    expect(draftFromLanguage({
-      phonology: {
-        consonants: ["m"],
-        vowels: ["a"],
-        notes: ["keep"]
-      }
-    })).toEqual({ consonants: ["m"], vowels: ["a"] });
+    expect(
+      draftFromLanguage({
+        phonology: {
+          consonants: ["m"],
+          vowels: ["a"],
+          notes: ["keep"]
+        }
+      })
+    ).toEqual({ consonants: ["m"], vowels: ["a"] });
     expect(hasDeclaredInventory({ consonants: [], vowels: [] })).toBe(false);
     expect(hasDeclaredInventory({ consonants: ["m"], vowels: [] })).toBe(true);
   });
@@ -36,15 +38,20 @@ describe("phonologyInventory helpers", () => {
     expect(inventoriesEqual(left, right)).toBe(true);
     expect(inventoriesEqual(left, { consonants: ["m"], vowels: ["i"] })).toBe(false);
 
-    expect(buildPhonologyPatch({
-      phonology: {
-        consonants: ["k"],
-        vowels: ["a"],
-        syllableTemplate: "CV",
-        stress: "word-initial",
-        notes: ["No clusters."]
-      }
-    }, { consonants: ["m", "n"], vowels: ["a", "i"] })).toEqual({
+    expect(
+      buildPhonologyPatch(
+        {
+          phonology: {
+            consonants: ["k"],
+            vowels: ["a"],
+            syllableTemplate: "CV",
+            stress: "word-initial",
+            notes: ["No clusters."]
+          }
+        },
+        { consonants: ["m", "n"], vowels: ["a", "i"] }
+      )
+    ).toEqual({
       consonants: ["m", "n"],
       vowels: ["a", "i"],
       syllableTemplate: "CV",

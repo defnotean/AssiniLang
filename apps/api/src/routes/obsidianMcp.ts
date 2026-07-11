@@ -11,6 +11,7 @@ import {
   type ObsidianMcpResourceList
 } from "@assini/api-contract";
 import type { SourceAsset } from "@assini/db";
+import { toPublicSourceAsset } from "../sourceAssetViews.js";
 import {
   applyObsidianMcpSettingsPatch,
   readObsidianMcpConnectionConfigFromEnv,
@@ -270,11 +271,9 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
       session = await obsidianMcpSessionFactory(config);
       for (const uri of payload.uris) {
         if (config.token && uri.includes(config.token)) {
-          skipped.push(skippedResource(
-            uri,
-            "Resource URI contained a configured credential and was not imported.",
-            config.token
-          ));
+          skipped.push(
+            skippedResource(uri, "Resource URI contained a configured credential and was not imported.", config.token)
+          );
           continue;
         }
         if (existingUris.has(uri)) {
@@ -284,16 +283,15 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
 
         try {
           const resource = await session.readTextResource(uri);
-          if (config.token && (
-            resource.uri.includes(config.token)
-            || resource.text.includes(config.token)
-            || resource.mimeType?.includes(config.token)
-          )) {
-            skipped.push(skippedResource(
-              uri,
-              "MCP resource contained a configured credential and was not imported.",
-              config.token
-            ));
+          if (
+            config.token &&
+            (resource.uri.includes(config.token) ||
+              resource.text.includes(config.token) ||
+              resource.mimeType?.includes(config.token))
+          ) {
+            skipped.push(
+              skippedResource(uri, "MCP resource contained a configured credential and was not imported.", config.token)
+            );
             continue;
           }
           const validated = validateTextResource(resource);
@@ -315,9 +313,8 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
           });
           existingUris.add(uri);
         } catch (error) {
-          const reason = error instanceof ObsidianMcpResourceReadError
-            ? error.message
-            : safeMcpError(error, config.token);
+          const reason =
+            error instanceof ObsidianMcpResourceReadError ? error.message : safeMcpError(error, config.token);
           skipped.push(skippedResource(uri, reason, config.token));
         }
       }
@@ -348,11 +345,9 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
         imported = candidates.filter((asset) => {
           if (!asset.url || persistedUris.has(asset.url)) {
             if (asset.url) {
-              skipped.push(skippedResource(
-                asset.url,
-                "Resource URI was already imported for this language.",
-                config.token
-              ));
+              skipped.push(
+                skippedResource(asset.url, "Resource URI was already imported for this language.", config.token)
+              );
             }
             return false;
           }
@@ -361,23 +356,26 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
         });
         if (imported.length === 0) return state;
 
-        return appendAuditEvent({
-          ...state,
-          sourceAssets: [...state.sourceAssets, ...imported]
-        }, {
-          actor,
-          action: "source_asset.obsidian_mcp_imported",
-          entityType: "source_asset",
-          entityId: imported[0].id,
-          languageId,
-          summary: `Imported ${imported.length} text sources through Obsidian MCP.`,
-          metadata: {
-            integration: "obsidian_mcp",
-            requested: payload.uris.length,
-            imported: imported.length,
-            skipped: skipped.length
+        return appendAuditEvent(
+          {
+            ...state,
+            sourceAssets: [...state.sourceAssets, ...imported]
+          },
+          {
+            actor,
+            action: "source_asset.obsidian_mcp_imported",
+            entityType: "source_asset",
+            entityId: imported[0].id,
+            languageId,
+            summary: `Imported ${imported.length} text sources through Obsidian MCP.`,
+            metadata: {
+              integration: "obsidian_mcp",
+              requested: payload.uris.length,
+              imported: imported.length,
+              skipped: skipped.length
+            }
           }
-        });
+        );
       });
     }
 
@@ -387,7 +385,7 @@ export function registerObsidianMcpRoutes(app: FastifyInstance, ctx: RouteContex
     }
     if (imported.length > 0) reply.code(201);
     return {
-      imported,
+      imported: imported.map((item) => toPublicSourceAsset(item)),
       skipped,
       summary: {
         requested: payload.uris.length,

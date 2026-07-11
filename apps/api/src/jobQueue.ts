@@ -3,6 +3,39 @@ type Job = {
   fn: () => Promise<void>;
 };
 
+export type JobQueueMetrics = {
+  enqueued: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  duplicateRejected: number;
+  durationMs: {
+    count: number;
+    total: number;
+    max: number;
+  };
+};
+
+export type JobQueueLogFields = {
+  event:
+    | "job.duplicate_rejected"
+    | "job.enqueued"
+    | "job.started"
+    | "job.completed"
+    | "job.failed"
+    | "job.cancel_rejected"
+    | "job.cancelled";
+  pending: number;
+  active: number;
+  durationMs?: number;
+};
+
+export type JobQueueLogger = {
+  info?: (fields: JobQueueLogFields, message: string) => void;
+  warn?: (fields: JobQueueLogFields, message: string) => void;
+  error?: (fields: JobQueueLogFields, message: string) => void;
+};
+
 export type JobQueueStatus = {
   pending: number;
   active: number;
@@ -11,16 +44,52 @@ export type JobQueueStatus = {
 export class JobQueue {
   private queue: Job[] = [];
   private activeJobs = new Set<string>();
+  private metrics: JobQueueMetrics = {
+    enqueued: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+    duplicateRejected: 0,
+    durationMs: { count: 0, total: 0, max: 0 }
+  };
 
-  constructor(private readonly concurrency: number = 2, private readonly logger?: any) {}
+  constructor(
+    private readonly concurrency: number = 2,
+    private readonly logger?: JobQueueLogger,
+    private readonly now: () => number = Date.now
+  ) {}
+
+  private logFields(event: JobQueueLogFields["event"], durationMs?: number): JobQueueLogFields {
+    return {
+      event,
+      pending: this.queue.length,
+      active: this.activeJobs.size,
+      ...(durationMs === undefined ? {} : { durationMs })
+    };
+  }
+
+  private elapsedMs(startedAtMs: number): number {
+    const endedAtMs = this.now();
+    if (!Number.isFinite(startedAtMs) || !Number.isFinite(endedAtMs)) return 0;
+    const elapsed = Math.max(0, Math.trunc(endedAtMs - startedAtMs));
+    return Number.isSafeInteger(elapsed) ? elapsed : 0;
+  }
+
+  private recordDuration(durationMs: number): void {
+    this.metrics.durationMs.count += 1;
+    this.metrics.durationMs.total = Math.min(Number.MAX_SAFE_INTEGER, this.metrics.durationMs.total + durationMs);
+    this.metrics.durationMs.max = Math.max(this.metrics.durationMs.max, durationMs);
+  }
 
   add(id: string, fn: () => Promise<void>): void {
     if (this.queue.some((j) => j.id === id) || this.activeJobs.has(id)) {
-      this.logger?.warn?.({ id }, "Job is already queued or active");
+      this.metrics.duplicateRejected += 1;
+      this.logger?.warn?.(this.logFields("job.duplicate_rejected"), "Job is already queued or active");
       return;
     }
     this.queue.push({ id, fn });
-    this.logger?.info?.({ id, queueLength: this.queue.length }, "Job added to queue");
+    this.metrics.enqueued += 1;
+    this.logger?.info?.(this.logFields("job.enqueued"), "Job added to queue");
     this.next();
   }
 
@@ -31,14 +100,23 @@ export class JobQueue {
 
     const job = this.queue.shift()!;
     this.activeJobs.add(job.id);
-    this.logger?.info?.({ id: job.id, activeCount: this.activeJobs.size }, "Starting queued job");
+    const startedAtMs = this.now();
+    this.logger?.info?.(this.logFields("job.started"), "Starting queued job");
 
     void (async () => {
       try {
         await job.fn();
-        this.logger?.info?.({ id: job.id }, "Job completed successfully");
-      } catch (error) {
-        this.logger?.error?.({ err: error, id: job.id }, "Error running queued job");
+        const durationMs = this.elapsedMs(startedAtMs);
+        this.metrics.completed += 1;
+        this.recordDuration(durationMs);
+        this.logger?.info?.(this.logFields("job.completed", durationMs), "Job completed successfully");
+      } catch {
+        const durationMs = this.elapsedMs(startedAtMs);
+        this.metrics.failed += 1;
+        this.recordDuration(durationMs);
+        // Never hand the thrown error or caller-controlled id to the logger. Provider
+        // errors can contain source text, local paths, endpoint credentials, or tokens.
+        this.logger?.error?.(this.logFields("job.failed", durationMs), "Error running queued job");
       } finally {
         this.activeJobs.delete(job.id);
         this.next();
@@ -64,7 +142,7 @@ export class JobQueue {
    */
   cancel(id: string): boolean {
     if (this.activeJobs.has(id)) {
-      this.logger?.warn?.({ id }, "Cannot cancel active job");
+      this.logger?.warn?.(this.logFields("job.cancel_rejected"), "Cannot cancel active job");
       return false;
     }
     const index = this.queue.findIndex((j) => j.id === id);
@@ -72,7 +150,8 @@ export class JobQueue {
       return false;
     }
     this.queue.splice(index, 1);
-    this.logger?.info?.({ id, queueLength: this.queue.length }, "Pending job cancelled");
+    this.metrics.cancelled += 1;
+    this.logger?.info?.(this.logFields("job.cancelled"), "Pending job cancelled");
     return true;
   }
 
@@ -80,6 +159,14 @@ export class JobQueue {
     return {
       pending: this.queue.length,
       active: this.activeJobs.size
+    };
+  }
+
+  /** Aggregate-only diagnostics. No caller-controlled job ids or error text. */
+  getMetrics(): JobQueueMetrics {
+    return {
+      ...this.metrics,
+      durationMs: { ...this.metrics.durationMs }
     };
   }
 

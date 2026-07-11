@@ -7,9 +7,6 @@
     "rootDir": ".",
     "outDir": "dist"
   },
-  "references": [
-    { "path": "../../packages/db" },
-    { "path": "../../packages/api-contract" }
-  ],
+  "references": [{ "path": "../../packages/api-contract" }],
   "include": ["src", "vite.config.ts"]
 }

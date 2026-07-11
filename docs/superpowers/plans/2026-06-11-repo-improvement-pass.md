@@ -13,6 +13,7 @@
 ## Task 1: Frontend Evaluation Utilities
 
 **Files:**
+
 - Create: `apps/web/src/evaluationTrends.ts`
 - Create: `apps/web/src/evaluationTrends.test.ts`
 - Modify: `apps/web/src/App.tsx`
@@ -26,6 +27,7 @@
 ## Task 2: DB Audit Metadata Privacy Module
 
 **Files:**
+
 - Create: `packages/db/src/auditMetadataPrivacy.ts`
 - Create: `packages/db/src/auditMetadataPrivacy.test.ts`
 - Modify: `packages/db/src/schema.ts`
@@ -39,6 +41,7 @@
 ## Task 3: API Request Parsing Boundary
 
 **Files:**
+
 - Create: `apps/api/src/requestParsing.ts`
 - Create: `apps/api/src/requestParsing.test.ts`
 - Modify: `apps/api/src/server.ts`
@@ -52,6 +55,7 @@
 ## Task 4: Integration Verification
 
 **Files:**
+
 - Modify as needed only for imports and type fixes.
 
 - [x] Run `npm.cmd test`.

@@ -55,10 +55,7 @@ describe("WorkspaceHeader", () => {
   it("exposes aria-busy on drafting and evaluation actions while in flight", () => {
     const { rerender } = renderHeader({ isWorkflowBusy: true, isDrafting: true });
     expect(screen.getByRole("button", { name: "Drafting..." })).toHaveAttribute("aria-busy", "true");
-    expect(screen.getByRole("button", { name: "Draft notes with model" })).not.toHaveAttribute(
-      "aria-busy",
-      "true"
-    );
+    expect(screen.getByRole("button", { name: "Draft notes with model" })).not.toHaveAttribute("aria-busy", "true");
 
     rerender(
       <WorkspaceHeader

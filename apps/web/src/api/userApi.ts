@@ -1,4 +1,4 @@
-import type { User } from "@assini/db";
+import type { User } from "@assini/api-contract";
 import { getJson } from "../lib/apiClient";
 
 export async function fetchCurrentUser(): Promise<User> {

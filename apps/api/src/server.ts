@@ -23,7 +23,7 @@ import {
 import { censorLogSecret, redactErrorSecrets } from "./secretRedaction.js";
 import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
 import { createObsidianMcpSession, type ObsidianMcpSessionFactory } from "./obsidianMcpClient.js";
-import type { RequestStatusClass, RouteContext } from "./routes/context.js";
+import type { RecoveryMetrics, RequestLatencyBucket, RequestStatusClass, RouteContext } from "./routes/context.js";
 import { registerAiSessionRoutes } from "./routes/aiSessions.js";
 import { registerAuthRoutes } from "./routes/auth.js";
 import { registerCorpusRoutes } from "./routes/corpus.js";
@@ -102,6 +102,24 @@ function responseStatusClass(statusCode: number): RequestStatusClass | undefined
   return undefined;
 }
 
+function requestLatencyBucket(durationMs: number): RequestLatencyBucket {
+  if (durationMs <= 10) return "le10";
+  if (durationMs <= 50) return "le50";
+  if (durationMs <= 250) return "le250";
+  if (durationMs <= 1_000) return "le1000";
+  return "gt1000";
+}
+
+function safeDurationMs(startedAtMs: number, endedAtMs: number): number {
+  if (!Number.isFinite(startedAtMs) || !Number.isFinite(endedAtMs)) return 0;
+  const value = Math.max(0, Math.trunc(endedAtMs - startedAtMs));
+  return Number.isSafeInteger(value) ? value : 0;
+}
+
+function incrementCount(value: number, increment = 1): number {
+  return Math.min(Number.MAX_SAFE_INTEGER, value + increment);
+}
+
 function singleHeaderValue(value: string | string[] | undefined): string | undefined {
   if (typeof value === "string") return value;
   if (Array.isArray(value) && value.length === 1) return value[0];
@@ -134,21 +152,23 @@ export function createServer(options: ServerOptions = {}) {
   });
   const store = options.store ?? new JsonStore();
   const jobQueue = options.jobQueue ?? new JobQueue(options.concurrency ?? 2, app.log);
-  const rateLimit = options.rateLimit === false ? undefined : options.rateLimit ?? DEFAULT_RATE_LIMIT;
-  const authToken = options.authToken ?? process.env.ASSINI_DEV_AUTH_TOKEN ?? (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
+  const rateLimit = options.rateLimit === false ? undefined : (options.rateLimit ?? DEFAULT_RATE_LIMIT);
+  const authToken =
+    options.authToken ??
+    process.env.ASSINI_DEV_AUTH_TOKEN ??
+    (process.env.NODE_ENV === "test" ? TEST_ONLY_AUTH_TOKEN : undefined);
   const enablePrototypeAuth = options.enablePrototypeAuth ?? process.env.ASSINI_ENABLE_PROTOTYPE_AUTH === "true";
   const prototypeSessions: PrototypeSessionMap = options.prototypeSessions ?? new Map<string, PrototypeSessionRecord>();
   const prototypeSessionTtlMs = options.prototypeSessionTtlMs ?? readPrototypeSessionTtlMs(process.env);
   const prototypeSessionAbsoluteMaxMs =
-    options.prototypeSessionAbsoluteMaxMs
-    ?? readPrototypeSessionAbsoluteMaxMs(process.env, prototypeSessionTtlMs);
+    options.prototypeSessionAbsoluteMaxMs ?? readPrototypeSessionAbsoluteMaxMs(process.env, prototypeSessionTtlMs);
   const now = options.now ?? Date.now;
   prototypeSessions.now = now;
   const dataDir = options.dataDir ?? resolvePath(process.cwd(), "data");
   const multipartFileSizeBytes = options.multipartFileSizeBytes ?? MAX_SOURCE_UPLOAD_BYTES;
   const ingestionFetch = options.ingestionFetch ?? globalThis.fetch;
   const mutableLlmProvider = options.llmProvider ? undefined : createMutableLlmProvider(process.env, ingestionFetch);
-  const llmProvider = options.llmProvider ?? mutableLlmProvider as LlmProvider;
+  const llmProvider = options.llmProvider ?? (mutableLlmProvider as LlmProvider);
   const settingsPath = options.settingsPath ?? resolveRuntimeSettingsPath({ moduleUrl: import.meta.url });
   const obsidianMcpSessionFactory = options.obsidianMcpSessionFactory ?? createObsidianMcpSession;
   const rateLimitBuckets = new Map<string, number[]>();
@@ -156,23 +176,45 @@ export function createServer(options: ServerOptions = {}) {
     startedAtMs: now(),
     requests: {
       total: 0,
-      byStatusClass: { "1xx": 0, "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0 }
+      byStatusClass: { "1xx": 0, "2xx": 0, "3xx": 0, "4xx": 0, "5xx": 0 },
+      latencyMs: {
+        count: 0,
+        total: 0,
+        max: 0,
+        byBucket: { le10: 0, le50: 0, le250: 0, le1000: 0, gt1000: 0 }
+      }
     }
   };
+  const recoveryMetrics: RecoveryMetrics = {
+    startup: { status: "pending", recovered: 0 },
+    staleSweep: { status: "idle", runs: 0, failures: 0, totalRecovered: 0 }
+  };
+  const requestStartedAt = new WeakMap<FastifyRequest, number>();
   let memoryState = options.initialState;
   const usesMemoryState = options.initialState !== undefined;
   let memoryUpdateQueue: Promise<void> = Promise.resolve();
 
   app.addHook("onRequest", async (request, reply) => {
+    requestStartedAt.set(request, now());
     reply.header(REQUEST_ID_HEADER, requestIdForResponse(request));
   });
 
-  app.addHook("onResponse", async (_request, reply) => {
-    requestMetrics.requests.total += 1;
+  app.addHook("onResponse", async (request, reply) => {
+    requestMetrics.requests.total = incrementCount(requestMetrics.requests.total);
     const statusClass = responseStatusClass(reply.statusCode);
     if (statusClass) {
-      requestMetrics.requests.byStatusClass[statusClass] += 1;
+      requestMetrics.requests.byStatusClass[statusClass] = incrementCount(
+        requestMetrics.requests.byStatusClass[statusClass]
+      );
     }
+    const durationMs = safeDurationMs(requestStartedAt.get(request) ?? now(), now());
+    requestStartedAt.delete(request);
+    const latency = requestMetrics.requests.latencyMs;
+    latency.count = incrementCount(latency.count);
+    latency.total = incrementCount(latency.total, durationMs);
+    latency.max = Math.max(latency.max, durationMs);
+    const bucket = requestLatencyBucket(durationMs);
+    latency.byBucket[bucket] = incrementCount(latency.byBucket[bucket]);
   });
 
   const readState = async (): Promise<AppState> => {
@@ -256,11 +298,14 @@ export function createServer(options: ServerOptions = {}) {
       return;
     }
 
-    const statusCode = typeof maybeStatusError.statusCode === "number" && maybeStatusError.statusCode >= 400
-      ? maybeStatusError.statusCode
-      : 500;
+    const statusCode =
+      typeof maybeStatusError.statusCode === "number" && maybeStatusError.statusCode >= 400
+        ? maybeStatusError.statusCode
+        : 500;
     if (statusCode >= 500) {
-      app.log.error({ err: error, requestId }, "Unhandled request error");
+      // The exception itself can contain provider bodies, source text, paths, or
+      // credentials. Keep the correlation id and a fixed event code only.
+      app.log.error({ event: "request.unhandled", requestId, statusCode }, "Unhandled request error");
       reply.code(statusCode).send({
         error: "Internal Server Error",
         requestId
@@ -305,11 +350,10 @@ export function createServer(options: ServerOptions = {}) {
     ingestionFetch,
     settingsPath,
     obsidianMcpSessionFactory,
-    reloadLlmProvider: mutableLlmProvider
-      ? () => mutableLlmProvider.updateFromEnv(process.env)
-      : undefined,
+    reloadLlmProvider: mutableLlmProvider ? () => mutableLlmProvider.updateFromEnv(process.env) : undefined,
     jobQueue,
-    requestMetrics
+    requestMetrics,
+    recoveryMetrics
   };
 
   registerSystemRoutes(app, ctx);
@@ -335,31 +379,75 @@ export function createServer(options: ServerOptions = {}) {
   app.addHook("onReady", async () => {
     try {
       const recoveredCount = await recoverInterruptedSources({ update: updateState });
+      recoveryMetrics.startup = {
+        status: "succeeded",
+        recovered: recoveredCount,
+        completedAtMs: now()
+      };
       if (recoveredCount > 0) {
-        app.log.info({ count: recoveredCount }, "Reset interrupted processing source assets to failed on startup");
+        app.log.info(
+          {
+            event: "recovery.startup_completed",
+            recovered: recoveredCount
+          },
+          "Reset interrupted processing source assets to failed on startup"
+        );
       }
-    } catch (error) {
-      app.log.error({ err: error }, "Failed to clean up stuck processing source assets on startup");
+    } catch {
+      recoveryMetrics.startup = {
+        status: "failed",
+        recovered: 0,
+        completedAtMs: now()
+      };
+      app.log.error(
+        { event: "recovery.startup_failed" },
+        "Failed to clean up stuck processing source assets on startup"
+      );
     }
 
     // Live reclaim for orphaned processing rows (queue slot already freed after
     // a failed completion persist, etc.). Skip ids still queued or active so a
     // slow live job is not failed while its worker is still running.
     staleRecoveryTimer = setInterval(() => {
-      const { pending, active } = jobQueue.getPendingAndActiveIds();
-      void recoverStaleProcessingSources(
-        { update: updateState },
-        {
-          staleMs: DEFAULT_PROCESSING_STALE_MS,
-          skipIds: new Set([...pending, ...active])
+      recoveryMetrics.staleSweep.status = "running";
+      recoveryMetrics.staleSweep.runs = incrementCount(recoveryMetrics.staleSweep.runs);
+      recoveryMetrics.staleSweep.lastRunAtMs = now();
+      void (async () => {
+        try {
+          const { pending, active } = jobQueue.getPendingAndActiveIds();
+          const recoveredCount = await recoverStaleProcessingSources(
+            { update: updateState },
+            {
+              staleMs: DEFAULT_PROCESSING_STALE_MS,
+              skipIds: new Set([...pending, ...active])
+            }
+          );
+          recoveryMetrics.staleSweep.status = "idle";
+          recoveryMetrics.staleSweep.totalRecovered = incrementCount(
+            recoveryMetrics.staleSweep.totalRecovered,
+            recoveredCount
+          );
+          recoveryMetrics.staleSweep.lastSuccessAtMs = now();
+          if (recoveredCount > 0) {
+            app.log.info(
+              {
+                event: "recovery.stale_sweep_completed",
+                recovered: recoveredCount
+              },
+              "Reset stale-heartbeat processing source assets to failed"
+            );
+          }
+        } catch {
+          recoveryMetrics.staleSweep.status = "failed";
+          recoveryMetrics.staleSweep.failures = incrementCount(recoveryMetrics.staleSweep.failures);
+          app.log.error(
+            {
+              event: "recovery.stale_sweep_failed"
+            },
+            "Failed to recover stale-heartbeat processing source assets"
+          );
         }
-      ).then((count) => {
-        if (count > 0) {
-          app.log.info({ count }, "Reset stale-heartbeat processing source assets to failed");
-        }
-      }).catch((error) => {
-        app.log.error({ err: error }, "Failed to recover stale-heartbeat processing source assets");
-      });
+      })();
     }, DEFAULT_STALE_RECOVERY_INTERVAL_MS);
     staleRecoveryTimer.unref?.();
   });

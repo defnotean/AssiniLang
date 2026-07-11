@@ -135,49 +135,51 @@ async function invokeDesktopAction(action) {
   return invokeDesktopChannel("assini:desktop-action", action);
 }
 
-const assiniDesktop = Object.freeze(withoutUndefined({
-  apiBaseUrl,
-  appFolder,
-  appPath,
-  appVersion,
-  authToken,
-  backupSummary,
-  backupsDir,
-  createAppShortcuts: () => invokeDesktopAction("createAppShortcuts"),
-  createDataBackup: () => invokeDesktopAction("createDataBackup"),
-  createDesktopShortcut: () => invokeDesktopAction("createDesktopShortcut"),
-  createStartMenuShortcut: () => invokeDesktopAction("createStartMenuShortcut"),
-  dataDir,
-  diagnosticsDir,
-  desktopPreferences,
-  isPackaged,
-  openBackupsFolder: () => invokeDesktopAction("openBackupsFolder"),
-  openAppFolder: () => invokeDesktopAction("openAppFolder"),
-  openDataFolder: () => invokeDesktopAction("openDataFolder"),
-  openDiagnosticsFolder: () => invokeDesktopAction("openDiagnosticsFolder"),
-  openLatestBackupFolder: () => invokeDesktopAction("openLatestBackupFolder"),
-  openSettingsFolder: () => invokeDesktopAction("openSettingsFolder"),
-  pruneOldDataBackups: () => invokeDesktopAction("pruneOldDataBackups"),
-  prototypeAuth: true,
-  refreshShortcutSummary: () => invokeDesktopChannel("assini:desktop-shortcut-summary"),
-  refreshBackupSummary: () => invokeDesktopChannel("assini:desktop-backup-summary"),
-  restoreLatestDataBackup: () => invokeDesktopAction("restoreLatestDataBackup"),
-  resetWindowLayout: () => invokeDesktopAction("resetWindowLayout"),
-  saveDiagnosticsReport: (text) => {
-    if (text != null && typeof text !== "string") {
-      return Promise.resolve(ipcFailure(INVALID_DIAGNOSTICS_TEXT));
-    }
-    return invokeDesktopChannel("assini:desktop-diagnostics", text);
-  },
-  setDesktopPreferences: (patch) => {
-    const normalized = normalizePreferencesPatch(patch);
-    if (!normalized) {
-      return Promise.resolve(ipcFailure(INVALID_PREFERENCES_PATCH));
-    }
-    return invokeDesktopChannel("assini:desktop-preferences", normalized);
-  },
-  shortcutSummary,
-  settingsPath
-}));
+const assiniDesktop = Object.freeze(
+  withoutUndefined({
+    apiBaseUrl,
+    appFolder,
+    appPath,
+    appVersion,
+    authToken,
+    backupSummary,
+    backupsDir,
+    createAppShortcuts: () => invokeDesktopAction("createAppShortcuts"),
+    createDataBackup: () => invokeDesktopAction("createDataBackup"),
+    createDesktopShortcut: () => invokeDesktopAction("createDesktopShortcut"),
+    createStartMenuShortcut: () => invokeDesktopAction("createStartMenuShortcut"),
+    dataDir,
+    diagnosticsDir,
+    desktopPreferences,
+    isPackaged,
+    openBackupsFolder: () => invokeDesktopAction("openBackupsFolder"),
+    openAppFolder: () => invokeDesktopAction("openAppFolder"),
+    openDataFolder: () => invokeDesktopAction("openDataFolder"),
+    openDiagnosticsFolder: () => invokeDesktopAction("openDiagnosticsFolder"),
+    openLatestBackupFolder: () => invokeDesktopAction("openLatestBackupFolder"),
+    openSettingsFolder: () => invokeDesktopAction("openSettingsFolder"),
+    pruneOldDataBackups: () => invokeDesktopAction("pruneOldDataBackups"),
+    prototypeAuth: true,
+    refreshShortcutSummary: () => invokeDesktopChannel("assini:desktop-shortcut-summary"),
+    refreshBackupSummary: () => invokeDesktopChannel("assini:desktop-backup-summary"),
+    restoreLatestDataBackup: () => invokeDesktopAction("restoreLatestDataBackup"),
+    resetWindowLayout: () => invokeDesktopAction("resetWindowLayout"),
+    saveDiagnosticsReport: (text) => {
+      if (text != null && typeof text !== "string") {
+        return Promise.resolve(ipcFailure(INVALID_DIAGNOSTICS_TEXT));
+      }
+      return invokeDesktopChannel("assini:desktop-diagnostics", text);
+    },
+    setDesktopPreferences: (patch) => {
+      const normalized = normalizePreferencesPatch(patch);
+      if (!normalized) {
+        return Promise.resolve(ipcFailure(INVALID_PREFERENCES_PATCH));
+      }
+      return invokeDesktopChannel("assini:desktop-preferences", normalized);
+    },
+    shortcutSummary,
+    settingsPath
+  })
+);
 
 contextBridge.exposeInMainWorld("assiniDesktop", assiniDesktop);

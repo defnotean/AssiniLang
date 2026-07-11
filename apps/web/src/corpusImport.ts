@@ -3,7 +3,7 @@ import type { Translate } from "./i18n";
 
 export type CorpusConsentUse = CorpusImportPayload["consentStatus"]["use"];
 
-/** Mirrors CONSENT_USE_VALUES from @assini/db (type-checked against the schema union). */
+/** Mirrors CONSENT_USE_VALUES from @assini/api-contract (type-checked against the schema union). */
 export const CORPUS_CONSENT_USE_VALUES: readonly CorpusConsentUse[] = [
   "testing-only",
   "community-approved",
@@ -33,8 +33,7 @@ export type CorpusImportDraft = {
 export type CorpusImportErrorCode = "incomplete" | "invalidConsentUse";
 
 type CorpusImportBuildResult =
-  | { ok: true; payload: CorpusImportPayload }
-  | { ok: false; errorCode: CorpusImportErrorCode };
+  { ok: true; payload: CorpusImportPayload } | { ok: false; errorCode: CorpusImportErrorCode };
 
 export const EMPTY_CORPUS_IMPORT_DRAFT: CorpusImportDraft = {
   target: "",
@@ -67,9 +66,7 @@ export function parseCorpusMorphemeDraft(value: string): CorpusImportPayload["mo
     .map((row) => row.trim())
     .filter(Boolean)
     .map((row) => {
-      const [surface = "", lemma = "", gloss = "", features = ""] = row
-        .split("|")
-        .map((part) => part.trim());
+      const [surface = "", lemma = "", gloss = "", features = ""] = row.split("|").map((part) => part.trim());
       return {
         surface,
         lemma,
@@ -80,11 +77,10 @@ export function parseCorpusMorphemeDraft(value: string): CorpusImportPayload["mo
 }
 
 function hasCompleteCorpusMorphemes(morphemes: CorpusImportPayload["morphologicalSegmentation"]): boolean {
-  return morphemes.length > 0 && morphemes.every((morpheme) => (
-    morpheme.surface.length > 0
-    && morpheme.lemma.length > 0
-    && morpheme.gloss.length > 0
-  ));
+  return (
+    morphemes.length > 0 &&
+    morphemes.every((morpheme) => morpheme.surface.length > 0 && morpheme.lemma.length > 0 && morpheme.gloss.length > 0)
+  );
 }
 
 export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImportBuildResult {
@@ -94,16 +90,16 @@ export function buildCorpusImportPayload(draft: CorpusImportDraft): CorpusImport
   const consentUse = draft.consentUse.trim();
 
   if (
-    draft.target.trim().length === 0
-    || draft.translation.trim().length === 0
-    || draft.source.trim().length === 0
-    || draft.author.trim().length === 0
-    || draft.year.trim().length === 0
-    || !Number.isInteger(parsedYear)
-    || draft.license.trim().length === 0
-    || draft.consentRecord.trim().length === 0
-    || topicTags.length === 0
-    || !hasCompleteCorpusMorphemes(morphologicalSegmentation)
+    draft.target.trim().length === 0 ||
+    draft.translation.trim().length === 0 ||
+    draft.source.trim().length === 0 ||
+    draft.author.trim().length === 0 ||
+    draft.year.trim().length === 0 ||
+    !Number.isInteger(parsedYear) ||
+    draft.license.trim().length === 0 ||
+    draft.consentRecord.trim().length === 0 ||
+    topicTags.length === 0 ||
+    !hasCompleteCorpusMorphemes(morphologicalSegmentation)
   ) {
     return { ok: false, errorCode: "incomplete" };
   }
@@ -222,9 +218,9 @@ export function splitCorpusBulkLine(line: string, format: CorpusBulkDelimiter): 
   for (let index = 0; index < line.length; index += 1) {
     const char = line[index]!;
     if (inQuotes) {
-      if (char === "\"") {
-        if (line[index + 1] === "\"") {
-          current += "\"";
+      if (char === '"') {
+        if (line[index + 1] === '"') {
+          current += '"';
           index += 1;
         } else {
           inQuotes = false;
@@ -234,7 +230,7 @@ export function splitCorpusBulkLine(line: string, format: CorpusBulkDelimiter): 
       }
       continue;
     }
-    if (char === "\"") {
+    if (char === '"') {
       inQuotes = true;
       continue;
     }
@@ -258,10 +254,7 @@ function normalizeBulkMorphemesCell(value: string): string {
     .join("\n");
 }
 
-function draftFromBulkCells(
-  header: string[],
-  cells: string[]
-): CorpusImportDraft {
+function draftFromBulkCells(header: string[], cells: string[]): CorpusImportDraft {
   const byName = new Map<string, string>();
   for (let index = 0; index < header.length; index += 1) {
     byName.set(header[index]!.trim().toLowerCase(), (cells[index] ?? "").trim());
@@ -305,7 +298,10 @@ export function dryRunCorpusBulkImport(text: string): CorpusBulkDryRunReport {
     };
   }
 
-  const lines = trimmed.split(/\r?\n/).map((line) => line.trimEnd()).filter((line) => line.trim().length > 0);
+  const lines = trimmed
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.trim().length > 0);
   const headerLine = lines[0] ?? "";
   const format = detectCorpusBulkDelimiter(headerLine);
   if (!format) {
@@ -414,10 +410,12 @@ export function formatCorpusBulkDryRunReport(report: CorpusBulkDryRunReport, t: 
   for (const row of report.rows) {
     if (!row.ok) failedRows.push(row);
   }
-  const failures = failedRows.map((row) => t("corpus.bulkDryRunRowError", {
-    row: row.rowNumber,
-    detail: formatBulkRowError(row.errorCode, t)
-  }));
+  const failures = failedRows.map((row) =>
+    t("corpus.bulkDryRunRowError", {
+      row: row.rowNumber,
+      detail: formatBulkRowError(row.errorCode, t)
+    })
+  );
 
   if (failures.length === 0) {
     return `${dryRunPrefix} ${summary}`;

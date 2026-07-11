@@ -11,22 +11,24 @@ describe("LLM model discovery", () => {
     let fetchCalls = 0;
     let lookupCalls = 0;
 
-    await expect(discoverLlmModels({
-      env: {},
-      fetchFn: async () => {
-        fetchCalls += 1;
-        return new Response(JSON.stringify({ data: [] }), { status: 200 });
-      },
-      extraBaseUrls: Array.from(
-        { length: MAX_EXTRA_DISCOVERY_BASE_URLS + 1 },
-        (_, index) => `https://models-${index}.example/v1`
-      ),
-      includeCommonTargets: false,
-      lookupFn: async () => {
-        lookupCalls += 1;
-        return { address: "93.184.216.34", family: 4 };
-      }
-    })).rejects.toBeInstanceOf(LlmDiscoveryInputLimitError);
+    await expect(
+      discoverLlmModels({
+        env: {},
+        fetchFn: async () => {
+          fetchCalls += 1;
+          return new Response(JSON.stringify({ data: [] }), { status: 200 });
+        },
+        extraBaseUrls: Array.from(
+          { length: MAX_EXTRA_DISCOVERY_BASE_URLS + 1 },
+          (_, index) => `https://models-${index}.example/v1`
+        ),
+        includeCommonTargets: false,
+        lookupFn: async () => {
+          lookupCalls += 1;
+          return { address: "93.184.216.34", family: 4 };
+        }
+      })
+    ).rejects.toBeInstanceOf(LlmDiscoveryInputLimitError);
 
     expect(fetchCalls).toBe(0);
     expect(lookupCalls).toBe(0);
@@ -38,20 +40,26 @@ describe("LLM model discovery", () => {
       const url = input.toString();
       seenUrls.push(url);
       if (url === "http://irene-box:8080/v1/models") {
-        return new Response(JSON.stringify({
-          data: [{ id: "irene-fusion" }, { id: "irene-lite" }]
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(
+          JSON.stringify({
+            data: [{ id: "irene-fusion" }, { id: "irene-lite" }]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       }
       if (url === "http://127.0.0.1:11434/api/tags") {
-        return new Response(JSON.stringify({
-          models: [{ name: "llama3.1:8b" }]
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(
+          JSON.stringify({
+            models: [{ name: "llama3.1:8b" }]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       }
       return new Response("missing", { status: 404 });
     };
@@ -66,42 +74,49 @@ describe("LLM model discovery", () => {
 
     expect(seenUrls).toContain("http://irene-box:8080/v1/models");
     expect(seenUrls).toContain("http://127.0.0.1:11434/api/tags");
-    expect(result.models).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        provider: "openai-compatible",
-        baseUrl: "http://irene-box:8080/v1",
-        model: "irene-fusion"
-      }),
-      expect.objectContaining({
-        provider: "ollama",
-        baseUrl: "http://127.0.0.1:11434/v1",
-        model: "llama3.1:8b"
-      })
-    ]));
-    expect(result.endpoints).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        baseUrl: "http://irene-box:8080/v1",
-        connected: true,
-        modelCount: 2
-      }),
-      expect.objectContaining({
-        baseUrl: "http://127.0.0.1:11434/v1",
-        connected: true,
-        modelCount: 1
-      })
-    ]));
+    expect(result.models).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          provider: "openai-compatible",
+          baseUrl: "http://irene-box:8080/v1",
+          model: "irene-fusion"
+        }),
+        expect.objectContaining({
+          provider: "ollama",
+          baseUrl: "http://127.0.0.1:11434/v1",
+          model: "llama3.1:8b"
+        })
+      ])
+    );
+    expect(result.endpoints).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          baseUrl: "http://irene-box:8080/v1",
+          connected: true,
+          modelCount: 2
+        }),
+        expect.objectContaining({
+          baseUrl: "http://127.0.0.1:11434/v1",
+          connected: true,
+          modelCount: 1
+        })
+      ])
+    );
   });
 
   it("uses a configured root API key for its normalized /v1 discovery target", async () => {
     const fetchStub: typeof fetch = async (input, init) => {
       expect(input.toString()).toBe("http://model-host:9000/v1/models");
       expect((init?.headers as Record<string, string>).Authorization).toBe("Bearer local-secret");
-      return new Response(JSON.stringify({
-        data: [{ id: "configured-model" }]
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "configured-model" }]
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
     };
 
     const result = await discoverLlmModels({
@@ -129,33 +144,39 @@ describe("LLM model discovery", () => {
       const url = input.toString();
       seenUrls.push(url);
       if (url === "http://127.0.0.1:1234/api/v1/models") {
-        return new Response(JSON.stringify({
-          models: [
-            {
-              type: "llm",
-              key: "downloaded-old-model",
-              display_name: "Downloaded Old Model",
-              loaded_instances: []
-            },
-            {
-              type: "llm",
-              key: "new-loaded-model",
-              display_name: "New Loaded Model",
-              loaded_instances: [{ id: "new-loaded-model" }]
-            }
-          ]
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(
+          JSON.stringify({
+            models: [
+              {
+                type: "llm",
+                key: "downloaded-old-model",
+                display_name: "Downloaded Old Model",
+                loaded_instances: []
+              },
+              {
+                type: "llm",
+                key: "new-loaded-model",
+                display_name: "New Loaded Model",
+                loaded_instances: [{ id: "new-loaded-model" }]
+              }
+            ]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       }
       if (url === "http://127.0.0.1:1234/v1/models") {
-        return new Response(JSON.stringify({
-          data: [{ id: "downloaded-old-model" }, { id: "new-loaded-model" }]
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(
+          JSON.stringify({
+            data: [{ id: "downloaded-old-model" }, { id: "new-loaded-model" }]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       }
       return new Response("missing", { status: 404 });
     };
@@ -243,20 +264,26 @@ describe("LLM model discovery", () => {
     expect(seenUrls).toEqual([]);
     expect(result.models).toEqual([]);
     expect(result.endpoints).toEqual([]);
-    expect(result.errors).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        source: "Configured endpoint",
-        baseUrl: "http://127.0.0.1:9000/v1",
-        detail: expect.stringMatching(/private or local network/)
-      }),
-      expect.objectContaining({
-        source: "Discovery endpoint",
-        baseUrl: "http://10.0.0.8:8080/v1",
-        detail: expect.stringMatching(/private or local network/)
-      })
-    ]));
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: "Configured endpoint",
+          baseUrl: "http://127.0.0.1:9000/v1",
+          detail: expect.stringMatching(/private or local network/)
+        }),
+        expect.objectContaining({
+          source: "Discovery endpoint",
+          baseUrl: "http://10.0.0.8:8080/v1",
+          detail: expect.stringMatching(/private or local network/)
+        })
+      ])
+    );
     // Common localhost targets are skipped silently (reportErrors: false).
-    expect(result.errors.every((error) => !/Ollama local|LM Studio local|llama\.cpp local|Local model server/.test(error.source))).toBe(true);
+    expect(
+      result.errors.every(
+        (error) => !/Ollama local|LM Studio local|llama\.cpp local|Local model server/.test(error.source)
+      )
+    ).toBe(true);
   });
 
   it("scans common localhost targets only when ASSINI_ALLOW_PRIVATE_URLS is on", async () => {
@@ -338,18 +365,17 @@ describe("LLM model discovery", () => {
       env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
       fetchFn: async (input) => {
         seenUrls.push(input.toString());
-        return new Response(JSON.stringify({
-          data: [{ id: "Irene" }]
-        }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" }
-        });
+        return new Response(
+          JSON.stringify({
+            data: [{ id: "Irene" }]
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
       },
-      extraBaseUrls: [
-        "http://127.0.0.1:12345",
-        "http://localhost:12345/v1/",
-        "http://127.0.0.1:12345/v1?refresh=true"
-      ],
+      extraBaseUrls: ["http://127.0.0.1:12345", "http://localhost:12345/v1/", "http://127.0.0.1:12345/v1?refresh=true"],
       includeCommonTargets: false,
       timeoutMs: 500
     });
@@ -388,10 +414,7 @@ describe("LLM model discovery", () => {
         active -= 1;
         return new Response(JSON.stringify({ data: [] }), { status: 200 });
       },
-      extraBaseUrls: Array.from(
-        { length: targetCount },
-        (_, index) => `http://127.0.0.1:${9_000 + index}/v1`
-      ),
+      extraBaseUrls: Array.from({ length: targetCount }, (_, index) => `http://127.0.0.1:${9_000 + index}/v1`),
       includeCommonTargets: false,
       timeoutMs: 5_000
     });

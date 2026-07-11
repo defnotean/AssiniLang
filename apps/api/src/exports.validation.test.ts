@@ -36,20 +36,22 @@ describe("export route remaining edges", () => {
       headers: authHeaders("lead-1")
     });
     expect(audit.statusCode).toBe(200);
-    expect(audit.json()).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        action: "language_snapshot.exported",
-        entityType: "language",
-        entityId: TEST_LANGUAGE_ID,
-        languageId: TEST_LANGUAGE_ID,
-        actorId: "reviewer-1",
-        metadata: expect.objectContaining({
-          exportVersion: "language-snapshot-v2",
-          contentHash: snapshot.integrity.contentHash,
-          algorithm: "sha256"
+    expect(audit.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "language_snapshot.exported",
+          entityType: "language",
+          entityId: TEST_LANGUAGE_ID,
+          languageId: TEST_LANGUAGE_ID,
+          actorId: "reviewer-1",
+          metadata: expect.objectContaining({
+            exportVersion: "language-snapshot-v2",
+            contentHash: snapshot.integrity.contentHash,
+            algorithm: "sha256"
+          })
         })
-      })
-    ]));
+      ])
+    );
   });
 
   it("sanitizes unsafe language ids in snapshot Content-Disposition filenames", async () => {
@@ -93,9 +95,7 @@ describe("export route remaining edges", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store, max-age=0");
     expect(response.headers.pragma).toBe("no-cache");
-    expect(response.headers["content-disposition"]).toBe(
-      'attachment; filename="assini-evaluation-artifact.json"'
-    );
+    expect(response.headers["content-disposition"]).toBe('attachment; filename="assini-evaluation-artifact.json"');
 
     const artifact = response.json();
     expect(verifyExportIntegrity(artifact)).toBe(true);
@@ -106,24 +106,26 @@ describe("export route remaining edges", () => {
       headers: authHeaders("programmer-1")
     });
     expect(audit.statusCode).toBe(200);
-    expect(audit.json()).toEqual(expect.arrayContaining([
-      expect.objectContaining({
-        action: "evaluation_artifact.exported",
-        entityType: "evaluation_run",
-        entityId: "evaluation-artifact",
-        languageId: null,
-        actorId: "programmer-1",
-        metadata: expect.objectContaining({
-          exportVersion: "evaluation-artifact-v2",
-          contentHash: artifact.integrity.contentHash,
-          algorithm: "sha256",
-          passed: artifact.summary.passed,
-          languages: artifact.summary.languages,
-          totalRuns: artifact.summary.totalRuns,
-          failureCount: artifact.summary.failureCount
+    expect(audit.json()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "evaluation_artifact.exported",
+          entityType: "evaluation_run",
+          entityId: "evaluation-artifact",
+          languageId: null,
+          actorId: "programmer-1",
+          metadata: expect.objectContaining({
+            exportVersion: "evaluation-artifact-v2",
+            contentHash: artifact.integrity.contentHash,
+            algorithm: "sha256",
+            passed: artifact.summary.passed,
+            languages: artifact.summary.languages,
+            totalRuns: artifact.summary.totalRuns,
+            failureCount: artifact.summary.failureCount
+          })
         })
-      })
-    ]));
+      ])
+    );
   });
 
   it("exports empty-workspace evaluation artifacts as failed gates over HTTP", async () => {

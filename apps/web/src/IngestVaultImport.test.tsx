@@ -123,7 +123,10 @@ describe("IngestView Obsidian vault import", () => {
   it("disables the import button while a vault import is running", async () => {
     let resolveImport: (value: unknown) => void = () => {};
     apiMock.importObsidianVault.mockImplementation(
-      () => new Promise((resolve) => { resolveImport = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveImport = resolve;
+        })
     );
 
     await renderIngestView();
@@ -149,7 +152,10 @@ describe("IngestView Obsidian vault import", () => {
   it("disables upload and marks the button busy while a source file upload is running", async () => {
     let resolveUpload: (value: unknown) => void = () => {};
     apiMock.uploadSourceFile.mockImplementation(
-      () => new Promise((resolve) => { resolveUpload = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = resolve;
+        })
     );
 
     await renderIngestView();

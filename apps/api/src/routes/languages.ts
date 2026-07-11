@@ -81,35 +81,39 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
         .filter((user) => isReviewPolicyAssignableRole(user.role))
         .map((user) => user.id);
       const assignedReviewerIds = assignableReviewerIds.slice(0, 2);
-      const reviewPolicy: ReviewPolicy | undefined = assignedReviewerIds.length > 0
-        ? {
-            id: `review-policy-${id}`,
-            languageId: id,
-            assignedReviewerIds,
-            approvalThreshold: Math.min(2, assignedReviewerIds.length),
-            requiresAssignedReviewer: true,
-            updatedAt: createdAt,
-            updatedBy: "system-seed"
-          }
-        : undefined;
+      const reviewPolicy: ReviewPolicy | undefined =
+        assignedReviewerIds.length > 0
+          ? {
+              id: `review-policy-${id}`,
+              languageId: id,
+              assignedReviewerIds,
+              approvalThreshold: Math.min(2, assignedReviewerIds.length),
+              requiresAssignedReviewer: true,
+              updatedAt: createdAt,
+              updatedBy: "system-seed"
+            }
+          : undefined;
 
-      return appendAuditEvent({
-        ...state,
-        languages: [...state.languages, created],
-        reviewPolicies: reviewPolicy ? [...state.reviewPolicies, reviewPolicy] : state.reviewPolicies
-      }, {
-        actor,
-        at: createdAt,
-        action: "language.created",
-        entityType: "language",
-        entityId: id,
-        languageId: id,
-        summary: `Created language ${body.name}.`,
-        metadata: {
-          typology: body.typology,
-          hasPhonology: Boolean(body.phonology)
+      return appendAuditEvent(
+        {
+          ...state,
+          languages: [...state.languages, created],
+          reviewPolicies: reviewPolicy ? [...state.reviewPolicies, reviewPolicy] : state.reviewPolicies
+        },
+        {
+          actor,
+          at: createdAt,
+          action: "language.created",
+          entityType: "language",
+          entityId: id,
+          languageId: id,
+          summary: `Created language ${body.name}.`,
+          metadata: {
+            typology: body.typology,
+            hasPhonology: Boolean(body.phonology)
+          }
         }
-      });
+      );
     });
 
     if (!created) {
@@ -160,19 +164,22 @@ export function registerLanguageRoutes(app: FastifyInstance, ctx: RouteContext):
         ...("phonology" in body ? { phonology: body.phonology } : {})
       };
 
-      return appendAuditEvent({
-        ...state,
-        languages: state.languages.map((language) => (language.id === languageId ? updated as Language : language))
-      }, {
-        actor,
-        at: new Date().toISOString(),
-        action: "language.updated",
-        entityType: "language",
-        entityId: languageId,
-        languageId,
-        summary: `Updated language metadata for ${updated.name}.`,
-        metadata: { fields: Object.keys(body) }
-      });
+      return appendAuditEvent(
+        {
+          ...state,
+          languages: state.languages.map((language) => (language.id === languageId ? (updated as Language) : language))
+        },
+        {
+          actor,
+          at: new Date().toISOString(),
+          action: "language.updated",
+          entityType: "language",
+          entityId: languageId,
+          languageId,
+          summary: `Updated language metadata for ${updated.name}.`,
+          metadata: { fields: Object.keys(body) }
+        }
+      );
     });
 
     if (languageMissing) {

@@ -11,10 +11,7 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
   const normalized = error.trim();
   if (!normalized) return undefined;
 
-  if (
-    /ASSINI_OCR_BASE_URL/i.test(normalized)
-    && /not configured|Configure ASSINI_OCR/i.test(normalized)
-  ) {
+  if (/ASSINI_OCR_BASE_URL/i.test(normalized) && /not configured|Configure ASSINI_OCR/i.test(normalized)) {
     return { i18nKey: "ingest.ocrNotConfigured" };
   }
 
@@ -27,9 +24,9 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
   }
 
   if (
-    /Configured OCR model could not read/i.test(normalized)
-    || /OCR model request failed/i.test(normalized)
-    || /OCR model endpoint returned (invalid JSON|no choices|no text)/i.test(normalized)
+    /Configured OCR model could not read/i.test(normalized) ||
+    /OCR model request failed/i.test(normalized) ||
+    /OCR model endpoint returned (invalid JSON|no choices|no text)/i.test(normalized)
   ) {
     return { i18nKey: "ingest.ocrModelFailed" };
   }
@@ -42,10 +39,7 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.ocrDocxUnsupported" };
   }
 
-  if (
-    /may not be vision-capable/i.test(normalized)
-    && /no usable result for this image/i.test(normalized)
-  ) {
+  if (/may not be vision-capable/i.test(normalized) && /no usable result for this image/i.test(normalized)) {
     return { i18nKey: "ingest.visionModelRequired" };
   }
 
@@ -66,8 +60,8 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
   }
 
   if (
-    /Queued source processing was cancelled/i.test(normalized)
-    && (/Use Retry when ready/i.test(normalized) || /Re-run processing when ready/i.test(normalized))
+    /Queued source processing was cancelled/i.test(normalized) &&
+    (/Use Retry when ready/i.test(normalized) || /Re-run processing when ready/i.test(normalized))
   ) {
     return { i18nKey: "ingest.sourceProcessingCancelled" };
   }
@@ -88,9 +82,7 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
     return { i18nKey: "ingest.urlNoReadableText" };
   }
 
-  const unsupportedDocument = normalized.match(
-    /Document type \.([^\s]+) is not supported yet/i
-  );
+  const unsupportedDocument = normalized.match(/Document type \.([^\s]+) is not supported yet/i);
   if (unsupportedDocument) {
     return {
       i18nKey: "ingest.documentTypeUnsupported",
@@ -99,16 +91,16 @@ export function sourceProcessingErrorI18n(error: string): SourceProcessingErrorI
   }
 
   if (
-    /ASSINI_TRANSCRIBE_BASE_URL/i.test(normalized)
-    && /Audio sources need a transcription endpoint|Set ASSINI_TRANSCRIBE/i.test(normalized)
+    /ASSINI_TRANSCRIBE_BASE_URL/i.test(normalized) &&
+    /Audio sources need a transcription endpoint|Set ASSINI_TRANSCRIBE/i.test(normalized)
   ) {
     return { i18nKey: "ingest.transcribeNotConfigured" };
   }
 
   if (
-    /Transcription request failed/i.test(normalized)
-    || /Transcription endpoint returned no text/i.test(normalized)
-    || /Transcription endpoint returned invalid JSON/i.test(normalized)
+    /Transcription request failed/i.test(normalized) ||
+    /Transcription endpoint returned no text/i.test(normalized) ||
+    /Transcription endpoint returned invalid JSON/i.test(normalized)
   ) {
     return { i18nKey: "ingest.transcribeFailed" };
   }
@@ -124,9 +116,7 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
   const normalized = warning.trim();
   if (!normalized) return undefined;
 
-  const multiPageCap = normalized.match(
-    /PDF has (\d+) pages;\s*only the first (\d+) pages were OCR'?d/i
-  );
+  const multiPageCap = normalized.match(/PDF has (\d+) pages;\s*only the first (\d+) pages were OCR'?d/i);
   if (multiPageCap) {
     return {
       i18nKey: "ingest.ocrPdfMultiPageWarning",
@@ -143,9 +133,7 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
     };
   }
 
-  const pdfOcrUsed = normalized.match(
-    /Used configured OCR model to read scanned document \((\d+) of (\d+) pages\)/i
-  );
+  const pdfOcrUsed = normalized.match(/Used configured OCR model to read scanned document \((\d+) of (\d+) pages\)/i);
   if (pdfOcrUsed) {
     return {
       i18nKey: "ingest.ocrPdfUsed",
@@ -164,9 +152,7 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
     };
   }
 
-  const pageFailed = normalized.match(
-    /OCR failed for page (\d+);\s*continuing with remaining pages/i
-  );
+  const pageFailed = normalized.match(/OCR failed for page (\d+);\s*continuing with remaining pages/i);
   if (pageFailed) {
     return {
       i18nKey: "ingest.ocrPdfPageFailed",
@@ -228,9 +214,7 @@ export function sourceProcessingWarningI18n(warning: string): SourceProcessingEr
     };
   }
 
-  const vaultFileLimit = normalized.match(
-    /Import stopped at the configured (\d+) file limit/i
-  );
+  const vaultFileLimit = normalized.match(/Import stopped at the configured (\d+) file limit/i);
   if (vaultFileLimit) {
     return {
       i18nKey: "ingest.warningVaultFileLimit",

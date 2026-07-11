@@ -125,11 +125,7 @@ export function isPathInsideRoot(candidate: string, root: string): boolean {
 function isAbsoluteVaultRoot(pathValue: string): boolean {
   // Bare `C:` is not path.isAbsolute, but it is a Windows volume root and must be
   // classified (then rejected) rather than treated as a relative segment.
-  return (
-    isAbsolute(pathValue) ||
-    looksLikeWindowsAbsolutePath(pathValue) ||
-    looksLikeBareWindowsDrive(pathValue)
-  );
+  return isAbsolute(pathValue) || looksLikeWindowsAbsolutePath(pathValue) || looksLikeBareWindowsDrive(pathValue);
 }
 
 /** True when a win32-normalized path is only a drive letter (C:, C:\, C:.). */
@@ -183,7 +179,10 @@ export function parseObsidianVaultRoots(env: Env = process.env): string[] {
 function configuredVaultRootSegments(env: Env): string[] {
   const raw = env.ASSINI_OBSIDIAN_VAULT_ROOTS?.trim();
   if (!raw) return [];
-  return raw.split(";").map((part) => part.trim()).filter(Boolean);
+  return raw
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
 function vaultRootsConfigError(env: Env): Error {
@@ -209,10 +208,7 @@ async function resolveExistingPath(pathValue: string, realpathFn: RealpathFn): P
   const stripped = stripWindowsExtendedPrefix(pathValue);
   // On non-Windows hosts, Windows drive/UNC strings are not real filesystem paths.
   // Keep them lexical so allowlist checks stay meaningful in Linux CI.
-  if (
-    process.platform !== "win32" &&
-    (looksLikeWindowsAbsolutePath(stripped) || looksLikeBareWindowsDrive(stripped))
-  ) {
+  if (process.platform !== "win32" && (looksLikeWindowsAbsolutePath(stripped) || looksLikeBareWindowsDrive(stripped))) {
     return win32.normalize(stripped);
   }
 

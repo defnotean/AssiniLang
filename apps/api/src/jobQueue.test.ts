@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JobQueue } from "./jobQueue.js";
+import { JobQueue, type JobQueueLogFields } from "./jobQueue.js";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -91,10 +91,14 @@ describe("JobQueue", () => {
     const order: string[] = [];
 
     let resolve1!: () => void;
-    const p1 = new Promise<void>((r) => { resolve1 = r; });
+    const p1 = new Promise<void>((r) => {
+      resolve1 = r;
+    });
 
     let resolve2!: () => void;
-    const p2 = new Promise<void>((r) => { resolve2 = r; });
+    const p2 = new Promise<void>((r) => {
+      resolve2 = r;
+    });
 
     queue.add("1", async () => {
       order.push("1");
@@ -133,10 +137,10 @@ describe("JobQueue", () => {
   });
 
   it("frees the active slot after a job failure so the same id can be re-queued", async () => {
-    const errors: Array<{ id: string }> = [];
+    const errors: JobQueueLogFields[] = [];
     const queue = new JobQueue(1, {
-      error: (fields: { id: string }) => {
-        errors.push({ id: fields.id });
+      error: (fields) => {
+        errors.push(fields);
       }
     });
 
@@ -148,7 +152,14 @@ describe("JobQueue", () => {
 
     expect(queue.getStatus()).toEqual({ pending: 0, active: 0 });
     expect(queue.isQueuedOrActive("src-fail")).toBe(false);
-    expect(errors).toEqual([{ id: "src-fail" }]);
+    expect(errors).toEqual([
+      {
+        event: "job.failed",
+        pending: 0,
+        active: 1,
+        durationMs: expect.any(Number)
+      }
+    ]);
 
     let ranAgain = false;
     queue.add("src-fail", async () => {
@@ -240,5 +251,60 @@ describe("JobQueue", () => {
     resolveActive();
     await sleep(20);
     expect(queue.cancel("missing-job")).toBe(false);
+  });
+
+  it("records aggregate outcomes and durations without logging ids or thrown details", async () => {
+    let clock = 100;
+    const emitted: Array<{ level: string; fields: JobQueueLogFields; message: string }> = [];
+    const queue = new JobQueue(
+      1,
+      {
+        info: (fields, message) => emitted.push({ level: "info", fields, message }),
+        warn: (fields, message) => emitted.push({ level: "warn", fields, message }),
+        error: (fields, message) => emitted.push({ level: "error", fields, message })
+      },
+      () => clock
+    );
+
+    const secretId = "C:/private/source-sk-live-secret";
+    queue.add(secretId, async () => {
+      clock = 145;
+      throw new Error("private source text at C:/private/data with sk-live-secret");
+    });
+    queue.add(secretId, async () => {});
+
+    await sleep(20);
+
+    expect(queue.getMetrics()).toEqual({
+      enqueued: 1,
+      completed: 0,
+      failed: 1,
+      cancelled: 0,
+      duplicateRejected: 1,
+      durationMs: { count: 1, total: 45, max: 45 }
+    });
+    const serialized = JSON.stringify(emitted);
+    expect(serialized).toContain("job.failed");
+    expect(serialized).toContain("job.duplicate_rejected");
+    expect(serialized).not.toContain(secretId);
+    expect(serialized).not.toContain("private source text");
+    expect(serialized).not.toContain("sk-live-secret");
+  });
+
+  it("clamps backward and non-finite job clocks to zero-duration aggregate values", async () => {
+    const clocks = [100, 50, Number.NaN, Number.POSITIVE_INFINITY];
+    const queue = new JobQueue(1, undefined, () => clocks.shift() ?? 0);
+
+    queue.add("backward", async () => {});
+    await sleep(10);
+    queue.add("non-finite", async () => {});
+    await sleep(10);
+
+    expect(queue.getMetrics()).toMatchObject({
+      enqueued: 2,
+      completed: 2,
+      failed: 0,
+      durationMs: { count: 2, total: 0, max: 0 }
+    });
   });
 });

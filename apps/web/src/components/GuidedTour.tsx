@@ -93,7 +93,13 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
         if (!el) return prev === null ? prev : null;
         const r = el.getBoundingClientRect();
         const next = { top: r.top, left: r.left, width: r.width, height: r.height };
-        if (prev && prev.top === next.top && prev.left === next.left && prev.width === next.width && prev.height === next.height) {
+        if (
+          prev &&
+          prev.top === next.top &&
+          prev.left === next.left &&
+          prev.width === next.width &&
+          prev.height === next.height
+        ) {
           return prev;
         }
         return next;
@@ -115,7 +121,7 @@ export function GuidedTour({ steps, onClose }: { steps: TourStep[]; onClose: () 
     const width = card.offsetWidth;
     const height = card.offsetHeight;
     setCardSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
-  });
+  }, [index, step]);
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {

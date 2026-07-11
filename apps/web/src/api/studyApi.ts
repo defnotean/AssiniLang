@@ -1,4 +1,4 @@
-import type { CorpusPassage, Note } from "@assini/db";
+import type { CorpusPassage, Note } from "@assini/api-contract";
 import { actorJsonRequest, actorRequest, assertOk } from "../lib/apiClient";
 
 export type CorpusImportPayload = Omit<CorpusPassage, "id" | "languageId">;
@@ -33,10 +33,15 @@ export type ModelDraftGrounding = {
 export type ModelDraftNote = Note & { grounding?: ModelDraftGrounding };
 
 export async function generateDraftNotes(languageId: string): Promise<Note[]> {
-  return actorJsonRequest<Note[]>("reviewer", "/api/study-loop/draft", {
-    method: "POST",
-    body: JSON.stringify({ languageId })
-  }, "Draft generation failed");
+  return actorJsonRequest<Note[]>(
+    "reviewer",
+    "/api/study-loop/draft",
+    {
+      method: "POST",
+      body: JSON.stringify({ languageId })
+    },
+    "Draft generation failed"
+  );
 }
 
 export async function generateModelDraftNotes(
@@ -50,10 +55,7 @@ export async function generateModelDraftNotes(
   return response.json() as Promise<{ notes: ModelDraftNote[]; warnings: string[]; generated: number }>;
 }
 
-export async function reviewNote(
-  noteId: string,
-  payload: ReviewNotePayload
-): Promise<Note> {
+export async function reviewNote(noteId: string, payload: ReviewNotePayload): Promise<Note> {
   const response = await fetch(`/api/notes/${encodeURIComponent(noteId)}/review`, {
     method: "PATCH",
     ...(await actorRequest("reviewer", true)),
@@ -65,10 +67,7 @@ export async function reviewNote(
   return response.json() as Promise<Note>;
 }
 
-export async function importCorpusPassage(
-  languageId: string,
-  payload: CorpusImportPayload
-): Promise<CorpusPassage> {
+export async function importCorpusPassage(languageId: string, payload: CorpusImportPayload): Promise<CorpusPassage> {
   const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/corpus`, {
     method: "POST",
     ...(await actorRequest("reviewer", true)),

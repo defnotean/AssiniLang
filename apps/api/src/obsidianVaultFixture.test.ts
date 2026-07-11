@@ -48,14 +48,15 @@ describe("obsidian vault fixture pack", () => {
       );
       expect(importedTitles).not.toContain("Language Notes/empty");
 
-      const lexicon = response.json().imported.find(
-        (asset: { title: string }) => asset.title === "Language Notes/lexicon"
-      );
+      const lexicon = response
+        .json()
+        .imported.find((asset: { title: string }) => asset.title === "Language Notes/lexicon");
       expect(lexicon).toMatchObject({
         kind: "text",
-        status: "pending",
-        rawText: expect.stringContaining("vel = water")
+        status: "pending"
       });
+      expect(lexicon).not.toHaveProperty("rawText");
+      expect(response.body).not.toContain("vel = water");
 
       expect(response.json().skipped).toEqual(
         expect.arrayContaining([

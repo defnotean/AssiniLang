@@ -48,10 +48,7 @@ export function I18nProvider({ children }: { children: ReactNode; initialLocale?
     document.documentElement.dir = "ltr";
   }, []);
 
-  const value = useMemo<I18nContextValue>(
-    () => ({ locale, dir, t }),
-    [locale, dir, t]
-  );
+  const value = useMemo<I18nContextValue>(() => ({ locale, dir, t }), [locale, dir, t]);
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }

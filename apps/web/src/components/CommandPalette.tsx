@@ -21,13 +21,7 @@ function matchesQuery(label: string, query: string): boolean {
   return true;
 }
 
-export function CommandPalette({
-  commands,
-  onClose
-}: {
-  commands: PaletteCommand[];
-  onClose: () => void;
-}) {
+export function CommandPalette({ commands, onClose }: { commands: PaletteCommand[]; onClose: () => void }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);

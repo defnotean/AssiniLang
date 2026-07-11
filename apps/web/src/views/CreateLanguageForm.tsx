@@ -51,19 +51,32 @@ export function CreateLanguageForm({
 
   if (!isOpen) {
     return (
-      <button type="button" className="secondary new-language-toggle" disabled={isWorkflowBusy} onClick={() => setIsOpen(true)}>
+      <button
+        type="button"
+        className="secondary new-language-toggle"
+        disabled={isWorkflowBusy}
+        onClick={() => setIsOpen(true)}
+      >
         {t("createLang.newLanguage")}
       </button>
     );
   }
 
   return (
-    <form className="form-panel compact new-language-form" aria-label={t("createLang.createLanguage")} onSubmit={handleSubmit}>
+    <form
+      className="form-panel compact new-language-form"
+      aria-label={t("createLang.createLanguage")}
+      onSubmit={handleSubmit}
+    >
       <div>
         <span className="detail-label">{t("createLang.workspaceSetup")}</span>
         <h3>{t("createLang.newLanguage")}</h3>
       </div>
-      {createError && <p className="result-notice error" role="alert">{createError}</p>}
+      {createError && (
+        <p className="result-notice error" role="alert">
+          {createError}
+        </p>
+      )}
       <div className="form-group">
         <label htmlFor="new-language-name">{t("createLang.nameLabel")}</label>
         <input id="new-language-name" value={name} onChange={(event) => setName(event.target.value)} />
@@ -78,7 +91,11 @@ export function CreateLanguageForm({
       </div>
       <div className="form-group">
         <label htmlFor="new-language-orthography">{t("createLang.orthographyLabel")}</label>
-        <input id="new-language-orthography" value={orthography} onChange={(event) => setOrthography(event.target.value)} />
+        <input
+          id="new-language-orthography"
+          value={orthography}
+          onChange={(event) => setOrthography(event.target.value)}
+        />
       </div>
       <div className="form-group">
         <label htmlFor="new-language-typology">{t("createLang.typologyLabel")}</label>
@@ -88,7 +105,9 @@ export function CreateLanguageForm({
           onChange={(event) => setTypology(event.target.value as Language["typology"])}
         >
           {LANGUAGE_TYPOLOGY_OPTIONS.map((option) => (
-            <option key={option} value={option}>{formatTypology(option, t)}</option>
+            <option key={option} value={option}>
+              {formatTypology(option, t)}
+            </option>
           ))}
         </select>
       </div>

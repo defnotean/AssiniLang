@@ -10,12 +10,7 @@ type ModelSettingsFormFieldsProps = {
   setForm: Dispatch<SetStateAction<SettingsFormState>>;
 };
 
-export function ModelSettingsFormFields({
-  children,
-  form,
-  isSavingSettings,
-  setForm
-}: ModelSettingsFormFieldsProps) {
+export function ModelSettingsFormFields({ children, form, isSavingSettings, setForm }: ModelSettingsFormFieldsProps) {
   const { t } = useI18n();
 
   return (
@@ -74,11 +69,13 @@ export function ModelSettingsFormFields({
             type="checkbox"
             checked={form.clearApiKey}
             disabled={isSavingSettings}
-            onChange={(event) => setForm((current) => ({
-              ...current,
-              clearApiKey: event.target.checked,
-              apiKey: event.target.checked ? "" : current.apiKey
-            }))}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                clearApiKey: event.target.checked,
+                apiKey: event.target.checked ? "" : current.apiKey
+              }))
+            }
           />
           {t("model.clearApiKey")}
         </label>
@@ -126,10 +123,12 @@ export function ModelSettingsFormFields({
               value={form.embeddingBaseUrl}
               placeholder={t("model.embeddingBaseUrlPlaceholder")}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                embeddingBaseUrl: event.target.value
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  embeddingBaseUrl: event.target.value
+                }))
+              }
             />
           </div>
           <div className="form-group">
@@ -139,10 +138,12 @@ export function ModelSettingsFormFields({
               value={form.embeddingModel}
               placeholder={t("model.embeddingModelPlaceholder")}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                embeddingModel: event.target.value
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  embeddingModel: event.target.value
+                }))
+              }
             />
           </div>
           <div className="form-group">
@@ -153,10 +154,12 @@ export function ModelSettingsFormFields({
               value={form.embeddingApiKey}
               autoComplete="off"
               disabled={isSavingSettings || form.clearEmbeddingApiKey}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                embeddingApiKey: event.target.value
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  embeddingApiKey: event.target.value
+                }))
+              }
             />
           </div>
           <label className="checkbox-row settings-checkbox" htmlFor="clear-embedding-key">
@@ -165,11 +168,13 @@ export function ModelSettingsFormFields({
               type="checkbox"
               checked={form.clearEmbeddingApiKey}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                clearEmbeddingApiKey: event.target.checked,
-                embeddingApiKey: event.target.checked ? "" : current.embeddingApiKey
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  clearEmbeddingApiKey: event.target.checked,
+                  embeddingApiKey: event.target.checked ? "" : current.embeddingApiKey
+                }))
+              }
             />
             {t("model.clearEmbeddingApiKey")}
           </label>
@@ -182,10 +187,12 @@ export function ModelSettingsFormFields({
               max="600000"
               value={form.embeddingTimeoutMs}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                embeddingTimeoutMs: event.target.value
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  embeddingTimeoutMs: event.target.value
+                }))
+              }
             />
           </div>
         </div>
@@ -230,11 +237,13 @@ export function ModelSettingsFormFields({
               type="checkbox"
               checked={form.clearTranscriptionApiKey}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                clearTranscriptionApiKey: event.target.checked,
-                transcriptionApiKey: event.target.checked ? "" : current.transcriptionApiKey
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  clearTranscriptionApiKey: event.target.checked,
+                  transcriptionApiKey: event.target.checked ? "" : current.transcriptionApiKey
+                }))
+              }
             />
             {t("model.clearTranscriptionApiKey")}
           </label>
@@ -282,11 +291,13 @@ export function ModelSettingsFormFields({
               type="checkbox"
               checked={form.clearOcrApiKey}
               disabled={isSavingSettings}
-              onChange={(event) => setForm((current) => ({
-                ...current,
-                clearOcrApiKey: event.target.checked,
-                ocrApiKey: event.target.checked ? "" : current.ocrApiKey
-              }))}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  clearOcrApiKey: event.target.checked,
+                  ocrApiKey: event.target.checked ? "" : current.ocrApiKey
+                }))
+              }
             />
             {t("model.clearOcrApiKey")}
           </label>

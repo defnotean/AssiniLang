@@ -20,9 +20,7 @@ describe("Obsidian vault path safety", () => {
     expect(i18nKeyForVaultPathError(VAULT_ROOTS_MUST_NOT_BE_FILESYSTEM_ROOT_MESSAGE)).toBe(
       "ingest.errorVaultRootsMustNotBeFilesystemRoot"
     );
-    expect(i18nKeyForVaultPathError(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE)).toBe(
-      "ingest.errorVaultOutsideAllowlist"
-    );
+    expect(i18nKeyForVaultPathError(VAULT_PATH_OUTSIDE_ALLOWLIST_MESSAGE)).toBe("ingest.errorVaultOutsideAllowlist");
     expect(i18nKeyForVaultPathError("unrelated")).toBeUndefined();
   });
 
@@ -38,11 +36,11 @@ describe("Obsidian vault path safety", () => {
 
   it("drops relative root segments so CWD cannot widen the allowlist", () => {
     expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "./vaults;vaults" })).toEqual([]);
-    expect(parseObsidianVaultRoots({
-      ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;./relative;D:\\Notes"
-    })).toEqual(
-      parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;D:\\Notes" })
-    );
+    expect(
+      parseObsidianVaultRoots({
+        ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;./relative;D:\\Notes"
+      })
+    ).toEqual(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\Vaults;D:\\Notes" }));
   });
 
   it("drops filesystem / drive roots so whole-volume allowlists cannot widen imports", () => {
@@ -55,9 +53,11 @@ describe("Obsidian vault path safety", () => {
 
     expect(parseObsidianVaultRoots({ ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;/;C:/;C:" })).toEqual([]);
     // Windows drive strings must stay lexical on every host (no POSIX resolve into CWD).
-    expect(parseObsidianVaultRoots({
-      ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;C:\\Vaults;/"
-    })).toEqual(["C:\\Vaults"]);
+    expect(
+      parseObsidianVaultRoots({
+        ASSINI_OBSIDIAN_VAULT_ROOTS: "C:\\;C:\\Vaults;/"
+      })
+    ).toEqual(["C:\\Vaults"]);
   });
 
   it("treats a path as inside a root only when equal or a descendant", () => {
@@ -69,9 +69,7 @@ describe("Obsidian vault path safety", () => {
 
   it("strips Windows extended-length path prefixes before compare", () => {
     expect(stripWindowsExtendedPrefix("\\\\?\\C:\\Users\\vault")).toBe("C:\\Users\\vault");
-    expect(stripWindowsExtendedPrefix("\\\\?\\UNC\\server\\share\\notes")).toBe(
-      "\\\\server\\share\\notes"
-    );
+    expect(stripWindowsExtendedPrefix("\\\\?\\UNC\\server\\share\\notes")).toBe("\\\\server\\share\\notes");
     expect(stripWindowsExtendedPrefix("/posix/unchanged")).toBe("/posix/unchanged");
   });
 
@@ -86,8 +84,9 @@ describe("Obsidian vault path safety", () => {
   });
 
   it("fails closed when ASSINI_OBSIDIAN_VAULT_ROOTS is unset", async () => {
-    await expect(assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), { env: {} }))
-      .rejects.toThrow(/ASSINI_OBSIDIAN_VAULT_ROOTS is set/);
+    await expect(assertObsidianVaultPathAllowed(join(tmpdir(), "vault"), { env: {} })).rejects.toThrow(
+      /ASSINI_OBSIDIAN_VAULT_ROOTS is set/
+    );
   });
 
   it("treats blank-only ASSINI_OBSIDIAN_VAULT_ROOTS as unset", async () => {

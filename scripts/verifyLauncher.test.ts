@@ -12,8 +12,10 @@ describe("repository verification launcher", () => {
   it("builds a Windows-safe full-stack verification plan in dependency order", () => {
     const steps = createVerificationSteps({ platform: "win32", env: { ComSpec: "C:\\Windows\\System32\\cmd.exe" } });
 
-    expect(steps.map((step) => step.name)).toEqual(["test", "check", "seed", "eval", "build"]);
+    expect(steps.map((step) => step.name)).toEqual(["format:check", "lint", "test", "check", "seed", "eval", "build"]);
     expect(steps.map((step) => step.args)).toEqual([
+      ["/d", "/s", "/c", "npm.cmd run format:check"],
+      ["/d", "/s", "/c", "npm.cmd run lint"],
       ["/d", "/s", "/c", "npm.cmd run test"],
       ["/d", "/s", "/c", "npm.cmd run check"],
       ["/d", "/s", "/c", "npm.cmd run seed"],
@@ -24,8 +26,9 @@ describe("repository verification launcher", () => {
     expect(steps.every((step) => step.options.stdio === "inherit")).toBe(true);
     expect(steps.every((step) => step.options.windowsHide === true)).toBe(true);
     expect(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH).toMatch(/local-db\.json$/);
-    expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_DB_PATH)
-      .toBe(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH);
+    expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_DB_PATH).toBe(
+      steps.find((step) => step.name === "seed")?.options.env?.ASSINI_DB_PATH
+    );
     expect(steps.find((step) => step.name === "seed")?.options.env?.ASSINI_SEED_FIXTURE).toBe("1");
     expect(steps.find((step) => step.name === "eval")?.options.env?.ASSINI_EVAL_REQUIRE_LANGUAGES).toBe("1");
   });
@@ -34,6 +37,8 @@ describe("repository verification launcher", () => {
     const steps = createVerificationSteps({ platform: "linux", env: {} });
 
     expect(steps.map((step) => ({ command: step.command, args: step.args }))).toEqual([
+      { command: "npm", args: ["run", "format:check"] },
+      { command: "npm", args: ["run", "lint"] },
       { command: "npm", args: ["run", "test"] },
       { command: "npm", args: ["run", "check"] },
       { command: "npm", args: ["run", "seed"] },

@@ -1,9 +1,5 @@
 import { useEffect, useLayoutEffect, useState, type FormEvent } from "react";
-import type {
-  DiscoveredLlmModel,
-  ModelProfileSavePayload,
-  RuntimeSettingsUpdate
-} from "../api";
+import type { DiscoveredLlmModel, ModelProfileSavePayload, RuntimeSettingsUpdate } from "../api";
 import type { ModelWorkspace } from "../hooks/useModelWorkspace";
 import { useI18n } from "../i18n";
 import {
@@ -62,7 +58,9 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
   useLayoutEffect(() => {
     if (settingsState.status === "ready") {
       setForm(formFromSettings(settingsState.data));
-      const activeProfile = settingsState.data.profiles?.find((profile) => profile.id === settingsState.data.activeProfileId);
+      const activeProfile = settingsState.data.profiles?.find(
+        (profile) => profile.id === settingsState.data.activeProfileId
+      );
       setProfileName(activeProfile?.name ?? settingsState.data.settings.model ?? "");
       setFormError(null);
     }
@@ -70,11 +68,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
 
   useEffect(() => {
     if (settingsState.status !== "ready" || modelDiscoveryState.status !== "ready") return;
-    setForm((current) => syncFormWithDiscoveredModels(
-      current,
-      modelDiscoveryState.data,
-      settingsState.data.settings
-    ));
+    setForm((current) => syncFormWithDiscoveredModels(current, modelDiscoveryState.data, settingsState.data.settings));
   }, [modelDiscoveryState, settingsState]);
 
   const discoveredModels = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.models : [];
@@ -109,20 +103,21 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
 
   const status = llmState.data;
   const settings = settingsState.status === "ready" ? settingsState.data.settings : null;
-  const modelProfiles = settingsState.status === "ready" ? settingsState.data.profiles ?? [] : [];
-  const activeProfileId = settingsState.status === "ready" ? settingsState.data.activeProfileId ?? "" : "";
-  const discoveryEndpoints = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.endpoints ?? [] : [];
+  const modelProfiles = settingsState.status === "ready" ? (settingsState.data.profiles ?? []) : [];
+  const activeProfileId = settingsState.status === "ready" ? (settingsState.data.activeProfileId ?? "") : "";
+  const discoveryEndpoints = modelDiscoveryState.status === "ready" ? (modelDiscoveryState.data.endpoints ?? []) : [];
   const discoveryErrors = modelDiscoveryState.status === "ready" ? modelDiscoveryState.data.errors : [];
   const connectedEndpoints = discoveryEndpoints.filter((endpoint) => endpoint.connected);
   const failedEndpoints = discoveryEndpoints.filter((endpoint) => !endpoint.connected);
   const isScanningModels = isRefreshingModels || modelDiscoveryState.status === "loading";
-  const lastModelScan = modelDiscoveryState.status === "ready"
-    ? formatScanTime(modelDiscoveryState.data.scannedAt)
-    : null;
-  const selectedDiscoveredModelId = discoveredModels.find((candidate) => discoveredModelMatchesForm(candidate, form))?.id ?? "";
-  const staleActiveModel = settings && modelDiscoveryState.status === "ready"
-    ? findStaleActiveModel(settings, modelDiscoveryState.data)
-    : null;
+  const lastModelScan =
+    modelDiscoveryState.status === "ready" ? formatScanTime(modelDiscoveryState.data.scannedAt) : null;
+  const selectedDiscoveredModelId =
+    discoveredModels.find((candidate) => discoveredModelMatchesForm(candidate, form))?.id ?? "";
+  const staleActiveModel =
+    settings && modelDiscoveryState.status === "ready"
+      ? findStaleActiveModel(settings, modelDiscoveryState.data)
+      : null;
 
   function buildSettingsPayload(nextForm: SettingsFormState): RuntimeSettingsUpdate | null {
     const validation = validateSettingsForm(nextForm);
@@ -176,9 +171,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
       return null;
     }
     const activeProfile = modelProfiles.find((profile) => profile.id === activeProfileId);
-    const saveProfileId = activeProfile?.name.trim().toLowerCase() === name.toLowerCase()
-      ? activeProfileId
-      : undefined;
+    const saveProfileId = activeProfile?.name.trim().toLowerCase() === name.toLowerCase() ? activeProfileId : undefined;
 
     return {
       ...runtimePayload,
@@ -315,7 +308,9 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
           )}
         </div>
         {settingsState.status === "loading" && (
-          <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingSettings")}</p>
+          <p className="inline-empty" role="status" aria-live="polite">
+            {t("model.loadingSettings")}
+          </p>
         )}
         <DesktopToolsPanel
           connectedEndpointCount={connectedEndpoints.length}
@@ -342,7 +337,9 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
                     disabled={isSavingSettings || modelProfiles.length === 0}
                     onChange={(event) => void handleActivateProfile(event.target.value)}
                   >
-                    <option value="">{modelProfiles.length > 0 ? t("model.chooseProfile") : t("model.noProfiles")}</option>
+                    <option value="">
+                      {modelProfiles.length > 0 ? t("model.chooseProfile") : t("model.noProfiles")}
+                    </option>
                     {modelProfiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
                         {profile.name} ({profile.model || profile.provider})
@@ -393,11 +390,7 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
                 </button>
               </div>
             </div>
-            <ModelSettingsFormFields
-              form={form}
-              isSavingSettings={isSavingSettings}
-              setForm={setForm}
-            >
+            <ModelSettingsFormFields form={form} isSavingSettings={isSavingSettings} setForm={setForm}>
               <ModelDiscoveryPanel
                 connectedEndpoints={connectedEndpoints}
                 discoveryErrors={discoveryErrors}
@@ -422,25 +415,38 @@ export function ModelSetupView({ model }: { model: ModelWorkspace }) {
               <button type="submit" disabled={isSavingSettings} aria-busy={isSavingSettings}>
                 {isSavingSettings ? t("model.savingSettings") : t("model.saveSettings")}
               </button>
-              {formError && <p className="inline-error" role="alert" aria-live="assertive">{formError}</p>}
-              {settingsSaveError && <p className="inline-error" role="alert" aria-live="assertive">{settingsSaveError}</p>}
-              {settingsSaveResult && <p className="result-notice" role="status" aria-live="polite">{settingsSaveResult}</p>}
+              {formError && (
+                <p className="inline-error" role="alert" aria-live="assertive">
+                  {formError}
+                </p>
+              )}
+              {settingsSaveError && (
+                <p className="inline-error" role="alert" aria-live="assertive">
+                  {settingsSaveError}
+                </p>
+              )}
+              {settingsSaveResult && (
+                <p className="result-notice" role="status" aria-live="polite">
+                  {settingsSaveResult}
+                </p>
+              )}
             </div>
           </form>
         )}
       </section>
 
-      <ModelObservabilityPanel
-        observabilityState={observabilityState}
-        onRetry={onRefreshModelObservability}
-      />
+      <ModelObservabilityPanel observabilityState={observabilityState} onRetry={onRefreshModelObservability} />
 
       <ObsidianMcpSettingsPanel />
 
       <section className="panel-card setup-card" aria-label={t("model.localSetupAria")}>
         <span className="detail-label">{t("model.localEndpoints")}</span>
         <h2>{t("model.localProviders")}</h2>
-        <p>{t("model.localSetupIntroBefore")}<code>/v1/chat/completions</code>{t("model.localSetupIntroAfter")}</p>
+        <p>
+          {t("model.localSetupIntroBefore")}
+          <code>/v1/chat/completions</code>
+          {t("model.localSetupIntroAfter")}
+        </p>
         {status.setup.localExamples.length === 0 ? (
           <p className="muted empty-state" role="status" aria-live="polite">
             {t("model.localSetupEmpty")}

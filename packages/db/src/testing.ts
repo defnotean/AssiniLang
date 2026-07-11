@@ -108,13 +108,69 @@ export function buildTestCorpus(languageId = TEST_LANGUAGE_ID): CorpusPassage[] 
 
 export function buildTestLexemes(languageId = TEST_LANGUAGE_ID): Lexeme[] {
   return [
-    { id: `${languageId}-lex-001`, languageId, form: "mira", gloss: "river", partOfSpeech: "noun", tags: ["place"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-002`, languageId, form: "talo", gloss: "walk", partOfSpeech: "verb", tags: ["motion"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-003`, languageId, form: "saku", gloss: "child", partOfSpeech: "noun", tags: ["person"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-004`, languageId, form: "nemi", gloss: "teach", partOfSpeech: "verb", tags: ["learning"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-005`, languageId, form: "-na", gloss: "first person singular", partOfSpeech: "suffix", tags: ["person"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-006`, languageId, form: "-ki", gloss: "third person singular", partOfSpeech: "suffix", tags: ["person"], sourceAssetIds: [] },
-    { id: `${languageId}-lex-007`, languageId, form: "-lo", gloss: "past tense", partOfSpeech: "suffix", tags: ["tense"], sourceAssetIds: [] }
+    {
+      id: `${languageId}-lex-001`,
+      languageId,
+      form: "mira",
+      gloss: "river",
+      partOfSpeech: "noun",
+      tags: ["place"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-002`,
+      languageId,
+      form: "talo",
+      gloss: "walk",
+      partOfSpeech: "verb",
+      tags: ["motion"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-003`,
+      languageId,
+      form: "saku",
+      gloss: "child",
+      partOfSpeech: "noun",
+      tags: ["person"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-004`,
+      languageId,
+      form: "nemi",
+      gloss: "teach",
+      partOfSpeech: "verb",
+      tags: ["learning"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-005`,
+      languageId,
+      form: "-na",
+      gloss: "first person singular",
+      partOfSpeech: "suffix",
+      tags: ["person"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-006`,
+      languageId,
+      form: "-ki",
+      gloss: "third person singular",
+      partOfSpeech: "suffix",
+      tags: ["person"],
+      sourceAssetIds: []
+    },
+    {
+      id: `${languageId}-lex-007`,
+      languageId,
+      form: "-lo",
+      gloss: "past tense",
+      partOfSpeech: "suffix",
+      tags: ["tense"],
+      sourceAssetIds: []
+    }
   ];
 }
 

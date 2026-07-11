@@ -24,7 +24,11 @@ async function api(method, path, body) {
   const res = await fetch(`${API}${path}`, init);
   const text = await res.text();
   let json;
-  try { json = text ? JSON.parse(text) : undefined; } catch { json = text; }
+  try {
+    json = text ? JSON.parse(text) : undefined;
+  } catch {
+    json = text;
+  }
   return { status: res.status, json, text };
 }
 
@@ -62,7 +66,10 @@ function chunkWordlist(text, size = 14) {
 
 function seg(parts) {
   return parts.map(([surface, lemma, gloss, features]) => ({
-    surface, lemma, gloss, features: Array.isArray(features) ? features : [features]
+    surface,
+    lemma,
+    gloss,
+    features: Array.isArray(features) ? features : [features]
   }));
 }
 
@@ -417,25 +424,28 @@ async function main() {
 
   // 3. Lexicon via chunked DGX extraction
   if (!skipLexicon) {
-  console.log("\n[2/5] Lexicon via DGX (chunked wordlists)…");
-  const chunks = chunkWordlist(WORDLIST, 12);
-  for (const [i, chunk] of chunks.entries()) {
-    const srcLex = await api("POST", `/languages/${langId}/sources`, {
-      kind: "wordlist",
-      title: `Veridspark lexicon chunk ${i + 1}/${chunks.length}`,
-      rawText: chunk
-    });
-    if (srcLex.status !== 201) continue;
-    console.log(`      processing chunk ${i + 1}/${chunks.length}…`);
-    const procLex = await processSourceWithRetry(srcLex.json.id);
-    if (procLex.status !== 200) {
-      console.warn(`      chunk ${i + 1} failed:`, procLex.json?.error ?? procLex.status);
-      continue;
+    console.log("\n[2/5] Lexicon via DGX (chunked wordlists)…");
+    const chunks = chunkWordlist(WORDLIST, 12);
+    for (const [i, chunk] of chunks.entries()) {
+      const srcLex = await api("POST", `/languages/${langId}/sources`, {
+        kind: "wordlist",
+        title: `Veridspark lexicon chunk ${i + 1}/${chunks.length}`,
+        rawText: chunk
+      });
+      if (srcLex.status !== 201) continue;
+      console.log(`      processing chunk ${i + 1}/${chunks.length}…`);
+      const procLex = await processSourceWithRetry(srcLex.json.id);
+      if (procLex.status !== 200) {
+        console.warn(`      chunk ${i + 1} failed:`, procLex.json?.error ?? procLex.status);
+        continue;
+      }
+      const accepted = await bulkAcceptDrafts(
+        langId,
+        (procLex.json?.drafts ?? []).filter((d) => d.kind === "lexeme")
+      );
+      stats.lexemes += accepted;
+      console.log(`      chunk ${i + 1}: ${accepted} lexemes`);
     }
-    const accepted = await bulkAcceptDrafts(langId, (procLex.json?.drafts ?? []).filter((d) => d.kind === "lexeme"));
-    stats.lexemes += accepted;
-    console.log(`      chunk ${i + 1}: ${accepted} lexemes`);
-  }
   }
 
   // Skip grammar/narrative if notes already plentiful
@@ -444,44 +454,52 @@ async function main() {
 
   // 4. Grammar doc → LLM → accept grammar notes
   if (!skipNotes) {
-  console.log("\n[3/5] Grammar notes via DGX extraction…");
-  const srcGram = await api("POST", `/languages/${langId}/sources`, {
-    kind: "text",
-    title: "Veridspark grammar reference",
-    rawText: GRAMMAR_DOC
-  });
-  if (srcGram.status === 201) {
-    console.log("      processing grammar doc…");
-    const procGram = await processSourceWithRetry(srcGram.json.id);
-    if (procGram.status === 200) {
-      stats.notes += await bulkAcceptDrafts(langId, (procGram.json?.drafts ?? []).filter((d) => d.kind === "grammar_note"));
-      stats.corpus += await bulkAcceptDrafts(langId, (procGram.json?.drafts ?? []).filter((d) => d.kind === "corpus_passage"));
-      console.log(`      grammar extraction: ${stats.notes} notes so far`);
+    console.log("\n[3/5] Grammar notes via DGX extraction…");
+    const srcGram = await api("POST", `/languages/${langId}/sources`, {
+      kind: "text",
+      title: "Veridspark grammar reference",
+      rawText: GRAMMAR_DOC
+    });
+    if (srcGram.status === 201) {
+      console.log("      processing grammar doc…");
+      const procGram = await processSourceWithRetry(srcGram.json.id);
+      if (procGram.status === 200) {
+        stats.notes += await bulkAcceptDrafts(
+          langId,
+          (procGram.json?.drafts ?? []).filter((d) => d.kind === "grammar_note")
+        );
+        stats.corpus += await bulkAcceptDrafts(
+          langId,
+          (procGram.json?.drafts ?? []).filter((d) => d.kind === "corpus_passage")
+        );
+        console.log(`      grammar extraction: ${stats.notes} notes so far`);
+      }
     }
-  }
 
-  // 5. Narrative → LLM → accept extra corpus + notes
-  console.log("\n[4/5] Narrative enrichment via DGX…");
-  const srcNar = await api("POST", `/languages/${langId}/sources`, {
-    kind: "text",
-    title: "Veridspark river walk narrative",
-    rawText: NARRATIVE
-  });
-  if (srcNar.status === 201) {
-    console.log("      processing narrative…");
-    const procNar = await processSourceWithRetry(srcNar.json.id);
-    if (procNar.status === 200) {
-      const ok = await bulkAcceptDrafts(langId, procNar.json?.drafts ?? []);
-      console.log(`      ${ok} narrative drafts accepted`);
+    // 5. Narrative → LLM → accept extra corpus + notes
+    console.log("\n[4/5] Narrative enrichment via DGX…");
+    const srcNar = await api("POST", `/languages/${langId}/sources`, {
+      kind: "text",
+      title: "Veridspark river walk narrative",
+      rawText: NARRATIVE
+    });
+    if (srcNar.status === 201) {
+      console.log("      processing narrative…");
+      const procNar = await processSourceWithRetry(srcNar.json.id);
+      if (procNar.status === 200) {
+        const ok = await bulkAcceptDrafts(langId, procNar.json?.drafts ?? []);
+        console.log(`      ${ok} narrative drafts accepted`);
+      }
     }
-  }
 
-  // Model-backed grammar notes from approved data
-  const modelDraft = await api("POST", `/languages/${langId}/study-loop/model-draft`, { languageId: langId });
-  if (modelDraft.status === 200) {
-    stats.notes += modelDraft.json?.generated ?? 0;
-    console.log(`      model-draft: ${modelDraft.json?.generated ?? 0} notes (${modelDraft.json?.warnings?.length ?? 0} warnings)`);
-  }
+    // Model-backed grammar notes from approved data
+    const modelDraft = await api("POST", `/languages/${langId}/study-loop/model-draft`, { languageId: langId });
+    if (modelDraft.status === 200) {
+      stats.notes += modelDraft.json?.generated ?? 0;
+      console.log(
+        `      model-draft: ${modelDraft.json?.generated ?? 0} notes (${modelDraft.json?.warnings?.length ?? 0} warnings)`
+      );
+    }
   }
 
   // Approve draft notes for exercises

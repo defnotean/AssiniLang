@@ -10,11 +10,18 @@ import type { CorpusPassage } from "./lib/types";
 const fetchNeuralMapMock = vi.fn();
 const validateCorpusImportMock = vi.fn();
 
-vi.mock("./api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./api")>();
+vi.mock("./api/aiSessionApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/aiSessionApi")>();
   return {
     ...actual,
-    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args),
+    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args)
+  };
+});
+
+vi.mock("./api/studyApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/studyApi")>();
+  return {
+    ...actual,
     validateCorpusImport: (...args: unknown[]) => validateCorpusImportMock(...args)
   };
 });
@@ -94,12 +101,13 @@ describe("corpus graph-rendering fixture (web)", () => {
     const nodeGroups = svg.querySelectorAll("g.network-nodes > g.network-node");
     expect(nodeGroups).toHaveLength(manifest.expected.nodeCount);
 
-    const titleTexts = [...svg.querySelectorAll("g.network-nodes title")].map(
-      (title) => title.textContent ?? ""
-    );
+    const titleTexts = [...svg.querySelectorAll("g.network-nodes title")].map((title) => title.textContent ?? "");
     expect(titleTexts).toHaveLength(manifest.expected.nodeCount);
     for (const node of expected.nodes) {
-      expect(titleTexts.some((text) => text.endsWith(`: ${node.label}`)), node.label).toBe(true);
+      expect(
+        titleTexts.some((text) => text.endsWith(`: ${node.label}`)),
+        node.label
+      ).toBe(true);
     }
 
     for (const node of expected.nodes) {
@@ -110,15 +118,17 @@ describe("corpus graph-rendering fixture (web)", () => {
     expect(edgeLines).toHaveLength(manifest.expected.edgeCount);
 
     const relations = [...edgeLines].map((line) => line.getAttribute("data-relation"));
-    expect(relations).toEqual(expect.arrayContaining([
-      "has_corpus",
-      "from_source",
-      "contains_morpheme",
-      "tagged",
-      "co_occurs",
-      "has_note",
-      "uses_context"
-    ]));
+    expect(relations).toEqual(
+      expect.arrayContaining([
+        "has_corpus",
+        "from_source",
+        "contains_morpheme",
+        "tagged",
+        "co_occurs",
+        "has_note",
+        "uses_context"
+      ])
+    );
 
     for (const line of edgeLines) {
       expect(Number(line.getAttribute("x1"))).not.toBeNaN();

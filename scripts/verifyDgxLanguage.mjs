@@ -55,7 +55,8 @@ async function main() {
   const langName = `SparkVeridian-${Date.now().toString(36)}`;
   const createLang = await api("POST", "/languages", {
     name: langName,
-    description: "Synthetic agglutinative language for DGX Spark integration testing. Uses CV syllables and -na/-ko suffixes.",
+    description:
+      "Synthetic agglutinative language for DGX Spark integration testing. Uses CV syllables and -na/-ko suffixes.",
     orthography: "Latin lowercase; hyphen joins morphemes (e.g. mira-na-ko).",
     typology: "agglutinative",
     phonology: {
@@ -121,7 +122,11 @@ async function main() {
     const response = await fetch(`${API}${path}`, init);
     const text = await response.text();
     let json;
-    try { json = text ? JSON.parse(text) : undefined; } catch { json = text; }
+    try {
+      json = text ? JSON.parse(text) : undefined;
+    } catch {
+      json = text;
+    }
     return { status: response.status, json, text };
   }
 

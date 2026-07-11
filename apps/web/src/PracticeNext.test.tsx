@@ -33,14 +33,17 @@ const fixtureExercises = [
   createExercise("avn-ex-004", "Translate: I see the river.")
 ];
 
-function renderLearnerView(overrides: {
-  onSelectExercise?: (exerciseId: string) => void;
-  languageId?: string | null;
-  exercises?: PublicExercise[];
-  selectedExercise?: PublicExercise | null;
-} = {}) {
+function renderLearnerView(
+  overrides: {
+    onSelectExercise?: (exerciseId: string) => void;
+    languageId?: string | null;
+    exercises?: PublicExercise[];
+    selectedExercise?: PublicExercise | null;
+  } = {}
+) {
   const exercises = overrides.exercises ?? fixtureExercises;
-  const selectedExercise = overrides.selectedExercise === undefined ? exercises[0] ?? null : overrides.selectedExercise;
+  const selectedExercise =
+    overrides.selectedExercise === undefined ? (exercises[0] ?? null) : overrides.selectedExercise;
   const setSelectedExerciseId: Dispatch<SetStateAction<string | null>> = (value) => {
     const next = typeof value === "function" ? value(selectedExercise?.id ?? null) : value;
     overrides.onSelectExercise?.(next ?? "");
@@ -178,9 +181,11 @@ describe("LearnerView practice next panel", () => {
 
     const panel = await screen.findByRole("region", { name: "Practice next" });
     expect(within(panel).getByText("No exercises to recommend yet.")).toBeInTheDocument();
-    expect(within(panel).getByText(
-      "Author the first learner task below, or open Build to accept grammar drafts that can become practice."
-    )).toBeInTheDocument();
+    expect(
+      within(panel).getByText(
+        "Author the first learner task below, or open Build to accept grammar drafts that can become practice."
+      )
+    ).toBeInTheDocument();
 
     const promptField = screen.getByLabelText("Exercise prompt");
     promptField.focus = focusSpy;
@@ -302,9 +307,11 @@ describe("LearnerView practice next panel", () => {
     renderLearnerView({ exercises: [], selectedExercise: null });
 
     const exerciseList = screen.getByRole("region", { name: "Exercise selector" });
-    expect(within(exerciseList).getByText(
-      "No exercises yet. Author one below, or open Build to accept grammar drafts that can become practice tasks."
-    )).toBeInTheDocument();
+    expect(
+      within(exerciseList).getByText(
+        "No exercises yet. Author one below, or open Build to accept grammar drafts that can become practice tasks."
+      )
+    ).toBeInTheDocument();
     expect(within(exerciseList).getByText("0 exercises")).toBeInTheDocument();
     expect(within(exerciseList).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
 
@@ -315,10 +322,18 @@ describe("LearnerView practice next panel", () => {
     expect(detailEmpty).toHaveTextContent(
       "Fill the authoring form below to create the first task, or open Build to accept grammar drafts that can become practice."
     );
-    expect(within(detailPanel).queryByText("Select an exercise from the list or author one below.")).not.toBeInTheDocument();
+    expect(
+      within(detailPanel).queryByText("Select an exercise from the list or author one below.")
+    ).not.toBeInTheDocument();
     expect(within(detailPanel).getByRole("button", { name: "Author an exercise" })).toBeInTheDocument();
-    expect(within(detailPanel).getByText("No learner tasks yet. Fill the form below, validate without saving, then create the exercise.")).toBeInTheDocument();
-    expect(within(detailPanel).getByText("Validate checks rules and answer keys without creating an exercise.")).toBeInTheDocument();
+    expect(
+      within(detailPanel).getByText(
+        "No learner tasks yet. Fill the form below, validate without saving, then create the exercise."
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(detailPanel).getByText("Validate checks rules and answer keys without creating an exercise.")
+    ).toBeInTheDocument();
   });
 
   it("shows a dry-run success notice without creating an exercise", async () => {
@@ -378,13 +393,16 @@ describe("LearnerView practice next panel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Validate exercise authoring" }));
 
     await waitFor(() => expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledTimes(1));
-    expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledWith("avenik", expect.objectContaining({
-      adversarialAnswers: [
-        { answer: "talo-mi-na mira", reason: "Verb-first order." },
-        { answer: "mira talo-na-mi", reason: "Suffix order drift." },
-        { answer: "talo mira-mi-na", reason: "Splits the verb chain." }
-      ]
-    }));
+    expect(apiMock.validateExerciseAuthoring).toHaveBeenCalledWith(
+      "avenik",
+      expect.objectContaining({
+        adversarialAnswers: [
+          { answer: "talo-mi-na mira", reason: "Verb-first order." },
+          { answer: "mira talo-na-mi", reason: "Suffix order drift." },
+          { answer: "talo mira-mi-na", reason: "Splits the verb chain." }
+        ]
+      })
+    );
     const authoringForm = screen.getByRole("form", { name: "Exercise authoring" });
     const dryRunStatus = await within(authoringForm).findByRole("status");
     expect(dryRunStatus).toHaveTextContent("Dry-run only — nothing saved yet.");

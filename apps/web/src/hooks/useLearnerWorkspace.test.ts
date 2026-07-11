@@ -58,9 +58,7 @@ describe("useLearnerWorkspace", () => {
       evaluations: []
     };
 
-    const { result } = renderHook(() =>
-      useLearnerWorkspace("learner", "lang-1", data, async () => undefined)
-    );
+    const { result } = renderHook(() => useLearnerWorkspace("learner", "lang-1", data, async () => undefined));
 
     await waitFor(() => {
       expect(result.current.selectedExercise?.id).toBe("ex-1");

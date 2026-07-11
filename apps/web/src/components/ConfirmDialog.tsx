@@ -58,12 +58,7 @@ export function ConfirmDialog({
           <button type="button" className="confirm-dialog-cancel" onClick={onCancel}>
             {t("common.cancel")}
           </button>
-          <button
-            type="button"
-            className="confirm-dialog-confirm"
-            ref={confirmRef}
-            onClick={onConfirm}
-          >
+          <button type="button" className="confirm-dialog-confirm" ref={confirmRef} onClick={onConfirm}>
             {t("common.confirm")}
           </button>
         </div>

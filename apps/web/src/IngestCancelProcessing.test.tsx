@@ -107,9 +107,7 @@ describe("IngestView cancel queued processing", () => {
     // Active queue phase badge (button labels also contain "processing" while busy).
     expect(screen.getByText("processing", { selector: ".status-badge.processing" })).toBeInTheDocument();
     expect(screen.getByText("attempt cap reached")).toBeInTheDocument();
-    expect(
-      screen.getByText(/This source reached the 5-attempt cap/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/This source reached the 5-attempt cap/)).toBeInTheDocument();
 
     expect(screen.getByRole("button", { name: "Cancel Queued source" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel Active source" })).not.toBeInTheDocument();
@@ -126,9 +124,7 @@ describe("IngestView cancel queued processing", () => {
       await screen.findByText("Cancelled queued processing for Queued source. Use Retry when ready.")
     ).toBeInTheDocument();
     // Appears on both the originally failed source and the newly cancelled one.
-    expect(
-      screen.getAllByText("Queued processing was cancelled. Use Retry when ready.")
-    ).toHaveLength(2);
+    expect(screen.getAllByText("Queued processing was cancelled. Use Retry when ready.")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Retry Queued source" })).toBeInTheDocument();
   });
 

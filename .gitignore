@@ -16,6 +16,9 @@ coverage/
 .nyc_output/
 vitest-*.txt
 apps/*/vitest-*.txt
+test-results/
+playwright-report/
+blob-report/
 
 # Local runtime data
 data/local-db.json

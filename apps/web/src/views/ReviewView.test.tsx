@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import type { CorpusPassage, Note } from "@assini/db";
+import type { CorpusPassage, Note } from "@assini/api-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReviewView } from "./ReviewView";
 

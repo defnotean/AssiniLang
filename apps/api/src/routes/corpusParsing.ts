@@ -1,8 +1,4 @@
-import {
-  CONSENT_USE_VALUES,
-  type ConsentUse,
-  type CorpusPassage
-} from "@assini/db";
+import { CONSENT_USE_VALUES, type ConsentUse, type CorpusPassage } from "@assini/db";
 import { parseStringArray } from "../routeHelpers.js";
 
 export type CorpusImportBody = Omit<CorpusPassage, "id" | "languageId">;
@@ -43,18 +39,21 @@ export function parseCorpusImportBody(input: unknown): CorpusImportBody | undefi
   const source = typeof body.source === "string" ? body.source.trim() : "";
   const sourceMetadata = parseCorpusSourceMetadata(body.sourceMetadata);
   const textTarget = typeof body.textTarget === "string" ? body.textTarget.trim().replace(/\s+/g, " ") : "";
-  const textTranslation = typeof body.textTranslation === "string" ? body.textTranslation.trim().replace(/\s+/g, " ") : "";
+  const textTranslation =
+    typeof body.textTranslation === "string" ? body.textTranslation.trim().replace(/\s+/g, " ") : "";
   const morphologicalSegmentation = parseCorpusMorphemes(body.morphologicalSegmentation);
   const topicTags = parseStringArray(body.topicTags);
-  const consentStatus = body.consentStatus && typeof body.consentStatus === "object" && !Array.isArray(body.consentStatus)
-    ? body.consentStatus as Record<string, unknown>
-    : undefined;
+  const consentStatus =
+    body.consentStatus && typeof body.consentStatus === "object" && !Array.isArray(body.consentStatus)
+      ? (body.consentStatus as Record<string, unknown>)
+      : undefined;
   const restrictions = parseStringArray(consentStatus?.restrictions);
 
   if (!source || !sourceMetadata || !textTarget || !textTranslation || !morphologicalSegmentation) return undefined;
-  const consentUse = typeof consentStatus?.use === "string" && (CONSENT_USE_VALUES as readonly string[]).includes(consentStatus.use)
-    ? consentStatus.use as ConsentUse
-    : undefined;
+  const consentUse =
+    typeof consentStatus?.use === "string" && (CONSENT_USE_VALUES as readonly string[]).includes(consentStatus.use)
+      ? (consentStatus.use as ConsentUse)
+      : undefined;
   if (!topicTags || topicTags.length === 0 || !restrictions || !consentUse) return undefined;
 
   return {

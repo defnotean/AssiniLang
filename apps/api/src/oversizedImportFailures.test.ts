@@ -4,10 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildTestWorkspaceState, TEST_LANGUAGE_ID } from "@assini/db";
 import { fetchUrlText, MAX_URL_CONTENT_BYTES } from "./ingestion.js";
-import {
-  MAX_OBSIDIAN_MARKDOWN_BYTES,
-  OBSIDIAN_MARKDOWN_TOO_LARGE_REASON
-} from "./routes/sources.js";
+import { MAX_OBSIDIAN_MARKDOWN_BYTES, OBSIDIAN_MARKDOWN_TOO_LARGE_REASON } from "./routes/sources.js";
 import { createServer } from "./server.js";
 
 function authHeaders(userId: string) {
@@ -22,19 +19,20 @@ function restoreEnv(key: string, value: string | undefined) {
   }
 }
 
-function multipartPayload(parts: Array<{
-  name: string;
-  filename?: string;
-  contentType?: string;
-  body: string;
-}>, boundary: string): string {
+function multipartPayload(
+  parts: Array<{
+    name: string;
+    filename?: string;
+    contentType?: string;
+    body: string;
+  }>,
+  boundary: string
+): string {
   const chunks: string[] = [];
   for (const part of parts) {
     chunks.push(`--${boundary}`);
     if (part.filename !== undefined) {
-      chunks.push(
-        `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"`
-      );
+      chunks.push(`Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"`);
       chunks.push(`Content-Type: ${part.contentType ?? "application/octet-stream"}`);
     } else {
       chunks.push(`Content-Disposition: form-data; name="${part.name}"`);
@@ -103,10 +101,11 @@ describe("oversized import failure examples", () => {
       expect.objectContaining({
         title: "ok",
         kind: "text",
-        status: "pending",
-        rawText: expect.stringContaining("vel = water")
+        status: "pending"
       })
     ]);
+    expect(response.json().imported[0]).not.toHaveProperty("rawText");
+    expect(response.body).not.toContain("vel = water");
     expect(response.json().skipped).toEqual([
       {
         path: "huge.md",
@@ -162,9 +161,7 @@ describe("oversized import failure examples", () => {
     });
     expect(listed.statusCode).toBe(200);
     expect(listed.json()).toHaveLength(beforeCount);
-    expect(
-      listed.json().some((passage: { textTarget: string }) => passage.textTarget === oversizedTarget)
-    ).toBe(false);
+    expect(listed.json().some((passage: { textTarget: string }) => passage.textTarget === oversizedTarget)).toBe(false);
   });
 
   it("rejects oversized multipart source uploads with payloadTooLarge i18nKey", async () => {
@@ -175,14 +172,17 @@ describe("oversized import failure examples", () => {
       multipartFileSizeBytes: 48
     });
     const boundary = "----assini-oversized-source";
-    const payload = multipartPayload([
-      {
-        name: "file",
-        filename: "big.txt",
-        contentType: "text/plain",
-        body: "y".repeat(96)
-      }
-    ], boundary);
+    const payload = multipartPayload(
+      [
+        {
+          name: "file",
+          filename: "big.txt",
+          contentType: "text/plain",
+          body: "y".repeat(96)
+        }
+      ],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",
@@ -210,10 +210,11 @@ describe("oversized import failure examples", () => {
   });
 
   it("rejects fetched URL source bodies above the 2 MB intake limit", async () => {
-    const fetchStub = (async () => new Response("z".repeat(MAX_URL_CONTENT_BYTES + 1), {
-      status: 200,
-      headers: { "content-type": "text/plain" }
-    })) as typeof fetch;
+    const fetchStub = (async () =>
+      new Response("z".repeat(MAX_URL_CONTENT_BYTES + 1), {
+        status: 200,
+        headers: { "content-type": "text/plain" }
+      })) as typeof fetch;
 
     const publicLookup = async () => ({ address: "93.184.216.34", family: 4 });
     await expect(

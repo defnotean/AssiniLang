@@ -25,10 +25,7 @@ function readString(value, fallback) {
  */
 export const CI_GREEN_AUDIT_ARGS = ["audit", "--omit=dev", "--audit-level=moderate"];
 
-export function createCiGreenAuditSpec({
-  platform = process.platform,
-  env = process.env
-} = {}) {
+export function createCiGreenAuditSpec({ platform = process.platform, env = process.env } = {}) {
   return npmSpawnSpec(CI_GREEN_AUDIT_ARGS, {
     comSpec: readString(env.ComSpec, "cmd.exe"),
     platform
@@ -55,16 +52,12 @@ export function runCiGreenSmoke({
       env
     });
   } catch (error) {
-    stderr.write(
-      `[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(error)}\n`
-    );
+    stderr.write(`[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(error)}\n`);
     return { exitCode: 1, command: npmSpec.command, args: npmSpec.args, error };
   }
 
   if (result?.error) {
-    stderr.write(
-      `[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(result.error)}\n`
-    );
+    stderr.write(`[ciGreenSmoke] production dependency audit failed to start: ${formatSpawnFailure(result.error)}\n`);
     return {
       exitCode: 1,
       command: npmSpec.command,
@@ -74,9 +67,7 @@ export function runCiGreenSmoke({
   }
 
   if (result?.signal) {
-    stderr.write(
-      `[ciGreenSmoke] production dependency audit terminated by signal ${result.signal}\n`
-    );
+    stderr.write(`[ciGreenSmoke] production dependency audit terminated by signal ${result.signal}\n`);
     return {
       exitCode: 1,
       command: npmSpec.command,
@@ -95,9 +86,7 @@ export function runCiGreenSmoke({
   return { exitCode: 0, command: npmSpec.command, args: npmSpec.args };
 }
 
-const isMain =
-  typeof process.argv[1] === "string" &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+const isMain = typeof process.argv[1] === "string" && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isMain) {
   const result = runCiGreenSmoke();

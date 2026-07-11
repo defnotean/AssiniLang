@@ -19,11 +19,7 @@ describe("llm provider", () => {
   function captureFetch(responseContent = "Model response") {
     const calls: Array<{ url: string; init: Parameters<typeof fetch>[1] }> = [];
     const fetchFn: typeof fetch = async (input, init) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       calls.push({ url, init });
       return new Response(JSON.stringify({ choices: [{ message: { content: responseContent } }] }), {
         status: 200,
@@ -35,12 +31,15 @@ describe("llm provider", () => {
 
   it("builds OpenAI-compatible requests for local endpoints without requiring an API key", async () => {
     const { calls, fetchFn } = captureFetch("Local model response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1/",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1/",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
     const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
       languageId: TEST_LANGUAGE_ID,
@@ -67,11 +66,14 @@ describe("llm provider", () => {
 
   it("sends remote API keys only in authorization headers and never in prompt bodies", async () => {
     const { calls, fetchFn } = captureFetch("Remote model response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai",
-      OPENAI_API_KEY: "sk-test-secret",
-      ASSINI_LLM_MODEL: "gpt-test"
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai",
+        OPENAI_API_KEY: "sk-test-secret",
+        ASSINI_LLM_MODEL: "gpt-test"
+      },
+      fetchFn
+    );
 
     const input = buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
       languageId: TEST_LANGUAGE_ID,
@@ -110,11 +112,14 @@ describe("llm provider", () => {
 
   it("exposes completeChat on OpenAI-compatible providers for extraction with a low temperature", async () => {
     const { calls, fetchFn } = captureFetch('{"summary":"extracted"}');
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "http://127.0.0.1:11434/v1",
-      model: "llama3.1",
-      env: allowPrivateEnv
-    }, fetchFn);
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        model: "llama3.1",
+        env: allowPrivateEnv
+      },
+      fetchFn
+    );
 
     const content = await provider.completeChat?.([
       { role: "system", content: "Extract structured data." },
@@ -303,20 +308,25 @@ describe("llm provider", () => {
         });
       });
 
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "http://127.0.0.1:11434/v1",
-      model: "llama3.1",
-      timeoutMs: 25,
-      env: allowPrivateEnv
-    }, fetchFn);
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        model: "llama3.1",
+        timeoutMs: 25,
+        env: allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    const result = provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
     const assertion = expect(result).rejects.toThrow("LLM provider request timed out after 25ms");
     await vi.advanceTimersByTimeAsync(25);
 
@@ -325,27 +335,35 @@ describe("llm provider", () => {
 
   it("includes sanitized provider error details for non-OK responses", async () => {
     const fetchFn: typeof fetch = async () =>
-      new Response(JSON.stringify({
-        error: {
-          message: "Rate limit exceeded for sk-provider-secret"
+      new Response(
+        JSON.stringify({
+          error: {
+            message: "Rate limit exceeded for sk-provider-secret"
+          }
+        }),
+        {
+          status: 429,
+          headers: { "Content-Type": "application/json" }
         }
-      }), {
-        status: 429,
-        headers: { "Content-Type": "application/json" }
-      });
+      );
 
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "https://203.0.113.1/v1",
-      model: "gpt-test",
-      apiKey: "sk-provider-secret"
-    }, fetchFn);
-    const result = provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "programmer_debug",
-      prompt: "Summarize safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "https://93.184.216.34/v1",
+        model: "gpt-test",
+        apiKey: "sk-provider-secret"
+      },
+      fetchFn
+    );
+    const result = provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "programmer_debug",
+        prompt: "Summarize safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     await expect(result).rejects.toThrow(
       "LLM provider request failed with status 429: Rate limit exceeded for [redacted-secret]"
@@ -355,37 +373,49 @@ describe("llm provider", () => {
 
   it("redacts bearer and api_key shapes from non-sk provider error bodies", async () => {
     const fetchFn: typeof fetch = async () =>
-      new Response(JSON.stringify({
-        error: {
-          message: "Unauthorized Bearer plain-provider-secret api_key=query-leak"
+      new Response(
+        JSON.stringify({
+          error: {
+            message: "Unauthorized Bearer plain-provider-secret api_key=query-leak"
+          }
+        }),
+        {
+          status: 401,
+          headers: { "Content-Type": "application/json" }
         }
-      }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" }
-      });
+      );
 
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "https://203.0.113.1/v1",
-      model: "gpt-test",
-      apiKey: "plain-provider-secret"
-    }, fetchFn);
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "https://93.184.216.34/v1",
+        model: "gpt-test",
+        apiKey: "plain-provider-secret"
+      },
+      fetchFn
+    );
 
-    await expect(provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "programmer_debug",
-      prompt: "Summarize safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }))).rejects.toThrow(/\[redacted-secret\]/);
+    await expect(
+      provider.generateAssistantMessage(
+        buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+          languageId: TEST_LANGUAGE_ID,
+          mode: "programmer_debug",
+          prompt: "Summarize safely.",
+          contextNoteIds: [],
+          contextPassageIds: []
+        })
+      )
+    ).rejects.toThrow(/\[redacted-secret\]/);
 
     try {
-      await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-        languageId: TEST_LANGUAGE_ID,
-        mode: "programmer_debug",
-        prompt: "Summarize safely.",
-        contextNoteIds: [],
-        contextPassageIds: []
-      }));
+      await provider.generateAssistantMessage(
+        buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+          languageId: TEST_LANGUAGE_ID,
+          mode: "programmer_debug",
+          prompt: "Summarize safely.",
+          contextNoteIds: [],
+          contextPassageIds: []
+        })
+      );
     } catch (error) {
       expect((error as Error).message).not.toContain("plain-provider-secret");
       expect((error as Error).message).not.toContain("query-leak");
@@ -394,21 +424,26 @@ describe("llm provider", () => {
 
   it("sends a default max_tokens on every request and never a response_format on the chat path", async () => {
     const { calls, fetchFn } = captureFetch("Chat response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_JSON_MODE: "true",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ASSINI_LLM_JSON_MODE: "true",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     const body = JSON.parse(calls[0].init?.body as string);
     expect(body.max_tokens).toBe(4096);
@@ -417,14 +452,17 @@ describe("llm provider", () => {
 
   it("honors ASSINI_LLM_MAX_TOKENS and sends json mode only on the extraction path", async () => {
     const { calls, fetchFn } = captureFetch('{"ok":true}');
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_MAX_TOKENS: "256",
-      ASSINI_LLM_JSON_MODE: "1",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ASSINI_LLM_MAX_TOKENS: "256",
+        ASSINI_LLM_JSON_MODE: "1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
     await provider.completeChat?.([{ role: "user", content: "mira = river" }]);
 
@@ -436,21 +474,26 @@ describe("llm provider", () => {
 
   it("ignores invalid ASSINI_LLM_MAX_TOKENS and falls back to the default", async () => {
     const { calls, fetchFn } = captureFetch("Chat response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_MAX_TOKENS: "not-a-number",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ASSINI_LLM_MAX_TOKENS: "not-a-number",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     const body = JSON.parse(calls[0].init?.body as string);
     expect(body.max_tokens).toBe(4096);
@@ -458,12 +501,15 @@ describe("llm provider", () => {
 
   it("does NOT send json mode on completeChat unless ASSINI_LLM_JSON_MODE is enabled", async () => {
     const { calls, fetchFn } = captureFetch('{"ok":true}');
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
     await provider.completeChat?.([{ role: "user", content: "extract" }]);
 
@@ -473,101 +519,126 @@ describe("llm provider", () => {
 
   it("normalizes a bare ollama base URL to include /v1 before posting", async () => {
     const { calls, fetchFn } = captureFetch("Ollama response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "ollama",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "ollama",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
   });
 
   it("does not double-append /v1 when an ollama base URL already includes it", async () => {
     const { calls, fetchFn } = captureFetch("Ollama response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "ollama",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "ollama",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect(calls[0].url).toBe("http://127.0.0.1:11434/v1/chat/completions");
   });
 
   it("does not forward the OPENAI_API_KEY fallback to a local endpoint", async () => {
     const { calls, fetchFn } = captureFetch("Local response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "ollama",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      OPENAI_API_KEY: "sk-remote-secret",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "ollama",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        OPENAI_API_KEY: "sk-remote-secret",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBeUndefined();
   });
 
   it("forwards an explicit ASSINI_LLM_API_KEY to a local endpoint", async () => {
     const { calls, fetchFn } = captureFetch("Local response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai-compatible",
-      ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
-      ASSINI_LLM_MODEL: "llama3.1",
-      ASSINI_LLM_API_KEY: "explicit-local-key",
-      ...allowPrivateEnv
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai-compatible",
+        ASSINI_LLM_BASE_URL: "http://127.0.0.1:11434/v1",
+        ASSINI_LLM_MODEL: "llama3.1",
+        ASSINI_LLM_API_KEY: "explicit-local-key",
+        ...allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer explicit-local-key");
   });
 
   it("still forwards the OPENAI_API_KEY fallback to a remote endpoint", async () => {
     const { calls, fetchFn } = captureFetch("Remote response");
-    const provider = createLlmProviderFromEnv({
-      ASSINI_LLM_PROVIDER: "openai",
-      ASSINI_LLM_MODEL: "gpt-test",
-      OPENAI_API_KEY: "sk-remote-secret"
-    }, fetchFn);
+    const provider = createLlmProviderFromEnv(
+      {
+        ASSINI_LLM_PROVIDER: "openai",
+        ASSINI_LLM_MODEL: "gpt-test",
+        OPENAI_API_KEY: "sk-remote-secret"
+      },
+      fetchFn
+    );
 
-    await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect((calls[0].init?.headers as Record<string, string>).Authorization).toBe("Bearer sk-remote-secret");
   });
@@ -594,7 +665,7 @@ describe("llm provider", () => {
     const calls: Array<{ url: string; method?: string; body?: Record<string, unknown> }> = [];
     const fetchFn: typeof fetch = async (input, init) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : undefined;
+      const body = typeof init?.body === "string" ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
       calls.push({ url, method: init?.method, body });
       return new Response(JSON.stringify({ choices: [{ message: { content: "ok" } }] }), {
         status: 200,
@@ -650,9 +721,7 @@ describe("llm provider", () => {
       fetchFn
     });
 
-    expect(calls).toEqual([
-      { url: "http://127.0.0.1:1234/v1/chat/completions", method: "POST" }
-    ]);
+    expect(calls).toEqual([{ url: "http://127.0.0.1:1234/v1/chat/completions", method: "POST" }]);
     expect(result).toMatchObject({
       checked: true,
       reachable: false,
@@ -669,11 +738,12 @@ describe("llm provider", () => {
       return originalSetTimeout(handler, timeout, ...args);
     });
 
-    const fetchFn: typeof fetch = (_input, init) => new Promise((_resolve, reject) => {
-      init?.signal?.addEventListener("abort", () => {
-        reject(new DOMException("Aborted", "AbortError"));
+    const fetchFn: typeof fetch = (_input, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Aborted", "AbortError"));
+        });
       });
-    });
 
     await probeLlmProviderReachability({
       env: {
@@ -716,12 +786,15 @@ describe("llm provider", () => {
 
   it("reports reasoning-only local model responses without exposing reasoning content", async () => {
     const fetchFn: typeof fetch = async () =>
-      new Response(JSON.stringify({
-        choices: [{ message: { content: "", reasoning_content: "private internal reasoning" } }]
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: "", reasoning_content: "private internal reasoning" } }]
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
 
     const result = await probeLlmProviderReachability({
       env: {
@@ -737,7 +810,8 @@ describe("llm provider", () => {
       checked: true,
       reachable: false,
       status: 200,
-      detail: "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content."
+      detail:
+        "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content."
     });
     expect(JSON.stringify(result)).not.toContain("private internal reasoning");
   });
@@ -769,12 +843,15 @@ describe("llm provider", () => {
 
   it("accepts array-shaped assistant content from OpenAI-compatible providers", async () => {
     const fetchFn: typeof fetch = async () =>
-      new Response(JSON.stringify({
-        choices: [{ message: { content: [{ type: "text", text: "ok from parts" }] } }]
-      }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" }
-      });
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: [{ type: "text", text: "ok from parts" }] } }]
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        }
+      );
 
     const result = await probeLlmProviderReachability({
       env: {
@@ -829,37 +906,49 @@ describe("llm provider", () => {
 
   it("blocks private LLM base URLs before chat completions when ASSINI_ALLOW_PRIVATE_URLS is off", async () => {
     const fetchStub = vi.fn() as unknown as typeof fetch;
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "http://127.0.0.1:11434/v1",
-      model: "llama3.1",
-      env: {}
-    }, fetchStub);
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        model: "llama3.1",
+        env: {}
+      },
+      fetchStub
+    );
 
-    await expect(provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }))).rejects.toThrow(/private or local network/);
+    await expect(
+      provider.generateAssistantMessage(
+        buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+          languageId: TEST_LANGUAGE_ID,
+          mode: "learner_practice",
+          prompt: "Practice safely.",
+          contextNoteIds: [],
+          contextPassageIds: []
+        })
+      )
+    ).rejects.toThrow(/private or local network/);
     expect(fetchStub).not.toHaveBeenCalled();
   });
 
   it("allows private LLM base URLs when ASSINI_ALLOW_PRIVATE_URLS=1", async () => {
     const { calls, fetchFn } = captureFetch("Allowed local response");
-    const provider = createOpenAiCompatibleLlmProvider({
-      baseUrl: "http://127.0.0.1:11434/v1",
-      model: "llama3.1",
-      env: allowPrivateEnv
-    }, fetchFn);
+    const provider = createOpenAiCompatibleLlmProvider(
+      {
+        baseUrl: "http://127.0.0.1:11434/v1",
+        model: "llama3.1",
+        env: allowPrivateEnv
+      },
+      fetchFn
+    );
 
-    const result = await provider.generateAssistantMessage(buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
-      languageId: TEST_LANGUAGE_ID,
-      mode: "learner_practice",
-      prompt: "Practice safely.",
-      contextNoteIds: [],
-      contextPassageIds: []
-    }));
+    const result = await provider.generateAssistantMessage(
+      buildLlmGenerationInputFromState(buildTestWorkspaceState(), {
+        languageId: TEST_LANGUAGE_ID,
+        mode: "learner_practice",
+        prompt: "Practice safely.",
+        contextNoteIds: [],
+        contextPassageIds: []
+      })
+    );
 
     expect(result.content).toBe("Allowed local response");
     expect(calls).toHaveLength(1);

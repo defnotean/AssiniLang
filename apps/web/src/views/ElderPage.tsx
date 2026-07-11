@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { ElderCorrection } from "@assini/db";
+import type { ElderCorrection } from "@assini/api-contract";
 import type { DashboardData } from "../api";
 import type { ElderWorkspaceState } from "../hooks/useElderWorkspace";
 import { useI18n, type MessageKey } from "../i18n";
@@ -105,14 +105,14 @@ export function ElderPage({
       <section className="elder-card elder-suggest" aria-label={t("elderPage.suggestHeading")}>
         <div className="elder-card-head">
           <h2>{t("elderPage.suggestHeading")}</h2>
-          {!sent && (
-            <span className="elder-step-count">{t("elderPage.step", { current: step, total: 3 })}</span>
-          )}
+          {!sent && <span className="elder-step-count">{t("elderPage.step", { current: step, total: 3 })}</span>}
         </div>
 
         {sent ? (
           <div className="elder-thanks" role="status" aria-live="polite">
-            <span className="elder-thanks-mark" aria-hidden="true">✓</span>
+            <span className="elder-thanks-mark" aria-hidden="true">
+              ✓
+            </span>
             <h3>{t("elderPage.thanksTitle")}</h3>
             <p>{t("elderPage.thanksBody")}</p>
             <button type="button" className="elder-primary" onClick={suggestAnother}>
@@ -282,20 +282,18 @@ export function ElderPage({
           <ul className="elder-suggestions">
             {corrections.map((correction) => {
               const aboutText = correction.noteId
-                ? data.notes.find((note) => note.id === correction.noteId)?.topic ?? correction.noteId
+                ? (data.notes.find((note) => note.id === correction.noteId)?.topic ?? correction.noteId)
                 : correction.passageId
-                  ? data.corpus.find((passage) => passage.id === correction.passageId)?.textTarget ?? correction.passageId
-                  : correction.contextText ?? t("elderPage.aboutContext");
+                  ? (data.corpus.find((passage) => passage.id === correction.passageId)?.textTarget ??
+                    correction.passageId)
+                  : (correction.contextText ?? t("elderPage.aboutContext"));
               const linkedNote = correction.noteId
                 ? elder.elderContext?.notes.find((note) => note.id === correction.noteId)
                 : undefined;
               // Prefer an in-progress draft, then the elder's suggested fix, then the
               // existing lesson wording so reviewers can edit before apply.
               const applyDraft =
-                elder.correctionApplyDrafts[correction.id] ??
-                correction.correction ??
-                linkedNote?.explanation ??
-                "";
+                elder.correctionApplyDrafts[correction.id] ?? correction.correction ?? linkedNote?.explanation ?? "";
               const isReviewing = elder.reviewingCorrectionId === correction.id;
               const isApplying = elder.applyingCorrectionId === correction.id;
 

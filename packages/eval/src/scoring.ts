@@ -31,9 +31,7 @@ function recordEmptyCategoryFailure(
 
 function answerKeyTopicMap(languageId: string, state: AppState): Map<string, Note> {
   return new Map(
-    state.noteAnswerKeys
-      .filter((note) => note.languageId === languageId)
-      .map((note) => [note.topic, note])
+    state.noteAnswerKeys.filter((note) => note.languageId === languageId).map((note) => [note.topic, note])
   );
 }
 
@@ -77,9 +75,14 @@ function sameMorphemeSequence(left: Morpheme[], right: Morpheme[]): boolean {
   });
 }
 
-function translationMatchesAnswerKey(actual: { textTarget: string; textTranslation: string }, expected: CorpusAnswerKey): boolean {
-  return normalize(actual.textTarget) === normalize(expected.textTarget)
-    && normalize(actual.textTranslation) === normalize(expected.textTranslation);
+function translationMatchesAnswerKey(
+  actual: { textTarget: string; textTranslation: string },
+  expected: CorpusAnswerKey
+): boolean {
+  return (
+    normalize(actual.textTarget) === normalize(expected.textTarget) &&
+    normalize(actual.textTranslation) === normalize(expected.textTranslation)
+  );
 }
 
 function scoreCorpusAnswerKeys(
@@ -247,7 +250,12 @@ function targetAnswerExistsInCorpus(languageId: string, state: AppState, answer:
   );
 }
 
-function answerPassesGenerationPolicy(languageId: string, state: AppState, exercise: Exercise, answer: string): boolean {
+function answerPassesGenerationPolicy(
+  languageId: string,
+  state: AppState,
+  exercise: Exercise,
+  answer: string
+): boolean {
   if (!answerUsesAllowedVocabulary(answer, exercise.allowedVocabulary)) {
     return false;
   }
@@ -288,8 +296,9 @@ function deterministicNegativeProbeAnswers(exercise: Exercise): string[] {
 export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accepted: boolean; explanation: string } {
   const normalizedAnswer = normalize(answer);
   // Blank answers (and blank expected entries after normalize) must not auto-pass.
-  const accepted = Boolean(normalizedAnswer)
-    && exercise.expectedAnswers.some((expected) => {
+  const accepted =
+    Boolean(normalizedAnswer) &&
+    exercise.expectedAnswers.some((expected) => {
       const normalizedExpected = normalize(expected);
       return Boolean(normalizedExpected) && normalizedExpected === normalizedAnswer;
     });
@@ -317,7 +326,11 @@ export function exerciseGradingFailureMessage(
   return "Curated adversarial answer was accepted by the grader.";
 }
 
-export function scoreLanguageEvaluation(languageId: string, state: AppState, draftedNotes: Note[]): LanguageScoreResult {
+export function scoreLanguageEvaluation(
+  languageId: string,
+  state: AppState,
+  draftedNotes: Note[]
+): LanguageScoreResult {
   const failures: EvaluationFailure[] = [];
   const expectedByTopic = answerKeyTopicMap(languageId, state);
   const draftedByTopic = new Map(draftedNotes.map((note) => [note.topic, note]));
@@ -329,9 +342,24 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   for (const [topic, expected] of expectedByTopic) {
     const drafted = draftedByTopic.get(topic);
     if (!drafted) {
-      failures.push({ category: "noteCoverage", languageId, itemId: expected.id, message: `Missing note topic ${topic}` });
-      failures.push({ category: "noteAccuracy", languageId, itemId: expected.id, message: `Missing note content for ${topic}` });
-      failures.push({ category: "evidenceAccuracy", languageId, itemId: expected.id, message: `Missing note evidence for ${topic}` });
+      failures.push({
+        category: "noteCoverage",
+        languageId,
+        itemId: expected.id,
+        message: `Missing note topic ${topic}`
+      });
+      failures.push({
+        category: "noteAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Missing note content for ${topic}`
+      });
+      failures.push({
+        category: "evidenceAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Missing note evidence for ${topic}`
+      });
       continue;
     }
 
@@ -367,8 +395,9 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
   let exercisePass = 0;
   for (const exercise of languageExercises) {
-    const acceptsExpectedAnswers = exercise.expectedAnswers.length > 0
-      && exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted);
+    const acceptsExpectedAnswers =
+      exercise.expectedAnswers.length > 0 &&
+      exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted);
     const rejectsNegativeProbes = deterministicNegativeProbeAnswers(exercise).every(
       (answer) => !gradeExerciseAnswer(exercise, answer).accepted
     );
@@ -393,16 +422,16 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     }
   }
 
-  const generationCheckedExercises = languageExercises.filter((exercise) =>
-    exercise.type === "translate_to_target" || exercise.type === "segment" || exercise.type === "choose_particle"
+  const generationCheckedExercises = languageExercises.filter(
+    (exercise) =>
+      exercise.type === "translate_to_target" || exercise.type === "segment" || exercise.type === "choose_particle"
   );
   let generationPolicyPass = 0;
   for (const exercise of generationCheckedExercises) {
     // Empty expectedAnswers must not vacuous-pass generation policy.
-    const passesPolicy = exercise.expectedAnswers.length > 0
-      && exercise.expectedAnswers.every((answer) =>
-        answerPassesGenerationPolicy(languageId, state, exercise, answer)
-      );
+    const passesPolicy =
+      exercise.expectedAnswers.length > 0 &&
+      exercise.expectedAnswers.every((answer) => answerPassesGenerationPolicy(languageId, state, exercise, answer));
     if (passesPolicy) {
       generationPolicyPass += 1;
     } else {
@@ -410,9 +439,10 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
         category: "generationPolicy",
         languageId,
         itemId: exercise.id,
-        message: exercise.expectedAnswers.length === 0
-          ? "Generation-policy exercise has no expected answers to validate."
-          : "Expected answer uses forms outside the exercise allowed vocabulary."
+        message:
+          exercise.expectedAnswers.length === 0
+            ? "Generation-policy exercise has no expected answers to validate."
+            : "Expected answer uses forms outside the exercise allowed vocabulary."
       });
     }
   }

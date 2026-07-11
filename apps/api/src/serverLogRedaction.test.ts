@@ -3,14 +3,18 @@ import { FASTIFY_LOGGER_REDACT_PATHS } from "./serverLogRedaction.js";
 
 describe("Fastify logger redaction", () => {
   it("redacts LLM, transcription, and OCR API keys from request bodies", () => {
-    expect(FASTIFY_LOGGER_REDACT_PATHS).toEqual(expect.arrayContaining([
-      "body.apiKey",
-      "body.transcriptionApiKey",
-      "body.ocrApiKey",
-      "req.body.apiKey",
-      "req.body.transcriptionApiKey",
-      "req.body.ocrApiKey",
-      "err.message"
-    ]));
+    expect(FASTIFY_LOGGER_REDACT_PATHS).toEqual(
+      expect.arrayContaining([
+        "body.apiKey",
+        "body.transcriptionApiKey",
+        "body.ocrApiKey",
+        "req.body.apiKey",
+        "req.body.transcriptionApiKey",
+        "req.body.ocrApiKey",
+        "err.message",
+        "err.stack",
+        "err.cause"
+      ])
+    );
   });
 });

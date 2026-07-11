@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   acceptExtractionDraft,
   bulkReviewExtractionDrafts,
@@ -31,11 +31,7 @@ import type { Translate } from "../i18n";
 export const INGEST_POLL_INTERVAL_MS = 2500;
 export const INGEST_POLL_MAX_DURATION_MS = 10 * 60 * 1000;
 
-export function useIngestExtraction(
-  languageId: string,
-  t: Translate,
-  onIntakeCommitted?: () => Promise<void> | void
-) {
+export function useIngestExtraction(languageId: string, t: Translate, onIntakeCommitted?: () => Promise<void> | void) {
   const [sources, setSources] = useState<SourceAssetView[]>([]);
   const [drafts, setDrafts] = useState<ExtractionDraftView[]>([]);
   const [isLoadingIntake, setIsLoadingIntake] = useState(true);
@@ -65,6 +61,7 @@ export function useIngestExtraction(
   const [processNotice, setProcessNotice] = useState<string | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
   const [processWarnings, setProcessWarnings] = useState<string[]>([]);
+  const pollGenerationRef = useRef(0);
 
   const [reviewingDraftId, setReviewingDraftId] = useState<string | null>(null);
   const [draftNotice, setDraftNotice] = useState<string | null>(null);
@@ -147,9 +144,8 @@ export function useIngestExtraction(
       return;
     }
 
-    const payload: SourceRegistrationPayload = registerKind === "url"
-      ? { kind: registerKind, title, url }
-      : { kind: registerKind, title, rawText };
+    const payload: SourceRegistrationPayload =
+      registerKind === "url" ? { kind: registerKind, title, url } : { kind: registerKind, title, rawText };
 
     setIsRegisteringSource(true);
     setRegisterNotice(null);
@@ -225,9 +221,7 @@ export function useIngestExtraction(
       const skipDetails = result.skipped
         .map((item) => localizeVaultImportSkipReason(item.reason, t))
         .filter((reason, index, all) => all.indexOf(reason) === index);
-      const warningDetails = result.warnings.map((warning) =>
-        localizeSourceProcessingWarning(warning, t)
-      );
+      const warningDetails = result.warnings.map((warning) => localizeSourceProcessingWarning(warning, t));
       const details = [...skipDetails, ...warningDetails];
       setVaultNotice(details.length > 0 ? `${summary} ${details.join(" ")}` : summary);
       await refreshIntake();
@@ -251,6 +245,8 @@ export function useIngestExtraction(
     const startedAt = Date.now();
     const sourceTitle = pollingSource.title;
     const sourceId = pollingSource.id;
+    const pollGeneration = ++pollGenerationRef.current;
+    const isStale = () => cancelled || pollGenerationRef.current !== pollGeneration;
 
     const isTimedOut = () => Date.now() - startedAt >= INGEST_POLL_MAX_DURATION_MS;
 
@@ -262,15 +258,17 @@ export function useIngestExtraction(
     };
 
     const scheduleNextPoll = () => {
-      if (cancelled || isTimedOut()) {
-        if (!cancelled && isTimedOut()) stopDueToTimeout();
+      if (isStale() || isTimedOut()) {
+        if (!isStale() && isTimedOut()) stopDueToTimeout();
         return;
       }
-      timer = setTimeout(() => { void poll(); }, INGEST_POLL_INTERVAL_MS);
+      timer = setTimeout(() => {
+        void poll();
+      }, INGEST_POLL_INTERVAL_MS);
     };
 
     const poll = async () => {
-      if (cancelled) return;
+      if (isStale()) return;
       if (isTimedOut()) {
         stopDueToTimeout();
         return;
@@ -278,7 +276,7 @@ export function useIngestExtraction(
 
       try {
         const loadedSources = await fetchSources(languageId);
-        if (cancelled) return;
+        if (isStale()) return;
         setSources(loadedSources);
 
         const asset = loadedSources.find((item) => item.id === sourceId);
@@ -305,7 +303,7 @@ export function useIngestExtraction(
         }
 
         const loadedDrafts = await fetchExtractionDrafts(languageId, "proposed");
-        if (!cancelled) setDrafts(loadedDrafts);
+        if (!isStale()) setDrafts(loadedDrafts);
       } catch {
         // Transient fetch failure: keep polling until timeout.
         scheduleNextPoll();
@@ -345,6 +343,10 @@ export function useIngestExtraction(
       const result = await cancelSourceProcessing(sourceId);
       setSources((previous) => previous.map((item) => (item.id === result.asset.id ? result.asset : item)));
       if (pollingSource?.id === sourceId) {
+        // Invalidate the active poll synchronously. React runs the effect cleanup
+        // after this async handler yields, so cleanup alone cannot prevent a poll
+        // that resolves in the same microtask window from restoring stale state.
+        pollGenerationRef.current += 1;
         setPollingSource(null);
       }
       if (processingSourceId === sourceId) {
@@ -396,8 +398,7 @@ export function useIngestExtraction(
     setPendingBulkAction(null);
     const targetIds = visibleDraftIds ?? drafts.map((draft) => draft.id);
     setSelectedDraftIds((previous) => {
-      const allVisibleSelected =
-        targetIds.length > 0 && targetIds.every((id) => previous.includes(id));
+      const allVisibleSelected = targetIds.length > 0 && targetIds.every((id) => previous.includes(id));
       if (allVisibleSelected) {
         const hide = new Set(targetIds);
         return previous.filter((id) => !hide.has(id));

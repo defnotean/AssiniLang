@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
-import type { ElderCorrection } from "@assini/db";
+import type { ElderCorrection } from "@assini/api-contract";
 import type { ElderContext, ElderCorrectionPayload, ElderCorrectionReviewStatus } from "../api";
 import { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "../api";
 import { useI18n } from "../i18n";
@@ -65,10 +65,7 @@ export function useElderWorkspace(
   const reviewRequestRef = useRef(0);
   const applyRequestRef = useRef(0);
 
-  if (
-    scopeRef.current.selectedLanguageId !== selectedLanguageId ||
-    scopeRef.current.isElderMode !== isElderMode
-  ) {
+  if (scopeRef.current.selectedLanguageId !== selectedLanguageId || scopeRef.current.isElderMode !== isElderMode) {
     scopeRef.current = { selectedLanguageId, isElderMode };
   }
 

@@ -36,14 +36,20 @@ function expectReady(label, response) {
     console.error(`${label}: expected checks.jobQueue.ok, got: ${response.body}`);
     process.exit(1);
   }
+  if (!body.checks?.recovery?.ok) {
+    console.error(`${label}: expected checks.recovery.ok, got: ${response.body}`);
+    process.exit(1);
+  }
   if (typeof body.checks.jobQueue.pending !== "number" || typeof body.checks.jobQueue.active !== "number") {
     console.error(`${label}: expected numeric jobQueue pending/active, got: ${response.body}`);
     process.exit(1);
   }
-  console.log(`  ready checks: storage ok, jobQueue pending=${body.checks.jobQueue.pending} active=${body.checks.jobQueue.active}`);
+  console.log(
+    `  ready checks: storage ok, jobQueue pending=${body.checks.jobQueue.pending} active=${body.checks.jobQueue.active}, recovery ${body.checks.recovery.status}`
+  );
 }
 
-// 0. Readiness probe (same storage + jobQueue shape CI asserts on built-dist /ready)
+// 0. Readiness probe (same storage + jobQueue + recovery shape CI asserts on built-dist /ready)
 const ready = await app.inject({ method: "GET", url: "/ready" });
 expectReady("ready", ready);
 

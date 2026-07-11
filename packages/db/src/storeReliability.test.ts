@@ -4,12 +4,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildTestWorkspaceState } from "./testing.js";
-import {
-  JsonStore,
-  SQLITE_BUSY_TIMEOUT_MS,
-  createEmptyState,
-  replaceFileAtomically
-} from "./store.js";
+import { JsonStore, SQLITE_BUSY_TIMEOUT_MS, createEmptyState, replaceFileAtomically } from "./store.js";
 
 let dir: string;
 

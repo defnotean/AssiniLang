@@ -1,10 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type {
-  DashboardData,
-  ExerciseAuthoringPayload,
-  GeneratedExerciseDraft,
-  PublicExerciseSubmission
-} from "../api";
+import type { DashboardData, ExerciseAuthoringPayload, GeneratedExerciseDraft, PublicExerciseSubmission } from "../api";
 import { createExercise, fetchExerciseSubmissions, generateModelExercise, submitExerciseAnswer } from "../api";
 import { formatSubmissionExplanation, localizeApiError } from "../lib/format";
 import type { PublicExercise, ViewMode } from "../lib/types";
@@ -24,9 +19,9 @@ export interface LearnerWorkspace {
   setSubmissionHistory: Dispatch<SetStateAction<PublicExerciseSubmission[]>>;
   handleGrade: () => Promise<void>;
   handleCreateExercise: (payload: ExerciseAuthoringPayload) => Promise<void>;
-  handleGenerateExercise: (
-    options?: { type?: string }
-  ) => Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
+  handleGenerateExercise: (options?: {
+    type?: string;
+  }) => Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }>;
 }
 
 /**
@@ -48,14 +43,16 @@ export function useLearnerWorkspace(
   const [exerciseResult, setExerciseResult] = useState<string | null>(null);
   const [submissionHistory, setSubmissionHistory] = useState<PublicExerciseSubmission[]>([]);
 
-  const selectedExercise = data?.exercises.find((exercise) => exercise.id === selectedExerciseId) ?? data?.exercises[0] ?? null;
+  const selectedExercise =
+    data?.exercises.find((exercise) => exercise.id === selectedExerciseId) ?? data?.exercises[0] ?? null;
+  const historyExerciseId = selectedExercise?.id;
 
   useEffect(() => {
     let isCurrent = true;
     setExerciseAnswer("");
     setExerciseResult(null);
 
-    if (view !== "learner" || !selectedExercise) {
+    if (view !== "learner" || !historyExerciseId) {
       setSubmissionHistory([]);
       setIsLoadingSubmissions(false);
       return () => {
@@ -64,7 +61,7 @@ export function useLearnerWorkspace(
     }
 
     setIsLoadingSubmissions(true);
-    fetchExerciseSubmissions(selectedExercise.id)
+    fetchExerciseSubmissions(historyExerciseId)
       .then((history) => {
         if (isCurrent) setSubmissionHistory(history);
       })
@@ -78,7 +75,7 @@ export function useLearnerWorkspace(
     return () => {
       isCurrent = false;
     };
-  }, [selectedExercise?.id, view]);
+  }, [historyExerciseId, view]);
 
   async function handleGrade() {
     const submittedAnswer = exerciseAnswer.trim();
@@ -109,9 +106,9 @@ export function useLearnerWorkspace(
     setSubmissionHistory([]);
   }
 
-  async function handleGenerateExercise(
-    options?: { type?: string }
-  ): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
+  async function handleGenerateExercise(options?: {
+    type?: string;
+  }): Promise<{ exercise: GeneratedExerciseDraft; warnings: string[] }> {
     if (!selectedLanguageId) {
       throw new Error(t("errors.selectOrCreateLanguage"));
     }

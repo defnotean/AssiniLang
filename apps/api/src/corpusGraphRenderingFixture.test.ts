@@ -97,7 +97,10 @@ describe("corpus graph-rendering fixture pack", () => {
     expect(nodeTypeCounts).toEqual(manifest.expected.nodeTypes);
 
     for (const nodeId of manifest.expected.requiredNodeIds) {
-      expect(neuralMap.nodes.some((node) => node.id === nodeId), nodeId).toBe(true);
+      expect(
+        neuralMap.nodes.some((node) => node.id === nodeId),
+        nodeId
+      ).toBe(true);
     }
 
     const relations = new Set(neuralMap.edges.map((edge) => edge.relation));

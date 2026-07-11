@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceRecord } from "@assini/db";
+import type { GovernanceRecord } from "@assini/api-contract";
 import type { GovernanceWorkspace } from "../hooks/useGovernanceWorkspace";
 import { GovernanceView } from "./GovernanceView";
 
@@ -18,7 +18,18 @@ function createGovernanceWorkspace(records: GovernanceRecord[] = []): Governance
     governanceError: null,
     isSubmittingGovernance: false,
     auditEventState: { status: "ready", data: [] },
-    reviewPolicyState: { status: "ready", data: { id: "policy-avenik", languageId: "avenik", assignedReviewerIds: [], approvalThreshold: 1, requiresAssignedReviewer: false, updatedAt: "2026-01-01T00:00:00.000Z", updatedBy: "system" } },
+    reviewPolicyState: {
+      status: "ready",
+      data: {
+        id: "policy-avenik",
+        languageId: "avenik",
+        assignedReviewerIds: [],
+        approvalThreshold: 1,
+        requiresAssignedReviewer: false,
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        updatedBy: "system"
+      }
+    },
     reviewPolicyReviewerIds: "",
     setReviewPolicyReviewerIds: vi.fn(),
     reviewPolicyApprovalThreshold: "1",
@@ -51,12 +62,7 @@ function createGovernanceWorkspace(records: GovernanceRecord[] = []): Governance
 
 describe("GovernanceView consent empty states", () => {
   it("guides operators to record a consent policy when no governance records exist", () => {
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={createGovernanceWorkspace()}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={createGovernanceWorkspace()} />);
 
     expect(screen.getByText("No governance policy records for this language yet.")).toBeInTheDocument();
     expect(
@@ -84,17 +90,14 @@ describe("GovernanceView consent empty states", () => {
     );
 
     expect(screen.getByText("Only reviewers may approve community notes.")).toBeInTheDocument();
-    expect(screen.getByText("No consent policy recorded yet. Add one above to document how corpus material may be used.")).toBeInTheDocument();
+    expect(
+      screen.getByText("No consent policy recorded yet. Add one above to document how corpus material may be used.")
+    ).toBeInTheDocument();
     expect(screen.queryByText("No governance policy records for this language yet.")).not.toBeInTheDocument();
   });
 
   it("shows next-step hints for empty disposition and audit ledgers", () => {
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={createGovernanceWorkspace()}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={createGovernanceWorkspace()} />);
 
     expect(screen.getByText("No review disposition work for this language.")).toBeInTheDocument();
     expect(screen.getByText(/Disposition work appears when reviewers contest/i)).toBeInTheDocument();
@@ -122,12 +125,7 @@ describe("GovernanceView consent empty states", () => {
       ]
     };
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     expect(screen.getByRole("heading", { name: "Language created" })).toBeInTheDocument();
     expect(screen.getByText("Created language Avenik.")).toBeInTheDocument();
@@ -143,12 +141,7 @@ describe("GovernanceView form notices", () => {
     workspace.reviewPolicyError = "Approval threshold must be at least 1.";
     workspace.reviewDispositionError = "Resolution summary is required.";
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     for (const message of [
       "Policy content is required.",
@@ -164,12 +157,7 @@ describe("GovernanceView form notices", () => {
     workspace.governanceSuccess = "Governance policy recorded.";
     workspace.reviewPolicySuccess = "Review policy updated.";
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     const policySuccess = screen.getByText("Governance policy recorded.");
     expect(policySuccess).toHaveAttribute("role", "status");
@@ -191,12 +179,7 @@ describe("GovernanceView export and disposition guards", () => {
       exportedAt: "2026-07-01T00:00:00.000Z"
     };
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     const exportStatus = screen.getByText("Language snapshot exported.").closest("[aria-live]");
     expect(exportStatus).toHaveAttribute("role", "status");
@@ -208,12 +191,7 @@ describe("GovernanceView export and disposition guards", () => {
     const workspace = createGovernanceWorkspace();
     workspace.isSubmittingReviewPolicy = true;
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     expect(screen.getByRole("button", { name: "Export review snapshot" })).toBeDisabled();
   });
@@ -222,12 +200,7 @@ describe("GovernanceView export and disposition guards", () => {
     const workspace = createGovernanceWorkspace();
     workspace.isExportingSnapshot = true;
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     const exportButton = screen.getByRole("button", { name: "Exporting..." });
     expect(exportButton).toBeDisabled();
@@ -238,12 +211,7 @@ describe("GovernanceView export and disposition guards", () => {
     const recording = createGovernanceWorkspace();
     recording.isSubmittingGovernance = true;
 
-    const { unmount } = render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={recording}
-      />
-    );
+    const { unmount } = render(<GovernanceView selectedLanguageId="avenik" governance={recording} />);
 
     const recordButton = screen.getByRole("button", { name: "Recording..." });
     expect(recordButton).toBeDisabled();
@@ -253,12 +221,7 @@ describe("GovernanceView export and disposition guards", () => {
     const updating = createGovernanceWorkspace();
     updating.isSubmittingReviewPolicy = true;
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={updating}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={updating} />);
 
     const updateButton = screen.getByRole("button", { name: "Updating..." });
     expect(updateButton).toBeDisabled();
@@ -308,12 +271,7 @@ describe("GovernanceView export and disposition guards", () => {
     };
     workspace.resolvingReviewDispositionId = "disposition-1";
 
-    render(
-      <GovernanceView
-        selectedLanguageId="avenik"
-        governance={workspace}
-      />
-    );
+    render(<GovernanceView selectedLanguageId="avenik" governance={workspace} />);
 
     const resolvingButton = screen.getByRole("button", { name: "Resolving disposition-1..." });
     expect(resolvingButton).toBeDisabled();

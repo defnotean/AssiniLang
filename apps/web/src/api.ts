@@ -8,23 +8,10 @@ export {
   fetchNeuralMap,
   fetchObservability
 } from "./api/aiSessionApi";
-export type {
-  CreateAiSessionPayload,
-  NeuralMapResponse,
-  ObservabilityData
-} from "./api/aiSessionApi";
+export type { CreateAiSessionPayload, NeuralMapResponse, ObservabilityData } from "./api/aiSessionApi";
 
-export {
-  applyElderCorrection,
-  fetchElderContext,
-  reviewElderCorrection,
-  submitElderCorrection
-} from "./api/elderApi";
-export type {
-  ElderContext,
-  ElderCorrectionApplyResult,
-  ElderCorrectionReviewStatus
-} from "./api/elderApi";
+export { applyElderCorrection, fetchElderContext, reviewElderCorrection, submitElderCorrection } from "./api/elderApi";
+export type { ElderContext, ElderCorrectionApplyResult, ElderCorrectionReviewStatus } from "./api/elderApi";
 
 export {
   createExercise,
@@ -174,4 +161,4 @@ export type {
   SourceRegistrationPayload
 } from "@assini/api-contract";
 
-export type { ExtractionDraft, Language, LanguagePhonology, Lexeme, SourceAsset } from "@assini/db";
+export type { ExtractionDraft, Language, LanguagePhonology, Lexeme, SourceAsset } from "@assini/api-contract";

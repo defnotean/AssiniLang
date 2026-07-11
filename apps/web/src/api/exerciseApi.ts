@@ -1,13 +1,7 @@
-import type { Exercise, ExerciseSubmission } from "@assini/db";
+import type { ExerciseAuthoringPayload, PublicExercise, PublicExerciseSubmission } from "@assini/api-contract";
 import { actorRequest, assertOk, getJson } from "../lib/apiClient";
 
-export type PublicExercise = Omit<Exercise, "expectedAnswers" | "adversarialAnswers" | "gradingExplanation">;
-export type PublicExerciseSubmission = Omit<ExerciseSubmission, "answer" | "learnerId">;
-
-export type ExerciseAuthoringPayload = Pick<
-  Exercise,
-  "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
->;
+export type { ExerciseAuthoringPayload, PublicExercise, PublicExerciseSubmission } from "@assini/api-contract";
 
 export type ExerciseAuthoringDryRunResult = {
   ok: boolean;
@@ -53,10 +47,7 @@ export async function submitExerciseAnswer(exerciseId: string, answer: string): 
 }
 
 export async function fetchRecommendedExercises(languageId: string): Promise<RecommendedExercises> {
-  return getJson<RecommendedExercises>(
-    `/languages/${encodeURIComponent(languageId)}/exercises/recommended`,
-    "learner"
-  );
+  return getJson<RecommendedExercises>(`/languages/${encodeURIComponent(languageId)}/exercises/recommended`, "learner");
 }
 
 export async function fetchExerciseSubmissions(exerciseId: string): Promise<PublicExerciseSubmission[]> {
@@ -78,10 +69,7 @@ export async function validateExerciseAuthoring(
   return response.json() as Promise<ExerciseAuthoringDryRunResult>;
 }
 
-export async function createExercise(
-  languageId: string,
-  payload: ExerciseAuthoringPayload
-): Promise<PublicExercise> {
+export async function createExercise(languageId: string, payload: ExerciseAuthoringPayload): Promise<PublicExercise> {
   const response = await fetch(`/api/languages/${encodeURIComponent(languageId)}/exercises`, {
     method: "POST",
     ...(await actorRequest("reviewer", true)),

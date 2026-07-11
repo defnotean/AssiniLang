@@ -1,15 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTranslator } from "../i18n";
-import {
-  INGEST_POLL_INTERVAL_MS,
-  INGEST_POLL_MAX_DURATION_MS,
-  useIngestExtraction
-} from "./useIngestExtraction";
+import { INGEST_POLL_INTERVAL_MS, INGEST_POLL_MAX_DURATION_MS, useIngestExtraction } from "./useIngestExtraction";
 
 const apiMock = vi.hoisted(() => ({
   acceptExtractionDraft: vi.fn(),
   bulkReviewExtractionDrafts: vi.fn(),
+  cancelSourceProcessing: vi.fn(),
   fetchExtractionDrafts: vi.fn(),
   fetchSources: vi.fn(),
   importObsidianVault: vi.fn(),
@@ -39,7 +36,15 @@ async function flushHook() {
   });
 }
 
-describe("useIngestExtraction polling timeout", () => {
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+describe("useIngestExtraction polling", () => {
   const t = createTranslator("en");
 
   beforeEach(() => {
@@ -114,5 +119,33 @@ describe("useIngestExtraction polling timeout", () => {
     expect(result.current.processError).toContain("Field notebook page");
     expect(apiMock.fetchSources.mock.calls.length).toBeGreaterThan(callsBeforeTimeout);
     expect(apiMock.fetchSources.mock.calls.length).toBeLessThan(300);
+  });
+
+  it("does not let an older poll overwrite a successful cancellation", async () => {
+    const pendingPoll = deferred<(typeof PROCESSING_SOURCE)[]>();
+    const cancelledSource = {
+      ...PROCESSING_SOURCE,
+      status: "failed" as const,
+      error: "Queued source processing was cancelled. Use Retry when ready."
+    };
+    apiMock.fetchSources.mockResolvedValueOnce([PROCESSING_SOURCE]).mockReturnValueOnce(pendingPoll.promise);
+    apiMock.cancelSourceProcessing.mockResolvedValue({ asset: cancelledSource });
+
+    const { result } = renderHook(() => useIngestExtraction(LANGUAGE_ID, t));
+    await flushHook();
+
+    expect(result.current.processingSourceId).toBe("src-1");
+    expect(apiMock.fetchSources).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      await result.current.handleCancelProcessing("src-1");
+      pendingPoll.resolve([PROCESSING_SOURCE]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.sources).toEqual([cancelledSource]);
+    expect(result.current.processingSourceId).toBeNull();
+    expect(result.current.processNotice).toContain("Field notebook page");
   });
 });

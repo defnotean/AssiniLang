@@ -130,9 +130,7 @@ describe("evaluation CLI", () => {
       await new JsonStore(dbPath).update((current) => ({
         ...current,
         languages: current.languages.map((language) =>
-          language.id === state.languages[0]?.id
-            ? { ...language, description: concurrentDescription }
-            : language
+          language.id === state.languages[0]?.id ? { ...language, description: concurrentDescription } : language
         )
       }));
       return staleState;

@@ -45,12 +45,14 @@ describe("recoverInterruptedSourcesState", () => {
 
   it("clears in-flight processing markers when recovering an interrupted source", () => {
     const state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "source-interrupted",
-      processingStartedAt: "2026-06-06T00:00:30.000Z",
-      processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
-      processingAttempts: 2
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-interrupted",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
+        processingAttempts: 2
+      })
+    );
 
     const recovered = recoverInterruptedSourcesState(state, "2026-06-06T00:01:00.000Z");
     const interrupted = recovered.sourceAssets.find((asset) => asset.id === "source-interrupted");
@@ -87,12 +89,14 @@ describe("recoverInterruptedSourcesState", () => {
 
   it("includes processing metadata in recovery audit events when present", () => {
     const state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "source-interrupted",
-      processingStartedAt: "2026-06-06T00:00:30.000Z",
-      processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
-      processingAttempts: 2
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-interrupted",
+        processingStartedAt: "2026-06-06T00:00:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:45.000Z",
+        processingAttempts: 2
+      })
+    );
 
     const recovered = recoverInterruptedSourcesState(state);
 
@@ -109,10 +113,7 @@ describe("recoverInterruptedSourcesState", () => {
 
   it("appends one audit event per interrupted source", () => {
     const state = buildTestWorkspaceState();
-    state.sourceAssets.push(
-      buildSource({ id: "source-interrupted-a" }),
-      buildSource({ id: "source-interrupted-b" })
-    );
+    state.sourceAssets.push(buildSource({ id: "source-interrupted-a" }), buildSource({ id: "source-interrupted-b" }));
 
     const recovered = recoverInterruptedSourcesState(state);
 
@@ -133,31 +134,53 @@ describe("recoverInterruptedSourcesState", () => {
 describe("isProcessingHeartbeatStale", () => {
   it("treats missing or unparseable markers as stale while status is processing", () => {
     expect(isProcessingHeartbeatStale({ status: "processing" }, Date.parse("2026-06-06T00:20:00.000Z"))).toBe(true);
-    expect(isProcessingHeartbeatStale({
-      status: "processing",
-      processingStartedAt: "not-a-date"
-    }, Date.parse("2026-06-06T00:20:00.000Z"))).toBe(true);
+    expect(
+      isProcessingHeartbeatStale(
+        {
+          status: "processing",
+          processingStartedAt: "not-a-date"
+        },
+        Date.parse("2026-06-06T00:20:00.000Z")
+      )
+    ).toBe(true);
   });
 
   it("uses heartbeat over startedAt and respects the stale window", () => {
     const nowMs = Date.parse("2026-06-06T00:20:00.000Z");
-    expect(isProcessingHeartbeatStale({
-      status: "processing",
-      processingStartedAt: "2026-06-06T00:00:00.000Z",
-      processingHeartbeatAt: "2026-06-06T00:15:00.000Z"
-    }, nowMs, DEFAULT_PROCESSING_STALE_MS)).toBe(false);
-    expect(isProcessingHeartbeatStale({
-      status: "processing",
-      processingStartedAt: "2026-06-06T00:00:00.000Z",
-      processingHeartbeatAt: "2026-06-06T00:09:00.000Z"
-    }, nowMs, DEFAULT_PROCESSING_STALE_MS)).toBe(true);
+    expect(
+      isProcessingHeartbeatStale(
+        {
+          status: "processing",
+          processingStartedAt: "2026-06-06T00:00:00.000Z",
+          processingHeartbeatAt: "2026-06-06T00:15:00.000Z"
+        },
+        nowMs,
+        DEFAULT_PROCESSING_STALE_MS
+      )
+    ).toBe(false);
+    expect(
+      isProcessingHeartbeatStale(
+        {
+          status: "processing",
+          processingStartedAt: "2026-06-06T00:00:00.000Z",
+          processingHeartbeatAt: "2026-06-06T00:09:00.000Z"
+        },
+        nowMs,
+        DEFAULT_PROCESSING_STALE_MS
+      )
+    ).toBe(true);
   });
 
   it("ignores non-processing assets", () => {
-    expect(isProcessingHeartbeatStale({
-      status: "failed",
-      processingHeartbeatAt: "2026-06-06T00:00:00.000Z"
-    }, Date.parse("2026-06-06T01:00:00.000Z"))).toBe(false);
+    expect(
+      isProcessingHeartbeatStale(
+        {
+          status: "failed",
+          processingHeartbeatAt: "2026-06-06T00:00:00.000Z"
+        },
+        Date.parse("2026-06-06T01:00:00.000Z")
+      )
+    ).toBe(false);
   });
 });
 
@@ -215,12 +238,14 @@ describe("recoverStaleProcessingSourcesState", () => {
 
   it("honors skipIds so queued-but-not-started claims are left alone", () => {
     const state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "source-queued",
-      processingStartedAt: "2026-06-06T00:00:00.000Z",
-      processingHeartbeatAt: "2026-06-06T00:00:00.000Z",
-      processingAttempts: 1
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-queued",
+        processingStartedAt: "2026-06-06T00:00:00.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:00.000Z",
+        processingAttempts: 1
+      })
+    );
 
     const recovered = recoverStaleProcessingSourcesState(state, {
       recoveredAt: "2026-06-06T00:20:00.000Z",
@@ -233,11 +258,13 @@ describe("recoverStaleProcessingSourcesState", () => {
 
   it("returns the state unchanged when nothing is stale", () => {
     const state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "source-fresh",
-      processingStartedAt: "2026-06-06T00:19:30.000Z",
-      processingHeartbeatAt: "2026-06-06T00:19:45.000Z"
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-fresh",
+        processingStartedAt: "2026-06-06T00:19:30.000Z",
+        processingHeartbeatAt: "2026-06-06T00:19:45.000Z"
+      })
+    );
 
     const recovered = recoverStaleProcessingSourcesState(state, {
       recoveredAt: "2026-06-06T00:20:00.000Z",
@@ -285,12 +312,14 @@ describe("recoverInterruptedSources", () => {
 describe("recoverStaleProcessingSources", () => {
   it("applies the stale sweep through the store update seam", async () => {
     let state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "source-stale",
-      processingStartedAt: "2026-06-06T00:00:00.000Z",
-      processingHeartbeatAt: "2026-06-06T00:00:30.000Z",
-      processingAttempts: 2
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "source-stale",
+        processingStartedAt: "2026-06-06T00:00:00.000Z",
+        processingHeartbeatAt: "2026-06-06T00:00:30.000Z",
+        processingAttempts: 2
+      })
+    );
     const store = {
       async update(updater: (current: AppState) => AppState): Promise<AppState> {
         state = updater(state);
@@ -320,13 +349,15 @@ describe("interrupted-processing drill log", () => {
   it("records a pasteable drill log for the acceptance pack", async () => {
     const recoveredAt = "2026-07-09T15:00:00.000Z";
     let state = buildTestWorkspaceState();
-    state.sourceAssets.push(buildSource({
-      id: "drill-interrupted-1",
-      title: "Drill interrupted source",
-      processingStartedAt: "2026-07-09T14:59:00.000Z",
-      processingHeartbeatAt: "2026-07-09T14:59:30.000Z",
-      processingAttempts: 1
-    }));
+    state.sourceAssets.push(
+      buildSource({
+        id: "drill-interrupted-1",
+        title: "Drill interrupted source",
+        processingStartedAt: "2026-07-09T14:59:00.000Z",
+        processingHeartbeatAt: "2026-07-09T14:59:30.000Z",
+        processingAttempts: 1
+      })
+    );
 
     const store = {
       async update(updater: (current: AppState) => AppState): Promise<AppState> {
@@ -361,9 +392,10 @@ describe("interrupted-processing drill log", () => {
     });
     steps.push({
       name: "markersClearedAttemptsKept",
-      ok: recovered?.processingStartedAt === undefined
-        && recovered?.processingHeartbeatAt === undefined
-        && recovered?.processingAttempts === 1,
+      ok:
+        recovered?.processingStartedAt === undefined &&
+        recovered?.processingHeartbeatAt === undefined &&
+        recovered?.processingAttempts === 1,
       detail: `processingAttempts=${recovered?.processingAttempts ?? "missing"}`
     });
     steps.push({

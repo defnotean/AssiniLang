@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { npmSpawnSpec } from "./lib/processHelpers.mjs";
 
-const VERIFY_SCRIPT_NAMES = ["test", "check", "seed", "eval", "build"];
+const VERIFY_SCRIPT_NAMES = ["format:check", "lint", "test", "check", "seed", "eval", "build"];
 
 function readString(value, fallback) {
   const trimmed = typeof value === "string" ? value.trim() : "";

@@ -1,5 +1,5 @@
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import type { Note } from "@assini/db";
+import type { Note } from "@assini/api-contract";
 import type { DashboardData } from "../api";
 import { generateDraftNotes, generateModelDraftNotes, reviewNote, runEvaluation } from "../api";
 import type { PublicNote, ReviewStatus, ViewMode } from "../lib/types";
@@ -107,11 +107,14 @@ export function useReviewWorkspace(
         count: generated
       });
       const scored = notes?.filter((note) => note.grounding) ?? [];
-      const groundingSummary = scored.length > 0
-        ? ` ${t("review.groundingLabel")} ${scored
-            .map((note) => `${Math.round((note.grounding?.score ?? 0) * 100)}%`)
-            .join(", ")}.${scored.some((note) => (note.grounding?.failures.length ?? 0) > 0) ? ` ${t("review.reviewFlagged")}` : ""}`
-        : "";
+      const groundingSummary =
+        scored.length > 0
+          ? ` ${t("review.groundingLabel")} ${scored
+              .map((note) => `${Math.round((note.grounding?.score ?? 0) * 100)}%`)
+              .join(
+                ", "
+              )}.${scored.some((note) => (note.grounding?.failures.length ?? 0) > 0) ? ` ${t("review.reviewFlagged")}` : ""}`
+          : "";
       setModelDraftMessage(
         warnings.length > 0 ? `${summary}${groundingSummary} ${warnings.join(" ")}` : `${summary}${groundingSummary}`
       );
@@ -147,11 +150,12 @@ export function useReviewWorkspace(
     setReviewActionError(null);
     const explanationChanged = edits.explanation !== selectedNote.explanation;
     const examplesChanged = JSON.stringify(edits.examples) !== JSON.stringify(selectedNote.examples);
-    const reviewerComment = explanationChanged && examplesChanged
-      ? t(REVIEWER_EDITED_EXPLANATION_AND_EXAMPLES_COMMENT_KEY)
-      : examplesChanged
-        ? t(REVIEWER_EDITED_EXAMPLES_COMMENT_KEY)
-        : t(REVIEWER_EDITED_EXPLANATION_COMMENT_KEY);
+    const reviewerComment =
+      explanationChanged && examplesChanged
+        ? t(REVIEWER_EDITED_EXPLANATION_AND_EXAMPLES_COMMENT_KEY)
+        : examplesChanged
+          ? t(REVIEWER_EDITED_EXAMPLES_COMMENT_KEY)
+          : t(REVIEWER_EDITED_EXPLANATION_COMMENT_KEY);
     try {
       await reviewNote(selectedNote.id, {
         ...(explanationChanged ? { explanation: edits.explanation } : {}),

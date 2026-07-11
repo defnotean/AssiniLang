@@ -16,14 +16,18 @@ describe("Obsidian MCP API contract", () => {
   });
 
   it("deduplicates trimmed resource URIs and caps the request at 50 entries", () => {
-    expect(obsidianMcpImportPayloadSchema.parse({
-      uris: [" obsidian://vault/one.md ", "obsidian://vault/one.md", "obsidian://vault/two.md"]
-    })).toEqual({
+    expect(
+      obsidianMcpImportPayloadSchema.parse({
+        uris: [" obsidian://vault/one.md ", "obsidian://vault/one.md", "obsidian://vault/two.md"]
+      })
+    ).toEqual({
       uris: ["obsidian://vault/one.md", "obsidian://vault/two.md"]
     });
-    expect(obsidianMcpImportPayloadSchema.safeParse({
-      uris: Array.from({ length: 51 }, (_, index) => `obsidian://vault/${index}.md`)
-    }).success).toBe(false);
+    expect(
+      obsidianMcpImportPayloadSchema.safeParse({
+        uris: Array.from({ length: 51 }, (_, index) => `obsidian://vault/${index}.md`)
+      }).success
+    ).toBe(false);
   });
 
   it("validates the optional pagination cursor", () => {

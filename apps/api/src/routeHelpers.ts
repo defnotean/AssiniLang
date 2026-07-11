@@ -121,17 +121,19 @@ export function sanitizeNeuralMapForActor(neuralMap: NeuralMap, actor: User): Ne
   if (actor.role === "learner" || actor.role === "reviewer") {
     return {
       nodes: neuralMap.nodes.filter((node) => !correctionNodeIds.has(node.id)),
-      edges: neuralMap.edges.filter((edge) => !correctionNodeIds.has(edge.source) && !correctionNodeIds.has(edge.target))
+      edges: neuralMap.edges.filter(
+        (edge) => !correctionNodeIds.has(edge.source) && !correctionNodeIds.has(edge.target)
+      )
     };
   }
 
   if (actor.role === "programmer") {
     return {
-      nodes: neuralMap.nodes.map((node) => (
+      nodes: neuralMap.nodes.map((node) =>
         node.type === "elder_correction"
           ? { ...node, label: "Elder correction (redacted)", metadata: { ...node.metadata, redacted: true } }
           : node
-      )),
+      ),
       edges: neuralMap.edges
     };
   }
@@ -256,19 +258,13 @@ export function resolveActor(
 }
 
 /** Re-issues Set-Cookie so browser Max-Age tracks server-side sliding renewal. */
-export function refreshPrototypeSessionCookie(
-  reply: FastifyReply,
-  resolved: ResolvedActor
-): void {
+export function refreshPrototypeSessionCookie(reply: FastifyReply, resolved: ResolvedActor): void {
   if (resolved.authMethod !== "prototype-session" || !resolved.prototypeSession) {
     return;
   }
   reply.header(
     "Set-Cookie",
-    serializePrototypeSessionCookie(
-      resolved.prototypeSession.sessionId,
-      resolved.prototypeSession.maxAgeSeconds
-    )
+    serializePrototypeSessionCookie(resolved.prototypeSession.sessionId, resolved.prototypeSession.maxAgeSeconds)
   );
 }
 
@@ -277,10 +273,7 @@ export function refreshPrototypeSessionCookie(
  * (expired, orphaned, or unknown), expire it so the client stops replaying
  * a dead session id on every subsequent request.
  */
-export function expireStalePrototypeSessionCookie(
-  request: FastifyRequest,
-  reply: FastifyReply
-): void {
+export function expireStalePrototypeSessionCookie(request: FastifyRequest, reply: FastifyReply): void {
   if (!cookieValue(request, PROTOTYPE_SESSION_COOKIE)) {
     return;
   }
@@ -310,8 +303,8 @@ export function requireActor(
 
   const { actor } = resolved;
   const allowedByPrimaryRole = !allowedRoles || actorCan(actor, allowedRoles);
-  const allowedByPrototypeException = resolved.authMethod === "prototype-session"
-    && actorCan(actor, prototypeSessionAdditionalRoles);
+  const allowedByPrototypeException =
+    resolved.authMethod === "prototype-session" && actorCan(actor, prototypeSessionAdditionalRoles);
   if (!allowedByPrimaryRole && !allowedByPrototypeException) {
     reply.code(403);
     return undefined;
@@ -334,7 +327,12 @@ export function buildNeuralMap(state: AppState, languageId: string): NeuralMapRe
   const edges: NeuralMap["edges"] = [];
 
   if (language) {
-    nodes.push({ id: `language:${language.id}`, type: "language", label: language.name, metadata: { typology: language.typology } });
+    nodes.push({
+      id: `language:${language.id}`,
+      type: "language",
+      label: language.name,
+      metadata: { typology: language.typology }
+    });
   }
 
   for (const asset of sourceAssets) {
@@ -353,12 +351,18 @@ export function buildNeuralMap(state: AppState, languageId: string): NeuralMapRe
   const seenCoOccurrenceEdges = new Set<string>();
 
   for (const passage of corpus) {
-    nodes.push({ id: `corpus:${passage.id}`, type: "corpus", label: passage.textTarget, metadata: { source: passage.source } });
+    nodes.push({
+      id: `corpus:${passage.id}`,
+      type: "corpus",
+      label: passage.textTarget,
+      metadata: { source: passage.source }
+    });
     edges.push({ source: `language:${languageId}`, target: `corpus:${passage.id}`, relation: "has_corpus", weight: 1 });
 
     const sourceTitle = passage.source.startsWith("source-asset:") ? passage.source.slice("source-asset:".length) : "";
-    const sourceAsset = (passage.sourceAssetId ? sourceAssetsById.get(passage.sourceAssetId) : undefined)
-      ?? sourceAssetsByTitle.get(sourceTitle);
+    const sourceAsset =
+      (passage.sourceAssetId ? sourceAssetsById.get(passage.sourceAssetId) : undefined) ??
+      sourceAssetsByTitle.get(sourceTitle);
     if (sourceAsset) {
       edges.push({
         source: `source_asset:${sourceAsset.id}`,
@@ -377,16 +381,21 @@ export function buildNeuralMap(state: AppState, languageId: string): NeuralMapRe
       edges.push({ source: `corpus:${passage.id}`, target: tagNodeId, relation: "tagged", weight: 0.65 });
     }
 
-    const morphemeSurfaces = [...new Set(
-      passage.morphologicalSegmentation.map((morpheme) => morpheme.surface).filter(Boolean)
-    )].slice(0, 12);
+    const morphemeSurfaces = [
+      ...new Set(passage.morphologicalSegmentation.map((morpheme) => morpheme.surface).filter(Boolean))
+    ].slice(0, 12);
     for (const surface of morphemeSurfaces) {
       const morphemeNodeId = `morpheme:${languageId}:${surface}`;
       if (!seenMorphemes.has(morphemeNodeId)) {
         seenMorphemes.add(morphemeNodeId);
         nodes.push({ id: morphemeNodeId, type: "morpheme", label: surface, metadata: {} });
       }
-      edges.push({ source: `corpus:${passage.id}`, target: morphemeNodeId, relation: "contains_morpheme", weight: 0.72 });
+      edges.push({
+        source: `corpus:${passage.id}`,
+        target: morphemeNodeId,
+        relation: "contains_morpheme",
+        weight: 0.72
+      });
     }
 
     for (let index = 0; index < morphemeSurfaces.length; index += 1) {
@@ -406,31 +415,76 @@ export function buildNeuralMap(state: AppState, languageId: string): NeuralMapRe
   }
 
   for (const note of notes) {
-    nodes.push({ id: `note:${note.id}`, type: "note", label: note.topic, metadata: { status: note.status, confidence: note.confidence } });
-    edges.push({ source: `language:${languageId}`, target: `note:${note.id}`, relation: "has_note", weight: note.confidence === "high" ? 1 : 0.7 });
+    nodes.push({
+      id: `note:${note.id}`,
+      type: "note",
+      label: note.topic,
+      metadata: { status: note.status, confidence: note.confidence }
+    });
+    edges.push({
+      source: `language:${languageId}`,
+      target: `note:${note.id}`,
+      relation: "has_note",
+      weight: note.confidence === "high" ? 1 : 0.7
+    });
     for (const passageId of note.evidencePassageIds) {
       edges.push({ source: `corpus:${passageId}`, target: `note:${note.id}`, relation: "uses_context", weight: 0.85 });
     }
   }
 
   for (const exercise of exercises) {
-    nodes.push({ id: `exercise:${exercise.id}`, type: "exercise", label: exercise.prompt, metadata: { type: exercise.type } });
-    edges.push({ source: `language:${languageId}`, target: `exercise:${exercise.id}`, relation: "has_exercise", weight: 0.8 });
+    nodes.push({
+      id: `exercise:${exercise.id}`,
+      type: "exercise",
+      label: exercise.prompt,
+      metadata: { type: exercise.type }
+    });
+    edges.push({
+      source: `language:${languageId}`,
+      target: `exercise:${exercise.id}`,
+      relation: "has_exercise",
+      weight: 0.8
+    });
   }
 
   for (const session of sessions) {
-    nodes.push({ id: `ai_session:${session.id}`, type: "ai_session", label: session.mode, metadata: { status: session.status } });
-    edges.push({ source: `language:${languageId}`, target: `ai_session:${session.id}`, relation: "generated", weight: 0.75 });
+    nodes.push({
+      id: `ai_session:${session.id}`,
+      type: "ai_session",
+      label: session.mode,
+      metadata: { status: session.status }
+    });
+    edges.push({
+      source: `language:${languageId}`,
+      target: `ai_session:${session.id}`,
+      relation: "generated",
+      weight: 0.75
+    });
     for (const noteId of session.contextNoteIds) {
-      edges.push({ source: `note:${noteId}`, target: `ai_session:${session.id}`, relation: "uses_context", weight: 0.7 });
+      edges.push({
+        source: `note:${noteId}`,
+        target: `ai_session:${session.id}`,
+        relation: "uses_context",
+        weight: 0.7
+      });
     }
     for (const passageId of session.contextPassageIds) {
-      edges.push({ source: `corpus:${passageId}`, target: `ai_session:${session.id}`, relation: "uses_context", weight: 0.7 });
+      edges.push({
+        source: `corpus:${passageId}`,
+        target: `ai_session:${session.id}`,
+        relation: "uses_context",
+        weight: 0.7
+      });
     }
   }
 
   for (const correction of corrections) {
-    nodes.push({ id: `elder_correction:${correction.id}`, type: "elder_correction", label: correction.correction, metadata: { severity: correction.severity, status: correction.status } });
+    nodes.push({
+      id: `elder_correction:${correction.id}`,
+      type: "elder_correction",
+      label: correction.correction,
+      metadata: { severity: correction.severity, status: correction.status }
+    });
     edges.push({
       source: correction.noteId ? `note:${correction.noteId}` : `language:${languageId}`,
       target: `elder_correction:${correction.id}`,

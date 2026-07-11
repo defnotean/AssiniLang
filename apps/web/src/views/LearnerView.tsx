@@ -89,9 +89,8 @@ export function LearnerView({
   const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
   const [authoringRulesAdvanced, setAuthoringRulesAdvanced] = useState("");
   const [authoringAnswers, setAuthoringAnswers] = useState("");
-  const [authoringAdversarialProbes, setAuthoringAdversarialProbes] = useState<AuthoringAdversarialProbe[]>(
-    defaultAdversarialProbes
-  );
+  const [authoringAdversarialProbes, setAuthoringAdversarialProbes] =
+    useState<AuthoringAdversarialProbe[]>(defaultAdversarialProbes);
   const [authoringExplanation, setAuthoringExplanation] = useState("");
   const [authoringMessage, setAuthoringMessage] = useState<string | null>(null);
   const [authoringError, setAuthoringError] = useState<string | null>(null);
@@ -149,22 +148,23 @@ export function LearnerView({
     }
   }
 
-  const nextAfterGrade = exerciseResult && practiceState.status === "ready"
-    ? practiceState.data.exercises.find((exercise) => exercise.id !== selectedExercise?.id) ?? null
-    : null;
-  const hasFilledAdversarialProbes = authoringAdversarialProbes.length >= MIN_ADVERSARIAL_PROBES
-    && authoringAdversarialProbes.every(
-      (probe) => probe.answer.trim().length > 0 && probe.reason.trim().length > 0
-    );
+  const nextAfterGrade =
+    exerciseResult && practiceState.status === "ready"
+      ? (practiceState.data.exercises.find((exercise) => exercise.id !== selectedExercise?.id) ?? null)
+      : null;
+  const hasFilledAdversarialProbes =
+    authoringAdversarialProbes.length >= MIN_ADVERSARIAL_PROBES &&
+    authoringAdversarialProbes.every((probe) => probe.answer.trim().length > 0 && probe.reason.trim().length > 0);
   const allowedRuleIds = mergeAllowedRuleIds(selectedRuleIds, authoringRulesAdvanced);
-  const canCreateExercise = authoringPrompt.trim().length > 0
-    && authoringVocabulary.trim().length > 0
-    && allowedRuleIds.length > 0
-    && authoringAnswers.trim().length > 0
-    && hasFilledAdversarialProbes
-    && authoringExplanation.trim().length > 0
-    && !isWorkflowBusy
-    && !isCreatingExercise;
+  const canCreateExercise =
+    authoringPrompt.trim().length > 0 &&
+    authoringVocabulary.trim().length > 0 &&
+    allowedRuleIds.length > 0 &&
+    authoringAnswers.trim().length > 0 &&
+    hasFilledAdversarialProbes &&
+    authoringExplanation.trim().length > 0 &&
+    !isWorkflowBusy &&
+    !isCreatingExercise;
 
   function clearAuthoringNotice() {
     setAuthoringMessage(null);
@@ -182,9 +182,9 @@ export function LearnerView({
   }
 
   function updateAdversarialProbe(index: number, patch: Partial<AuthoringAdversarialProbe>) {
-    setAuthoringAdversarialProbes((current) => current.map((probe, probeIndex) => (
-      probeIndex === index ? { ...probe, ...patch } : probe
-    )));
+    setAuthoringAdversarialProbes((current) =>
+      current.map((probe, probeIndex) => (probeIndex === index ? { ...probe, ...patch } : probe))
+    );
     clearAuthoringNotice();
   }
 
@@ -236,9 +236,10 @@ export function LearnerView({
         const probeCount = validation.preview?.adversarialAnswers.length ?? 0;
         const answerCount = validation.preview?.expectedAnswers.length ?? 0;
         const dryRunPrefix = t("learner.validateExerciseDryRunNote");
-        const success = validation.warnings.length > 0
-          ? `${t("learner.validateExerciseSuccess", { probeCount, answerCount })} ${validation.warnings.join(" ")}`
-          : t("learner.validateExerciseSuccess", { probeCount, answerCount });
+        const success =
+          validation.warnings.length > 0
+            ? `${t("learner.validateExerciseSuccess", { probeCount, answerCount })} ${validation.warnings.join(" ")}`
+            : t("learner.validateExerciseSuccess", { probeCount, answerCount });
         setAuthoringMessage(`${dryRunPrefix} ${success}`);
       } else {
         setAuthoringError(validation.errors.join(" "));
@@ -318,21 +319,11 @@ export function LearnerView({
           <div className="empty-state" role="status" aria-live="polite">
             <p>{t("learner.noExercisesAvailable")}</p>
             <div className="practice-next-actions">
-              <button
-                type="button"
-                className="secondary"
-                disabled={isWorkflowBusy}
-                onClick={focusAuthoringForm}
-              >
+              <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={focusAuthoringForm}>
                 {t("learner.authorExerciseCta")}
               </button>
               {onOpenBuild && (
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={isWorkflowBusy}
-                  onClick={onOpenBuild}
-                >
+                <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={onOpenBuild}>
                   {t("learner.openBuildCta")}
                 </button>
               )}
@@ -373,7 +364,9 @@ export function LearnerView({
                 <dt>{t("learner.rules")}</dt>
                 <dd className="token-list">
                   {selectedExercise.allowedRuleIds.map((rule, index) => (
-                    <span className="pill" key={`${index}:${rule}`}>{rule}</span>
+                    <span className="pill" key={`${index}:${rule}`}>
+                      {rule}
+                    </span>
                   ))}
                 </dd>
               </div>
@@ -414,12 +407,7 @@ export function LearnerView({
                   </div>
                 ) : practiceState.status === "ready" && practiceState.data.exercises.length === 0 ? (
                   <div className="practice-next-actions">
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={isWorkflowBusy}
-                      onClick={focusAuthoringForm}
-                    >
+                    <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={focusAuthoringForm}>
                       {t("learner.authorExerciseCta")}
                     </button>
                   </div>
@@ -458,21 +446,11 @@ export function LearnerView({
                 <p>{t("learner.noExercisesDetailEmpty")}</p>
                 <p className="muted">{t("learner.noExercisesDetailEmptyHint")}</p>
                 <div className="practice-next-actions">
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={isWorkflowBusy}
-                    onClick={focusAuthoringForm}
-                  >
+                  <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={focusAuthoringForm}>
                     {t("learner.authorExerciseCta")}
                   </button>
                   {onOpenBuild && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={isWorkflowBusy}
-                      onClick={onOpenBuild}
-                    >
+                    <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={onOpenBuild}>
                       {t("learner.openBuildCta")}
                     </button>
                   )}
@@ -494,9 +472,7 @@ export function LearnerView({
           <div>
             <span className="detail-label">{t("learner.exerciseAuthoring")}</span>
             <h3>{t("learner.createLearnerTask")}</h3>
-            {exercises.length === 0 && (
-              <p className="inline-empty muted">{t("learner.exerciseAuthoringEmptyHint")}</p>
-            )}
+            {exercises.length === 0 && <p className="inline-empty muted">{t("learner.exerciseAuthoringEmptyHint")}</p>}
           </div>
           <div className="form-group">
             <label htmlFor="exercise-author-type">{t("learner.exerciseType")}</label>
@@ -509,7 +485,9 @@ export function LearnerView({
               }}
             >
               {EXERCISE_TYPES.map((type) => (
-                <option key={type} value={type}>{t(`exerciseType.${type}`)}</option>
+                <option key={type} value={type}>
+                  {t(`exerciseType.${type}`)}
+                </option>
               ))}
             </select>
           </div>
@@ -613,11 +591,7 @@ export function LearnerView({
                     />
                   </div>
                   {canRemoveProbe && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => removeAdversarialProbe(index)}
-                    >
+                    <button type="button" className="secondary" onClick={() => removeAdversarialProbe(index)}>
                       {t("learner.removeAdversarialProbe")}
                     </button>
                   )}
@@ -660,20 +634,23 @@ export function LearnerView({
             >
               {isValidatingExercise ? t("learner.validatingExercise") : t("learner.validateExercise")}
             </button>
-            <button
-              type="submit"
-              className="secondary"
-              disabled={!canCreateExercise}
-              aria-busy={isCreatingExercise}
-            >
+            <button type="submit" className="secondary" disabled={!canCreateExercise} aria-busy={isCreatingExercise}>
               {isCreatingExercise ? t("learner.creating") : t("learner.createExercise")}
             </button>
           </div>
           <p id="exercise-validate-dry-run-hint" className="inline-empty muted">
             {t("learner.validateExerciseDryRunHint")}
           </p>
-          {authoringMessage && <p className="result-notice" role="status" aria-live="polite">{authoringMessage}</p>}
-          {authoringError && <p className="result-notice error" role="alert">{authoringError}</p>}
+          {authoringMessage && (
+            <p className="result-notice" role="status" aria-live="polite">
+              {authoringMessage}
+            </p>
+          )}
+          {authoringError && (
+            <p className="result-notice error" role="alert">
+              {authoringError}
+            </p>
+          )}
         </form>
       </section>
     </div>

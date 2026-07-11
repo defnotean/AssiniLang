@@ -49,9 +49,7 @@ export function readPrototypeSessionAbsoluteMaxMs(
 ): number {
   const raw = env[PROTOTYPE_SESSION_ABSOLUTE_MAX_ENV_NAME]?.trim();
   if (!raw) {
-    return ttlMs === DEFAULT_PROTOTYPE_SESSION_TTL_MS
-      ? DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS
-      : ttlMs * 3;
+    return ttlMs === DEFAULT_PROTOTYPE_SESSION_TTL_MS ? DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS : ttlMs * 3;
   }
 
   const value = Number(raw);
@@ -68,9 +66,7 @@ export function readPrototypeSessionAbsoluteMaxMs(
   return value;
 }
 
-export function prototypeSessionCookieSecure(
-  env: Record<string, string | undefined> = process.env
-): boolean {
+export function prototypeSessionCookieSecure(env: Record<string, string | undefined> = process.env): boolean {
   const flag = env.ASSINI_COOKIE_SECURE?.trim().toLowerCase();
   if (flag === "1" || flag === "true") return true;
   if (flag === "0" || flag === "false") return false;

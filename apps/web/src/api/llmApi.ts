@@ -36,10 +36,15 @@ export async function fetchDiscoveredModels(
 }
 
 export async function updateRuntimeSettings(payload: RuntimeSettingsUpdate): Promise<RuntimeSettingsResponse> {
-  const response = await fetchAsActor("programmer", "/api/llm/settings", {
-    method: "PUT",
-    body: JSON.stringify(payload)
-  }, true);
+  const response = await fetchAsActor(
+    "programmer",
+    "/api/llm/settings",
+    {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    },
+    true
+  );
 
   await assertOk(response, "Runtime settings update failed");
 
@@ -47,10 +52,15 @@ export async function updateRuntimeSettings(payload: RuntimeSettingsUpdate): Pro
 }
 
 export async function saveModelProfile(payload: ModelProfileSavePayload): Promise<RuntimeSettingsResponse> {
-  const response = await fetchAsActor("programmer", "/api/llm/model-profiles", {
-    method: "POST",
-    body: JSON.stringify(payload)
-  }, true);
+  const response = await fetchAsActor(
+    "programmer",
+    "/api/llm/model-profiles",
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    },
+    true
+  );
 
   await assertOk(response, "Model profile save failed");
 
@@ -70,11 +80,9 @@ export async function activateModelProfile(profileId: string): Promise<RuntimeSe
 }
 
 export async function deleteModelProfile(profileId: string): Promise<RuntimeSettingsResponse> {
-  const response = await fetchAsActor(
-    "programmer",
-    `/api/llm/model-profiles/${encodeURIComponent(profileId)}`,
-    { method: "DELETE" }
-  );
+  const response = await fetchAsActor("programmer", `/api/llm/model-profiles/${encodeURIComponent(profileId)}`, {
+    method: "DELETE"
+  });
 
   await assertOk(response, "Model profile delete failed");
 

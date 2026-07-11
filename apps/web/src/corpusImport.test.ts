@@ -27,11 +27,15 @@ const completeDraft = {
 
 describe("corpus import helpers", () => {
   it("parses pipe-delimited morpheme rows with comma-delimited feature lists", () => {
-    expect(parseCorpusMorphemeDraft([
-      "mira | mira | river | noun",
-      "lumo-ke | lumo | practice-mat.locative | noun, case-loc",
-      "talo-mi-na | talo | walk.present.1sg | verb, present, 1sg"
-    ].join("\n"))).toEqual([
+    expect(
+      parseCorpusMorphemeDraft(
+        [
+          "mira | mira | river | noun",
+          "lumo-ke | lumo | practice-mat.locative | noun, case-loc",
+          "talo-mi-na | talo | walk.present.1sg | verb, present, 1sg"
+        ].join("\n")
+      )
+    ).toEqual([
       { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] },
       { surface: "lumo-ke", lemma: "lumo", gloss: "practice-mat.locative", features: ["noun", "case-loc"] },
       { surface: "talo-mi-na", lemma: "talo", gloss: "walk.present.1sg", features: ["verb", "present", "1sg"] }
@@ -111,7 +115,8 @@ describe("corpus import helpers", () => {
       ok: false,
       errorCode: "invalidConsentUse"
     });
-  });});
+  });
+});
 
 const BULK_HEADER = [
   "target",
@@ -198,7 +203,7 @@ describe("corpus bulk TSV/CSV dry-run", () => {
     ].join(",");
     const row = [
       "saku nemi-na",
-      "\"The child teaches me.\"",
+      '"The child teaches me."',
       "local-import",
       "Local Reviewer",
       "2026",
@@ -206,7 +211,7 @@ describe("corpus bulk TSV/CSV dry-run", () => {
       "local import consent",
       "testing-only",
       "learning",
-      "\"saku | saku | child | noun; nemi-na | nemi | teach.1sg | verb\""
+      '"saku | saku | child | noun; nemi-na | nemi | teach.1sg | verb"'
     ].join(",");
 
     const report = dryRunCorpusBulkImport([header, row].join("\n"));
@@ -223,12 +228,14 @@ describe("corpus bulk TSV/CSV dry-run", () => {
   });
 
   it("reports incomplete and duplicate-target row failures in the dry-run", () => {
-    const report = dryRunCorpusBulkImport([
-      BULK_HEADER,
-      bulkTsvRow(),
-      bulkTsvRow({ tags: "" }),
-      bulkTsvRow({ target: "mira talo-mi-na", translation: "Duplicate walk." })
-    ].join("\n"));
+    const report = dryRunCorpusBulkImport(
+      [
+        BULK_HEADER,
+        bulkTsvRow(),
+        bulkTsvRow({ tags: "" }),
+        bulkTsvRow({ target: "mira talo-mi-na", translation: "Duplicate walk." })
+      ].join("\n")
+    );
 
     expect(report.ok).toBe(false);
     expect(report.validCount).toBe(1);
@@ -261,4 +268,5 @@ describe("corpus bulk TSV/CSV dry-run", () => {
       format: "tsv",
       parseError: "missingHeader"
     });
-  });});
+  });
+});

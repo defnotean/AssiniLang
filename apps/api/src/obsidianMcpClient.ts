@@ -2,7 +2,7 @@ import { Buffer } from "node:buffer";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ObsidianMcpResource } from "@assini/api-contract";
-import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
+import { assertOutboundHttpUrlAllowed, fetchOutboundHttp } from "./urlSafety.js";
 
 export const DEFAULT_OBSIDIAN_MCP_TIMEOUT_MS = 15_000;
 export const MAX_OBSIDIAN_MCP_RESOURCE_BYTES = 1_000_000;
@@ -41,34 +41,23 @@ export interface ObsidianMcpSession {
   close(): Promise<void>;
 }
 
-export type ObsidianMcpSessionFactory = (
-  config: ObsidianMcpConnectionConfig
-) => Promise<ObsidianMcpSession>;
+export type ObsidianMcpSessionFactory = (config: ObsidianMcpConnectionConfig) => Promise<ObsidianMcpSession>;
 
 type CreateObsidianMcpSessionOptions = {
   env?: Env;
   fetchFn?: typeof fetch;
 };
 
-function inputUrl(input: Parameters<typeof fetch>[0]): string {
-  if (typeof input === "string") return input;
-  if (input instanceof URL) return input.toString();
-  return input.url;
-}
-
-function guardedFetch(
-  fetchFn: typeof fetch,
-  env: Env
-): typeof fetch {
-  return async (input, init) => {
-    const url = inputUrl(input);
-    await assertOutboundHttpUrlAllowed(url, { env });
-    const response = await fetchFn(input, { ...init, redirect: "manual" });
-    if (response.status >= 300 && response.status < 400) {
-      throw new Error(`MCP endpoint redirect was blocked (${response.status}).`);
-    }
-    return response;
-  };
+function guardedFetch(fetchFn: typeof fetch, env: Env, timeoutMs: number, token?: string): typeof fetch {
+  return (input, init) =>
+    fetchOutboundHttp(input, init, {
+      env,
+      fetchFn,
+      timeoutMs,
+      maxResponseBytes: MAX_OBSIDIAN_MCP_RESOURCE_BYTES,
+      operation: "MCP endpoint request",
+      secrets: [token]
+    });
 }
 
 export function redactObsidianMcpSecret(message: string, token?: string): string {
@@ -85,14 +74,16 @@ function sanitizedMcpError(error: unknown, token?: string): Error {
 export function isObsidianMcpTextMimeType(mimeType: string | undefined): boolean {
   if (!mimeType) return true;
   const normalized = mimeType.split(";", 1)[0]?.trim().toLowerCase() ?? "";
-  return normalized.startsWith("text/")
-    || normalized === "application/json"
-    || normalized.endsWith("+json")
-    || normalized === "application/xml"
-    || normalized.endsWith("+xml")
-    || normalized === "application/yaml"
-    || normalized === "application/x-yaml"
-    || normalized === "application/toml";
+  return (
+    normalized.startsWith("text/") ||
+    normalized === "application/json" ||
+    normalized.endsWith("+json") ||
+    normalized === "application/xml" ||
+    normalized.endsWith("+xml") ||
+    normalized === "application/yaml" ||
+    normalized === "application/x-yaml" ||
+    normalized === "application/toml"
+  );
 }
 
 function normalizeResource(resource: {
@@ -133,12 +124,10 @@ export async function createObsidianMcpSession(
   if (!Number.isInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 120_000) {
     throw new Error("MCP timeout must be an integer between 1 and 120000 milliseconds.");
   }
-  const requestInit: RequestInit = token
-    ? { headers: { Authorization: `Bearer ${token}` } }
-    : {};
+  const requestInit: RequestInit = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
   const transport = new StreamableHTTPClientTransport(parsedEndpoint, {
     requestInit,
-    fetch: guardedFetch(options.fetchFn ?? globalThis.fetch, env)
+    fetch: guardedFetch(options.fetchFn ?? globalThis.fetch, env, timeoutMs, token)
   });
   const client = new Client({ name: "assini-lang", version: "0.3.0" });
 
@@ -155,10 +144,10 @@ export async function createObsidianMcpSession(
     serverVersion: server?.version,
     async listResources(cursor) {
       try {
-        const result = await client.listResources(
-          cursor ? { cursor } : undefined,
-          { timeout: timeoutMs, maxTotalTimeout: timeoutMs }
-        );
+        const result = await client.listResources(cursor ? { cursor } : undefined, {
+          timeout: timeoutMs,
+          maxTotalTimeout: timeoutMs
+        });
         return {
           resources: result.resources.map(normalizeResource),
           ...(result.nextCursor ? { nextCursor: result.nextCursor } : {})
@@ -169,10 +158,7 @@ export async function createObsidianMcpSession(
     },
     async readTextResource(uri) {
       try {
-        const result = await client.readResource(
-          { uri },
-          { timeout: timeoutMs, maxTotalTimeout: timeoutMs }
-        );
+        const result = await client.readResource({ uri }, { timeout: timeoutMs, maxTotalTimeout: timeoutMs });
         const textContents = result.contents.filter(
           (content): content is Extract<typeof content, { text: string }> => "text" in content
         );
@@ -197,10 +183,7 @@ export async function createObsidianMcpSession(
           throw new ObsidianMcpResourceReadError("empty", "MCP resource had no importable text.");
         }
         if (Buffer.byteLength(text, "utf8") > MAX_OBSIDIAN_MCP_RESOURCE_BYTES) {
-          throw new ObsidianMcpResourceReadError(
-            "too_large",
-            "MCP resource is larger than the 1 MB import limit."
-          );
+          throw new ObsidianMcpResourceReadError("too_large", "MCP resource is larger than the 1 MB import limit.");
         }
         const mimeType = supportedContents.find((content) => content.mimeType)?.mimeType;
         return {

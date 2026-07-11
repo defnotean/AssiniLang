@@ -101,7 +101,11 @@ describe("IngestView bulk draft review", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirm reject selected" }));
 
     await waitFor(() => {
-      expect(apiMock.bulkReviewExtractionDrafts).toHaveBeenCalledWith(LANGUAGE_ID, "reject", ["draft-1", "draft-2", "draft-3"]);
+      expect(apiMock.bulkReviewExtractionDrafts).toHaveBeenCalledWith(LANGUAGE_ID, "reject", [
+        "draft-1",
+        "draft-2",
+        "draft-3"
+      ]);
     });
     await screen.findByText("Bulk review finished: 3 rejected, 0 failed.");
   });
@@ -131,7 +135,10 @@ describe("IngestView bulk draft review", () => {
   it("disables the bulk action bar while a bulk review is running", async () => {
     let resolveBulk: (value: unknown) => void = () => {};
     apiMock.bulkReviewExtractionDrafts.mockImplementation(
-      () => new Promise((resolve) => { resolveBulk = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveBulk = resolve;
+        })
     );
 
     await renderIngestView();

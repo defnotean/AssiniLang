@@ -15,6 +15,11 @@ describe("createReadinessReport", () => {
           ok: true,
           pending: 0,
           active: 0
+        },
+        recovery: {
+          ok: true,
+          status: "succeeded",
+          recovered: 0
         }
       }
     });
@@ -37,6 +42,11 @@ describe("createReadinessReport", () => {
           ok: true,
           pending: 3,
           active: 2
+        },
+        recovery: {
+          ok: true,
+          status: "succeeded",
+          recovered: 0
         }
       }
     });
@@ -59,6 +69,11 @@ describe("createReadinessReport", () => {
           ok: true,
           pending: 0,
           active: 0
+        },
+        recovery: {
+          ok: true,
+          status: "succeeded",
+          recovered: 0
         }
       }
     });
@@ -83,6 +98,11 @@ describe("createReadinessReport", () => {
         jobQueue: {
           ok: false,
           error: "Job queue status unavailable"
+        },
+        recovery: {
+          ok: true,
+          status: "succeeded",
+          recovered: 0
         }
       }
     });
@@ -109,6 +129,11 @@ describe("createReadinessReport", () => {
         jobQueue: {
           ok: false,
           error: "Job queue status unavailable"
+        },
+        recovery: {
+          ok: true,
+          status: "succeeded",
+          recovered: 0
         }
       }
     });
@@ -120,7 +145,10 @@ describe("createReadinessReport", () => {
 
   it("treats non-finite, negative, or non-integer job-queue counts as unavailable", async () => {
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => ({ pending: -1, active: 0 }))
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => ({ pending: -1, active: 0 })
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -129,7 +157,10 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => ({ pending: 0, active: Number.NaN }))
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => ({ pending: 0, active: Number.NaN })
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -138,10 +169,13 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => ({
-        pending: Number.POSITIVE_INFINITY,
-        active: 1
-      }))
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => ({
+          pending: Number.POSITIVE_INFINITY,
+          active: 1
+        })
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -150,10 +184,13 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => ({
-        pending: 1.5,
-        active: 0
-      }))
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => ({
+          pending: 1.5,
+          active: 0
+        })
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -162,10 +199,13 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => ({
-        pending: Number.MAX_SAFE_INTEGER + 1,
-        active: 0
-      }))
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => ({
+          pending: Number.MAX_SAFE_INTEGER + 1,
+          active: 0
+        })
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -176,7 +216,10 @@ describe("createReadinessReport", () => {
 
   it("treats nullish or non-object job-queue status as unavailable", async () => {
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => null as never)
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => null as never
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -185,7 +228,10 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => undefined as never)
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => undefined as never
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -194,7 +240,10 @@ describe("createReadinessReport", () => {
     });
 
     await expect(
-      createReadinessReport(async () => createEmptyState(), () => "pending" as never)
+      createReadinessReport(
+        async () => createEmptyState(),
+        () => "pending" as never
+      )
     ).resolves.toMatchObject({
       ok: false,
       checks: {
@@ -223,6 +272,11 @@ describe("createReadinessReport", () => {
             ok: true,
             pending: 0,
             active: 0
+          },
+          recovery: {
+            ok: true,
+            status: "succeeded",
+            recovered: 0
           }
         }
       });
@@ -240,5 +294,35 @@ describe("createReadinessReport", () => {
     expect(report.ok).toBe(true);
     expect(JSON.stringify(report)).not.toContain("source-secret");
     expect(Object.keys(report.checks.jobQueue).sort()).toEqual(["active", "ok", "pending"]);
+  });
+
+  it("fails readiness with fixed diagnostics while startup recovery is pending or failed", async () => {
+    const pending = await createReadinessReport(
+      async () => createEmptyState(),
+      () => ({ pending: 0, active: 0 }),
+      () => ({ status: "pending", recovered: 0 })
+    );
+    expect(pending).toMatchObject({
+      ok: false,
+      checks: {
+        recovery: { ok: false, status: "pending", error: "Startup recovery pending" }
+      }
+    });
+
+    const failed = await createReadinessReport(
+      async () => createEmptyState(),
+      () => ({ pending: 0, active: 0 }),
+      () => {
+        throw new Error("C:/private/workspace with sk-live-secret");
+      }
+    );
+    expect(failed).toMatchObject({
+      ok: false,
+      checks: {
+        recovery: { ok: false, status: "failed", error: "Startup recovery failed" }
+      }
+    });
+    expect(JSON.stringify(failed)).not.toContain("C:/private");
+    expect(JSON.stringify(failed)).not.toContain("sk-live-secret");
   });
 });

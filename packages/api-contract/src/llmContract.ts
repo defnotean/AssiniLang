@@ -12,14 +12,9 @@ export const LLM_PROVIDERS = [
   "remote"
 ] as const;
 
-export type LlmProviderName = typeof LLM_PROVIDERS[number];
+export type LlmProviderName = (typeof LLM_PROVIDERS)[number];
 
-export const llmProviderModeSchema = z.enum([
-  "deterministic",
-  "local-openai-compatible",
-  "remote-api",
-  "invalid"
-]);
+export const llmProviderModeSchema = z.enum(["deterministic", "local-openai-compatible", "remote-api", "invalid"]);
 
 export const llmStatusSchema = z.object({
   provider: z.string(),
@@ -100,31 +95,33 @@ export const runtimeSettingsSchema = z.object({
 
 export type RuntimeSettings = z.infer<typeof runtimeSettingsSchema>;
 
-export const runtimeSettingsPatchSchema = z.object({
-  provider: z.enum(LLM_PROVIDERS).optional(),
-  baseUrl: z.string().trim().max(2048).optional(),
-  model: z.string().trim().max(256).optional(),
-  apiKey: z.string().max(4096).optional(),
-  clearApiKey: z.boolean().optional(),
-  timeoutMs: z.number().int().positive().max(600_000).optional(),
-  maxTokens: z.number().int().positive().max(200_000).optional(),
-  jsonMode: z.boolean().optional(),
-  embeddingBaseUrl: z.string().trim().max(2048).optional(),
-  embeddingModel: z.string().trim().max(256).optional(),
-  embeddingApiKey: z.string().max(4096).optional(),
-  clearEmbeddingApiKey: z.boolean().optional(),
-  embeddingTimeoutMs: z.number().int().positive().max(600_000).optional(),
-  transcriptionBaseUrl: z.string().trim().max(2048).optional(),
-  transcriptionModel: z.string().trim().max(256).optional(),
-  transcriptionApiKey: z.string().max(4096).optional(),
-  clearTranscriptionApiKey: z.boolean().optional(),
-  ocrBaseUrl: z.string().trim().max(2048).optional(),
-  ocrModel: z.string().trim().max(256).optional(),
-  ocrApiKey: z.string().max(4096).optional(),
-  clearOcrApiKey: z.boolean().optional(),
-  ocrLang: z.string().trim().min(1).max(32).optional(),
-  allowPrivateUrls: z.boolean().optional()
-}).strict();
+export const runtimeSettingsPatchSchema = z
+  .object({
+    provider: z.enum(LLM_PROVIDERS).optional(),
+    baseUrl: z.string().trim().max(2048).optional(),
+    model: z.string().trim().max(256).optional(),
+    apiKey: z.string().max(4096).optional(),
+    clearApiKey: z.boolean().optional(),
+    timeoutMs: z.number().int().positive().max(600_000).optional(),
+    maxTokens: z.number().int().positive().max(200_000).optional(),
+    jsonMode: z.boolean().optional(),
+    embeddingBaseUrl: z.string().trim().max(2048).optional(),
+    embeddingModel: z.string().trim().max(256).optional(),
+    embeddingApiKey: z.string().max(4096).optional(),
+    clearEmbeddingApiKey: z.boolean().optional(),
+    embeddingTimeoutMs: z.number().int().positive().max(600_000).optional(),
+    transcriptionBaseUrl: z.string().trim().max(2048).optional(),
+    transcriptionModel: z.string().trim().max(256).optional(),
+    transcriptionApiKey: z.string().max(4096).optional(),
+    clearTranscriptionApiKey: z.boolean().optional(),
+    ocrBaseUrl: z.string().trim().max(2048).optional(),
+    ocrModel: z.string().trim().max(256).optional(),
+    ocrApiKey: z.string().max(4096).optional(),
+    clearOcrApiKey: z.boolean().optional(),
+    ocrLang: z.string().trim().min(1).max(32).optional(),
+    allowPrivateUrls: z.boolean().optional()
+  })
+  .strict();
 
 export type RuntimeSettingsPatch = z.infer<typeof runtimeSettingsPatchSchema>;
 
@@ -156,11 +153,13 @@ export const llmModelProfileSchema = z.object({
 
 export type LlmModelProfile = z.infer<typeof llmModelProfileSchema>;
 
-export const modelProfileSavePayloadSchema = runtimeSettingsPatchSchema.extend({
-  id: z.string().trim().min(1).max(96).optional(),
-  name: z.string().trim().min(1).max(80),
-  activate: z.boolean().optional()
-}).strict();
+export const modelProfileSavePayloadSchema = runtimeSettingsPatchSchema
+  .extend({
+    id: z.string().trim().min(1).max(96).optional(),
+    name: z.string().trim().min(1).max(80),
+    activate: z.boolean().optional()
+  })
+  .strict();
 
 export type ModelProfileSavePayload = z.infer<typeof modelProfileSavePayloadSchema>;
 

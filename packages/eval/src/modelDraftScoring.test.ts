@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildTestCorpus,
-  buildTestLexemes,
-  buildTestNoteAnswerKeys,
-  TEST_LANGUAGE_ID
-} from "@assini/db";
+import { buildTestCorpus, buildTestLexemes, buildTestNoteAnswerKeys, TEST_LANGUAGE_ID } from "@assini/db";
 import { scoreModelDraft, classifyModelDraftFailure, type ModelDraftScoringContext } from "./modelDraftScoring.js";
 
 function buildContext(overrides: Partial<ModelDraftScoringContext> = {}): ModelDraftScoringContext {
@@ -166,8 +161,14 @@ describe("scoreModelDraft", () => {
 describe("classifyModelDraftFailure", () => {
   it.each([
     ["groundedEvidence: draft cites no evidence passages.", "groundedEvidence:missing"],
-    ['groundedEvidence: evidence passage "x" does not resolve to a passage in language "testlang".', "groundedEvidence:unresolved"],
-    ['knownForms: form "zorblat" does not appear in the lexicon or corpus for language "testlang".', "knownForms:unknown"],
+    [
+      'groundedEvidence: evidence passage "x" does not resolve to a passage in language "testlang".',
+      "groundedEvidence:unresolved"
+    ],
+    [
+      'knownForms: form "zorblat" does not appear in the lexicon or corpus for language "testlang".',
+      "knownForms:unknown"
+    ],
     ['topicAlignment: topic "phonology" does not overlap any answer-key topic.', "topicAlignment:mismatch"],
     ["exampleCoverage: draft has no examples.", "exampleCoverage:missing"],
     ['exampleCoverage: example target text does not match passage "c001".', "exampleCoverage:mismatch"],

@@ -3,6 +3,8 @@ export const FASTIFY_LOGGER_REDACT_PATHS = [
   "req.headers.cookie",
   "res.headers['set-cookie']",
   "err.message",
+  "err.stack",
+  "err.cause",
   "body.apiKey",
   "body.transcriptionApiKey",
   "body.ocrApiKey",

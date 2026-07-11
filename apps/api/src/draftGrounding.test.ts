@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildTestWorkspaceState, TEST_LANGUAGE_ID, type AppState, type ExtractionDraft, type Lexeme } from "@assini/db";
+import {
+  buildTestWorkspaceState,
+  TEST_LANGUAGE_ID,
+  type AppState,
+  type ExtractionDraft,
+  type Lexeme
+} from "@assini/db";
 import { computeDraftGroundingFlags } from "./draftGrounding.js";
 
 const emptyPayload = { tags: [], morphologicalSegmentation: [], topicTags: [] };
@@ -76,10 +82,7 @@ describe("computeDraftGroundingFlags", () => {
   });
 
   it("flags decomposable_form for talune when talu and ne are accepted (live-model regression)", () => {
-    const state = stateWithLexemes([
-      lexeme("talu", "water"),
-      lexeme("ne", "locative case marker")
-    ]);
+    const state = stateWithLexemes([lexeme("talu", "water"), lexeme("ne", "locative case marker")]);
     const flags = computeDraftGroundingFlags(lexemeDraft("talune", "swims"), state);
     expect(flags).toHaveLength(1);
     expect(flags[0]?.kind).toBe("decomposable_form");
@@ -88,10 +91,7 @@ describe("computeDraftGroundingFlags", () => {
   });
 
   it("requires full coverage of the form for decomposable_form", () => {
-    const state = stateWithLexemes([
-      lexeme("talu", "water"),
-      lexeme("ne", "locative case marker")
-    ]);
+    const state = stateWithLexemes([lexeme("talu", "water"), lexeme("ne", "locative case marker")]);
     // "taluneX" has a trailing residue not covered by any accepted form.
     const flags = computeDraftGroundingFlags(lexemeDraft("taluneq", "swims"), state);
     expect(flags).toEqual([]);

@@ -31,7 +31,10 @@ async function call(method, path, body, headers = auth) {
 
 function expect(label, result, expected) {
   if (result.status !== expected) {
-    console.error(`FAIL ${label}: expected ${expected}, got ${result.status}:`, JSON.stringify(result.body).slice(0, 500));
+    console.error(
+      `FAIL ${label}: expected ${expected}, got ${result.status}:`,
+      JSON.stringify(result.body).slice(0, 500)
+    );
     process.exit(1);
   }
   console.log(`ok   ${label} (${result.status})`);
@@ -261,7 +264,10 @@ console.log(`     recommended: ${recommended.exercises.length}, first status: ${
 // --- 8. Evaluation run + profile summary ------------------------------------
 const evaluationResult = await call("POST", "/evaluations/run", {});
 if (evaluationResult.status !== 200 && evaluationResult.status !== 201) {
-  console.error(`FAIL run evaluation: got ${evaluationResult.status}:`, JSON.stringify(evaluationResult.body).slice(0, 300));
+  console.error(
+    `FAIL run evaluation: got ${evaluationResult.status}:`,
+    JSON.stringify(evaluationResult.body).slice(0, 300)
+  );
   process.exit(1);
 }
 console.log(`ok   run evaluation (${evaluationResult.status})`);
@@ -274,7 +280,9 @@ console.log(`     stats: ${JSON.stringify(profile.stats)}`);
 console.log(`     morphemes derived: ${profile.morphemeInventory?.length ?? 0}`);
 console.log(`     paradigm gaps: ${(profile.paradigmGaps ?? []).length}`);
 for (const gap of (profile.paradigmGaps ?? []).slice(0, 5)) {
-  console.log(`     - ${gap.lemma} [${gap.dimension}] attested: ${gap.attested.join(",")} missing: ${gap.missing.join(",")}`);
+  console.log(
+    `     - ${gap.lemma} [${gap.dimension}] attested: ${gap.attested.join(",")} missing: ${gap.missing.join(",")}`
+  );
 }
 
 console.log("\nKELEVI SETUP COMPLETE");

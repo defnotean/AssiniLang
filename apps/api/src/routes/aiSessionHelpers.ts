@@ -1,10 +1,4 @@
-import type {
-  AiMessage,
-  AiSession,
-  AiSessionMode,
-  AppState,
-  User
-} from "@assini/db";
+import type { AiMessage, AiSession, AiSessionMode, AppState, User } from "@assini/db";
 import type { LlmGenerationResult } from "../llmProvider.js";
 import {
   buildNeuralMap,
@@ -47,12 +41,9 @@ export function toPublicAiSession(session: AiSession, actor: User): PublicAiSess
     })),
     neuralMap: sanitizeNeuralMapForActor(session.neuralMap, actor),
     privacy: {
-      redactions: Array.from(new Set([
-        ...session.privacy.redactions,
-        "hidden-chain-of-thought",
-        "answer-keys",
-        "learner-identifiers"
-      ])),
+      redactions: Array.from(
+        new Set([...session.privacy.redactions, "hidden-chain-of-thought", "answer-keys", "learner-identifiers"])
+      ),
       exposesHiddenChainOfThought: false
     }
   };
@@ -103,7 +94,12 @@ function buildAiSessionNeuralMap(
 ): NeuralMapResponse {
   const neuralMap = buildNeuralMap(state, languageId);
   neuralMap.nodes.push({ id: `ai_session:${sessionId}`, type: "ai_session", label: mode, metadata: { status } });
-  neuralMap.edges.push({ source: `language:${languageId}`, target: `ai_session:${sessionId}`, relation: "generated", weight: 0.75 });
+  neuralMap.edges.push({
+    source: `language:${languageId}`,
+    target: `ai_session:${sessionId}`,
+    relation: "generated",
+    weight: 0.75
+  });
   return neuralMap;
 }
 
@@ -280,11 +276,9 @@ export function markAiSessionGenerationFailed(
     ],
     neuralMap: {
       ...session.neuralMap,
-      nodes: session.neuralMap.nodes.map((node) => (
-        node.id === `ai_session:${session.id}`
-          ? { ...node, metadata: { ...node.metadata, status: "failed" } }
-          : node
-      ))
+      nodes: session.neuralMap.nodes.map((node) =>
+        node.id === `ai_session:${session.id}` ? { ...node, metadata: { ...node.metadata, status: "failed" } } : node
+      )
     },
     privacy: buildAiSessionPrivacy()
   };
@@ -292,7 +286,9 @@ export function markAiSessionGenerationFailed(
 
 export function validateAiSessionContext(state: AppState, body: AiSessionBody): string | undefined {
   const noteIds = new Set(state.notes.filter((note) => note.languageId === body.languageId).map((note) => note.id));
-  const passageIds = new Set(state.corpus.filter((passage) => passage.languageId === body.languageId).map((passage) => passage.id));
+  const passageIds = new Set(
+    state.corpus.filter((passage) => passage.languageId === body.languageId).map((passage) => passage.id)
+  );
 
   for (const noteId of body.contextNoteIds) {
     if (!noteIds.has(noteId)) return `Context note not found for language: ${noteId}`;

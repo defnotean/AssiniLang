@@ -133,7 +133,11 @@ export function EvaluationView({
             <p className="muted">{artifactDownload.summary}</p>
           </div>
         )}
-        {artifactError && <p className="result-notice error" role="alert">{artifactError}</p>}
+        {artifactError && (
+          <p className="result-notice error" role="alert">
+            {artifactError}
+          </p>
+        )}
       </section>
 
       <section className="panel-card evaluation-trend-card" aria-label={t("eval.trendsAria")}>
@@ -148,9 +152,7 @@ export function EvaluationView({
         {comparableTrends.length === 0 ? (
           <div className="empty-state" role="status">
             <p>{t("eval.runMoreThanOnce")}</p>
-            {evaluations.length > 0 && (
-              <p className="muted">{t("eval.trendsNextStep")}</p>
-            )}
+            {evaluations.length > 0 && <p className="muted">{t("eval.trendsNextStep")}</p>}
           </div>
         ) : (
           <div className="trend-grid">
@@ -159,11 +161,13 @@ export function EvaluationView({
               const languageName = language?.name ?? trend.languageId;
               return (
                 <article className={`trend-card ${trend.status}`} key={trend.languageId}>
-                  <p>{t("eval.trendSentence", {
-                    name: languageName,
-                    verb: t(TREND_VERB_KEY[trend.status]),
-                    points: formatTrendPoints(trend.averageDelta, t)
-                  })}</p>
+                  <p>
+                    {t("eval.trendSentence", {
+                      name: languageName,
+                      verb: t(TREND_VERB_KEY[trend.status]),
+                      points: formatTrendPoints(trend.averageDelta, t)
+                    })}
+                  </p>
                   <div className="pill-row">
                     {Object.entries(trend.categoryDeltas)
                       .filter(([, delta]) => delta.delta !== null)
@@ -187,9 +191,7 @@ export function EvaluationView({
               <span className="detail-label">{t("eval.latestRun")}</span>
               <h2>{t("eval.scoreBreakdown", { name: activeLanguage?.name ?? activeRun.languageId })}</h2>
             </div>
-            <span className="id-badge">
-              {new Date(activeRun.createdAt).toLocaleString(locale)}
-            </span>
+            <span className="id-badge">{new Date(activeRun.createdAt).toLocaleString(locale)}</span>
           </div>
           <p className="eval-summary">{localizeEvaluationRunSummary(activeRun.summary, t)}</p>
           <div className="score-bars">

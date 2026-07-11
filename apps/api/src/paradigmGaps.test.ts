@@ -6,12 +6,7 @@ import { detectParadigmGaps, PARADIGM_GAP_REPORT_LIMIT } from "./paradigmGaps.js
 type Passage = AppState["corpus"][number];
 type Morpheme = Passage["morphologicalSegmentation"][number];
 
-function makePassage(
-  base: Passage,
-  id: string,
-  languageId: string,
-  segmentation: Morpheme[]
-): Passage {
+function makePassage(base: Passage, id: string, languageId: string, segmentation: Morpheme[]): Passage {
   return {
     ...base,
     id,
@@ -111,10 +106,16 @@ describe("paradigm gap detection", () => {
       makePassage(base, "p2", TEST_LANGUAGE_ID, [free("talo", "walk"), suffix("-lo", "past tense", ["tense"])]),
       makePassage(base, "p3", TEST_LANGUAGE_ID, [free("nemi", "teach"), suffix("-mi", "present tense", ["tense"])]),
       makePassage(base, "p4", TEST_LANGUAGE_ID, [free("nemi", "teach"), suffix("-lo", "past", ["tense"])]),
-      makePassage(base, "p5", TEST_LANGUAGE_ID, [free("kora", "speak"), suffix("-na", "first person singular", ["person"])]),
+      makePassage(base, "p5", TEST_LANGUAGE_ID, [
+        free("kora", "speak"),
+        suffix("-na", "first person singular", ["person"])
+      ]),
       makePassage(base, "p6", TEST_LANGUAGE_ID, [free("kora", "speak"), suffix("-ki", "3sg", ["person"])]),
       makePassage(base, "p7", TEST_LANGUAGE_ID, [free("sora", "see"), suffix("-na", "1sg", ["person"])]),
-      makePassage(base, "p8", TEST_LANGUAGE_ID, [free("sora", "see"), suffix("-ki", "third person singular", ["person"])])
+      makePassage(base, "p8", TEST_LANGUAGE_ID, [
+        free("sora", "see"),
+        suffix("-ki", "third person singular", ["person"])
+      ])
     ]);
 
     expect(detectParadigmGaps(state, TEST_LANGUAGE_ID)).toEqual([]);
@@ -144,17 +145,34 @@ describe("paradigm gap detection", () => {
     const corpus: Passage[] = [];
     // A language-wide person dimension with three values; "big" lemma attests
     // three of four values, the numbered lemmas attest two each.
-    const values: Array<[string, string]> = [["-na", "1sg"], ["-ki", "3sg"], ["-su", "2sg"], ["-zu", "4sg"]];
+    const values: Array<[string, string]> = [
+      ["-na", "1sg"],
+      ["-ki", "3sg"],
+      ["-su", "2sg"],
+      ["-zu", "4sg"]
+    ];
     for (const [form, gloss] of values) {
-      corpus.push(makePassage(base, `seed-${gloss}`, TEST_LANGUAGE_ID, [free("seedmost", "seed"), suffix(form, gloss, ["person"])]));
+      corpus.push(
+        makePassage(base, `seed-${gloss}`, TEST_LANGUAGE_ID, [
+          free("seedmost", "seed"),
+          suffix(form, gloss, ["person"])
+        ])
+      );
     }
     for (const [form, gloss] of values.slice(0, 3)) {
-      corpus.push(makePassage(base, `big-${gloss}`, TEST_LANGUAGE_ID, [free("big", "big"), suffix(form, gloss, ["person"])]));
+      corpus.push(
+        makePassage(base, `big-${gloss}`, TEST_LANGUAGE_ID, [free("big", "big"), suffix(form, gloss, ["person"])])
+      );
     }
     for (let i = 0; i < 25; i += 1) {
       const lemma = `lemma${String(i).padStart(2, "0")}`;
       for (const [form, gloss] of values.slice(0, 2)) {
-        corpus.push(makePassage(base, `${lemma}-${gloss}`, TEST_LANGUAGE_ID, [free(lemma, lemma), suffix(form, gloss, ["person"])]));
+        corpus.push(
+          makePassage(base, `${lemma}-${gloss}`, TEST_LANGUAGE_ID, [
+            free(lemma, lemma),
+            suffix(form, gloss, ["person"])
+          ])
+        );
       }
     }
 
@@ -164,7 +182,11 @@ describe("paradigm gap detection", () => {
     expect(gaps[0]).toMatchObject({ lemma: "big", attested: ["1sg", "2sg", "3sg"], missing: ["4sg"] });
     expect(gaps.slice(1).every((gap) => gap.attested.length === 2)).toBe(true);
     expect(gaps.slice(1).map((gap) => gap.lemma)).toEqual(
-      gaps.slice(1).map((gap) => gap.lemma).slice().sort()
+      gaps
+        .slice(1)
+        .map((gap) => gap.lemma)
+        .slice()
+        .sort()
     );
   });
 

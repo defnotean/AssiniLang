@@ -52,20 +52,16 @@ function readLogger(value: string | undefined): FastifyServerOptions["logger"] {
 
 function isLoopbackHost(host: string): boolean {
   const normalized = host.toLowerCase();
-  return normalized === "localhost"
-    || normalized === "::1"
-    || normalized === "[::1]"
-    || /^127(?:\.\d{1,3}){3}$/.test(normalized);
+  return (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "[::1]" ||
+    /^127(?:\.\d{1,3}){3}$/.test(normalized)
+  );
 }
 
-export function applyLoopbackPrivateUrlDefault(
-  env: Record<string, string | undefined>,
-  host: string
-): void {
-  if (
-    isLoopbackHost(host)
-    && !Object.prototype.hasOwnProperty.call(env, "ASSINI_ALLOW_PRIVATE_URLS")
-  ) {
+export function applyLoopbackPrivateUrlDefault(env: Record<string, string | undefined>, host: string): void {
+  if (isLoopbackHost(host) && !Object.prototype.hasOwnProperty.call(env, "ASSINI_ALLOW_PRIVATE_URLS")) {
     env.ASSINI_ALLOW_PRIVATE_URLS = "1";
   }
 }
@@ -79,9 +75,9 @@ function assertNetworkAuthIsExplicit(host: string, env: Record<string, string | 
   if (!prototypeAuthEnabled && !predictableDevToken) return;
 
   throw new Error(
-    `Refusing to expose insecure prototype authentication on HOST=${host}. `
-    + `Use loopback, configure production authentication, or set ${INSECURE_NETWORK_AUTH_OVERRIDE}=true `
-    + "only for an intentionally isolated development network."
+    `Refusing to expose insecure prototype authentication on HOST=${host}. ` +
+      `Use loopback, configure production authentication, or set ${INSECURE_NETWORK_AUTH_OVERRIDE}=true ` +
+      "only for an intentionally isolated development network."
   );
 }
 

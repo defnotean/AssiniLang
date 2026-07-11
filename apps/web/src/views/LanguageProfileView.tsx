@@ -22,7 +22,15 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
     );
   }
 
-  const { language, stats, phonology, grammarRules, vocabulary, morphemeInventory, paradigmGaps = [] } = profileState.data;
+  const {
+    language,
+    stats,
+    phonology,
+    grammarRules,
+    vocabulary,
+    morphemeInventory,
+    paradigmGaps = []
+  } = profileState.data;
 
   return (
     <div className="profile-view">
@@ -96,7 +104,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
           </dl>
           <div className="detail-list">
             {phonology.notes.map((note) => (
-              <p className="detail-row" key={note}>{note}</p>
+              <p className="detail-row" key={note}>
+                {note}
+              </p>
             ))}
           </div>
         </section>
@@ -108,7 +118,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
               <h2>{t("profile.noPhonologyDeclared")}</h2>
             </div>
           </div>
-          <p className="empty-state" role="status" aria-live="polite">{t("profile.phonologyEmptyState")}</p>
+          <p className="empty-state" role="status" aria-live="polite">
+            {t("profile.phonologyEmptyState")}
+          </p>
           <p className="muted">{t("profile.inventoryEditorBody")}</p>
         </section>
       )}
@@ -126,21 +138,27 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
         <div className="detail-list">
           {grammarRules.length === 0 ? (
-            <p className="empty-state" role="status">{t("profile.grammarEmptyState")}</p>
-          ) : grammarRules.map((rule) => (
-            <article className="detail-row grammar-rule-row" key={rule.id}>
-              <div>
-                <strong>{rule.topic}</strong>
-                <p>{rule.explanation}</p>
-              </div>
-              <ConfidenceBadge confidence={rule.confidence} />
-              <div className="pill-row">
-                {rule.evidencePassageIds.map((passageId, index) => (
-                  <span className="pill" key={`${index}:${passageId}`}>{passageId}</span>
-                ))}
-              </div>
-            </article>
-          ))}
+            <p className="empty-state" role="status">
+              {t("profile.grammarEmptyState")}
+            </p>
+          ) : (
+            grammarRules.map((rule) => (
+              <article className="detail-row grammar-rule-row" key={rule.id}>
+                <div>
+                  <strong>{rule.topic}</strong>
+                  <p>{rule.explanation}</p>
+                </div>
+                <ConfidenceBadge confidence={rule.confidence} />
+                <div className="pill-row">
+                  {rule.evidencePassageIds.map((passageId, index) => (
+                    <span className="pill" key={`${index}:${passageId}`}>
+                      {passageId}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
 
@@ -157,19 +175,25 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
         <div className="vocabulary-grid">
           {vocabulary.length === 0 ? (
-            <p className="empty-state" role="status">{t("profile.vocabularyEmptyState")}</p>
-          ) : vocabulary.map((item) => (
-            <article className="vocabulary-entry" key={item.id}>
-              <code>{item.form}</code>
-              <strong>{item.gloss}</strong>
-              <span>{formatPartOfSpeech(item.partOfSpeech, t)}</span>
-              <div className="pill-row">
-                {item.tags.map((tag, index) => (
-                  <span className="pill" key={`${item.id}:${index}:${tag}`}>{tag}</span>
-                ))}
-              </div>
-            </article>
-          ))}
+            <p className="empty-state" role="status">
+              {t("profile.vocabularyEmptyState")}
+            </p>
+          ) : (
+            vocabulary.map((item) => (
+              <article className="vocabulary-entry" key={item.id}>
+                <code>{item.form}</code>
+                <strong>{item.gloss}</strong>
+                <span>{formatPartOfSpeech(item.partOfSpeech, t)}</span>
+                <div className="pill-row">
+                  {item.tags.map((tag, index) => (
+                    <span className="pill" key={`${item.id}:${index}:${tag}`}>
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
 
@@ -186,34 +210,44 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
         </div>
         <div className="morpheme-grid">
           {morphemeInventory.length === 0 ? (
-            <p className="empty-state" role="status">{t("profile.morphemeEmptyState")}</p>
-          ) : morphemeInventory.map((item, index) => (
-            <article className="morpheme-entry" key={`${index}:${item.surface}:${item.lemma}`}>
-              <div className="morpheme-entry-topline">
-                <code>{item.surface}</code>
-                <span className="id-badge">
-                  {item.occurrenceCount === 1
-                    ? t("profile.corpusUseCountOne", { count: item.occurrenceCount })
-                    : t("profile.corpusUseCountMany", { count: item.occurrenceCount })}
-                </span>
-              </div>
-              <strong>{item.lemma}</strong>
-              <span>{item.glosses.join(" / ")}</span>
-              {item.vocabulary && (
-                <small>{formatPartOfSpeech(item.vocabulary.partOfSpeech, t)}: {item.vocabulary.gloss}</small>
-              )}
-              <div className="pill-row">
-                {item.features.map((feature, index) => (
-                  <span className="pill" key={`${item.surface}:feature:${index}:${feature}`}>{feature}</span>
-                ))}
-              </div>
-              <div className="pill-row">
-                {item.passageIds.map((passageId, index) => (
-                  <span className="pill" key={`${item.surface}:passage:${index}:${passageId}`}>{passageId}</span>
-                ))}
-              </div>
-            </article>
-          ))}
+            <p className="empty-state" role="status">
+              {t("profile.morphemeEmptyState")}
+            </p>
+          ) : (
+            morphemeInventory.map((item, index) => (
+              <article className="morpheme-entry" key={`${index}:${item.surface}:${item.lemma}`}>
+                <div className="morpheme-entry-topline">
+                  <code>{item.surface}</code>
+                  <span className="id-badge">
+                    {item.occurrenceCount === 1
+                      ? t("profile.corpusUseCountOne", { count: item.occurrenceCount })
+                      : t("profile.corpusUseCountMany", { count: item.occurrenceCount })}
+                  </span>
+                </div>
+                <strong>{item.lemma}</strong>
+                <span>{item.glosses.join(" / ")}</span>
+                {item.vocabulary && (
+                  <small>
+                    {formatPartOfSpeech(item.vocabulary.partOfSpeech, t)}: {item.vocabulary.gloss}
+                  </small>
+                )}
+                <div className="pill-row">
+                  {item.features.map((feature, index) => (
+                    <span className="pill" key={`${item.surface}:feature:${index}:${feature}`}>
+                      {feature}
+                    </span>
+                  ))}
+                </div>
+                <div className="pill-row">
+                  {item.passageIds.map((passageId, index) => (
+                    <span className="pill" key={`${item.surface}:passage:${index}:${passageId}`}>
+                      {passageId}
+                    </span>
+                  ))}
+                </div>
+              </article>
+            ))
+          )}
         </div>
       </section>
 
@@ -247,7 +281,9 @@ export function LanguageProfileView({ profileState }: { profileState: AsyncState
                 </div>
                 <div className="pill-row">
                   {gap.attested.map((cell, index) => (
-                    <span className="pill paradigm-cell-attested" key={`${gap.lemma}:attested:${index}:${cell}`}>{cell}</span>
+                    <span className="pill paradigm-cell-attested" key={`${gap.lemma}:attested:${index}:${cell}`}>
+                      {cell}
+                    </span>
                   ))}
                   {gap.missing.map((cell, index) => (
                     <span className="pill paradigm-cell-missing" key={`${gap.lemma}:missing:${index}:${cell}`}>

@@ -8,9 +8,14 @@ import {
 describe("llm response parsing", () => {
   it("trims string assistant content", () => {
     expect(parseAssistantMessageContent("  Visible response \n")).toBe("Visible response");
-    expect(parseOpenAiChatCompletionContent({
-      choices: [{ message: { content: "  Visible response \n" } }]
-    }, "empty fallback")).toEqual({
+    expect(
+      parseOpenAiChatCompletionContent(
+        {
+          choices: [{ message: { content: "  Visible response \n" } }]
+        },
+        "empty fallback"
+      )
+    ).toEqual({
       ok: true,
       content: "Visible response"
     });
@@ -26,9 +31,14 @@ describe("llm response parsing", () => {
     ];
 
     expect(parseAssistantMessageContent(content)).toBe("First second");
-    expect(parseOpenAiChatCompletionContent({
-      choices: [{ message: { content } }]
-    }, "empty fallback")).toEqual({
+    expect(
+      parseOpenAiChatCompletionContent(
+        {
+          choices: [{ message: { content } }]
+        },
+        "empty fallback"
+      )
+    ).toEqual({
       ok: true,
       content: "First second"
     });
@@ -46,18 +56,29 @@ describe("llm response parsing", () => {
     };
 
     expect(hasReasoningOnlyContent(message)).toBe(true);
-    expect(parseOpenAiChatCompletionContent({
-      choices: [{ message }]
-    }, "empty fallback")).toEqual({
+    expect(
+      parseOpenAiChatCompletionContent(
+        {
+          choices: [{ message }]
+        },
+        "empty fallback"
+      )
+    ).toEqual({
       ok: false,
-      error: "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content."
+      error:
+        "LLM provider returned only reasoning_content without visible assistant content. Increase max tokens or choose a model that emits final content."
     });
   });
 
   it("uses the caller-provided empty content fallback", () => {
-    expect(parseOpenAiChatCompletionContent({
-      choices: [{ message: { content: " " } }]
-    }, "empty fallback")).toEqual({
+    expect(
+      parseOpenAiChatCompletionContent(
+        {
+          choices: [{ message: { content: " " } }]
+        },
+        "empty fallback"
+      )
+    ).toEqual({
       ok: false,
       error: "empty fallback"
     });

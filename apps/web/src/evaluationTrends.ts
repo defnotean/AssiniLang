@@ -10,11 +10,14 @@ export type EvaluationTrend = {
   previousAverageScore: number | null;
   averageDelta: number | null;
   status: EvaluationTrendStatus;
-  categoryDeltas: Record<string, {
-    latestScore: number;
-    previousScore: number | null;
-    delta: number | null;
-  }>;
+  categoryDeltas: Record<
+    string,
+    {
+      latestScore: number;
+      previousScore: number | null;
+      delta: number | null;
+    }
+  >;
 };
 
 export function averageScore(scores: Record<string, number>): number {
@@ -45,14 +48,17 @@ export function evaluationTrendsForRuns(runs: EvaluationRun[]): EvaluationTrend[
 
   return Object.entries(grouped)
     .map(([languageId, languageRuns]): EvaluationTrend | undefined => {
-      const sorted = languageRuns.slice().sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+      const sorted = languageRuns
+        .slice()
+        .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
       const latest = sorted[sorted.length - 1];
       if (!latest) return undefined;
 
       const previous = sorted[sorted.length - 2];
       const latestAverageScore = roundedScore(averageScore(latest.scores));
       const previousAverageScore = previous ? roundedScore(averageScore(previous.scores)) : null;
-      const averageDelta = previousAverageScore === null ? null : roundedScore(latestAverageScore - previousAverageScore);
+      const averageDelta =
+        previousAverageScore === null ? null : roundedScore(latestAverageScore - previousAverageScore);
       const categories = new Set([...Object.keys(latest.scores), ...Object.keys(previous?.scores ?? {})]);
       const categoryDeltas = [...categories].sort().reduce<EvaluationTrend["categoryDeltas"]>((deltas, category) => {
         const latestScore = roundedScore(latest.scores[category] ?? 0);

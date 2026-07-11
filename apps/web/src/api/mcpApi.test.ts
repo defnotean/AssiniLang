@@ -24,7 +24,8 @@ describe("Obsidian MCP API client", () => {
 
   it("loads settings through a programmer prototype session", async () => {
     const settings = { endpointUrl: "", tokenConfigured: false, timeoutMs: 15_000 };
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJson({ userId: "programmer-1" }))
       .mockResolvedValueOnce(okJson(settings));
     vi.stubGlobal("fetch", fetchMock);
@@ -42,7 +43,8 @@ describe("Obsidian MCP API client", () => {
       tokenConfigured: true,
       timeoutMs: 20_000
     };
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJson({ userId: "programmer-1" }))
       .mockResolvedValueOnce(okJson(saved));
     vi.stubGlobal("fetch", fetchMock);
@@ -74,7 +76,8 @@ describe("Obsidian MCP API client", () => {
       skipped: [],
       summary: { requested: 1, imported: 1, skipped: 0 }
     };
-    const fetchMock = vi.fn()
+    const fetchMock = vi
+      .fn()
       .mockResolvedValueOnce(okJson({ userId: "reviewer-1" }))
       .mockResolvedValueOnce(okJson(resources))
       .mockResolvedValueOnce(okJson(imported));

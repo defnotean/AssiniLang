@@ -43,7 +43,9 @@ function SectionNavigation({
           <ViewGlyph view={mode} />
           <span>{t(`viewConfig.${mode}.label`)}</span>
           {sectionCounts[mode] != null && (
-            <span className="section-count" aria-hidden="true">{sectionCounts[mode]}</span>
+            <span className="section-count" aria-hidden="true">
+              {sectionCounts[mode]}
+            </span>
           )}
         </button>
       ))}

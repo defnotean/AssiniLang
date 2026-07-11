@@ -43,12 +43,7 @@ import {
   uploadSourceFile,
   updateRuntimeSettings
 } from "./api";
-import {
-  assertOk,
-  fetchAsActor,
-  resetPrototypeSessionCache,
-  actorRequest as buildActorRequest
-} from "./lib/apiClient";
+import { assertOk, fetchAsActor, resetPrototypeSessionCache, actorRequest as buildActorRequest } from "./lib/apiClient";
 
 describe("fetchDashboardData", () => {
   afterEach(() => {
@@ -193,9 +188,7 @@ describe("fetchDashboardData", () => {
       allowedVocabulary: ["mira", "talo", "-mi", "-na"],
       allowedRuleIds: ["avn-rule-verb-chain"],
       expectedAnswers: ["mira talo-mi-na"],
-      adversarialAnswers: [
-        { answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }
-      ],
+      adversarialAnswers: [{ answer: "talo-mi-na mira", reason: "Moves the finite verb before the locative noun." }],
       gradingExplanation: "Use mira for river, talo for walk, -mi for present, and -na for first person singular."
     };
 
@@ -355,9 +348,7 @@ describe("fetchDashboardData", () => {
       },
       textTarget: "mira lumo-ke talo-mi-na",
       textTranslation: "I walk by the river at the practice mat.",
-      morphologicalSegmentation: [
-        { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }
-      ],
+      morphologicalSegmentation: [{ surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }],
       topicTags: ["movement"],
       consentStatus: {
         use: "testing-only" as const,
@@ -399,9 +390,7 @@ describe("fetchDashboardData", () => {
       },
       textTarget: "mira lumo-ke talo-mi-na",
       textTranslation: "I walk by the river near the practice mat.",
-      morphologicalSegmentation: [
-        { surface: "mira", lemma: "river", gloss: "river", features: ["noun"] }
-      ],
+      morphologicalSegmentation: [{ surface: "mira", lemma: "river", gloss: "river", features: ["noun"] }],
       topicTags: ["movement"],
       consentStatus: {
         use: "testing-only" as const,
@@ -443,9 +432,7 @@ describe("fetchDashboardData", () => {
       },
       textTarget: "mira lumo-ke talo-mi-na",
       textTranslation: "I walk by the river at the practice mat.",
-      morphologicalSegmentation: [
-        { surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }
-      ],
+      morphologicalSegmentation: [{ surface: "mira", lemma: "mira", gloss: "river", features: ["noun"] }],
       topicTags: ["movement"],
       consentStatus: {
         use: "testing-only" as const,
@@ -680,9 +667,7 @@ describe("fetchDashboardData", () => {
     }
     expect(caught).toBeInstanceOf(ApiError);
     const error = caught as ApiError;
-    expect(error.message).toBe(
-      "Request failed: /llm/status (413): Payload is too large (request id: req-body-413)"
-    );
+    expect(error.message).toBe("Request failed: /llm/status (413): Payload is too large (request id: req-body-413)");
     expect(error.status).toBe(413);
     expect(error.requestId).toBe("req-body-413");
     expect(error.i18nKey).toBe("errors.payloadTooLarge");
@@ -711,9 +696,7 @@ describe("fetchDashboardData", () => {
     }
     expect(caught).toBeInstanceOf(ApiError);
     const error = caught as ApiError;
-    expect(error.message).toBe(
-      "Request failed: /llm/status (429): Rate limit exceeded Retry after 12 seconds."
-    );
+    expect(error.message).toBe("Request failed: /llm/status (429): Rate limit exceeded Retry after 12 seconds.");
     expect(error.status).toBe(429);
     expect(error.requestId).toBeUndefined();
     expect(error.i18nKey).toBe("app.rateLimitExceeded");
@@ -813,11 +796,7 @@ describe("fetchDashboardData", () => {
 
     await fetchReviewPolicy("avenik/test language");
     expectPrototypeSession(fetchMock, "reviewer-1");
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/api/languages/avenik%2Ftest%20language/review-policy",
-      actorRequest
-    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/review-policy", actorRequest);
 
     const payload = {
       assignedReviewerIds: ["reviewer-1", "elder-1"],
@@ -845,11 +824,7 @@ describe("fetchDashboardData", () => {
     await fetchAuditEvents("avenik/test language");
 
     expectPrototypeSession(fetchMock, "programmer-1");
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      "/api/audit/events?languageId=avenik%2Ftest%20language",
-      actorRequest
-    );
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/audit/events?languageId=avenik%2Ftest%20language", actorRequest);
   });
 
   it("fetches and resolves review dispositions through role-aware prototype auth", async () => {
@@ -935,7 +910,11 @@ describe("fetchDashboardData", () => {
     await fetchLanguageSnapshot("avenik/test language");
 
     expectPrototypeSession(fetchMock, "reviewer-1");
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/exports/languages/avenik%2Ftest%20language/snapshot", actorRequest);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/exports/languages/avenik%2Ftest%20language/snapshot",
+      actorRequest
+    );
     expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("x-assini-dev-token");
   });
 
@@ -945,7 +924,15 @@ describe("fetchDashboardData", () => {
       json: async () => ({
         exportVersion: "evaluation-artifact-v2",
         exportedAt: "2026-06-06T00:00:00.000Z",
-        summary: { languages: 4, totalRuns: 4, latestRuns: 4, failedLatestRuns: 0, averageLatestScore: 1, passed: true, failureCount: 0 },
+        summary: {
+          languages: 4,
+          totalRuns: 4,
+          latestRuns: 4,
+          failedLatestRuns: 0,
+          averageLatestScore: 1,
+          passed: true,
+          failureCount: 0
+        },
         latestRuns: [],
         runsByLanguage: {},
         failureLines: []
@@ -1132,9 +1119,7 @@ describe("fetchDashboardData", () => {
       body: JSON.stringify({ preferLexiconSegmentation: true })
     });
 
-    const editedSegmentation = [
-      { surface: "mira", lemma: "mira", gloss: "stream", features: ["noun"] }
-    ];
+    const editedSegmentation = [{ surface: "mira", lemma: "mira", gloss: "stream", features: ["noun"] }];
     await acceptExtractionDraft("draft/4", { morphologicalSegmentation: editedSegmentation });
     expect(fetchMock).toHaveBeenNthCalledWith(4, "/api/extraction-drafts/draft%2F4/accept", {
       method: "POST",
@@ -1166,11 +1151,15 @@ describe("fetchDashboardData", () => {
     const result = await bulkReviewExtractionDrafts("avenik/test language", "accept", ["draft-1"]);
 
     expectPrototypeSession(fetchMock, "reviewer-1");
-    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/languages/avenik%2Ftest%20language/extraction-drafts/bulk-review", {
-      ...jsonRequest,
-      method: "POST",
-      body: JSON.stringify({ action: "accept", draftIds: ["draft-1"] })
-    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/languages/avenik%2Ftest%20language/extraction-drafts/bulk-review",
+      {
+        ...jsonRequest,
+        method: "POST",
+        body: JSON.stringify({ action: "accept", draftIds: ["draft-1"] })
+      }
+    );
     expect(result.accepted).toBe(1);
     expect(result.results[0]).toMatchObject({ draftId: "draft-1", ok: true });
   });
@@ -1406,10 +1395,7 @@ describe("fetchDashboardData", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await Promise.all([
-      fetchAsActor("learner", "/api/users/me"),
-      fetchAsActor("reviewer", "/api/users/me")
-    ]);
+    await Promise.all([fetchAsActor("learner", "/api/users/me"), fetchAsActor("reviewer", "/api/users/me")]);
 
     expect(maxInFlightPosts).toBe(1);
     expect(prototypeSessionPostCount(fetchMock)).toBe(2);
@@ -1448,8 +1434,6 @@ describe("fetchDashboardData", () => {
 
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(closePrototypeSession()).rejects.toThrow(
-      "Prototype sign-out failed (500): session store unavailable"
-    );
+    await expect(closePrototypeSession()).rejects.toThrow("Prototype sign-out failed (500): session store unavailable");
   });
 });

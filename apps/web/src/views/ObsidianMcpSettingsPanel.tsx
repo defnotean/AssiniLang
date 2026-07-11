@@ -37,15 +37,18 @@ export function ObsidianMcpSettingsPanel() {
 
   useEffect(() => {
     let active = true;
-    void fetchObsidianMcpSettings().then((loaded) => {
-      if (!active) return;
-      setSettings(loaded);
-      setForm(formFromSettings(loaded));
-    }).catch((caught) => {
-      if (active) setError(caught instanceof Error ? caught.message : t("mcp.settingsLoadFailed"));
-    }).finally(() => {
-      if (active) setIsLoading(false);
-    });
+    void fetchObsidianMcpSettings()
+      .then((loaded) => {
+        if (!active) return;
+        setSettings(loaded);
+        setForm(formFromSettings(loaded));
+      })
+      .catch((caught) => {
+        if (active) setError(caught instanceof Error ? caught.message : t("mcp.settingsLoadFailed"));
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -102,9 +105,11 @@ export function ObsidianMcpSettingsPanel() {
           <h2>{t("mcp.settingsHeading")}</h2>
         </div>
         {settings ? (
-          <span className={`status-badge ${connection?.connected ? "approved" : settings.endpointUrl ? "under_review" : "draft"}`}>
+          <span
+            className={`status-badge ${connection?.connected ? "approved" : settings.endpointUrl ? "under_review" : "draft"}`}
+          >
             {connection?.connected
-              ? connection.serverName ?? t("mcp.connected")
+              ? (connection.serverName ?? t("mcp.connected"))
               : settings.endpointUrl
                 ? t("mcp.configured")
                 : t("mcp.notConfigured")}
@@ -112,7 +117,11 @@ export function ObsidianMcpSettingsPanel() {
         ) : null}
       </div>
 
-      {isLoading && <p className="inline-empty" role="status">{t("mcp.loadingSettings")}</p>}
+      {isLoading && (
+        <p className="inline-empty" role="status">
+          {t("mcp.loadingSettings")}
+        </p>
+      )}
       {form ? (
         <form className="settings-form" onSubmit={handleSave} aria-busy={isSaving}>
           <div className="settings-grid">
@@ -177,8 +186,16 @@ export function ObsidianMcpSettingsPanel() {
               {isTesting ? t("mcp.testing") : t("mcp.test")}
             </button>
           </div>
-          {notice && <p className="result-notice" role="status" aria-live="polite">{notice}</p>}
-          {error && <p className="inline-error" role="alert" aria-live="assertive">{error}</p>}
+          {notice && (
+            <p className="result-notice" role="status" aria-live="polite">
+              {notice}
+            </p>
+          )}
+          {error && (
+            <p className="inline-error" role="alert" aria-live="assertive">
+              {error}
+            </p>
+          )}
           {connection?.connected && (
             <p className="result-notice" role="status" aria-live="polite">
               {t("mcp.connectionReady", {

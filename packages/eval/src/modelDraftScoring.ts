@@ -112,10 +112,7 @@ function normalizeTargetForComparison(text: string): string {
  *
  * Score is the fraction of checks passed (0..1).
  */
-export function scoreModelDraft(
-  draft: ModelDraftLike,
-  context: ModelDraftScoringContext
-): ModelDraftGroundingResult {
+export function scoreModelDraft(draft: ModelDraftLike, context: ModelDraftScoringContext): ModelDraftGroundingResult {
   const failures: string[] = [];
 
   const sameLanguagePassagesById = new Map(
@@ -136,7 +133,9 @@ export function scoreModelDraft(
       detail: `Evidence passages not found in this language's corpus: ${missingEvidence.join(", ")}.`
     };
     for (const id of missingEvidence) {
-      failures.push(`groundedEvidence: evidence passage "${id}" does not resolve to a passage in language "${context.languageId}".`);
+      failures.push(
+        `groundedEvidence: evidence passage "${id}" does not resolve to a passage in language "${context.languageId}".`
+      );
     }
   } else {
     groundedEvidence = {
@@ -174,7 +173,9 @@ export function scoreModelDraft(
       detail: `Example forms not found in lexicon or corpus: ${unknownForms.join(", ")}.`
     };
     for (const form of unknownForms) {
-      failures.push(`knownForms: form "${form}" does not appear in the lexicon or corpus for language "${context.languageId}".`);
+      failures.push(
+        `knownForms: form "${form}" does not appear in the lexicon or corpus for language "${context.languageId}".`
+      );
     }
   } else {
     knownForms = {
@@ -195,9 +196,7 @@ export function scoreModelDraft(
     };
   } else {
     const draftTopicTokens = new Set(tokenizeTopic(draft.topic));
-    const aligned = answerKeyTopics.some((topic) =>
-      tokenizeTopic(topic).some((token) => draftTopicTokens.has(token))
-    );
+    const aligned = answerKeyTopics.some((topic) => tokenizeTopic(topic).some((token) => draftTopicTokens.has(token)));
     if (aligned) {
       topicAlignment = { passed: true, detail: "Topic overlaps an answer-key topic." };
     } else {

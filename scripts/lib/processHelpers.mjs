@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 export function quoteCmdArg(value) {
   if (/^[\w@./:\\=-]+$/.test(value)) return value;
-  return `"${value.replace(/"/g, "\\\"")}"`;
+  return `"${value.replace(/"/g, '\\"')}"`;
 }
 
 export function npmSpawnSpec(args, { comSpec = process.env.ComSpec, platform = process.platform } = {}) {

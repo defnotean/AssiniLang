@@ -13,8 +13,9 @@ describe("modelFormatting", () => {
   });
 
   it("summarizes Hugging Face cache paths with repo and file names", () => {
-    expect(modelDisplayName("/cache/models--huihui-ai--Irene/snapshots/abc/Q4_K_M.gguf"))
-      .toBe("huihui-ai/Irene / Q4_K_M.gguf");
+    expect(modelDisplayName("/cache/models--huihui-ai--Irene/snapshots/abc/Q4_K_M.gguf")).toBe(
+      "huihui-ai/Irene / Q4_K_M.gguf"
+    );
   });
 
   it("uses the file name for ordinary local model paths", () => {
@@ -27,10 +28,12 @@ describe("modelFormatting", () => {
   });
 
   it("combines compact model names with provider labels", () => {
-    expect(discoveredModelLabel({
-      model: "C:\\models\\irene\\fusion.gguf",
-      providerLabel: "LM Studio"
-    })).toBe("fusion.gguf | LM Studio");
+    expect(
+      discoveredModelLabel({
+        model: "C:\\models\\irene\\fusion.gguf",
+        providerLabel: "LM Studio"
+      })
+    ).toBe("fusion.gguf | LM Studio");
   });
 
   it("normalizes localhost model endpoints", () => {

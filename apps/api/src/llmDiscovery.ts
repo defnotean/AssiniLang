@@ -13,8 +13,9 @@ import {
   trimValue,
   type Env
 } from "./llmEnvShared.js";
+import { parseDiscoveryModelIds, type DiscoveryKind } from "./llmDiscoveryParsing.js";
 import { redactErrorSecrets } from "./secretRedaction.js";
-import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
+import { assertOutboundHttpUrlAllowed, fetchOutboundHttp, type LookupFn } from "./urlSafety.js";
 
 export type {
   DiscoveredLlmModel,
@@ -25,6 +26,7 @@ export type {
 
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
 const DEFAULT_DISCOVERY_TIMEOUT_MS = 1_800;
+const MAX_DISCOVERY_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_DISCOVERY_TARGETS = 12;
 export const MAX_EXTRA_DISCOVERY_BASE_URLS = 12;
 export const DISCOVERY_SCAN_CONCURRENCY = 4;
@@ -37,9 +39,7 @@ export class LlmDiscoveryInputLimitError extends Error {
 }
 
 type DiscoveryProvider = DiscoveredLlmModel["provider"];
-type DiscoveryKind = "openai-models" | "ollama-tags" | "lm-studio-native-v1" | "lm-studio-native-v0";
 type FetchFn = typeof fetch;
-type ModelIdParser = (payload: unknown) => string[];
 
 type DiscoveryTarget = {
   provider: DiscoveryProvider;
@@ -63,12 +63,42 @@ const COMMON_OPENAI_COMPATIBLE_BASE_URLS: Array<{
   { provider: "ollama", providerLabel: "Ollama", source: "Ollama local", baseUrl: "http://localhost:11434/v1" },
   { provider: "lm-studio", providerLabel: "LM Studio", source: "LM Studio local", baseUrl: "http://127.0.0.1:1234/v1" },
   { provider: "lm-studio", providerLabel: "LM Studio", source: "LM Studio local", baseUrl: "http://localhost:1234/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "llama.cpp local", baseUrl: "http://127.0.0.1:8080/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "llama.cpp local", baseUrl: "http://localhost:8080/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "Local model server", baseUrl: "http://127.0.0.1:8000/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "Local model server", baseUrl: "http://localhost:8000/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "Local model server", baseUrl: "http://127.0.0.1:12345/v1" },
-  { provider: "openai-compatible", providerLabel: "OpenAI-compatible", source: "Local model server", baseUrl: "http://localhost:12345/v1" }
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "llama.cpp local",
+    baseUrl: "http://127.0.0.1:8080/v1"
+  },
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "llama.cpp local",
+    baseUrl: "http://localhost:8080/v1"
+  },
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "Local model server",
+    baseUrl: "http://127.0.0.1:8000/v1"
+  },
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "Local model server",
+    baseUrl: "http://localhost:8000/v1"
+  },
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "Local model server",
+    baseUrl: "http://127.0.0.1:12345/v1"
+  },
+  {
+    provider: "openai-compatible",
+    providerLabel: "OpenAI-compatible",
+    source: "Local model server",
+    baseUrl: "http://localhost:12345/v1"
+  }
 ];
 
 function stripV1BaseUrl(baseUrl: string): string {
@@ -94,9 +124,7 @@ function normalizeAndDedupeDiscoveryBaseUrls(values: readonly string[]): string[
     const trimmed = trimValue(value);
     if (!trimmed) continue;
     const normalized = normalizeHttpBaseUrl(trimmed) ?? trimmed;
-    const normalizedTargetBaseUrl = inferProvider(normalized) === "openai"
-      ? normalized
-      : ensureV1BaseUrl(normalized);
+    const normalizedTargetBaseUrl = inferProvider(normalized) === "openai" ? normalized : ensureV1BaseUrl(normalized);
     const key = canonicalLocalBaseUrl(normalizedTargetBaseUrl);
     if (!byCanonicalBaseUrl.has(key)) {
       byCanonicalBaseUrl.set(key, normalized);
@@ -220,11 +248,7 @@ function ollamaTagsTarget(params: {
   };
 }
 
-function lmStudioNativeTargets(params: {
-  env: Env;
-  source: string;
-  baseUrl: string;
-}): DiscoveryTarget[] {
+function lmStudioNativeTargets(params: { env: Env; source: string; baseUrl: string }): DiscoveryTarget[] {
   const normalized = normalizeHttpBaseUrl(params.baseUrl);
   if (!normalized) return [];
   const rootUrl = stripV1BaseUrl(normalized);
@@ -305,11 +329,13 @@ function targetsForBaseUrl(params: {
   }
 
   if (shouldAddLmStudioNativeTarget(normalized, provider)) {
-    targets.push(...lmStudioNativeTargets({
-      env: params.env,
-      source: params.source,
-      baseUrl: normalized
-    }));
+    targets.push(
+      ...lmStudioNativeTargets({
+        env: params.env,
+        source: params.source,
+        baseUrl: normalized
+      })
+    );
   }
 
   return targets;
@@ -323,42 +349,50 @@ function buildDiscoveryTargets(params: {
   const targets: DiscoveryTarget[] = [];
   const configured = configuredBaseUrl(params.env);
   if (configured) {
-    targets.push(...targetsForBaseUrl({
-      env: params.env,
-      baseUrl: configured,
-      source: "Configured endpoint",
-      provider: providerFromEnv(params.env, configured),
-      reportErrors: true
-    }));
+    targets.push(
+      ...targetsForBaseUrl({
+        env: params.env,
+        baseUrl: configured,
+        source: "Configured endpoint",
+        provider: providerFromEnv(params.env, configured),
+        reportErrors: true
+      })
+    );
   }
 
   for (const baseUrl of discoveryBaseUrlsFromEnv(params.env)) {
-    targets.push(...targetsForBaseUrl({
-      env: params.env,
-      baseUrl,
-      source: "Discovery endpoint",
-      reportErrors: true
-    }));
+    targets.push(
+      ...targetsForBaseUrl({
+        env: params.env,
+        baseUrl,
+        source: "Discovery endpoint",
+        reportErrors: true
+      })
+    );
   }
 
   for (const baseUrl of params.extraBaseUrls ?? []) {
-    targets.push(...targetsForBaseUrl({
-      env: params.env,
-      baseUrl,
-      source: "Requested endpoint",
-      reportErrors: true
-    }));
+    targets.push(
+      ...targetsForBaseUrl({
+        env: params.env,
+        baseUrl,
+        source: "Requested endpoint",
+        reportErrors: true
+      })
+    );
   }
 
   if (params.includeCommonTargets) {
     for (const target of COMMON_OPENAI_COMPATIBLE_BASE_URLS) {
-      targets.push(...targetsForBaseUrl({
-        env: params.env,
-        provider: target.provider,
-        source: target.source,
-        baseUrl: target.baseUrl,
-        reportErrors: false
-      }));
+      targets.push(
+        ...targetsForBaseUrl({
+          env: params.env,
+          provider: target.provider,
+          source: target.source,
+          baseUrl: target.baseUrl,
+          reportErrors: false
+        })
+      );
     }
 
     for (const baseUrl of ["http://127.0.0.1:11434", "http://localhost:11434"]) {
@@ -385,9 +419,7 @@ function buildDiscoveryTargets(params: {
 }
 
 function errorDetail(error: unknown, apiKey?: string): string {
-  const message = error instanceof Error && error.message.trim().length > 0
-    ? error.message
-    : "Model discovery failed.";
+  const message = error instanceof Error && error.message.trim().length > 0 ? error.message : "Model discovery failed.";
   if (message === "fetch failed") {
     return "Could not connect to the endpoint. Check that the model server is running and the host/port are reachable from this app.";
   }
@@ -407,138 +439,44 @@ async function readFailureDetail(response: Response, apiKey?: string): Promise<s
 async function fetchJsonWithTimeout(
   fetchFn: FetchFn,
   target: DiscoveryTarget,
-  timeoutMs: number
+  timeoutMs: number,
+  env: Env,
+  lookupFn?: LookupFn
 ): Promise<{ payload: unknown; status: number }> {
-  const controller = new AbortController();
-  let timedOut = false;
-  const timeout = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, timeoutMs);
-
   try {
     const headers: Record<string, string> = {};
     headers["Cache-Control"] = "no-cache";
     if (target.apiKey) headers.Authorization = `Bearer ${target.apiKey}`;
-    const response = await fetchFn(target.scanUrl, {
-      method: "GET",
-      headers,
-      signal: controller.signal,
-      redirect: "manual"
-    });
+    const response = await fetchOutboundHttp(
+      target.scanUrl,
+      {
+        method: "GET",
+        headers
+      },
+      {
+        env,
+        fetchFn,
+        lookupFn,
+        timeoutMs,
+        maxResponseBytes: MAX_DISCOVERY_RESPONSE_BYTES,
+        operation: "Model discovery request",
+        secrets: [target.apiKey]
+      }
+    );
     if (!response.ok) {
       throw new Error(await readFailureDetail(response, target.apiKey));
     }
     return {
-      payload: await response.json() as unknown,
+      payload: (await response.json()) as unknown,
       status: response.status
     };
   } catch (error) {
-    if (timedOut || error instanceof Error && error.name === "AbortError") {
+    if (error instanceof Error && (error.name === "AbortError" || /timed out after/i.test(error.message))) {
       throw new Error(`Model discovery timed out after ${timeoutMs}ms.`);
     }
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
-
-function modelIdFromValue(value: unknown): string | undefined {
-  if (typeof value === "string") return trimValue(value);
-  if (!value || typeof value !== "object") return undefined;
-  const record = value as Record<string, unknown>;
-  for (const key of ["id", "model", "name", "key", "selected_variant"]) {
-    const candidate = record[key];
-    if (typeof candidate === "string") return trimValue(candidate);
-  }
-  return undefined;
-}
-
-function modelIdsFromValues(values: unknown[]): string[] {
-  return values.map(modelIdFromValue).filter((item): item is string => Boolean(item));
-}
-
-function parseOpenAiModelIds(payload: unknown): string[] {
-  if (!payload || typeof payload !== "object") return [];
-  const record = payload as Record<string, unknown>;
-  const data = record.data;
-  if (Array.isArray(data)) {
-    return modelIdsFromValues(data);
-  }
-
-  const models = record.models;
-  if (Array.isArray(models)) {
-    return modelIdsFromValues(models);
-  }
-
-  return [];
-}
-
-function parseOllamaModelIds(payload: unknown): string[] {
-  if (!payload || typeof payload !== "object") return [];
-  const models = (payload as Record<string, unknown>).models;
-  if (!Array.isArray(models)) return [];
-  return modelIdsFromValues(models);
-}
-
-function modelListFromPayload(payload: unknown): unknown[] {
-  if (!payload || typeof payload !== "object") return [];
-  const record = payload as Record<string, unknown>;
-  if (Array.isArray(record.models)) return record.models;
-  if (Array.isArray(record.data)) return record.data;
-  return [];
-}
-
-function modelTypeIsEmbeddings(model: Record<string, unknown>): boolean {
-  const type = typeof model.type === "string" ? model.type.toLowerCase() : "";
-  return type === "embedding" || type === "embeddings";
-}
-
-function parseLmStudioNativeV1ModelIds(payload: unknown): string[] {
-  const ids: string[] = [];
-  for (const item of modelListFromPayload(payload)) {
-    if (!item || typeof item !== "object") continue;
-    const model = item as Record<string, unknown>;
-    if (modelTypeIsEmbeddings(model)) continue;
-    const loadedInstances = Array.isArray(model.loaded_instances) ? model.loaded_instances : [];
-    if (loadedInstances.length === 0) continue;
-
-    const before = ids.length;
-    for (const instance of loadedInstances) {
-      const id = modelIdFromValue(instance);
-      if (id) ids.push(id);
-    }
-    if (ids.length === before) {
-      const fallback = modelIdFromValue(model);
-      if (fallback) ids.push(fallback);
-    }
-  }
-  return ids;
-}
-
-function lmStudioV0StateIsLoaded(value: unknown): boolean {
-  if (typeof value !== "string") return false;
-  const state = value.toLowerCase();
-  return state === "loaded" || state === "ready" || state === "loaded-in-memory";
-}
-
-function parseLmStudioNativeV0ModelIds(payload: unknown): string[] {
-  return modelListFromPayload(payload)
-    .map((item) => {
-      if (!item || typeof item !== "object") return undefined;
-      const model = item as Record<string, unknown>;
-      if (modelTypeIsEmbeddings(model) || !lmStudioV0StateIsLoaded(model.state)) return undefined;
-      return modelIdFromValue(model);
-    })
-    .filter((item): item is string => Boolean(item));
-}
-
-const MODEL_ID_PARSERS: Record<DiscoveryKind, ModelIdParser> = {
-  "openai-models": parseOpenAiModelIds,
-  "ollama-tags": parseOllamaModelIds,
-  "lm-studio-native-v1": parseLmStudioNativeV1ModelIds,
-  "lm-studio-native-v0": parseLmStudioNativeV0ModelIds
-};
 
 function uniqueSorted(values: string[]): string[] {
   return [...new Set(values)].sort((left, right) => left.localeCompare(right));
@@ -550,26 +488,25 @@ async function forEachWithConcurrency<T>(
   task: (value: T) => Promise<void>
 ): Promise<void> {
   let nextIndex = 0;
-  const workers = Array.from(
-    { length: Math.min(concurrency, values.length) },
-    async () => {
-      while (nextIndex < values.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        await task(values[index]!);
-      }
+  const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      await task(values[index]!);
     }
-  );
+  });
   await Promise.all(workers);
 }
 
 async function scanTarget(
   fetchFn: FetchFn,
   target: DiscoveryTarget,
-  timeoutMs: number
+  timeoutMs: number,
+  env: Env,
+  lookupFn?: LookupFn
 ): Promise<{ models: DiscoveredLlmModel[]; status: number }> {
-  const { payload, status } = await fetchJsonWithTimeout(fetchFn, target, timeoutMs);
-  const modelIds = uniqueSorted(MODEL_ID_PARSERS[target.kind](payload));
+  const { payload, status } = await fetchJsonWithTimeout(fetchFn, target, timeoutMs, env, lookupFn);
+  const modelIds = uniqueSorted(parseDiscoveryModelIds(target.kind, payload));
 
   return {
     status,
@@ -619,10 +556,7 @@ function isLocalhostAlias(baseUrl: string): boolean {
   }
 }
 
-function recordEndpoint(
-  endpoints: Map<string, LlmModelDiscoveryEndpoint>,
-  endpoint: LlmModelDiscoveryEndpoint
-): void {
+function recordEndpoint(endpoints: Map<string, LlmModelDiscoveryEndpoint>, endpoint: LlmModelDiscoveryEndpoint): void {
   const key = endpointDedupeKey(endpoint);
   const existing = endpoints.get(key);
   if (!existing) {
@@ -633,24 +567,31 @@ function recordEndpoint(
     endpoints.set(key, endpoint);
     return;
   }
-  if (existing.connected === endpoint.connected && isLocalhostAlias(existing.baseUrl) && !isLocalhostAlias(endpoint.baseUrl)) {
+  if (
+    existing.connected === endpoint.connected &&
+    isLocalhostAlias(existing.baseUrl) &&
+    !isLocalhostAlias(endpoint.baseUrl)
+  ) {
     endpoints.set(key, endpoint);
   }
 }
 
-export async function discoverLlmModels(options: {
-  env?: Env;
-  fetchFn?: FetchFn;
-  extraBaseUrls?: string[];
-  timeoutMs?: number;
-  includeCommonTargets?: boolean;
-  lookupFn?: (hostname: string) => Promise<{ address: string; family: number }>;
-} = {}): Promise<LlmModelDiscoveryResponse> {
+export async function discoverLlmModels(
+  options: {
+    env?: Env;
+    fetchFn?: FetchFn;
+    extraBaseUrls?: string[];
+    timeoutMs?: number;
+    includeCommonTargets?: boolean;
+    lookupFn?: (hostname: string) => Promise<{ address: string; family: number }>;
+  } = {}
+): Promise<LlmModelDiscoveryResponse> {
   const env = options.env ?? process.env;
   const fetchFn = options.fetchFn ?? globalThis.fetch;
-  const timeoutMs = Number.isInteger(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
-    ? options.timeoutMs as number
-    : DEFAULT_DISCOVERY_TIMEOUT_MS;
+  const timeoutMs =
+    Number.isInteger(options.timeoutMs) && (options.timeoutMs ?? 0) > 0
+      ? (options.timeoutMs as number)
+      : DEFAULT_DISCOVERY_TIMEOUT_MS;
   const errors: LlmModelDiscoveryError[] = [];
   const validatedExtraBaseUrls: string[] = [];
   const suppliedExtraBaseUrls = options.extraBaseUrls ?? [];
@@ -681,7 +622,8 @@ export async function discoverLlmModels(options: {
   });
   const models = new Map<string, DiscoveredLlmModel>();
   const endpoints = new Map<string, LlmModelDiscoveryEndpoint>();
-  const successfulScans: Array<{ target: DiscoveryTarget; result: { models: DiscoveredLlmModel[]; status: number } }> = [];
+  const successfulScans: Array<{ target: DiscoveryTarget; result: { models: DiscoveredLlmModel[]; status: number } }> =
+    [];
   const endpointRecords: Array<{ target: DiscoveryTarget; endpoint: LlmModelDiscoveryEndpoint }> = [];
   const errorRecords: Array<{
     target: DiscoveryTarget;
@@ -705,7 +647,7 @@ export async function discoverLlmModels(options: {
     }
 
     try {
-      const result = await scanTarget(fetchFn, target, timeoutMs);
+      const result = await scanTarget(fetchFn, target, timeoutMs, env, options.lookupFn);
       const endpoint: LlmModelDiscoveryEndpoint = {
         source: target.source,
         baseUrl: target.baseUrl,
@@ -750,9 +692,8 @@ export async function discoverLlmModels(options: {
       .map(({ target }) => baseUrlDedupeKey(target.baseUrl))
   );
 
-  const isShadowedOpenAiLmStudioScan = (target: DiscoveryTarget) => (
-    target.kind === "openai-models" && lmStudioNativeBaseUrls.has(baseUrlDedupeKey(target.baseUrl))
-  );
+  const isShadowedOpenAiLmStudioScan = (target: DiscoveryTarget) =>
+    target.kind === "openai-models" && lmStudioNativeBaseUrls.has(baseUrlDedupeKey(target.baseUrl));
 
   for (const { target, endpoint } of endpointRecords) {
     if (!isShadowedOpenAiLmStudioScan(target)) {

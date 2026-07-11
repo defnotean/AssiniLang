@@ -45,19 +45,23 @@ export function ModelDiscoveryPanel({
   const { t } = useI18n();
 
   function discoveredModelNamesForEndpoint(endpoint: LlmModelDiscoveryResponse["endpoints"][number]): string[] {
-    return [...new Set(
-      discoveredModels
-        .filter((candidate) => sameModelBaseUrl(candidate.baseUrl, endpoint.baseUrl))
-        .map((candidate) => modelDisplayName(candidate.model))
-    )];
+    return [
+      ...new Set(
+        discoveredModels
+          .filter((candidate) => sameModelBaseUrl(candidate.baseUrl, endpoint.baseUrl))
+          .map((candidate) => modelDisplayName(candidate.model))
+      )
+    ];
   }
 
   function fullDiscoveredModelNamesForEndpoint(endpoint: LlmModelDiscoveryResponse["endpoints"][number]): string {
-    return [...new Set(
-      discoveredModels
-        .filter((candidate) => sameModelBaseUrl(candidate.baseUrl, endpoint.baseUrl))
-        .map((candidate) => candidate.model)
-    )].join(", ");
+    return [
+      ...new Set(
+        discoveredModels
+          .filter((candidate) => sameModelBaseUrl(candidate.baseUrl, endpoint.baseUrl))
+          .map((candidate) => candidate.model)
+      )
+    ].join(", ");
   }
 
   function connectedEndpointMessage(endpoint: LlmModelDiscoveryResponse["endpoints"][number]): string {
@@ -83,35 +87,36 @@ export function ModelDiscoveryPanel({
 
   const visibleConnectedEndpoints = connectedEndpoints.slice(0, 2);
   const visibleFailedEndpoints = failedEndpoints.slice(0, 2);
-  const visibleDiscoveryErrors = failedEndpoints.length === 0 && connectedEndpoints.length === 0
-    ? discoveryErrors.slice(0, 2)
-    : [];
+  const visibleDiscoveryErrors =
+    failedEndpoints.length === 0 && connectedEndpoints.length === 0 ? discoveryErrors.slice(0, 2) : [];
   const connectionAnnouncementSignature = visibleConnectedEndpoints
     .map((endpoint) => connectedEndpointMessage(endpoint))
     .join(" ");
   const errorAnnouncementSignature = [
-    ...visibleFailedEndpoints.map((endpoint) => t("model.endpointConnectionFailed", {
-      baseUrl: endpoint.baseUrl,
-      detail: endpoint.detail ?? t("model.errModelDiscoveryFailed")
-    })),
-    ...visibleDiscoveryErrors.map((error) => t("model.endpointConnectionFailed", {
-      baseUrl: error.baseUrl,
-      detail: error.detail
-    }))
+    ...visibleFailedEndpoints.map((endpoint) =>
+      t("model.endpointConnectionFailed", {
+        baseUrl: endpoint.baseUrl,
+        detail: endpoint.detail ?? t("model.errModelDiscoveryFailed")
+      })
+    ),
+    ...visibleDiscoveryErrors.map((error) =>
+      t("model.endpointConnectionFailed", {
+        baseUrl: error.baseUrl,
+        detail: error.detail
+      })
+    )
   ].join(" ");
   const [connectionAnnouncement, setConnectionAnnouncement] = useState("");
   const [errorAnnouncement, setErrorAnnouncement] = useState("");
 
   useEffect(() => {
-    setConnectionAnnouncement((current) => (
+    setConnectionAnnouncement((current) =>
       current === connectionAnnouncementSignature ? current : connectionAnnouncementSignature
-    ));
+    );
   }, [connectionAnnouncementSignature]);
 
   useEffect(() => {
-    setErrorAnnouncement((current) => (
-      current === errorAnnouncementSignature ? current : errorAnnouncementSignature
-    ));
+    setErrorAnnouncement((current) => (current === errorAnnouncementSignature ? current : errorAnnouncementSignature));
   }, [errorAnnouncementSignature]);
 
   return (
@@ -194,14 +199,14 @@ export function ModelDiscoveryPanel({
           <p>
             {staleActiveModel.replacement
               ? t("model.savedModelUnavailableWithReplacement", {
-                baseUrl: staleActiveModel.baseUrl,
-                model: staleActiveModel.savedModelDisplay,
-                replacement: modelDisplayName(staleActiveModel.replacement.model)
-              })
+                  baseUrl: staleActiveModel.baseUrl,
+                  model: staleActiveModel.savedModelDisplay,
+                  replacement: modelDisplayName(staleActiveModel.replacement.model)
+                })
               : t("model.savedModelUnavailable", {
-                baseUrl: staleActiveModel.baseUrl,
-                model: staleActiveModel.savedModelDisplay
-              })}
+                  baseUrl: staleActiveModel.baseUrl,
+                  model: staleActiveModel.savedModelDisplay
+                })}
           </p>
           <div className="settings-actions">
             {staleActiveModel.replacement && (
@@ -226,10 +231,7 @@ export function ModelDiscoveryPanel({
         </div>
       )}
       {visibleFailedEndpoints.map((endpoint) => (
-        <p
-          key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`}
-          className="inline-error"
-        >
+        <p key={`failed:${endpoint.source}:${endpoint.baseUrl}:${endpoint.detail}`} className="inline-error">
           {t("model.endpointConnectionFailed", {
             baseUrl: endpoint.baseUrl,
             detail: endpoint.detail ?? t("model.errModelDiscoveryFailed")
@@ -237,10 +239,7 @@ export function ModelDiscoveryPanel({
         </p>
       ))}
       {visibleDiscoveryErrors.map((error) => (
-        <p
-          key={`${error.source}:${error.baseUrl}:${error.detail}`}
-          className="inline-error"
-        >
+        <p key={`${error.source}:${error.baseUrl}:${error.detail}`} className="inline-error">
           {t("model.endpointConnectionFailed", { baseUrl: error.baseUrl, detail: error.detail })}
         </p>
       ))}

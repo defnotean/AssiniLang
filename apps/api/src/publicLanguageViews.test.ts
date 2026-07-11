@@ -87,9 +87,7 @@ describe("public language views", () => {
     const firstVocabulary = profile?.vocabulary[0];
     firstVocabulary?.tags.push("test-tag");
     profile?.grammarRules[0]?.evidencePassageIds.push("test-passage");
-    profile?.morphemeInventory
-      .find((item) => item.surface === "saku")
-      ?.vocabulary?.tags.push("test-tag");
+    profile?.morphemeInventory.find((item) => item.surface === "saku")?.vocabulary?.tags.push("test-tag");
 
     const language = state.languages.find((item) => item.id === TEST_LANGUAGE_ID);
     expect(language?.phonology?.consonants).not.toContain("x-test");
@@ -710,9 +708,7 @@ describe("public language views", () => {
 
     expect(artifact.summary.failedLatestRuns).toBe(1);
     expect(artifact.summary.failureCount).toBe(1);
-    expect(artifact.failureLines).toEqual([
-      "Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."
-    ]);
+    expect(artifact.failureLines).toEqual(["Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."]);
   });
 
   it("exports latest-versus-previous evaluation trends for regression reports", () => {

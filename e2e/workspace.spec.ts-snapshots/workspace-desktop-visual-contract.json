@@ -1,0 +1,74 @@
+{
+  "viewport": {
+    "height": 900,
+    "width": 1440
+  },
+  "documentWidth": 1440,
+  "horizontalGeometry": {
+    "main": {
+      "left": 274,
+      "right": 1440,
+      "width": 1166
+    },
+    "prototypeNotice": {
+      "left": 274,
+      "right": 1440,
+      "width": 1166
+    },
+    "sidebar": {
+      "left": 0,
+      "right": 274,
+      "width": 274
+    },
+    "statStrip": {
+      "left": 274,
+      "right": 1440,
+      "width": 1166
+    },
+    "workspaceHeader": {
+      "left": 274,
+      "right": 1440,
+      "width": 1166
+    }
+  },
+  "relationships": {
+    "mainIsBesideOrBelowSidebar": true,
+    "noHorizontalOverflow": true
+  },
+  "styles": {
+    "appShell": {
+      "display": "grid",
+      "grid-template-columns": "273.594px 1166.41px"
+    },
+    "main": {
+      "background-color": "rgba(0, 0, 0, 0)",
+      "overflow-x": "hidden",
+      "overflow-y": "auto",
+      "padding-left": "0px",
+      "padding-right": "0px"
+    },
+    "prototypeNotice": {
+      "background-color": "color(srgb 0.22134 0.192759 0.159499 / 0.367529)",
+      "border-bottom-color": "color(srgb 0.866667 0.721569 0.431373 / 0.28)",
+      "border-bottom-width": "1px",
+      "display": "flex"
+    },
+    "sidebar": {
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border-right-color": "rgba(221, 190, 114, 0.16)",
+      "border-right-width": "1px",
+      "overflow-y": "hidden",
+      "position": "static"
+    },
+    "statStrip": {
+      "display": "grid",
+      "gap": "12.48px",
+      "grid-template-columns": "269.844px 269.859px 269.844px 269.859px"
+    },
+    "workspaceHeader": {
+      "background-color": "rgba(0, 0, 0, 0)",
+      "border-bottom-color": "rgba(221, 190, 114, 0.16)",
+      "border-bottom-width": "1px"
+    }
+  }
+}

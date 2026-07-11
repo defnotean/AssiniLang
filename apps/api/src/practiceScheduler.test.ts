@@ -9,12 +9,7 @@ function exercise(id: string): FixtureExercise {
   return { id };
 }
 
-function submission(
-  exerciseId: string,
-  learnerId: string,
-  accepted: boolean,
-  submittedAt: string
-): PracticeSubmission {
+function submission(exerciseId: string, learnerId: string, accepted: boolean, submittedAt: string): PracticeSubmission {
   return { exerciseId, learnerId, accepted, submittedAt };
 }
 

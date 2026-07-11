@@ -27,11 +27,13 @@ type ReviewDispositionResolveByIdBody = ReviewDispositionResolveBody & {
   dispositionId: string;
 };
 
-const trimmedNonEmptyStringSchema = z.string()
+const trimmedNonEmptyStringSchema = z
+  .string()
   .transform((value) => value.trim())
   .refine((value) => value.length > 0);
 
-const parseableDateStringSchema = z.string()
+const parseableDateStringSchema = z
+  .string()
   .transform((value) => value.trim())
   .refine((value) => value.length > 0 && !Number.isNaN(Date.parse(value)));
 
@@ -88,9 +90,9 @@ function reviewPolicyValidationError(state: AppState, body: ReviewPolicyBody): s
   }
 
   if (!body.requiresAssignedReviewer) {
-    const assignableReviewerCount = [...assignableUsers.values()]
-      .filter((user) => isReviewPolicyAssignableRole(user.role))
-      .length;
+    const assignableReviewerCount = [...assignableUsers.values()].filter((user) =>
+      isReviewPolicyAssignableRole(user.role)
+    ).length;
     if (body.approvalThreshold > assignableReviewerCount) {
       return "Review policy approvalThreshold cannot exceed assignable reviewers";
     }
@@ -122,7 +124,12 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     body: ReviewDispositionResolveBody
   ): Promise<ReviewDisposition | { error: string; i18nKey?: string }> {
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "elder",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
@@ -176,29 +183,30 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
           }
         : undefined;
 
-      return appendAuditEvent({
-        ...state,
-        reviewDispositions: state.reviewDispositions.map((disposition) => (
-          disposition.id === dispositionId ? nextDisposition as ReviewDisposition : disposition
-        )),
-        notes: nextNote
-          ? state.notes.map((note) => (note.id === nextNote.id ? nextNote : note))
-          : state.notes
-      }, {
-        actor,
-        at: resolvedAt,
-        action: "review_disposition.resolved",
-        entityType: "review_disposition",
-        entityId: dispositionId,
-        languageId: existingDisposition.languageId,
-        summary: `Resolved ${existingDisposition.disposition} review disposition for ${existingDisposition.noteId}.`,
-        metadata: {
-          noteId: existingDisposition.noteId,
-          disposition: existingDisposition.disposition,
-          noteStatus: nextNote?.status ?? null,
-          resolvedBy: actor.id
+      return appendAuditEvent(
+        {
+          ...state,
+          reviewDispositions: state.reviewDispositions.map((disposition) =>
+            disposition.id === dispositionId ? (nextDisposition as ReviewDisposition) : disposition
+          ),
+          notes: nextNote ? state.notes.map((note) => (note.id === nextNote.id ? nextNote : note)) : state.notes
+        },
+        {
+          actor,
+          at: resolvedAt,
+          action: "review_disposition.resolved",
+          entityType: "review_disposition",
+          entityId: dispositionId,
+          languageId: existingDisposition.languageId,
+          summary: `Resolved ${existingDisposition.disposition} review disposition for ${existingDisposition.noteId}.`,
+          metadata: {
+            noteId: existingDisposition.noteId,
+            disposition: existingDisposition.disposition,
+            noteStatus: nextNote?.status ?? null,
+            resolvedBy: actor.id
+          }
         }
-      });
+      );
     });
 
     if (dispositionMissing) {
@@ -227,7 +235,12 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
 
   app.get("/governance", async (request, reply) => {
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "elder",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     return state.governance;
   });
@@ -278,22 +291,25 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
         approvedBy: actor.id
       };
 
-      return appendAuditEvent({
-        ...state,
-        governance: [...state.governance, record as GovernanceRecord]
-      }, {
-        actor,
-        at: approvedAt,
-        action: "governance_record.created",
-        entityType: "governance_record",
-        entityId: record.id,
-        languageId: body.languageId,
-        summary: `Created ${body.policyType} governance policy record.`,
-        metadata: {
-          policyType: body.policyType,
-          effectiveDate: body.effectiveDate
+      return appendAuditEvent(
+        {
+          ...state,
+          governance: [...state.governance, record as GovernanceRecord]
+        },
+        {
+          actor,
+          at: approvedAt,
+          action: "governance_record.created",
+          entityType: "governance_record",
+          entityId: record.id,
+          languageId: body.languageId,
+          summary: `Created ${body.policyType} governance policy record.`,
+          metadata: {
+            policyType: body.policyType,
+            effectiveDate: body.effectiveDate
+          }
         }
-      });
+      );
     });
 
     reply.code(201);
@@ -303,7 +319,12 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
   app.get("/languages/:languageId/review-policy", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "elder",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
     if (!state.languages.some((language) => language.id === languageId)) {
@@ -329,7 +350,9 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES, ["reviewer"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, REVIEW_POLICY_UPDATER_ROLES, [
+      "reviewer"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
@@ -364,26 +387,29 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
       };
       const existingPolicy = state.reviewPolicies.some((item) => item.languageId === languageId);
       const reviewPolicies = existingPolicy
-        ? state.reviewPolicies.map((item) => (item.languageId === languageId ? policy as ReviewPolicy : item))
+        ? state.reviewPolicies.map((item) => (item.languageId === languageId ? (policy as ReviewPolicy) : item))
         : [...state.reviewPolicies, policy as ReviewPolicy];
 
-      return appendAuditEvent({
-        ...state,
-        reviewPolicies
-      }, {
-        actor,
-        at: updatedAt,
-        action: "review_policy.upserted",
-        entityType: "review_policy",
-        entityId: policy.id,
-        languageId,
-        summary: `Updated review policy for ${languageId}.`,
-        metadata: {
-          assignedReviewerCount: policy.assignedReviewerIds.length,
-          approvalThreshold: policy.approvalThreshold,
-          requiresAssignedReviewer: policy.requiresAssignedReviewer
+      return appendAuditEvent(
+        {
+          ...state,
+          reviewPolicies
+        },
+        {
+          actor,
+          at: updatedAt,
+          action: "review_policy.upserted",
+          entityType: "review_policy",
+          entityId: policy.id,
+          languageId,
+          summary: `Updated review policy for ${languageId}.`,
+          metadata: {
+            assignedReviewerCount: policy.assignedReviewerIds.length,
+            approvalThreshold: policy.approvalThreshold,
+            requiresAssignedReviewer: policy.requiresAssignedReviewer
+          }
         }
-      });
+      );
     });
 
     return policy;
@@ -392,7 +418,12 @@ export function registerGovernanceRoutes(app: FastifyInstance, ctx: RouteContext
   app.get("/languages/:languageId/review-dispositions", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "elder", "lead", "admin"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "elder",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
     if (!state.languages.some((language) => language.id === languageId)) {

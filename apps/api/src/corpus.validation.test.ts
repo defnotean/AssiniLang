@@ -92,9 +92,7 @@ describe("corpus route validation i18nKeys", () => {
         },
         textTarget: "saku nemi-na",
         textTranslation: "The child teaches me.",
-        morphologicalSegmentation: [
-          { surface: "ghost", lemma: "ghost", gloss: "ghost", features: ["noun"] }
-        ],
+        morphologicalSegmentation: [{ surface: "ghost", lemma: "ghost", gloss: "ghost", features: ["noun"] }],
         topicTags: ["learning"],
         consentStatus: {
           use: "testing-only",

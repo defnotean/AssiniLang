@@ -78,17 +78,13 @@ export async function runVerifyBeta({
   stderr = process.stderr
 } = {}) {
   if (!modelVerifyRequested(env)) {
-    stdout.write(
-      "[verify:beta] skipping model:verify (set ASSINI_VERIFY_MODEL=1 to run the live-model pack)\n"
-    );
+    stdout.write("[verify:beta] skipping model:verify (set ASSINI_VERIFY_MODEL=1 to run the live-model pack)\n");
     return { exitCode: 0, skipped: true };
   }
 
   const step = createVerifyBetaStep({ platform, env });
   if (!step) {
-    stdout.write(
-      "[verify:beta] skipping model:verify (set ASSINI_VERIFY_MODEL=1 to run the live-model pack)\n"
-    );
+    stdout.write("[verify:beta] skipping model:verify (set ASSINI_VERIFY_MODEL=1 to run the live-model pack)\n");
     return { exitCode: 0, skipped: true };
   }
 
@@ -98,9 +94,7 @@ export async function runVerifyBeta({
 
   if (result.exitCode !== 0) {
     if (result.error) {
-      stderr.write(
-        `[verify:beta] model:verify failed to start: ${formatSpawnFailure(result.error)}\n`
-      );
+      stderr.write(`[verify:beta] model:verify failed to start: ${formatSpawnFailure(result.error)}\n`);
     } else if (result.signal) {
       stderr.write(`[verify:beta] model:verify terminated by signal ${result.signal}\n`);
     } else {

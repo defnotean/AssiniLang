@@ -1,10 +1,5 @@
 import { useMemo, useState } from "react";
-import type {
-  ExtractionDraftView,
-  SourceAsset,
-  SourceAssetView,
-  SourceRegistrationPayload
-} from "../api";
+import type { ExtractionDraftView, SourceAsset, SourceAssetView, SourceRegistrationPayload } from "../api";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { useIngestExtraction } from "../hooks/useIngestExtraction";
 import {
@@ -162,39 +157,50 @@ export function IngestView({
     handleBulkReview
   } = useIngestExtraction(languageId, t, onIntakeCommitted);
 
-  const kindCounts = useMemo(() => (
-    drafts.reduce<Record<DraftKindFilter, number>>((counts, draft) => {
-      counts.all += 1;
-      counts[draft.kind] += 1;
-      return counts;
-    }, { all: 0, lexeme: 0, corpus_passage: 0, grammar_note: 0 })
-  ), [drafts]);
+  const kindCounts = useMemo(
+    () =>
+      drafts.reduce<Record<DraftKindFilter, number>>(
+        (counts, draft) => {
+          counts.all += 1;
+          counts[draft.kind] += 1;
+          return counts;
+        },
+        { all: 0, lexeme: 0, corpus_passage: 0, grammar_note: 0 }
+      ),
+    [drafts]
+  );
 
-  const issueCounts = useMemo(() => (
-    drafts.reduce<Record<DraftIssueFilter, number>>((counts, draft) => {
-      counts.all += 1;
-      if (draftHasGrounding(draft)) counts.grounding += 1;
-      else counts.clean += 1;
-      return counts;
-    }, { all: 0, grounding: 0, clean: 0 })
-  ), [drafts]);
+  const issueCounts = useMemo(
+    () =>
+      drafts.reduce<Record<DraftIssueFilter, number>>(
+        (counts, draft) => {
+          counts.all += 1;
+          if (draftHasGrounding(draft)) counts.grounding += 1;
+          else counts.clean += 1;
+          return counts;
+        },
+        { all: 0, grounding: 0, clean: 0 }
+      ),
+    [drafts]
+  );
 
-  const visibleDrafts = useMemo(() => (
-    drafts
-      .filter((draft) => matchesDraftKindFilter(draft, kindFilter) && matchesDraftIssueFilter(draft, issueFilter))
-      .slice()
-      .sort((left, right) => compareDrafts(left, right, draftSort))
-  ), [drafts, draftSort, issueFilter, kindFilter]);
+  const visibleDrafts = useMemo(
+    () =>
+      drafts
+        .filter((draft) => matchesDraftKindFilter(draft, kindFilter) && matchesDraftIssueFilter(draft, issueFilter))
+        .slice()
+        .sort((left, right) => compareDrafts(left, right, draftSort)),
+    [drafts, draftSort, issueFilter, kindFilter]
+  );
 
   const visibleDraftIds = useMemo(() => visibleDrafts.map((draft) => draft.id), [visibleDrafts]);
-  const allVisibleSelected = visibleDraftIds.length > 0
-    && visibleDraftIds.every((id) => selectedDraftIds.includes(id));
+  const allVisibleSelected = visibleDraftIds.length > 0 && visibleDraftIds.every((id) => selectedDraftIds.includes(id));
   const filtersActive = kindFilter !== "all" || issueFilter !== "all";
   const shownCountLabel = filtersActive
-    ? t(
-      visibleDrafts.length === 1 ? "ingest.draftShownCountOne" : "ingest.draftShownCountMany",
-      { shown: visibleDrafts.length, total: drafts.length }
-    )
+    ? t(visibleDrafts.length === 1 ? "ingest.draftShownCountOne" : "ingest.draftShownCountMany", {
+        shown: visibleDrafts.length,
+        total: drafts.length
+      })
     : t(drafts.length === 1 ? "ingest.draftCountOne" : "ingest.draftCountMany", { count: drafts.length });
 
   if (isLoadingIntake) {
@@ -215,13 +221,25 @@ export function IngestView({
 
   return (
     <div className="ingest-view">
-      <form className="record-card form-panel compact" aria-label={t("ingest.registerSourceAria")} onSubmit={handleRegisterSource}>
+      <form
+        className="record-card form-panel compact"
+        aria-label={t("ingest.registerSourceAria")}
+        onSubmit={handleRegisterSource}
+      >
         <div>
           <span className="detail-label">{t("ingest.sourceIntake")}</span>
           <h3>{t("ingest.addSource")}</h3>
         </div>
-        {registerNotice && <p className="result-notice" role="status" aria-live="polite">{registerNotice}</p>}
-        {registerError && <p className="result-notice error" role="alert">{registerError}</p>}
+        {registerNotice && (
+          <p className="result-notice" role="status" aria-live="polite">
+            {registerNotice}
+          </p>
+        )}
+        {registerError && (
+          <p className="result-notice error" role="alert">
+            {registerError}
+          </p>
+        )}
         <div className="form-group">
           <label htmlFor="ingest-source-kind">{t("ingest.sourceKind")}</label>
           <select
@@ -236,7 +254,11 @@ export function IngestView({
         </div>
         <div className="form-group">
           <label htmlFor="ingest-source-title">{t("ingest.sourceTitle")}</label>
-          <input id="ingest-source-title" value={registerTitle} onChange={(event) => setRegisterTitle(event.target.value)} />
+          <input
+            id="ingest-source-title"
+            value={registerTitle}
+            onChange={(event) => setRegisterTitle(event.target.value)}
+          />
         </div>
         {registerKind === "url" ? (
           <div className="form-group">
@@ -260,23 +282,31 @@ export function IngestView({
             />
           </div>
         )}
-        <button
-          type="submit"
-          className="secondary"
-          disabled={isRegisteringSource}
-          aria-busy={isRegisteringSource}
-        >
+        <button type="submit" className="secondary" disabled={isRegisteringSource} aria-busy={isRegisteringSource}>
           {isRegisteringSource ? t("ingest.registering") : t("ingest.registerSource")}
         </button>
       </form>
 
-      <form className="record-card form-panel compact" aria-label={t("ingest.obsidianVaultAria")} onSubmit={handleImportVault} aria-busy={isImportingVault}>
+      <form
+        className="record-card form-panel compact"
+        aria-label={t("ingest.obsidianVaultAria")}
+        onSubmit={handleImportVault}
+        aria-busy={isImportingVault}
+      >
         <div>
           <span className="detail-label">{t("ingest.obsidianVault")}</span>
           <h3>{t("ingest.importVault")}</h3>
         </div>
-        {vaultNotice && <p className="result-notice" role="status" aria-live="polite">{vaultNotice}</p>}
-        {vaultError && <p className="result-notice error" role="alert">{vaultError}</p>}
+        {vaultNotice && (
+          <p className="result-notice" role="status" aria-live="polite">
+            {vaultNotice}
+          </p>
+        )}
+        {vaultError && (
+          <p className="result-notice error" role="alert">
+            {vaultError}
+          </p>
+        )}
         <div className="form-group">
           <label htmlFor="ingest-vault-path">{t("ingest.vaultPath")}</label>
           <input
@@ -317,14 +347,22 @@ export function IngestView({
 
       <ObsidianMcpImportPanel languageId={languageId} onImported={onIntakeCommitted} />
 
-      <form className="record-card form-panel compact" aria-label={t("ingest.uploadSourceFileAria")} onSubmit={handleUploadSource}>
+      <form
+        className="record-card form-panel compact"
+        aria-label={t("ingest.uploadSourceFileAria")}
+        onSubmit={handleUploadSource}
+      >
         <div>
           <span className="detail-label">{t("ingest.fileIntake")}</span>
           <h3>{t("ingest.uploadHeading")}</h3>
         </div>
         <div className="form-group">
           <label htmlFor="ingest-upload-title">{t("ingest.uploadTitle")}</label>
-          <input id="ingest-upload-title" value={uploadTitle} onChange={(event) => setUploadTitle(event.target.value)} />
+          <input
+            id="ingest-upload-title"
+            value={uploadTitle}
+            onChange={(event) => setUploadTitle(event.target.value)}
+          />
         </div>
         <div className="form-group">
           <label htmlFor="ingest-upload-file">{t("ingest.sourceFile")}</label>
@@ -348,11 +386,21 @@ export function IngestView({
         <div className="record-topline">
           <div>
             <span className="detail-label">{t("ingest.registeredSources")}</span>
-            <h2>{t(sources.length === 1 ? "ingest.sourceCountOne" : "ingest.sourceCountMany", { count: sources.length })}</h2>
+            <h2>
+              {t(sources.length === 1 ? "ingest.sourceCountOne" : "ingest.sourceCountMany", { count: sources.length })}
+            </h2>
           </div>
         </div>
-        {processNotice && <p className="result-notice" role="status" aria-live="polite">{processNotice}</p>}
-        {processError && <p className="result-notice error" role="alert">{processError}</p>}
+        {processNotice && (
+          <p className="result-notice" role="status" aria-live="polite">
+            {processNotice}
+          </p>
+        )}
+        {processError && (
+          <p className="result-notice error" role="alert">
+            {processError}
+          </p>
+        )}
         {processWarnings.length > 0 && (
           <div className="warning-list" role="status" aria-live="polite">
             {processWarnings.map((warning, index) => (
@@ -371,118 +419,130 @@ export function IngestView({
               const attemptCapped = isAttemptCapped(source);
               const queued = isQueuedForCancel(source);
               const showAttempts =
-                (source.status === "processing" || source.status === "failed")
-                && source.processingAttempts !== undefined
-                && source.processingAttempts > 0;
+                (source.status === "processing" || source.status === "failed") &&
+                source.processingAttempts !== undefined &&
+                source.processingAttempts > 0;
               return (
-              <article className="detail-row source-row" key={source.id} aria-label={t("ingest.sourceRowAria", { title: source.title })}>
-                <div>
-                  <strong>{source.title}</strong>
-                  <div className="pill-row">
-                    <span className="pill">{formatSourceKind(source.kind, t)}</span>
-                    {source.status === "processing" && source.processingQueuePhase === "queued" ? (
-                      <span className="status-badge pending" role="status">
-                        {t("ingest.processingQueueQueued")}
-                      </span>
-                    ) : source.status === "processing" ? (
-                      <span className="status-badge processing" role="status">
-                        {t("ingest.processingQueueActive")}
-                      </span>
-                    ) : (
-                      <StatusBadge status={source.status} />
+                <article
+                  className="detail-row source-row"
+                  key={source.id}
+                  aria-label={t("ingest.sourceRowAria", { title: source.title })}
+                >
+                  <div>
+                    <strong>{source.title}</strong>
+                    <div className="pill-row">
+                      <span className="pill">{formatSourceKind(source.kind, t)}</span>
+                      {source.status === "processing" && source.processingQueuePhase === "queued" ? (
+                        <span className="status-badge pending" role="status">
+                          {t("ingest.processingQueueQueued")}
+                        </span>
+                      ) : source.status === "processing" ? (
+                        <span className="status-badge processing" role="status">
+                          {t("ingest.processingQueueActive")}
+                        </span>
+                      ) : (
+                        <StatusBadge status={source.status} />
+                      )}
+                      {attemptCapped && (
+                        <span className="status-badge failed" role="status">
+                          {t("ingest.processingAttemptsCapped")}
+                        </span>
+                      )}
+                      {showAttempts && (
+                        <span className="pill muted">
+                          {t("ingest.processingAttempts", {
+                            count: source.processingAttempts ?? 0,
+                            max: MAX_PROCESSING_ATTEMPTS
+                          })}
+                        </span>
+                      )}
+                      {source.kind === "audio" && (
+                        <span className="pill">
+                          {source.transcriptAvailable ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}
+                        </span>
+                      )}
+                      {(() => {
+                        const marker = processingHeartbeatMarker(source);
+                        if (!marker) return null;
+                        return (
+                          <span className="pill muted">
+                            {t("ingest.processingHeartbeatAge", {
+                              age: formatRelativeAgeLabel(relativeAge(marker), t)
+                            })}
+                          </span>
+                        );
+                      })()}
+                    </div>
+                    <small className="muted">
+                      {t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}
+                    </small>
+                    {isProcessingStale(source) &&
+                      (() => {
+                        const marker = processingHeartbeatMarker(source);
+                        const age = marker ? formatRelativeAgeLabel(relativeAge(marker), t) : "";
+                        return (
+                          <p className="result-notice warning" role="status">
+                            {t("ingest.processingStaleWarning", { age })}
+                          </p>
+                        );
+                      })()}
+                    {source.error && (
+                      <p className="result-notice error">
+                        {localizeSourceProcessingError(source.error, t, "ingest.sourceProcessingFailed")}
+                      </p>
                     )}
                     {attemptCapped && (
-                      <span className="status-badge failed" role="status">
-                        {t("ingest.processingAttemptsCapped")}
-                      </span>
-                    )}
-                    {showAttempts && (
-                      <span className="pill muted">
-                        {t("ingest.processingAttempts", {
-                          count: source.processingAttempts ?? 0,
-                          max: MAX_PROCESSING_ATTEMPTS
-                        })}
-                      </span>
-                    )}
-                    {source.kind === "audio" && (
-                      <span className="pill">{source.transcript ? t("ingest.transcriptReady") : t("ingest.noTranscriptYet")}</span>
-                    )}
-                    {(() => {
-                      const marker = processingHeartbeatMarker(source);
-                      if (!marker) return null;
-                      return (
-                        <span className="pill muted">
-                          {t("ingest.processingHeartbeatAge", { age: formatRelativeAgeLabel(relativeAge(marker), t) })}
-                        </span>
-                      );
-                    })()}
-                  </div>
-                  <small className="muted">{t("ingest.addedByAt", { createdBy: source.createdBy, createdAt: source.createdAt })}</small>
-                  {isProcessingStale(source) && (() => {
-                    const marker = processingHeartbeatMarker(source);
-                    const age = marker ? formatRelativeAgeLabel(relativeAge(marker), t) : "";
-                    return (
                       <p className="result-notice warning" role="status">
-                        {t("ingest.processingStaleWarning", { age })}
+                        {t("ingest.processingAttemptsCappedHint", { max: MAX_PROCESSING_ATTEMPTS })}
                       </p>
-                    );
-                  })()}
-                  {source.error && (
-                    <p className="result-notice error">
-                      {localizeSourceProcessingError(source.error, t, "ingest.sourceProcessingFailed")}
-                    </p>
-                  )}
-                  {attemptCapped && (
-                    <p className="result-notice warning" role="status">
-                      {t("ingest.processingAttemptsCappedHint", { max: MAX_PROCESSING_ATTEMPTS })}
-                    </p>
-                  )}
-                  {source.warnings && source.warnings.length > 0 && (
-                    <ul className="source-warnings" aria-label={t("ingest.processingWarningsAria", { title: source.title })}>
-                      {source.warnings.map((warning, index) => (
-                        <li key={`${index}:${warning}`}>{localizeSourceProcessingWarning(warning, t)}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-                <div className="source-row-actions">
-                  {queued && (
+                    )}
+                    {source.warnings && source.warnings.length > 0 && (
+                      <ul
+                        className="source-warnings"
+                        aria-label={t("ingest.processingWarningsAria", { title: source.title })}
+                      >
+                        {source.warnings.map((warning, index) => (
+                          <li key={`${index}:${warning}`}>{localizeSourceProcessingWarning(warning, t)}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="source-row-actions">
+                    {queued && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={cancellingSourceId !== null}
+                        aria-busy={cancellingSourceId === source.id || undefined}
+                        onClick={() => handleCancelProcessing(source.id)}
+                      >
+                        {cancellingSourceId === source.id
+                          ? t("ingest.cancelProcessingBusy")
+                          : t("ingest.cancelProcessing", { title: source.title })}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="secondary"
-                      disabled={cancellingSourceId !== null}
-                      aria-busy={cancellingSourceId === source.id || undefined}
-                      onClick={() => handleCancelProcessing(source.id)}
+                      disabled={
+                        processingSourceId !== null ||
+                        cancellingSourceId !== null ||
+                        source.status === "processing" ||
+                        attemptCapped
+                      }
+                      aria-busy={processingSourceId === source.id || source.status === "processing" || undefined}
+                      onClick={() => handleProcessSource(source.id)}
                     >
-                      {cancellingSourceId === source.id
-                        ? t("ingest.cancelProcessingBusy")
-                        : t("ingest.cancelProcessing", { title: source.title })}
+                      {processingSourceId === source.id || source.status === "processing"
+                        ? source.kind === "document"
+                          ? t("ingest.processingDocument")
+                          : t("ingest.processing")
+                        : source.status === "failed"
+                          ? t("ingest.retrySource", { title: source.title })
+                          : t("ingest.processSource", { title: source.title })}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={
-                      processingSourceId !== null
-                      || cancellingSourceId !== null
-                      || source.status === "processing"
-                      || attemptCapped
-                    }
-                    aria-busy={
-                      processingSourceId === source.id || source.status === "processing" || undefined
-                    }
-                    onClick={() => handleProcessSource(source.id)}
-                  >
-                    {processingSourceId === source.id || source.status === "processing"
-                      ? source.kind === "document"
-                        ? t("ingest.processingDocument")
-                        : t("ingest.processing")
-                      : source.status === "failed"
-                        ? t("ingest.retrySource", { title: source.title })
-                        : t("ingest.processSource", { title: source.title })}
-                  </button>
-                </div>
-              </article>
+                  </div>
+                </article>
               );
             })}
           </div>
@@ -496,8 +556,16 @@ export function IngestView({
             <h2>{shownCountLabel}</h2>
           </div>
         </div>
-        {draftNotice && <p className="result-notice" role="status" aria-live="polite">{draftNotice}</p>}
-        {draftError && <p className="result-notice error" role="alert">{draftError}</p>}
+        {draftNotice && (
+          <p className="result-notice" role="status" aria-live="polite">
+            {draftNotice}
+          </p>
+        )}
+        {draftError && (
+          <p className="result-notice error" role="alert">
+            {draftError}
+          </p>
+        )}
         {bulkFailures.length > 0 && (
           <ul className="warning-list" aria-label={t("ingest.bulkReviewFailuresAria")}>
             {bulkFailures.map((failure) => (
@@ -526,11 +594,7 @@ export function IngestView({
                   aria-pressed={kindFilter === item}
                   onClick={() => setKindFilter(item)}
                 >
-                  <span>
-                    {item === "all"
-                      ? t("ingest.draftFilter.all")
-                      : t(`draftKind.${item}`)}
-                  </span>
+                  <span>{item === "all" ? t("ingest.draftFilter.all") : t(`draftKind.${item}`)}</span>
                   <strong aria-hidden="true">{kindCounts[item]}</strong>
                 </button>
               ))}
@@ -580,7 +644,9 @@ export function IngestView({
                 className="secondary"
                 disabled={isBulkReviewing || selectedDraftIds.length === 0}
                 aria-busy={isBulkReviewing || undefined}
-                onClick={() => { void handleBulkReview("accept"); }}
+                onClick={() => {
+                  void handleBulkReview("accept");
+                }}
               >
                 {isBulkReviewing
                   ? t("ingest.reviewingSelected")
@@ -593,7 +659,9 @@ export function IngestView({
                 className="contest"
                 disabled={isBulkReviewing || selectedDraftIds.length === 0}
                 aria-busy={isBulkReviewing || undefined}
-                onClick={() => { void handleBulkReview("reject"); }}
+                onClick={() => {
+                  void handleBulkReview("reject");
+                }}
               >
                 {isBulkReviewing
                   ? t("ingest.reviewingSelected")
@@ -603,80 +671,86 @@ export function IngestView({
               </button>
             </div>
             <div className="detail-list">
-            {visibleDrafts.length === 0 ? (
-              <div className="empty-state" role="status" aria-live="polite">
-                <p>{t("ingest.noDraftsInFilter")}</p>
-                <p className="muted">{t("ingest.noDraftsInFilterHint")}</p>
-              </div>
-            ) : (
-              visibleDrafts.map((draft) => (
-              <article className="detail-row draft-row" key={draft.id} aria-label={t("ingest.extractionDraftRowAria", { id: draft.id })}>
-                <div>
-                  <div className="pill-row">
-                    <input
-                      type="checkbox"
-                      aria-label={t("ingest.selectDraftAria", { id: draft.id })}
-                      checked={selectedDraftIds.includes(draft.id)}
-                      disabled={isBulkReviewing}
-                      onChange={() => toggleDraftSelection(draft.id)}
-                    />
-                    <span className="pill">{t(`draftKind.${draft.kind}`)}</span>
-                    <ConfidenceBadge confidence={draft.confidence} />
-                    {draft.duplicate && (
-                      <span className={`status-badge ${draft.duplicate.kind === "pending" ? "under_review" : "contested"}`}>
-                        {t(`draftDuplicate.${draft.duplicate.kind}`)}
-                      </span>
-                    )}
-                    {draft.grounding?.map((flag) => (
-                      <span
-                        key={`${flag.kind}:${flag.message}`}
-                        className="status-badge contested"
-                        title={localizeDraftGroundingMessage(flag, t)}
-                      >
-                        {t(`draftGrounding.${flag.kind}`)}
-                      </span>
-                    ))}
-                  </div>
-                  <strong>{extractionDraftSummary(draft, t)}</strong>
-                  {draft.rationale && <p>{draft.rationale}</p>}
-                  {hasSegmentationConflict(draft) && (
-                    <SegmentationConflictPanel
-                      draft={draft}
-                      disabled={reviewingDraftId !== null}
-                      busy={reviewingDraftId === draft.id}
-                      onAccept={(options) => {
-                        void handleDraftDecision(draft.id, "accept", options);
-                      }}
-                    />
-                  )}
+              {visibleDrafts.length === 0 ? (
+                <div className="empty-state" role="status" aria-live="polite">
+                  <p>{t("ingest.noDraftsInFilter")}</p>
+                  <p className="muted">{t("ingest.noDraftsInFilterHint")}</p>
                 </div>
-                <div className="correction-actions draft-actions">
-                  {!hasSegmentationConflict(draft) && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
-                      disabled={reviewingDraftId !== null}
-                      aria-busy={reviewingDraftId === draft.id || undefined}
-                      onClick={() => handleDraftDecision(draft.id, "accept")}
-                    >
-                      {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="contest"
-                    aria-label={t("ingest.rejectDraftAria", { id: draft.id })}
-                    disabled={reviewingDraftId !== null}
-                    aria-busy={reviewingDraftId === draft.id || undefined}
-                    onClick={() => handleDraftDecision(draft.id, "reject")}
+              ) : (
+                visibleDrafts.map((draft) => (
+                  <article
+                    className="detail-row draft-row"
+                    key={draft.id}
+                    aria-label={t("ingest.extractionDraftRowAria", { id: draft.id })}
                   >
-                    {t("ingest.reject")}
-                  </button>
-                </div>
-              </article>
-              ))
-            )}
+                    <div>
+                      <div className="pill-row">
+                        <input
+                          type="checkbox"
+                          aria-label={t("ingest.selectDraftAria", { id: draft.id })}
+                          checked={selectedDraftIds.includes(draft.id)}
+                          disabled={isBulkReviewing}
+                          onChange={() => toggleDraftSelection(draft.id)}
+                        />
+                        <span className="pill">{t(`draftKind.${draft.kind}`)}</span>
+                        <ConfidenceBadge confidence={draft.confidence} />
+                        {draft.duplicate && (
+                          <span
+                            className={`status-badge ${draft.duplicate.kind === "pending" ? "under_review" : "contested"}`}
+                          >
+                            {t(`draftDuplicate.${draft.duplicate.kind}`)}
+                          </span>
+                        )}
+                        {draft.grounding?.map((flag) => (
+                          <span
+                            key={`${flag.kind}:${flag.message}`}
+                            className="status-badge contested"
+                            title={localizeDraftGroundingMessage(flag, t)}
+                          >
+                            {t(`draftGrounding.${flag.kind}`)}
+                          </span>
+                        ))}
+                      </div>
+                      <strong>{extractionDraftSummary(draft, t)}</strong>
+                      {draft.rationale && <p>{draft.rationale}</p>}
+                      {hasSegmentationConflict(draft) && (
+                        <SegmentationConflictPanel
+                          draft={draft}
+                          disabled={reviewingDraftId !== null}
+                          busy={reviewingDraftId === draft.id}
+                          onAccept={(options) => {
+                            void handleDraftDecision(draft.id, "accept", options);
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div className="correction-actions draft-actions">
+                      {!hasSegmentationConflict(draft) && (
+                        <button
+                          type="button"
+                          className="secondary"
+                          aria-label={t("ingest.acceptDraftAria", { id: draft.id })}
+                          disabled={reviewingDraftId !== null}
+                          aria-busy={reviewingDraftId === draft.id || undefined}
+                          onClick={() => handleDraftDecision(draft.id, "accept")}
+                        >
+                          {reviewingDraftId === draft.id ? t("ingest.reviewing") : t("ingest.accept")}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="contest"
+                        aria-label={t("ingest.rejectDraftAria", { id: draft.id })}
+                        disabled={reviewingDraftId !== null}
+                        aria-busy={reviewingDraftId === draft.id || undefined}
+                        onClick={() => handleDraftDecision(draft.id, "reject")}
+                      >
+                        {t("ingest.reject")}
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
             </div>
           </>
         )}

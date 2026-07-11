@@ -46,8 +46,7 @@ export interface RunSqliteMigrationsOptions {
 
 function readPersistedVersion(db: Database.Database): number | undefined {
   const row = db.prepare("SELECT schema_version FROM schema_meta LIMIT 1").get() as
-    | { schema_version: number }
-    | undefined;
+    { schema_version: number } | undefined;
   return row?.schema_version;
 }
 
@@ -92,9 +91,7 @@ export function runSqliteMigrations(
   const ordered = [...migrations].sort((a, b) => a.from - b.from);
   for (const migration of ordered) {
     if (migration.to !== migration.from + 1) {
-      throw new Error(
-        `Invalid SQLite migration ${migration.from} -> ${migration.to}: 'to' must be 'from' + 1.`
-      );
+      throw new Error(`Invalid SQLite migration ${migration.from} -> ${migration.to}: 'to' must be 'from' + 1.`);
     }
     if (migration.from < version) continue;
     if (migration.from > version) {

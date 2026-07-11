@@ -32,7 +32,9 @@ export function DesktopActionGroups({ ariaLabel, groups }: DesktopActionGroupsPr
             role="group"
             aria-labelledby={labelId}
           >
-            <span id={labelId} className="detail-label">{group.label}</span>
+            <span id={labelId} className="detail-label">
+              {group.label}
+            </span>
             <div className="settings-actions desktop-actions">
               {group.buttons.map((button) => (
                 <button

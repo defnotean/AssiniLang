@@ -8,7 +8,7 @@ describe("script JSON helpers", () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-json-helper-"));
     try {
       const path = join(dir, "fixture.json");
-      await writeFile(path, "{\"name\":\"AssiniLang\",\"ok\":true}\n", "utf8");
+      await writeFile(path, '{"name":"AssiniLang","ok":true}\n', "utf8");
       const { readJsonFile } = await import("./lib/jsonHelpers.mjs");
 
       await expect(readJsonFile(path)).resolves.toEqual({
