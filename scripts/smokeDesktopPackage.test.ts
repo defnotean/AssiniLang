@@ -132,9 +132,13 @@ describe("desktop package smoke report validation", () => {
   it("rejects blank or near-white screenshots", async () => {
     const { validateSmokeReport } = await import("./smokeDesktopPackage.mjs");
 
-    expect(() => validateSmokeReport(createReport({
-      visual: { width: 1264, height: 821, nonWhiteRatio: 0 }
-    }))).toThrow(/blank or near-white/);
+    expect(() =>
+      validateSmokeReport(
+        createReport({
+          visual: { width: 1264, height: 821, nonWhiteRatio: 0 }
+        })
+      )
+    ).toThrow(/blank or near-white/);
   });
 
   it("requires the provider settings controls to be visible", async () => {

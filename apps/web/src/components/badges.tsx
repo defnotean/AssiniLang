@@ -1,4 +1,4 @@
-import type { Note } from "@assini/db";
+import type { Note } from "@assini/api-contract";
 import { formatStatus } from "../lib/format";
 import { useI18n } from "../i18n";
 

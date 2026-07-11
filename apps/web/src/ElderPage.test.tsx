@@ -143,13 +143,7 @@ describe("ElderPage loading and empty states", () => {
   });
 
   it("shows next-step guidance when the suggestions list is empty", () => {
-    render(
-      <ElderPage
-        elder={createElderState()}
-        data={createDashboardData()}
-        isWorkflowBusy={false}
-      />
-    );
+    render(<ElderPage elder={createElderState()} data={createDashboardData()} isWorkflowBusy={false} />);
 
     const emptyState = screen.getByText("No suggestions yet.").closest("[role='status']");
     expect(emptyState).toHaveClass("empty-state");
@@ -276,13 +270,7 @@ describe("ElderPage review and apply busy guards", () => {
       }
     ];
 
-    render(
-      <ElderPage
-        elder={createElderState({ elderContext })}
-        data={data}
-        isWorkflowBusy={false}
-      />
-    );
+    render(<ElderPage elder={createElderState({ elderContext })} data={data} isWorkflowBusy={false} />);
 
     expect(screen.getByText(/Edit the wording below/)).toBeInTheDocument();
     expect(screen.getByDisplayValue("Use -na for locative.")).toBeInTheDocument();
@@ -307,13 +295,7 @@ describe("ElderPage review and apply busy guards", () => {
       }
     ];
 
-    render(
-      <ElderPage
-        elder={createElderState({ elderContext })}
-        data={data}
-        isWorkflowBusy={false}
-      />
-    );
+    render(<ElderPage elder={createElderState({ elderContext })} data={data} isWorkflowBusy={false} />);
 
     const emptyState = screen.getByText(/not linked to a lesson/).closest("[role='status']");
     expect(emptyState).toHaveClass("empty-state");

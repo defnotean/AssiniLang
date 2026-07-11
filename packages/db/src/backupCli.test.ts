@@ -136,9 +136,7 @@ describe("runBackupCli", () => {
     expect(await readFile(destination, "utf8")).toBe('{"stale":true}');
     expect(stdout).toHaveBeenCalledWith(`Dry run: would back up local database at ${resolve(dbPath)}`);
     expect(stdout).toHaveBeenCalledWith(`Dry run: backup destination would be ${resolve(destination)}`);
-    expect(stdout).not.toHaveBeenCalledWith(
-      expect.stringContaining("a real backup would need --force")
-    );
+    expect(stdout).not.toHaveBeenCalledWith(expect.stringContaining("a real backup would need --force"));
   });
 
   it("rejects backing up an invalid workspace before writing a copy", async () => {

@@ -90,8 +90,6 @@ describe("IngestView already-processing conflicts", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Register source" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Too many requests. Wait 12 seconds, then retry."
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests. Wait 12 seconds, then retry.");
   });
 });

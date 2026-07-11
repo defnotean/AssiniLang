@@ -47,6 +47,7 @@
 ## Task 1: Monorepo Foundation
 
 **Files:**
+
 - Create: `package.json`
 - Create: `tsconfig.base.json`
 - Create: `vitest.config.ts`
@@ -64,10 +65,7 @@ Create `package.json`:
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "workspaces": ["apps/*", "packages/*"],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "check": "tsc -b packages/db packages/synthetic-langs packages/eval apps/api apps/web",
@@ -164,7 +162,7 @@ npm-debug.log*
 
 Create `README.md`:
 
-```md
+````md
 # AssiniLang
 
 Synthetic language evaluation scaffold for a community-governed language AI system.
@@ -177,6 +175,7 @@ This repository intentionally starts with made-up languages only. No real First 
 npm install
 npm test
 ```
+````
 
 This verifies the initial workspace foundation. At this stage, Vitest exits cleanly even before test files exist.
 
@@ -208,7 +207,8 @@ Once the scaffold packages and apps are implemented, the demo seeds synthetic fi
 - `packages/eval`: deterministic study-loop simulation and scoring.
 - `apps/api`: Fastify API.
 - `apps/web`: Vite React prototype UI.
-```
+
+````
 
 Create an empty `data/.gitkeep` file.
 
@@ -218,7 +218,7 @@ Run:
 
 ```powershell
 npm install
-```
+````
 
 Expected: npm installs dependencies and creates `package-lock.json`.
 
@@ -244,6 +244,7 @@ git commit -m "chore: scaffold workspace foundation"
 ## Task 2: Shared Schemas And Local Store
 
 **Files:**
+
 - Create: `packages/db/package.json`
 - Create: `packages/db/tsconfig.json`
 - Create: `packages/db/src/schema.ts`
@@ -347,12 +348,7 @@ Create `packages/db/src/schema.ts`:
 ```ts
 import { z } from "zod";
 
-export const languageTypologySchema = z.enum([
-  "agglutinative",
-  "isolating",
-  "fusional",
-  "polysynthetic-lite"
-]);
+export const languageTypologySchema = z.enum(["agglutinative", "isolating", "fusional", "polysynthetic-lite"]);
 
 export const languageSchema = z.object({
   id: z.string().min(1),
@@ -399,11 +395,13 @@ export const noteSchema = z.object({
   languageId: z.string().min(1),
   topic: z.string().min(1),
   explanation: z.string().min(1),
-  examples: z.array(z.object({
-    passageId: z.string().min(1),
-    target: z.string().min(1),
-    translation: z.string().min(1)
-  })),
+  examples: z.array(
+    z.object({
+      passageId: z.string().min(1),
+      target: z.string().min(1),
+      translation: z.string().min(1)
+    })
+  ),
   evidencePassageIds: z.array(z.string().min(1)),
   evidenceCount: z.number().int().nonnegative(),
   confidence: confidenceSchema,
@@ -414,12 +412,14 @@ export const noteSchema = z.object({
     comments: z.array(z.string())
   }),
   dialectScope: z.string().min(1),
-  editHistory: z.array(z.object({
-    at: z.string(),
-    by: z.string(),
-    action: z.string(),
-    summary: z.string()
-  }))
+  editHistory: z.array(
+    z.object({
+      at: z.string(),
+      by: z.string(),
+      action: z.string(),
+      summary: z.string()
+    })
+  )
 });
 
 export const exerciseSchema = z.object({
@@ -518,7 +518,10 @@ export class JsonStore {
     return next;
   }
 
-  async updateNote(noteId: string, patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>): Promise<Note> {
+  async updateNote(
+    noteId: string,
+    patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>
+  ): Promise<Note> {
     let updated: Note | undefined;
     await this.update((state) => ({
       ...state,
@@ -565,6 +568,7 @@ git commit -m "feat: add shared schemas and json store"
 ## Task 3: Synthetic Language Fixtures
 
 **Files:**
+
 - Create: `packages/synthetic-langs/package.json`
 - Create: `packages/synthetic-langs/tsconfig.json`
 - Create: `packages/synthetic-langs/src/fixtures.ts`
@@ -666,7 +670,13 @@ import type { CorpusPassage, Exercise, Language, Note } from "@assini/db";
 export type SyntheticLanguageFixture = {
   language: Language;
   vocabulary: Array<{ id: string; form: string; gloss: string; partOfSpeech: string; tags: string[] }>;
-  grammarRules: Array<{ id: string; topic: string; explanation: string; evidencePassageIds: string[]; confidence: "low" | "medium" | "high" }>;
+  grammarRules: Array<{
+    id: string;
+    topic: string;
+    explanation: string;
+    evidencePassageIds: string[];
+    confidence: "low" | "medium" | "high";
+  }>;
   corpus: CorpusPassage[];
   notesAnswerKey: Note[];
   exercisesAnswerKey: Exercise[];
@@ -709,7 +719,8 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       {
         id: "avn-rule-verb-chain",
         topic: "morphology/verb/tense-person-suffix-chain",
-        explanation: "Avenik finite verbs use root + tense suffix + person suffix. The tense suffix comes before the person suffix.",
+        explanation:
+          "Avenik finite verbs use root + tense suffix + person suffix. The tense suffix comes before the person suffix.",
         evidencePassageIds: ["avn-c001", "avn-c002", "avn-c003"],
         confidence: "high"
       },
@@ -945,7 +956,8 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       {
         id: "vel-rule-fused-ending",
         topic: "morphology/verb/fused-person-tense-ending",
-        explanation: "Velari verb endings encode person and tense in a single fused ending: -or is first-person present, while -eth is third-person past.",
+        explanation:
+          "Velari verb endings encode person and tense in a single fused ending: -or is first-person present, while -eth is third-person past.",
         evidencePassageIds: ["vel-c001", "vel-c002", "vel-c004"],
         confidence: "high"
       },
@@ -1068,7 +1080,8 @@ export const syntheticLanguageFixtures: SyntheticLanguageFixture[] = [
       {
         id: "ket-rule-verb-as-clause",
         topic: "syntax/polysynthetic-lite/verb-word-clause",
-        explanation: "A single Ketharu verb word can express a full clause when subject, object, root, and time slots are present.",
+        explanation:
+          "A single Ketharu verb word can express a full clause when subject, object, root, and time slots are present.",
         evidencePassageIds: ["ket-c001", "ket-c003", "ket-c005"],
         confidence: "medium"
       }
@@ -1362,6 +1375,7 @@ git commit -m "feat: add synthetic language fixtures"
 ## Task 4: Evaluation Harness
 
 **Files:**
+
 - Create: `packages/eval/package.json`
 - Create: `packages/eval/tsconfig.json`
 - Create: `packages/eval/src/studyLoop.ts`
@@ -1507,11 +1521,7 @@ function scoreRatio(pass: number, total: number): number {
 }
 
 function answerKeyTopicMap(languageId: string, state: AppState): Map<string, Note> {
-  return new Map(
-    state.notes
-      .filter((note) => note.languageId === languageId)
-      .map((note) => [note.topic, note])
-  );
+  return new Map(state.notes.filter((note) => note.languageId === languageId).map((note) => [note.topic, note]));
 }
 
 export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accepted: boolean; explanation: string } {
@@ -1523,7 +1533,11 @@ export function gradeExerciseAnswer(exercise: Exercise, answer: string): { accep
   };
 }
 
-export function scoreLanguageEvaluation(languageId: string, state: AppState, draftedNotes: Note[]): LanguageScoreResult {
+export function scoreLanguageEvaluation(
+  languageId: string,
+  state: AppState,
+  draftedNotes: Note[]
+): LanguageScoreResult {
   const failures: EvaluationFailure[] = [];
   const expectedByTopic = answerKeyTopicMap(languageId, state);
   const draftedByTopic = new Map(draftedNotes.map((note) => [note.topic, note]));
@@ -1535,7 +1549,12 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
   for (const [topic, expected] of expectedByTopic) {
     const drafted = draftedByTopic.get(topic);
     if (!drafted) {
-      failures.push({ category: "noteCoverage", languageId, itemId: expected.id, message: `Missing note topic ${topic}` });
+      failures.push({
+        category: "noteCoverage",
+        languageId,
+        itemId: expected.id,
+        message: `Missing note topic ${topic}`
+      });
       continue;
     }
 
@@ -1544,7 +1563,12 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     if (normalize(drafted.explanation) === normalize(expected.explanation)) {
       contentPass += 1;
     } else {
-      failures.push({ category: "noteAccuracy", languageId, itemId: expected.id, message: `Explanation mismatch for ${topic}` });
+      failures.push({
+        category: "noteAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Explanation mismatch for ${topic}`
+      });
     }
 
     const expectedEvidence = expected.evidencePassageIds.slice().sort().join("|");
@@ -1552,21 +1576,29 @@ export function scoreLanguageEvaluation(languageId: string, state: AppState, dra
     if (expectedEvidence === draftedEvidence) {
       evidencePass += 1;
     } else {
-      failures.push({ category: "evidenceAccuracy", languageId, itemId: expected.id, message: `Evidence mismatch for ${topic}` });
+      failures.push({
+        category: "evidenceAccuracy",
+        languageId,
+        itemId: expected.id,
+        message: `Evidence mismatch for ${topic}`
+      });
     }
   }
 
   const languageCorpus = state.corpus.filter((passage) => passage.languageId === languageId);
   const segmentationPass = languageCorpus.filter((passage) => passage.morphologicalSegmentation.length > 0).length;
-  const translationPass = languageCorpus.filter((passage) => passage.textTranslation.length > 0 && passage.textTarget.length > 0).length;
+  const translationPass = languageCorpus.filter(
+    (passage) => passage.textTranslation.length > 0 && passage.textTarget.length > 0
+  ).length;
 
   const languageExercises = state.exercises.filter((exercise) => exercise.languageId === languageId);
   const exercisePass = languageExercises.filter((exercise) =>
     exercise.expectedAnswers.every((answer) => gradeExerciseAnswer(exercise, answer).accepted)
   ).length;
 
-  const generationCheckedExercises = languageExercises.filter((exercise) =>
-    exercise.type === "translate_to_target" || exercise.type === "segment" || exercise.type === "choose_particle"
+  const generationCheckedExercises = languageExercises.filter(
+    (exercise) =>
+      exercise.type === "translate_to_target" || exercise.type === "segment" || exercise.type === "choose_particle"
   );
   const allowedForms = new Set(generationCheckedExercises.flatMap((exercise) => exercise.allowedVocabulary));
   const generationPolicyPass = generationCheckedExercises.filter((exercise) =>
@@ -1678,6 +1710,7 @@ git commit -m "feat: add synthetic evaluation harness"
 ## Task 5: API Service
 
 **Files:**
+
 - Create: `apps/api/package.json`
 - Create: `apps/api/tsconfig.json`
 - Create: `apps/api/src/server.ts`
@@ -1857,7 +1890,9 @@ export function createServer(options: ServerOptions = {}) {
       reviewer: {
         lastReviewedBy: "local-reviewer",
         lastReviewedAt: new Date().toISOString(),
-        comments: body.reviewerComment ? [...existing.reviewer.comments, body.reviewerComment] : existing.reviewer.comments
+        comments: body.reviewerComment
+          ? [...existing.reviewer.comments, body.reviewerComment]
+          : existing.reviewer.comments
       },
       editHistory: [
         ...existing.editHistory,
@@ -1919,6 +1954,7 @@ git commit -m "feat: add api service"
 ## Task 6: Web Prototype
 
 **Files:**
+
 - Create: `apps/web/package.json`
 - Create: `apps/web/tsconfig.json`
 - Create: `apps/web/vite.config.ts`
@@ -2121,9 +2157,7 @@ import { fetchDashboardData, runEvaluation } from "./api";
 import "./styles.css";
 
 type LoadState =
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "ready"; data: DashboardData };
+  { status: "loading" } | { status: "error"; message: string } | { status: "ready"; data: DashboardData };
 
 export function App() {
   const [selectedLanguageId, setSelectedLanguageId] = useState("avenik");
@@ -2151,8 +2185,12 @@ export function App() {
 
   function handleGradeExercise() {
     if (!firstExercise) return;
-    const accepted = firstExercise.expectedAnswers.some((expected) => expected.trim().toLowerCase() === answer.trim().toLowerCase());
-    setExerciseResult(accepted ? firstExercise.gradingExplanation : `Try again. Expected: ${firstExercise.expectedAnswers.join(" | ")}`);
+    const accepted = firstExercise.expectedAnswers.some(
+      (expected) => expected.trim().toLowerCase() === answer.trim().toLowerCase()
+    );
+    setExerciseResult(
+      accepted ? firstExercise.gradingExplanation : `Try again. Expected: ${firstExercise.expectedAnswers.join(" | ")}`
+    );
   }
 
   return (
@@ -2200,7 +2238,9 @@ export function App() {
                   <article key={passage.id} className="record">
                     <h3>{passage.textTarget}</h3>
                     <p>{passage.textTranslation}</p>
-                    <code>{passage.morphologicalSegmentation.map((part) => `${part.surface}:${part.gloss}`).join(" ")}</code>
+                    <code>
+                      {passage.morphologicalSegmentation.map((part) => `${part.surface}:${part.gloss}`).join(" ")}
+                    </code>
                   </article>
                 ))}
               </div>
@@ -2228,7 +2268,11 @@ export function App() {
                   <article key={run.id} className="record">
                     <h3>{run.languageId}</h3>
                     <p>{run.summary}</p>
-                    <code>{Object.entries(run.scores).map(([key, value]) => `${key}: ${Math.round(value * 100)}%`).join(" | ")}</code>
+                    <code>
+                      {Object.entries(run.scores)
+                        .map(([key, value]) => `${key}: ${Math.round(value * 100)}%`)
+                        .join(" | ")}
+                    </code>
                   </article>
                 ))}
               </div>
@@ -2239,7 +2283,11 @@ export function App() {
               {firstExercise ? (
                 <article className="record">
                   <h3>{firstExercise.prompt}</h3>
-                  <input value={answer} onChange={(event) => setAnswer(event.target.value)} aria-label="Exercise answer" />
+                  <input
+                    value={answer}
+                    onChange={(event) => setAnswer(event.target.value)}
+                    aria-label="Exercise answer"
+                  />
                   <button type="button" onClick={handleGradeExercise}>
                     Grade
                   </button>
@@ -2277,7 +2325,14 @@ Create `apps/web/src/styles.css`:
 :root {
   color: #172026;
   background: #f4f6f2;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
 }
 
 * {
@@ -2475,6 +2530,7 @@ git commit -m "feat: add web prototype surfaces"
 ## Task 7: End-To-End Verification And Docs
 
 **Files:**
+
 - Modify: `README.md`
 - Modify: package files only if scripts need adjustment after verification.
 
@@ -2534,7 +2590,7 @@ Open `http://127.0.0.1:5173` and verify:
 
 Append this section to `README.md` after the local setup section:
 
-```md
+````md
 ## Verification
 
 The baseline synthetic testbed is healthy when these commands succeed:
@@ -2545,20 +2601,22 @@ npm run check
 npm run seed
 npm run eval
 ```
+````
 
 The web prototype should then run with:
 
 ```powershell
 npm run dev
 ```
-```
+
+````
 
 - [ ] **Step 7: Commit**
 
 ```powershell
 git add README.md package.json package-lock.json apps packages
 git commit -m "docs: document verification workflow"
-```
+````
 
 ---
 

@@ -110,28 +110,34 @@ describe("runtime app settings", () => {
     const settingsPath = join(dir, ".env");
     await writeFile(settingsPath, "CUSTOM_VALUE=keep-me\n", "utf8");
 
-    await expect(applyObsidianMcpSettingsPatch({
-      settingsPath,
-      env: {},
-      patch: { endpointUrl: "http://127.0.0.1:27124/mcp" }
-    })).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
+    await expect(
+      applyObsidianMcpSettingsPatch({
+        settingsPath,
+        env: {},
+        patch: { endpointUrl: "http://127.0.0.1:27124/mcp" }
+      })
+    ).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
 
-    await expect(applyObsidianMcpSettingsPatch({
-      settingsPath,
-      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
-      patch: { endpointUrl: "http://user:password@127.0.0.1:27124/mcp" }
-    })).rejects.toMatchObject({
+    await expect(
+      applyObsidianMcpSettingsPatch({
+        settingsPath,
+        env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+        patch: { endpointUrl: "http://user:password@127.0.0.1:27124/mcp" }
+      })
+    ).rejects.toMatchObject({
       message: "Invalid Obsidian MCP endpoint URL: URL credentials are not allowed. Use the token field instead."
     });
 
-    await expect(applyObsidianMcpSettingsPatch({
-      settingsPath,
-      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
-      patch: {
-        endpointUrl: "http://127.0.0.1:27124/embedded-mcp-secret",
-        token: "embedded-mcp-secret"
-      }
-    })).rejects.toMatchObject({
+    await expect(
+      applyObsidianMcpSettingsPatch({
+        settingsPath,
+        env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+        patch: {
+          endpointUrl: "http://127.0.0.1:27124/embedded-mcp-secret",
+          token: "embedded-mcp-secret"
+        }
+      })
+    ).rejects.toMatchObject({
       message: "Invalid Obsidian MCP endpoint URL: configured tokens must use the token field only."
     });
     expect(await readFile(settingsPath, "utf8")).not.toContain("ASSINI_OBSIDIAN_MCP_ENDPOINT_URL");
@@ -208,11 +214,7 @@ describe("runtime app settings", () => {
 
   it("updates known .env keys while preserving comments and unknown values", () => {
     const next = updateEnvFileText(
-      [
-        "# local settings",
-        "ASSINI_LLM_PROVIDER=deterministic",
-        "CUSTOM_VALUE=keep-me"
-      ].join("\n"),
+      ["# local settings", "ASSINI_LLM_PROVIDER=deterministic", "CUSTOM_VALUE=keep-me"].join("\n"),
       {
         ASSINI_LLM_PROVIDER: "openai-compatible",
         ASSINI_LLM_MODEL: "irene fusion",
@@ -228,16 +230,10 @@ describe("runtime app settings", () => {
   });
 
   it("clears both ASSINI_LLM_API_KEY and OPENAI_API_KEY when clearApiKey is set", () => {
-    const next = updateEnvFileText(
-      [
-        "ASSINI_LLM_API_KEY=local-secret",
-        "OPENAI_API_KEY=remote-secret"
-      ].join("\n"),
-      {
-        ASSINI_LLM_API_KEY: "",
-        OPENAI_API_KEY: ""
-      }
-    );
+    const next = updateEnvFileText(["ASSINI_LLM_API_KEY=local-secret", "OPENAI_API_KEY=remote-secret"].join("\n"), {
+      ASSINI_LLM_API_KEY: "",
+      OPENAI_API_KEY: ""
+    });
 
     expect(next).toContain("ASSINI_LLM_API_KEY=");
     expect(next).toContain("OPENAI_API_KEY=");
@@ -439,33 +435,41 @@ describe("runtime app settings", () => {
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
     const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: { baseUrl: "http://127.0.0.1:11434/v1" },
-      env
-    })).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { baseUrl: "http://127.0.0.1:11434/v1" },
+        env
+      })
+    ).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: { transcriptionBaseUrl: "http://127.0.0.1:9000/v1" },
-      env
-    })).rejects.toMatchObject({
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { transcriptionBaseUrl: "http://127.0.0.1:9000/v1" },
+        env
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid transcription base URL:/)
     });
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: { embeddingBaseUrl: "http://127.0.0.1:8081/v1" },
-      env
-    })).rejects.toMatchObject({
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { embeddingBaseUrl: "http://127.0.0.1:8081/v1" },
+        env
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid embedding base URL:/)
     });
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: { ocrBaseUrl: "http://127.0.0.1:8080/v1" },
-      env
-    })).rejects.toMatchObject({
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { ocrBaseUrl: "http://127.0.0.1:8080/v1" },
+        env
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid OCR base URL:/)
     });
 
@@ -486,11 +490,13 @@ describe("runtime app settings", () => {
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
     const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: { baseUrl: "https://user:url-pass-secret@%zz" },
-      env
-    })).rejects.toMatchObject({
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: { baseUrl: "https://user:url-pass-secret@%zz" },
+        env
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid LLM base URL:.*\[redacted-secret\]/)
     });
 
@@ -524,14 +530,16 @@ describe("runtime app settings", () => {
       baseUrl: "http://127.0.0.1:11434/v1"
     });
 
-    await expect(applyRuntimeSettingsPatch({
-      settingsPath,
-      patch: {
-        allowPrivateUrls: false,
-        ocrBaseUrl: "http://127.0.0.1:8080/v1"
-      },
-      env
-    })).rejects.toMatchObject({
+    await expect(
+      applyRuntimeSettingsPatch({
+        settingsPath,
+        patch: {
+          allowPrivateUrls: false,
+          ocrBaseUrl: "http://127.0.0.1:8080/v1"
+        },
+        env
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid OCR base URL:/)
     });
   });
@@ -542,22 +550,24 @@ describe("runtime app settings", () => {
     await writeFile(settingsPath, "ASSINI_LLM_PROVIDER=deterministic\n", "utf8");
     const env: Record<string, string | undefined> = { ASSINI_LLM_PROVIDER: "deterministic" };
 
-    await expect(saveRuntimeModelProfile({
-      settingsPath,
-      env,
-      payload: {
-        name: "Blocked private",
-        provider: "openai-compatible",
-        baseUrl: "http://127.0.0.1:11434/v1",
-        timeoutMs: 30_000,
-        maxTokens: 1024,
-        jsonMode: false,
-        transcriptionModel: "whisper-1",
-        ocrModel: "llava",
-        ocrLang: "eng",
-        allowPrivateUrls: false
-      }
-    })).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
+    await expect(
+      saveRuntimeModelProfile({
+        settingsPath,
+        env,
+        payload: {
+          name: "Blocked private",
+          provider: "openai-compatible",
+          baseUrl: "http://127.0.0.1:11434/v1",
+          timeoutMs: 30_000,
+          maxTokens: 1024,
+          jsonMode: false,
+          transcriptionModel: "whisper-1",
+          ocrModel: "llava",
+          ocrLang: "eng",
+          allowPrivateUrls: false
+        }
+      })
+    ).rejects.toBeInstanceOf(RuntimeSettingsUrlValidationError);
 
     expect(env.ASSINI_LLM_MODEL_PROFILES).toBeUndefined();
     expect(await readFile(settingsPath, "utf8")).not.toContain("ASSINI_LLM_MODEL_PROFILES=");
@@ -573,21 +583,23 @@ describe("runtime app settings", () => {
       ASSINI_ALLOW_PRIVATE_URLS: "1"
     };
 
-    await expect(saveRuntimeModelProfile({
-      settingsPath,
-      env,
-      payload: {
-        name: "Inherit blocked",
-        provider: "openai-compatible",
-        timeoutMs: 30_000,
-        maxTokens: 1024,
-        jsonMode: false,
-        transcriptionModel: "whisper-1",
-        ocrModel: "llava",
-        ocrLang: "eng",
-        allowPrivateUrls: false
-      }
-    })).rejects.toMatchObject({
+    await expect(
+      saveRuntimeModelProfile({
+        settingsPath,
+        env,
+        payload: {
+          name: "Inherit blocked",
+          provider: "openai-compatible",
+          timeoutMs: 30_000,
+          maxTokens: 1024,
+          jsonMode: false,
+          transcriptionModel: "whisper-1",
+          ocrModel: "llava",
+          ocrLang: "eng",
+          allowPrivateUrls: false
+        }
+      })
+    ).rejects.toMatchObject({
       message: expect.stringMatching(/Invalid LLM base URL:/)
     });
   });
@@ -1029,26 +1041,28 @@ describe("runtime app settings", () => {
   it("refuses profile mutations when stored profiles JSON is corrupt", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-settings-"));
     const settingsPath = join(dir, ".env");
-    await writeFile(settingsPath, 'ASSINI_LLM_MODEL_PROFILES={not-json\n', "utf8");
+    await writeFile(settingsPath, "ASSINI_LLM_MODEL_PROFILES={not-json\n", "utf8");
     const env: Record<string, string | undefined> = {
       ASSINI_LLM_MODEL_PROFILES: "{not-json"
     };
 
-    await expect(saveRuntimeModelProfile({
-      settingsPath,
-      env,
-      payload: {
-        name: "Broken store",
-        provider: "deterministic",
-        timeoutMs: 1000,
-        maxTokens: 256,
-        jsonMode: false,
-        transcriptionModel: "whisper-1",
-        ocrModel: "llava",
-        ocrLang: "eng",
-        allowPrivateUrls: false
-      }
-    })).rejects.toBeInstanceOf(RuntimeModelProfilesCorruptError);
+    await expect(
+      saveRuntimeModelProfile({
+        settingsPath,
+        env,
+        payload: {
+          name: "Broken store",
+          provider: "deterministic",
+          timeoutMs: 1000,
+          maxTokens: 256,
+          jsonMode: false,
+          transcriptionModel: "whisper-1",
+          ocrModel: "llava",
+          ocrLang: "eng",
+          allowPrivateUrls: false
+        }
+      })
+    ).rejects.toBeInstanceOf(RuntimeModelProfilesCorruptError);
 
     expect(env.ASSINI_LLM_MODEL_PROFILES).toBe("{not-json");
   });

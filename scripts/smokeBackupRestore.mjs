@@ -263,9 +263,7 @@ async function smokeTimedBackupRestoreDrill() {
     fail("timed drill: post-restore read() does not match pre-backup state");
   }
   if (totalMs > MAX_TOTAL_MS) {
-    fail(
-      `timed drill: backup→corrupt→restore took ${totalMs}ms (soft bound ${MAX_TOTAL_MS}ms)`
-    );
+    fail(`timed drill: backup→corrupt→restore took ${totalMs}ms (soft bound ${MAX_TOTAL_MS}ms)`);
   }
 
   const drillLog = {
@@ -282,8 +280,7 @@ async function smokeTimedBackupRestoreDrill() {
     totalElapsedMs: totalMs,
     softBoundMs: MAX_TOTAL_MS,
     outcome: "pass",
-    notes:
-      "Automated acceptance drill via npm run smoke:backup; times are for a tiny fixture, not a production SLA."
+    notes: "Automated acceptance drill via npm run smoke:backup; times are for a tiny fixture, not a production SLA."
   };
   console.log(`timed backup/restore drill log: ${JSON.stringify(drillLog)}`);
   console.log(

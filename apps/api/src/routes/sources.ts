@@ -5,21 +5,13 @@ import type { FastifyInstance } from "fastify";
 import {
   obsidianVaultImportPayloadSchema,
   sourceRegistrationPayloadSchema,
-  sourceProcessingErrorI18n,
   type ObsidianVaultImportPayload,
   type ObsidianVaultImportResponse,
   type SourceRegistrationPayload
 } from "@assini/api-contract";
-import {
-  resolveSourceAssetFilePath,
-  type AppState,
-  type ExtractionDraft,
-  type SourceAsset,
-  type SourceAssetKind,
-  type User
-} from "@assini/db";
-import { extractCandidatesForAsset, type ExtractionCandidate, type SourceExtractionResult } from "../ingestion.js";
-import { appendAuditEvent, redactErrorSecrets, requireActor } from "../routeHelpers.js";
+import { resolveSourceAssetFilePath, type SourceAsset, type SourceAssetKind } from "@assini/db";
+import { toPublicSourceAsset } from "../sourceAssetViews.js";
+import { appendAuditEvent, requireActor } from "../routeHelpers.js";
 import {
   assertObsidianVaultPathAllowed,
   i18nKeyForVaultPathError,
@@ -28,58 +20,16 @@ import {
 } from "../vaultPathSafety.js";
 import type { RouteContext } from "./context.js";
 import { parseSchemaBody } from "./requestBody.js";
+import { registerSourceProcessingRoutes, withProcessingQueuePhase } from "./sourceProcessing.js";
 
-type SourceProcessCompletionInput = {
-  sourceId: string;
-  actor: User;
-  processedAt: string;
-  extraction?: SourceExtractionResult;
-  extractionError?: string;
-};
-
-type SourceProcessCompletionOutput = {
-  drafts: ExtractionDraft[];
-  updatedAsset?: SourceAsset;
-};
+export { CANCELLED_PROCESSING_ERROR, withProcessingQueuePhase, type SourceAssetView } from "./sourceProcessing.js";
 
 type VaultSkippedFile = ObsidianVaultImportResponse["skipped"][number];
 
 /** Per-note Markdown byte cap for Obsidian vault import (oversized notes are skipped). */
 export const MAX_OBSIDIAN_MARKDOWN_BYTES = 1_000_000;
 /** Operator-facing skip reason when a vault Markdown note exceeds {@link MAX_OBSIDIAN_MARKDOWN_BYTES}. */
-export const OBSIDIAN_MARKDOWN_TOO_LARGE_REASON =
-  "Markdown file is larger than the 1 MB import limit.";
-export const MAX_SOURCE_PROCESSING_ATTEMPTS = 5;
-/**
- * Operator-visible error left when a queued (not yet active) processing job
- * is cancelled via POST /sources/:sourceId/cancel-processing.
- */
-export const CANCELLED_PROCESSING_ERROR =
-  "Queued source processing was cancelled. Use Retry when ready.";
-
-/** Non-persisted operator queue phase derived from the in-memory job queue. */
-export type ProcessingQueuePhase = "queued" | "active";
-
-export type SourceAssetView = SourceAsset & {
-  processingQueuePhase?: ProcessingQueuePhase;
-};
-
-export function withProcessingQueuePhase(
-  asset: SourceAsset,
-  queue: { isPending(id: string): boolean; isActive(id: string): boolean }
-): SourceAssetView {
-  if (asset.status !== "processing") {
-    return asset;
-  }
-  if (queue.isPending(asset.id)) {
-    return { ...asset, processingQueuePhase: "queued" };
-  }
-  if (queue.isActive(asset.id)) {
-    return { ...asset, processingQueuePhase: "active" };
-  }
-  // Orphaned processing claim (not in queue): treat as active so Cancel stays hidden.
-  return { ...asset, processingQueuePhase: "active" };
-}
+export const OBSIDIAN_MARKDOWN_TOO_LARGE_REASON = "Markdown file is larger than the 1 MB import limit.";
 /** Default multipart file cap for source uploads (also registered on the Fastify multipart plugin). */
 export const MAX_SOURCE_UPLOAD_BYTES = 25 * 1024 * 1024;
 /** Cap for the optional multipart `title` text field (and busboy `fieldSize`). */
@@ -122,108 +72,6 @@ function readOptionalUploadTitle(
 
 function vaultAuditLabel(rootPath: string): string {
   return basename(rootPath) || "selected vault";
-}
-
-/**
- * Applies the result of a source extraction run (success or failure) to the
- * app state in a single mutation: asset status, error, summary, transcript,
- * new extraction drafts, and the audit event. Shared by the synchronous and
- * background processing paths so both persist identically.
- */
-export function applySourceProcessCompletion(
-  state: AppState,
-  input: SourceProcessCompletionInput,
-  output: SourceProcessCompletionOutput
-): AppState {
-  const { sourceId, actor, processedAt, extraction, extractionError } = input;
-  const stored = state.sourceAssets.find((item) => item.id === sourceId);
-  if (!stored) return state;
-  // Ignore late completions after stale/interrupted recovery already moved the
-  // asset out of "processing" so a hung job cannot overwrite the recovered state.
-  if (stored.status !== "processing") {
-    output.updatedAsset = stored;
-    return state;
-  }
-
-  if (!extraction) {
-    const failedAsset: SourceAsset = {
-      ...stored,
-      status: "failed",
-      error: extractionError ?? "Source processing failed.",
-      processedAt,
-      processingStartedAt: undefined,
-      processingHeartbeatAt: undefined
-    };
-    output.updatedAsset = failedAsset;
-    return appendAuditEvent({
-      ...state,
-      sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? failedAsset : item))
-    }, {
-      actor,
-      at: processedAt,
-      action: "source_asset.process_failed",
-      entityType: "source_asset",
-      entityId: sourceId,
-      languageId: stored.languageId,
-      summary: `Processing failed for source "${stored.title}".`,
-      metadata: { reason: extractionError ?? "unknown" }
-    });
-  }
-
-  output.drafts = extraction.candidates.map((candidate: ExtractionCandidate) => ({
-    id: `draft-${randomUUID()}`,
-    languageId: stored.languageId,
-    sourceAssetId: stored.id,
-    kind: candidate.kind,
-    payload: candidate.payload,
-    confidence: candidate.confidence,
-    rationale: candidate.rationale,
-    status: "proposed" as const,
-    createdAt: processedAt
-  }));
-
-  // Successful runs clear the attempt counter so only failed/abandoned claims
-  // accumulate toward MAX_SOURCE_PROCESSING_ATTEMPTS (see docs/api.md).
-  const updatedAsset: SourceAsset = {
-    ...stored,
-    status: "processed",
-    error: undefined,
-    summary: extraction.summary,
-    transcript: extraction.transcript ?? stored.transcript,
-    warnings: extraction.warnings.length > 0 ? extraction.warnings : undefined,
-    processedAt,
-    processingStartedAt: undefined,
-    processingHeartbeatAt: undefined,
-    processingAttempts: undefined
-  };
-  output.updatedAsset = updatedAsset;
-
-  return appendAuditEvent({
-    ...state,
-    sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? updatedAsset : item)),
-    extractionDrafts: [...state.extractionDrafts, ...output.drafts]
-  }, {
-    actor,
-    at: processedAt,
-    action: "source_asset.processed",
-    entityType: "source_asset",
-    entityId: sourceId,
-    languageId: stored.languageId,
-    summary: `Processed source "${stored.title}" into ${output.drafts.length} extraction drafts.`,
-    metadata: {
-      draftCount: output.drafts.length,
-      warningCount: extraction.warnings.length
-    }
-  });
-}
-
-function isAsyncProcessRequested(body: unknown): boolean {
-  return Boolean(
-    body
-    && typeof body === "object"
-    && !Array.isArray(body)
-    && (body as Record<string, unknown>).async === true
-  );
 }
 
 function parseSourceRegistrationBody(input: unknown): SourceRegistrationPayload | undefined {
@@ -310,7 +158,10 @@ async function collectObsidianMarkdownFiles(
     try {
       entries = await readdir(directory, { withFileTypes: true });
     } catch (error) {
-      skipped.push({ path: directory, reason: error instanceof Error ? error.message : "Directory could not be read." });
+      skipped.push({
+        path: directory,
+        reason: error instanceof Error ? error.message : "Directory could not be read."
+      });
       return;
     }
 
@@ -341,17 +192,20 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     checkRateLimit,
     authToken,
     prototypeSessions,
-    llmProvider,
     dataDir,
     multipartFileSizeBytes,
-    ingestionFetch,
     jobQueue
   } = ctx;
 
   app.get("/languages/:languageId/sources", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "programmer"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "lead",
+      "admin",
+      "programmer"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     if (!state.languages.some((language) => language.id === languageId)) {
       reply.code(404);
@@ -404,23 +258,26 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
         createdAt
       };
 
-      return appendAuditEvent({
-        ...state,
-        sourceAssets: [...state.sourceAssets, asset]
-      }, {
-        actor,
-        at: createdAt,
-        action: "source_asset.registered",
-        entityType: "source_asset",
-        entityId: asset.id,
-        languageId,
-        summary: `Registered ${body.kind} source "${body.title}".`,
-        metadata: {
-          kind: body.kind,
-          hasUrl: Boolean(body.url),
-          textLength: body.rawText?.length ?? 0
+      return appendAuditEvent(
+        {
+          ...state,
+          sourceAssets: [...state.sourceAssets, asset]
+        },
+        {
+          actor,
+          at: createdAt,
+          action: "source_asset.registered",
+          entityType: "source_asset",
+          entityId: asset.id,
+          languageId,
+          summary: `Registered ${body.kind} source "${body.title}".`,
+          metadata: {
+            kind: body.kind,
+            hasUrl: Boolean(body.url),
+            textLength: body.rawText?.length ?? 0
+          }
         }
-      });
+      );
     });
 
     if (languageMissing) {
@@ -440,7 +297,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     }
 
     reply.code(201);
-    return asset;
+    return toPublicSourceAsset(asset);
   });
 
   app.post("/languages/:languageId/sources/obsidian-vault", async (request, reply) => {
@@ -502,12 +359,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       };
     }
 
-    const markdownFiles = await collectObsidianMarkdownFiles(
-      rootPath,
-      body.includeSubfolders,
-      body.maxFiles,
-      skipped
-    );
+    const markdownFiles = await collectObsidianMarkdownFiles(rootPath, body.includeSubfolders, body.maxFiles, skipped);
     if (markdownFiles.length >= body.maxFiles) {
       warnings.push(`Import stopped at the configured ${body.maxFiles} file limit.`);
     }
@@ -540,7 +392,10 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
           createdAt: new Date().toISOString()
         });
       } catch (error) {
-        skipped.push({ path: relativePath, reason: error instanceof Error ? error.message : "Markdown file could not be imported." });
+        skipped.push({
+          path: relativePath,
+          reason: error instanceof Error ? error.message : "Markdown file could not be imported."
+        });
       }
     }
 
@@ -553,26 +408,31 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
       } satisfies ObsidianVaultImportResponse;
     }
 
-    await updateState((state) => appendAuditEvent({
-      ...state,
-      sourceAssets: [...state.sourceAssets, ...importedAssets]
-    }, {
-      actor,
-      action: "source_asset.obsidian_vault_imported",
-      entityType: "source_asset",
-      entityId: importedAssets[0].id,
-      languageId,
-      summary: `Imported ${importedAssets.length} Markdown sources from Obsidian vault "${vaultLabel}".`,
-      metadata: {
-        vaultName: vaultLabel,
-        imported: importedAssets.length,
-        skipped: skipped.length
-      }
-    }));
+    await updateState((state) =>
+      appendAuditEvent(
+        {
+          ...state,
+          sourceAssets: [...state.sourceAssets, ...importedAssets]
+        },
+        {
+          actor,
+          action: "source_asset.obsidian_vault_imported",
+          entityType: "source_asset",
+          entityId: importedAssets[0].id,
+          languageId,
+          summary: `Imported ${importedAssets.length} Markdown sources from Obsidian vault "${vaultLabel}".`,
+          metadata: {
+            vaultName: vaultLabel,
+            imported: importedAssets.length,
+            skipped: skipped.length
+          }
+        }
+      )
+    );
 
     reply.code(201);
     return {
-      imported: importedAssets,
+      imported: importedAssets.map((item) => toPublicSourceAsset(item)),
       skipped,
       warnings,
       summary: {
@@ -677,10 +537,7 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     const titleValue = titleResult.title;
     let asset: SourceAsset | undefined;
     const uploadDirectory = dirname(absolutePath);
-    const stagingPath = join(
-      uploadDirectory,
-      `.${basename(absolutePath)}.${randomUUID()}.uploading`
-    );
+    const stagingPath = join(uploadDirectory, `.${basename(absolutePath)}.${randomUUID()}.uploading`);
     let finalFileCreated = false;
 
     try {
@@ -707,23 +564,26 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
           createdAt
         };
 
-        return appendAuditEvent({
-          ...state,
-          sourceAssets: [...state.sourceAssets, asset]
-        }, {
-          actor,
-          at: createdAt,
-          action: "source_asset.uploaded",
-          entityType: "source_asset",
-          entityId: asset.id,
-          languageId,
-          summary: `Uploaded ${kind} source "${asset.title}".`,
-          metadata: {
-            kind,
-            mimeType,
-            byteSize: buffer.length
+        return appendAuditEvent(
+          {
+            ...state,
+            sourceAssets: [...state.sourceAssets, asset]
+          },
+          {
+            actor,
+            at: createdAt,
+            action: "source_asset.uploaded",
+            entityType: "source_asset",
+            entityId: asset.id,
+            languageId,
+            summary: `Uploaded ${kind} source "${asset.title}".`,
+            metadata: {
+              kind,
+              mimeType,
+              byteSize: buffer.length
+            }
           }
-        });
+        );
       });
     } catch (error) {
       // updateState resolves only after persistence. On rejection, neither a
@@ -750,315 +610,8 @@ export function registerSourceRoutes(app: FastifyInstance, ctx: RouteContext): v
     }
 
     reply.code(201);
-    return asset;
+    return toPublicSourceAsset(asset);
   });
 
-  app.post("/sources/:sourceId/process", async (request, reply) => {
-    const { sourceId } = request.params as { sourceId: string };
-
-    const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
-    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    const rateLimited = checkRateLimit(request, reply, actor);
-    if (rateLimited) return rateLimited;
-
-    const asset = current.sourceAssets.find((item) => item.id === sourceId);
-    if (!asset) {
-      reply.code(404);
-      return {
-        error: `Source not found: ${sourceId}`,
-        i18nKey: "errors.sourceNotFound"
-      };
-    }
-
-    const language = current.languages.find((item) => item.id === asset.languageId);
-    if (!language) {
-      reply.code(404);
-      return {
-        error: `Language not found: ${asset.languageId}`,
-        i18nKey: "errors.languageNotFound"
-      };
-    }
-
-    if (asset.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
-      reply.code(409);
-      return {
-        error: `Source is already processing: ${sourceId}`,
-        i18nKey: "ingest.sourceAlreadyProcessing"
-      };
-    }
-
-    if ((asset.processingAttempts ?? 0) >= MAX_SOURCE_PROCESSING_ATTEMPTS) {
-      reply.code(409);
-      return {
-        error: `Source processing attempt limit reached (${MAX_SOURCE_PROCESSING_ATTEMPTS}).`,
-        i18nKey: "ingest.sourceMaxProcessingAttempts",
-        i18nParams: { max: MAX_SOURCE_PROCESSING_ATTEMPTS, count: asset.processingAttempts ?? 0 }
-      };
-    }
-
-    const asyncRequested = isAsyncProcessRequested(request.body);
-    let claimed: SourceAsset | undefined;
-    let alreadyProcessing = false;
-
-    await updateState((state) => {
-      const stored = state.sourceAssets.find((item) => item.id === sourceId);
-      if (!stored) return state;
-      if (stored.status === "processing" || jobQueue.isQueuedOrActive(sourceId)) {
-        alreadyProcessing = true;
-        return state;
-      }
-
-      const processingStartedAt = new Date().toISOString();
-      const processingHeartbeatAt = processingStartedAt;
-      const processingAttempts = (stored.processingAttempts ?? 0) + 1;
-      claimed = {
-        ...stored,
-        status: "processing",
-        error: undefined,
-        processingStartedAt,
-        processingHeartbeatAt,
-        processingAttempts
-      };
-      return appendAuditEvent({
-        ...state,
-        sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? claimed as SourceAsset : item))
-      }, {
-        actor,
-        action: "source_asset.process_started",
-        entityType: "source_asset",
-        entityId: sourceId,
-        languageId: stored.languageId,
-        summary: asyncRequested
-          ? `Started background processing for source "${stored.title}".`
-          : `Started processing for source "${stored.title}".`,
-        metadata: { kind: stored.kind, async: asyncRequested, processingAttempts, processingStartedAt, processingHeartbeatAt }
-      });
-    });
-
-    if (alreadyProcessing) {
-      reply.code(409);
-      return {
-        error: `Source is already processing: ${sourceId}`,
-        i18nKey: "ingest.sourceAlreadyProcessing"
-      };
-    }
-
-    if (!claimed) {
-      reply.code(404);
-      return {
-        error: `Source not found: ${sourceId}`,
-        i18nKey: "errors.sourceNotFound"
-      };
-    }
-
-    const claimedAsset = claimed;
-
-    if (asyncRequested) {
-      const touchProcessingHeartbeat = async () => {
-        const heartbeatAt = new Date().toISOString();
-        await updateState((state) => ({
-          ...state,
-          sourceAssets: state.sourceAssets.map((item) => (
-            item.id === sourceId && item.status === "processing"
-              ? { ...item, processingHeartbeatAt: heartbeatAt }
-              : item
-          ))
-        }));
-      };
-
-      jobQueue.add(sourceId, async () => {
-        let extraction: SourceExtractionResult | undefined;
-        let extractionError: string | undefined;
-        try {
-          extraction = await extractCandidatesForAsset({
-            asset: claimedAsset,
-            language,
-            provider: llmProvider,
-            dataDir,
-            fetchFn: ingestionFetch,
-            onProgress: touchProcessingHeartbeat
-          });
-        } catch (error) {
-          extractionError = redactErrorSecrets(error instanceof Error ? error.message : "Source processing failed.");
-        }
-
-        const output: SourceProcessCompletionOutput = { drafts: [] };
-        try {
-          await updateState((state) => applySourceProcessCompletion(state, {
-            sourceId,
-            actor,
-            processedAt: new Date().toISOString(),
-            extraction,
-            extractionError
-          }, output));
-        } catch (error) {
-          // Persistence failed after extraction: mark failed so the asset is not
-          // left stuck in "processing" until restart or the stale-heartbeat sweep.
-          const persistError = redactErrorSecrets(
-            error instanceof Error ? error.message : "Source processing failed."
-          );
-          try {
-            await updateState((state) => applySourceProcessCompletion(state, {
-              sourceId,
-              actor,
-              processedAt: new Date().toISOString(),
-              extraction: undefined,
-              extractionError: persistError
-            }, { drafts: [] }));
-          } catch {
-            // Stale-heartbeat recovery will reclaim if this also fails.
-          }
-        }
-      });
-
-      reply.code(202);
-      return {
-        asset: withProcessingQueuePhase(claimedAsset, jobQueue),
-        drafts: [],
-        warnings: []
-      };
-    }
-
-    let extraction: SourceExtractionResult | undefined;
-    let extractionError: string | undefined;
-    try {
-      extraction = await extractCandidatesForAsset({
-        asset: claimedAsset,
-        language,
-        provider: llmProvider,
-        dataDir,
-        fetchFn: ingestionFetch
-      });
-    } catch (error) {
-      extractionError = redactErrorSecrets(error instanceof Error ? error.message : "Source processing failed.");
-    }
-
-    const processedAt = new Date().toISOString();
-    const output: SourceProcessCompletionOutput = { drafts: [] };
-
-    await updateState((state) => applySourceProcessCompletion(state, {
-      sourceId,
-      actor,
-      processedAt,
-      extraction,
-      extractionError
-    }, output));
-
-    if (!output.updatedAsset) {
-      reply.code(500);
-      return {
-        error: "Source could not be processed",
-        i18nKey: "errors.sourceProcessFailed"
-      };
-    }
-
-    if (!extraction) {
-      reply.code(422);
-      const i18n = extractionError ? sourceProcessingErrorI18n(extractionError) : undefined;
-      return {
-        error: extractionError ?? "Source processing failed.",
-        asset: output.updatedAsset,
-        ...(i18n ? { i18nKey: i18n.i18nKey, i18nParams: i18n.i18nParams } : {})
-      };
-    }
-
-    return {
-      asset: output.updatedAsset,
-      drafts: output.drafts,
-      warnings: extraction.warnings
-    };
-  });
-
-  app.post("/sources/:sourceId/cancel-processing", async (request, reply) => {
-    const { sourceId } = request.params as { sourceId: string };
-
-    const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin"]);
-    if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
-    const rateLimited = checkRateLimit(request, reply, actor);
-    if (rateLimited) return rateLimited;
-
-    const asset = current.sourceAssets.find((item) => item.id === sourceId);
-    if (!asset) {
-      reply.code(404);
-      return {
-        error: `Source not found: ${sourceId}`,
-        i18nKey: "errors.sourceNotFound"
-      };
-    }
-
-    if (jobQueue.isActive(sourceId)) {
-      reply.code(409);
-      return {
-        error: "Source processing is already running and cannot be cancelled.",
-        i18nKey: "ingest.sourceProcessingCancelActive"
-      };
-    }
-
-    if (!jobQueue.isPending(sourceId)) {
-      reply.code(409);
-      return {
-        error: asset.status === "processing"
-          ? "Source processing is already running and cannot be cancelled."
-          : "Source is not queued for processing.",
-        i18nKey: asset.status === "processing"
-          ? "ingest.sourceProcessingCancelActive"
-          : "ingest.sourceProcessingNotQueued"
-      };
-    }
-
-    if (!jobQueue.cancel(sourceId)) {
-      reply.code(409);
-      return {
-        error: "Source processing is already running and cannot be cancelled.",
-        i18nKey: "ingest.sourceProcessingCancelActive"
-      };
-    }
-
-    const cancelledAt = new Date().toISOString();
-    let cancelledAsset: SourceAsset | undefined;
-
-    await updateState((state) => {
-      const stored = state.sourceAssets.find((item) => item.id === sourceId);
-      if (!stored || stored.status !== "processing") {
-        return state;
-      }
-      const failedAsset: SourceAsset = {
-        ...stored,
-        status: "failed",
-        error: CANCELLED_PROCESSING_ERROR,
-        processedAt: cancelledAt,
-        processingStartedAt: undefined,
-        processingHeartbeatAt: undefined
-      };
-      cancelledAsset = failedAsset;
-      return appendAuditEvent({
-        ...state,
-        sourceAssets: state.sourceAssets.map((item) => (item.id === sourceId ? failedAsset : item))
-      }, {
-        actor,
-        at: cancelledAt,
-        action: "source_asset.process_cancelled",
-        entityType: "source_asset",
-        entityId: sourceId,
-        languageId: stored.languageId,
-        summary: `Cancelled queued processing for source "${stored.title}".`,
-        metadata: {
-          reason: "operator_cancel",
-          ...(stored.processingAttempts !== undefined ? { processingAttempts: stored.processingAttempts } : {})
-        }
-      });
-    });
-
-    if (!cancelledAsset) {
-      reply.code(409);
-      return {
-        error: "Source is not queued for processing.",
-        i18nKey: "ingest.sourceProcessingNotQueued"
-      };
-    }
-
-    return { asset: cancelledAsset };
-  });
+  registerSourceProcessingRoutes(app, ctx);
 }

@@ -1,8 +1,4 @@
-import {
-  findInvalidOrthographySymbols,
-  type AppState,
-  type CorpusPassage
-} from "@assini/db";
+import { findInvalidOrthographySymbols, type AppState, type CorpusPassage } from "@assini/db";
 
 export function normalizeAuthoredAnswer(value: string): string {
   return value.trim().replace(/\s+/g, " ");

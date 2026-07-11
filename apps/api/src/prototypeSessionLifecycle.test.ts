@@ -470,12 +470,9 @@ describe("prototype session lifecycle", () => {
 
     expect(readPrototypeSessionAbsoluteMaxMs({})).toBe(DEFAULT_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS);
     expect(readPrototypeSessionAbsoluteMaxMs({ ASSINI_PROTOTYPE_SESSION_TTL_MS: "60000" }, 60_000)).toBe(180_000);
-    expect(
-      readPrototypeSessionAbsoluteMaxMs(
-        { ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS: "120000" },
-        60_000
-      )
-    ).toBe(120_000);
+    expect(readPrototypeSessionAbsoluteMaxMs({ ASSINI_PROTOTYPE_SESSION_ABSOLUTE_MAX_MS: "120000" }, 60_000)).toBe(
+      120_000
+    );
 
     for (const invalid of ["0", "-1", "1.5", "abc"]) {
       expect(() =>

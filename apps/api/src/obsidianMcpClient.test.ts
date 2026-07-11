@@ -27,9 +27,7 @@ describe("Obsidian MCP Streamable HTTP client", () => {
     const fetchFn: typeof fetch = async (input, init) => {
       const method = init?.method ?? "GET";
       const headers = new Headers(init?.headers);
-      const body = typeof init?.body === "string"
-        ? JSON.parse(init.body) as JsonRpcRequest
-        : undefined;
+      const body = typeof init?.body === "string" ? (JSON.parse(init.body) as JsonRpcRequest) : undefined;
       calls.push({
         method,
         url: requestUrl(input),
@@ -43,17 +41,20 @@ describe("Obsidian MCP Streamable HTTP client", () => {
       if (!body) throw new Error("Expected a JSON-RPC body");
 
       if (body.method === "initialize") {
-        return Response.json({
-          jsonrpc: "2.0",
-          id: body.id,
-          result: {
-            protocolVersion: "2025-06-18",
-            capabilities: { resources: {} },
-            serverInfo: { name: "mock-obsidian", version: "1.2.3" }
+        return Response.json(
+          {
+            jsonrpc: "2.0",
+            id: body.id,
+            result: {
+              protocolVersion: "2025-06-18",
+              capabilities: { resources: {} },
+              serverInfo: { name: "mock-obsidian", version: "1.2.3" }
+            }
+          },
+          {
+            headers: { "mcp-session-id": "mock-session" }
           }
-        }, {
-          headers: { "mcp-session-id": "mock-session" }
-        });
+        );
       }
       if (body.method === "notifications/initialized") {
         return new Response(null, { status: 202 });
@@ -63,13 +64,15 @@ describe("Obsidian MCP Streamable HTTP client", () => {
           jsonrpc: "2.0",
           id: body.id,
           result: {
-            resources: [{
-              uri: "obsidian://vault/Grammar.md",
-              name: "Grammar",
-              title: "Grammar notes",
-              mimeType: "text/markdown",
-              annotations: { lastModified: "2026-07-09T00:00:00.000Z" }
-            }],
+            resources: [
+              {
+                uri: "obsidian://vault/Grammar.md",
+                name: "Grammar",
+                title: "Grammar notes",
+                mimeType: "text/markdown",
+                annotations: { lastModified: "2026-07-09T00:00:00.000Z" }
+              }
+            ],
             nextCursor: "page-2"
           }
         });
@@ -79,36 +82,43 @@ describe("Obsidian MCP Streamable HTTP client", () => {
           jsonrpc: "2.0",
           id: body.id,
           result: {
-            contents: [{
-              uri: "obsidian://vault/Grammar.md",
-              mimeType: "text/markdown",
-              text: "# Grammar\n\nA compact note."
-            }]
+            contents: [
+              {
+                uri: "obsidian://vault/Grammar.md",
+                mimeType: "text/markdown",
+                text: "# Grammar\n\nA compact note."
+              }
+            ]
           }
         });
       }
       throw new Error(`Unexpected method: ${body.method}`);
     };
 
-    const session = await createObsidianMcpSession({
-      endpointUrl: "http://127.0.0.1:27124/mcp",
-      token: "sdk-secret-token",
-      timeoutMs: 2_000
-    }, {
-      env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
-      fetchFn
-    });
+    const session = await createObsidianMcpSession(
+      {
+        endpointUrl: "http://127.0.0.1:27124/mcp",
+        token: "sdk-secret-token",
+        timeoutMs: 2_000
+      },
+      {
+        env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+        fetchFn
+      }
+    );
 
     expect(session.serverName).toBe("mock-obsidian");
     expect(session.serverVersion).toBe("1.2.3");
     await expect(session.listResources("page-1")).resolves.toEqual({
-      resources: [{
-        uri: "obsidian://vault/Grammar.md",
-        name: "Grammar",
-        title: "Grammar notes",
-        mimeType: "text/markdown",
-        lastModified: "2026-07-09T00:00:00.000Z"
-      }],
+      resources: [
+        {
+          uri: "obsidian://vault/Grammar.md",
+          name: "Grammar",
+          title: "Grammar notes",
+          mimeType: "text/markdown",
+          lastModified: "2026-07-09T00:00:00.000Z"
+        }
+      ],
       nextCursor: "page-2"
     });
     await expect(session.readTextResource("obsidian://vault/Grammar.md")).resolves.toEqual({
@@ -133,9 +143,14 @@ describe("Obsidian MCP Streamable HTTP client", () => {
 
   it("blocks private endpoints before issuing a request", async () => {
     const fetchFn = vi.fn<typeof fetch>();
-    await expect(createObsidianMcpSession({
-      endpointUrl: "http://127.0.0.1:27124/mcp"
-    }, { env: {}, fetchFn })).rejects.toThrow(/private or local network/i);
+    await expect(
+      createObsidianMcpSession(
+        {
+          endpointUrl: "http://127.0.0.1:27124/mcp"
+        },
+        { env: {}, fetchFn }
+      )
+    ).rejects.toThrow(/private or local network/i);
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
@@ -151,13 +166,16 @@ describe("Obsidian MCP Streamable HTTP client", () => {
 
     let message = "";
     try {
-      await createObsidianMcpSession({
-        endpointUrl: "http://127.0.0.1:27124/mcp",
-        token
-      }, {
-        env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
-        fetchFn
-      });
+      await createObsidianMcpSession(
+        {
+          endpointUrl: "http://127.0.0.1:27124/mcp",
+          token
+        },
+        {
+          env: { ASSINI_ALLOW_PRIVATE_URLS: "1" },
+          fetchFn
+        }
+      );
     } catch (error) {
       message = (error as Error).message;
     }

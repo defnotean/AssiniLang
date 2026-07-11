@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24.x
           cache: npm
@@ -34,8 +34,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint source
+        run: npm run lint
+
+      - name: Verify formatting
+        run: npm run format:check
+
       - name: Typecheck and build web assets
         run: npm run build
+
+      - name: Install Chromium for browser quality checks (Linux)
+        if: runner.os == 'Linux'
+        run: npm run e2e:install:ci
+
+      - name: Browser E2E and accessibility checks (Linux)
+        if: runner.os == 'Linux'
+        run: npm run e2e
 
       - name: Rendered web smoke (Linux)
         if: runner.os == 'Linux'
@@ -47,6 +61,9 @@ jobs:
 
       - name: Run repository verifier
         run: npm run verify
+
+      - name: Enforce test coverage thresholds
+        run: npm run test:coverage
 
       - name: Run ingestion smoke test
         run: npm run smoke
@@ -79,7 +96,7 @@ jobs:
           health_body="$(curl -fsS "http://127.0.0.1:4517/health")"
           ready_body="$(curl -fsS "http://127.0.0.1:4517/ready")"
           node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}' "$health_body"
-          node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}; if(!body.checks?.storage?.ok){console.error(body); process.exit(1)}; if(!body.checks?.jobQueue?.ok){console.error(body); process.exit(1)}; if(typeof body.checks.jobQueue.pending!=="number"||typeof body.checks.jobQueue.active!=="number"){console.error(body); process.exit(1)}' "$ready_body"
+          node -e 'const body=JSON.parse(process.argv[1]); if(body.ok!==true){console.error(body); process.exit(1)}; if(!body.checks?.storage?.ok){console.error(body); process.exit(1)}; if(!body.checks?.jobQueue?.ok){console.error(body); process.exit(1)}; if(!body.checks?.recovery?.ok){console.error(body); process.exit(1)}; if(typeof body.checks.jobQueue.pending!=="number"||typeof body.checks.jobQueue.active!=="number"){console.error(body); process.exit(1)}' "$ready_body"
 
       - name: Packaged desktop smoke (Windows)
         if: runner.os == 'Windows'
@@ -87,3 +104,21 @@ jobs:
 
       - name: Audit dependencies
         run: npm audit --audit-level=moderate
+
+      - name: Generate production dependency SBOM (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          npm sbom --sbom-format cyclonedx --omit dev > assini-sbom.cdx.json
+          sha256sum assini-sbom.cdx.json > assini-sbom.cdx.json.sha256
+
+      - name: Upload dependency SBOM (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dependency-sbom-${{ github.sha }}
+          path: |
+            assini-sbom.cdx.json
+            assini-sbom.cdx.json.sha256
+          if-no-files-found: error
+          retention-days: 30

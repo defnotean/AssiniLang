@@ -159,17 +159,15 @@ function desktopApiBaseUrl(): string | undefined {
 
   try {
     const url = new URL(candidate);
-    const isLoopback = url.hostname === "127.0.0.1"
-      || url.hostname === "localhost"
-      || url.hostname === "[::1]";
+    const isLoopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
     if (
-      url.protocol !== "http:"
-      || !isLoopback
-      || url.username
-      || url.password
-      || url.pathname !== "/"
-      || url.search
-      || url.hash
+      url.protocol !== "http:" ||
+      !isLoopback ||
+      url.username ||
+      url.password ||
+      url.pathname !== "/" ||
+      url.search ||
+      url.hash
     ) {
       return undefined;
     }
@@ -306,16 +304,16 @@ async function errorFromResponse(response: Response, fallback: string): Promise<
   if (response.status === 429) {
     i18nKey ??= "app.rateLimitExceeded";
     const bodySeconds = i18nParams?.seconds;
-    const parsedBodySeconds = typeof bodySeconds === "number"
-      ? bodySeconds
-      : typeof bodySeconds === "string"
-        ? Number.parseInt(bodySeconds, 10)
-        : undefined;
-    const seconds = parsedBodySeconds !== undefined
-      && Number.isFinite(parsedBodySeconds)
-      && parsedBodySeconds > 0
-      ? parsedBodySeconds
-      : retryAfterSeconds;
+    const parsedBodySeconds =
+      typeof bodySeconds === "number"
+        ? bodySeconds
+        : typeof bodySeconds === "string"
+          ? Number.parseInt(bodySeconds, 10)
+          : undefined;
+    const seconds =
+      parsedBodySeconds !== undefined && Number.isFinite(parsedBodySeconds) && parsedBodySeconds > 0
+        ? parsedBodySeconds
+        : retryAfterSeconds;
     if (seconds !== undefined) {
       i18nParams = { ...(i18nParams ?? {}), seconds };
     }
@@ -484,9 +482,7 @@ export async function fetchAsActor(
 }
 
 export async function getJson<T>(path: string, actor?: LocalActor, init?: RequestInit): Promise<T> {
-  const response = await (actor
-    ? fetchAsActor(actor, `/api${path}`, init)
-    : fetch(`/api${path}`, init));
+  const response = await (actor ? fetchAsActor(actor, `/api${path}`, init) : fetch(`/api${path}`, init));
 
   await assertOk(response, `Request failed: ${path}`);
 

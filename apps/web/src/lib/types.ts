@@ -1,7 +1,8 @@
-import type { Note } from "@assini/db";
+import type { Note } from "@assini/api-contract";
 import type { DashboardData } from "../api";
 
-export type ViewMode = "profile" | "ingest" | "corpus" | "review" | "learner" | "eval" | "governance" | "elder" | "assistant" | "model";
+export type ViewMode =
+  "profile" | "ingest" | "corpus" | "review" | "learner" | "eval" | "governance" | "elder" | "assistant" | "model";
 export type ReviewStatus = Extract<Note["status"], "approved" | "contested" | "rejected" | "deferred" | "escalated">;
 export type ReviewFilter = "all" | "pending" | "contested" | "rejected" | "deferred" | "escalated" | "approved";
 export type AsyncState<T> =

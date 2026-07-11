@@ -10,12 +10,7 @@ import {
   type User
 } from "@assini/db";
 import { toPublicNote, toPublicNotes } from "../publicLanguageViews.js";
-import {
-  appendAuditEvents,
-  requireActor,
-  usersForState,
-  type AuditEventDraft
-} from "../routeHelpers.js";
+import { appendAuditEvents, requireActor, usersForState, type AuditEventDraft } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
 type NoteExample = Note["examples"][number];
@@ -26,7 +21,12 @@ type ReviewBody = Partial<Pick<Note, "status" | "explanation" | "examples">> & {
 };
 type ReviewDispositionStatus = Extract<Note["status"], "contested" | "rejected" | "deferred" | "escalated">;
 
-const REVIEW_DISPOSITION_STATUSES: readonly ReviewDispositionStatus[] = ["contested", "rejected", "deferred", "escalated"];
+const REVIEW_DISPOSITION_STATUSES: readonly ReviewDispositionStatus[] = [
+  "contested",
+  "rejected",
+  "deferred",
+  "escalated"
+];
 
 function noteExplanationValidationError(explanation: string | undefined): string | undefined {
   if (explanation === undefined) return undefined;
@@ -47,9 +47,9 @@ function parseReviewExamples(input: unknown): NoteExample[] | undefined {
     if (!item || typeof item !== "object" || Array.isArray(item)) return undefined;
     const record = item as Record<string, unknown>;
     if (
-      typeof record.passageId !== "string"
-      || typeof record.target !== "string"
-      || typeof record.translation !== "string"
+      typeof record.passageId !== "string" ||
+      typeof record.target !== "string" ||
+      typeof record.translation !== "string"
     ) {
       return undefined;
     }
@@ -234,7 +234,12 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "lead",
+      "admin",
+      "elder"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
@@ -300,11 +305,12 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
           return state;
         }
 
-        const alreadyApproved = reviewApprovals.some((approval) => (
-          approval.languageId === existing.languageId
-          && approval.noteId === noteId
-          && approval.reviewerId === actor.id
-        ));
+        const alreadyApproved = reviewApprovals.some(
+          (approval) =>
+            approval.languageId === existing.languageId &&
+            approval.noteId === noteId &&
+            approval.reviewerId === actor.id
+        );
         if (!alreadyApproved) {
           const approval: ReviewApproval = {
             id: `review-approval-${existing.languageId}-${noteId}-${actor.id}-${reviewedAt}`,
@@ -326,16 +332,17 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         approvalThreshold = policy.approvalThreshold;
         nextStatus = approvalCount >= approvalThreshold ? "approved" : "under_review";
       } else if (disposition) {
-        reviewApprovals = reviewApprovals.filter((approval) => (
-          approval.languageId !== existing.languageId || approval.noteId !== noteId
-        ));
+        reviewApprovals = reviewApprovals.filter(
+          (approval) => approval.languageId !== existing.languageId || approval.noteId !== noteId
+        );
 
-        const existingOpenDisposition = state.reviewDispositions.find((item) => (
-          item.languageId === existing.languageId
-          && item.noteId === noteId
-          && item.disposition === disposition
-          && item.status === "open"
-        ));
+        const existingOpenDisposition = state.reviewDispositions.find(
+          (item) =>
+            item.languageId === existing.languageId &&
+            item.noteId === noteId &&
+            item.disposition === disposition &&
+            item.status === "open"
+        );
 
         reviewDisposition = existingOpenDisposition
           ? {
@@ -362,8 +369,9 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         reviewDispositionCreated = !existingOpenDisposition;
       }
 
-      const editSummary = body.reviewerComment
-        ?? (examplesChanged && body.explanation === undefined && body.status === undefined
+      const editSummary =
+        body.reviewerComment ??
+        (examplesChanged && body.explanation === undefined && body.status === undefined
           ? `Updated examples (${nextExamples.length})`
           : `Status set to ${nextStatus}`);
 
@@ -375,7 +383,9 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         reviewer: {
           lastReviewedBy: actor.id,
           lastReviewedAt: reviewedAt,
-          comments: body.reviewerComment ? [...existing.reviewer.comments, body.reviewerComment] : existing.reviewer.comments
+          comments: body.reviewerComment
+            ? [...existing.reviewer.comments, body.reviewerComment]
+            : existing.reviewer.comments
         },
         editHistory: [
           ...existing.editHistory,
@@ -390,13 +400,14 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
 
       const nextState = {
         ...state,
-        notes: state.notes.map((note) => (note.id === noteId ? nextNote as Note : note)),
+        notes: state.notes.map((note) => (note.id === noteId ? (nextNote as Note) : note)),
         reviewApprovals,
-        reviewDispositions: reviewDisposition && reviewDispositionCreated
-          ? [...state.reviewDispositions, reviewDisposition]
-          : reviewDisposition
-            ? state.reviewDispositions.map((item) => (item.id === reviewDisposition?.id ? reviewDisposition : item))
-          : state.reviewDispositions
+        reviewDispositions:
+          reviewDisposition && reviewDispositionCreated
+            ? [...state.reviewDispositions, reviewDisposition]
+            : reviewDisposition
+              ? state.reviewDispositions.map((item) => (item.id === reviewDisposition?.id ? reviewDisposition : item))
+              : state.reviewDispositions
       };
 
       const noteReviewedDraft: AuditEventDraft = {
@@ -420,21 +431,23 @@ export function registerNoteRoutes(app: FastifyInstance, ctx: RouteContext): voi
         }
       };
       const dispositionAuditDraft: AuditEventDraft[] = reviewDisposition
-        ? [{
-            actor,
-            at: reviewedAt,
-            action: reviewDispositionCreated ? "review_disposition.created" : "review_disposition.updated",
-            entityType: "review_disposition",
-            entityId: reviewDisposition.id,
-            languageId: existing.languageId,
-            summary: `${reviewDispositionCreated ? "Opened" : "Updated"} ${reviewDisposition.disposition} review disposition for ${noteId}.`,
-            metadata: {
-              noteId,
-              disposition: reviewDisposition.disposition,
-              assignedTo: reviewDisposition.assignedTo,
-              dueAt: reviewDisposition.dueAt
+        ? [
+            {
+              actor,
+              at: reviewedAt,
+              action: reviewDispositionCreated ? "review_disposition.created" : "review_disposition.updated",
+              entityType: "review_disposition",
+              entityId: reviewDisposition.id,
+              languageId: existing.languageId,
+              summary: `${reviewDispositionCreated ? "Opened" : "Updated"} ${reviewDisposition.disposition} review disposition for ${noteId}.`,
+              metadata: {
+                noteId,
+                disposition: reviewDisposition.disposition,
+                assignedTo: reviewDisposition.assignedTo,
+                dueAt: reviewDisposition.dueAt
+              }
             }
-          }]
+          ]
         : [];
 
       return appendAuditEvents(nextState, [noteReviewedDraft, ...dispositionAuditDraft]);

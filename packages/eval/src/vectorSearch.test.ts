@@ -142,17 +142,12 @@ describe("vectorSearch", () => {
         })
       } as Response);
 
-      const results = await retrieveTopKPassages(
-        "cat query",
-        passages,
-        1,
-        {
-          baseUrl: "http://localhost/v1",
-          apiKey: "test-key",
-          model: "text-embedding-3-small",
-          fetchFn: mockFetch
-        }
-      );
+      const results = await retrieveTopKPassages("cat query", passages, 1, {
+        baseUrl: "http://localhost/v1",
+        apiKey: "test-key",
+        model: "text-embedding-3-small",
+        fetchFn: mockFetch
+      });
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(mockFetch.mock.calls[0]?.[1]).toMatchObject({ redirect: "manual" });
@@ -163,31 +158,30 @@ describe("vectorSearch", () => {
     it("does not call embeddings for chat-only or partially configured embedding settings", async () => {
       const mockFetch = vi.fn();
 
-      expect(await retrieveTopKPassages("cat", passages, 1, {
-        baseUrl: "http://localhost/v1",
-        fetchFn: mockFetch
-      })).toEqual([passages[0]]);
-      expect(await retrieveTopKPassages("cat", passages, 1, {
-        model: "text-embedding-3-small",
-        fetchFn: mockFetch
-      })).toEqual([passages[0]]);
+      expect(
+        await retrieveTopKPassages("cat", passages, 1, {
+          baseUrl: "http://localhost/v1",
+          fetchFn: mockFetch
+        })
+      ).toEqual([passages[0]]);
+      expect(
+        await retrieveTopKPassages("cat", passages, 1, {
+          model: "text-embedding-3-small",
+          fetchFn: mockFetch
+        })
+      ).toEqual([passages[0]]);
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("falls back to offline TF-IDF when the embedding API throws", async () => {
       const mockFetch = vi.fn().mockRejectedValue(new Error("API offline"));
 
-      const results = await retrieveTopKPassages(
-        "cat",
-        passages,
-        1,
-        {
-          baseUrl: "http://localhost/v1",
-          apiKey: "test-key",
-          model: "text-embedding-3-small",
-          fetchFn: mockFetch
-        }
-      );
+      const results = await retrieveTopKPassages("cat", passages, 1, {
+        baseUrl: "http://localhost/v1",
+        apiKey: "test-key",
+        model: "text-embedding-3-small",
+        fetchFn: mockFetch
+      });
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(results.length).toBe(1);

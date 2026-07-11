@@ -19,7 +19,11 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
       <div className="record-topline">
         <div>
           <span className="detail-label">{t("model.sessionObservability")}</span>
-          <h2>{observability ? t("model.sessionsCount", { count: observability.totals.sessions }) : t("model.loadingSessions")}</h2>
+          <h2>
+            {observability
+              ? t("model.sessionsCount", { count: observability.totals.sessions })
+              : t("model.loadingSessions")}
+          </h2>
         </div>
         {observability && (
           <span className={`status-badge ${countFailedSessions(observability) > 0 ? "contested" : "approved"}`}>
@@ -28,7 +32,9 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
         )}
       </div>
       {observabilityState.status === "loading" && (
-        <p className="inline-empty" role="status" aria-live="polite">{t("model.loadingObservability")}</p>
+        <p className="inline-empty" role="status" aria-live="polite">
+          {t("model.loadingObservability")}
+        </p>
       )}
       {observabilityState.status === "error" && (
         <div className="inline-error" role="alert" aria-live="assertive">
@@ -61,7 +67,9 @@ export function ModelObservabilityPanel({ observabilityState, onRetry }: ModelOb
             </div>
           </dl>
           {recentSessions.length === 0 ? (
-            <p className="muted empty-state" role="status" aria-live="polite">{t("model.noSessions")}</p>
+            <p className="muted empty-state" role="status" aria-live="polite">
+              {t("model.noSessions")}
+            </p>
           ) : (
             <div className="detail-list session-list">
               {recentSessions.map((session) => (

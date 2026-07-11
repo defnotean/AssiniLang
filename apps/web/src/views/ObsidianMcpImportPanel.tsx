@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-  fetchObsidianMcpResources,
-  importObsidianMcpResources,
-  type ObsidianMcpResourceList
-} from "../api";
+import { fetchObsidianMcpResources, importObsidianMcpResources, type ObsidianMcpResourceList } from "../api";
 import { useI18n } from "../i18n";
 
 export function ObsidianMcpImportPanel({
@@ -27,9 +23,9 @@ export function ObsidianMcpImportPanel({
     setNotice(null);
     try {
       const next = await fetchObsidianMcpResources(cursor);
-      setResourceList((current) => cursor && current
-        ? { ...next, resources: [...current.resources, ...next.resources] }
-        : next);
+      setResourceList((current) =>
+        cursor && current ? { ...next, resources: [...current.resources, ...next.resources] } : next
+      );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("mcp.resourcesLoadFailed"));
     } finally {
@@ -38,9 +34,9 @@ export function ObsidianMcpImportPanel({
   }
 
   function toggleResource(uri: string) {
-    setSelectedUris((current) => current.includes(uri)
-      ? current.filter((item) => item !== uri)
-      : current.length < 50 ? [...current, uri] : current);
+    setSelectedUris((current) =>
+      current.includes(uri) ? current.filter((item) => item !== uri) : current.length < 50 ? [...current, uri] : current
+    );
   }
 
   async function handleImport() {
@@ -51,10 +47,12 @@ export function ObsidianMcpImportPanel({
     try {
       const result = await importObsidianMcpResources(languageId, { uris: selectedUris });
       setSelectedUris([]);
-      setNotice(t("mcp.importComplete", {
-        imported: result.summary.imported,
-        skipped: result.summary.skipped
-      }));
+      setNotice(
+        t("mcp.importComplete", {
+          imported: result.summary.imported,
+          skipped: result.summary.skipped
+        })
+      );
       await onImported?.();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : t("mcp.importFailed"));
@@ -64,7 +62,11 @@ export function ObsidianMcpImportPanel({
   }
 
   return (
-    <section className="record-card form-panel compact" aria-label={t("mcp.importAria")} aria-busy={isLoading || isImporting}>
+    <section
+      className="record-card form-panel compact"
+      aria-label={t("mcp.importAria")}
+      aria-busy={isLoading || isImporting}
+    >
       <div className="record-topline">
         <div>
           <span className="detail-label">{t("mcp.integration")}</span>
@@ -88,15 +90,23 @@ export function ObsidianMcpImportPanel({
           aria-busy={isImporting}
           onClick={() => void handleImport()}
         >
-          {isImporting
-            ? t("mcp.importing")
-            : t("mcp.importSelected", { count: selectedUris.length })}
+          {isImporting ? t("mcp.importing") : t("mcp.importSelected", { count: selectedUris.length })}
         </button>
       </div>
-      {notice && <p className="result-notice" role="status" aria-live="polite">{notice}</p>}
-      {error && <p className="inline-error" role="alert" aria-live="assertive">{error}</p>}
+      {notice && (
+        <p className="result-notice" role="status" aria-live="polite">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p className="inline-error" role="alert" aria-live="assertive">
+          {error}
+        </p>
+      )}
       {resourceList && resourceList.resources.length === 0 && (
-        <p className="muted empty-state" role="status">{t("mcp.noResources")}</p>
+        <p className="muted empty-state" role="status">
+          {t("mcp.noResources")}
+        </p>
       )}
       {resourceList && resourceList.resources.length > 0 && (
         <div className="checkbox-list" aria-label={t("mcp.availableResources")}>

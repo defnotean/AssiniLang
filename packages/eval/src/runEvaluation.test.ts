@@ -83,9 +83,7 @@ describe("evaluation run gate", () => {
     expect(gate.passed).toBe(false);
     expect(gate.exitCode).toBe(1);
     expect(gate.failureLines).toEqual(
-      expect.arrayContaining([
-        "Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."
-      ])
+      expect.arrayContaining(["Testlang noteAccuracy threshold: score 95.0% is below required 96.0%."])
     );
   });
 
@@ -217,9 +215,7 @@ describe("evaluation run gate", () => {
 
     expect(gate.passed).toBe(false);
     expect(gate.failureLines).toEqual(
-      expect.arrayContaining([
-        "Testlang experimentalMetric threshold: score 50.0% is below required 96.0%."
-      ])
+      expect.arrayContaining(["Testlang experimentalMetric threshold: score 50.0% is below required 96.0%."])
     );
   });
 });

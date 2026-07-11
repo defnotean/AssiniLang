@@ -86,9 +86,7 @@ describe("parseAcceptDraftBody", () => {
   it("rejects preferLexiconSegmentation combined with morphologicalSegmentation", () => {
     const result = parseAcceptDraftBody({
       preferLexiconSegmentation: true,
-      morphologicalSegmentation: [
-        { surface: "mira", lemma: "mira", gloss: "river", features: [] }
-      ]
+      morphologicalSegmentation: [{ surface: "mira", lemma: "mira", gloss: "river", features: [] }]
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {

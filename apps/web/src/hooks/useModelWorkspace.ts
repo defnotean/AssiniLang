@@ -33,9 +33,7 @@ import { useI18n } from "../i18n";
 const MODEL_DISCOVERY_REFRESH_INTERVAL_MS = 30_000;
 
 function settingsNeedInitialModel(settings: RuntimeSettingsResponse["settings"]): boolean {
-  return !settings.baseUrl.trim()
-    && !settings.model.trim()
-    && !settings.apiKeyConfigured;
+  return !settings.baseUrl.trim() && !settings.model.trim() && !settings.apiKeyConfigured;
 }
 
 function payloadForDiscoveredModel(
@@ -97,7 +95,9 @@ export function useModelWorkspace(
   const { t } = useI18n();
   const [llmState, setLlmState] = useState<AsyncState<LlmStatus>>({ status: "idle" });
   const [settingsState, setSettingsState] = useState<AsyncState<RuntimeSettingsResponse>>({ status: "idle" });
-  const [modelDiscoveryState, setModelDiscoveryState] = useState<AsyncState<LlmModelDiscoveryResponse>>({ status: "idle" });
+  const [modelDiscoveryState, setModelDiscoveryState] = useState<AsyncState<LlmModelDiscoveryResponse>>({
+    status: "idle"
+  });
   const [observabilityState, setObservabilityState] = useState<AsyncState<ObservabilityData>>({ status: "idle" });
   const [isTestingModel, setIsTestingModel] = useState(false);
   const [modelTestResult, setModelTestResult] = useState<string | null>(null);
@@ -117,58 +117,63 @@ export function useModelWorkspace(
   const manualDiscoveryInFlightRef = useRef(false);
   const autoAppliedDiscoveryModelIdRef = useRef<string | null>(null);
 
-  const startModelDiscovery = useCallback(async (
-    baseUrl?: string,
-    options: { showLoading?: boolean; includeCommonTargets?: boolean; automatic?: boolean; force?: boolean } = {}
-  ) => {
-    if (activeDiscoveryRequestIdRef.current !== null && !options.force) {
-      return;
-    }
-
-    const requestId = ++discoveryRequestIdRef.current;
-    activeDiscoveryRequestIdRef.current = requestId;
-    if (options.showLoading) {
-      setModelDiscoveryState({ status: "loading" });
-    } else if (options.automatic) {
-      setIsAutoRefreshingModels(true);
-    }
-
-    try {
-      const discovery = await fetchDiscoveredModels(baseUrl, {
-        includeCommonTargets: options.includeCommonTargets
-      });
-      if (discoveryRequestIdRef.current === requestId) {
-        setModelDiscoveryState({ status: "ready", data: discovery });
+  const startModelDiscovery = useCallback(
+    async (
+      baseUrl?: string,
+      options: { showLoading?: boolean; includeCommonTargets?: boolean; automatic?: boolean; force?: boolean } = {}
+    ) => {
+      if (activeDiscoveryRequestIdRef.current !== null && !options.force) {
+        return;
       }
-    } catch (error) {
-      if (discoveryRequestIdRef.current === requestId && options.showLoading) {
-        const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
-        setModelDiscoveryState({ status: "error", message });
-      } else if (discoveryRequestIdRef.current === requestId) {
-        const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
-        setModelDiscoveryState({
-          status: "ready",
-          data: {
-            scannedAt: new Date().toISOString(),
-            models: [],
-            endpoints: [],
-            errors: [{
-              source: t("model.automaticRefresh"),
-              baseUrl: baseUrl ?? t("model.configuredDiscoveryTargets"),
-              detail: message
-            }]
-          }
+
+      const requestId = ++discoveryRequestIdRef.current;
+      activeDiscoveryRequestIdRef.current = requestId;
+      if (options.showLoading) {
+        setModelDiscoveryState({ status: "loading" });
+      } else if (options.automatic) {
+        setIsAutoRefreshingModels(true);
+      }
+
+      try {
+        const discovery = await fetchDiscoveredModels(baseUrl, {
+          includeCommonTargets: options.includeCommonTargets
         });
+        if (discoveryRequestIdRef.current === requestId) {
+          setModelDiscoveryState({ status: "ready", data: discovery });
+        }
+      } catch (error) {
+        if (discoveryRequestIdRef.current === requestId && options.showLoading) {
+          const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
+          setModelDiscoveryState({ status: "error", message });
+        } else if (discoveryRequestIdRef.current === requestId) {
+          const message = localizeApiError(error, t, "model.errModelDiscoveryFailed");
+          setModelDiscoveryState({
+            status: "ready",
+            data: {
+              scannedAt: new Date().toISOString(),
+              models: [],
+              endpoints: [],
+              errors: [
+                {
+                  source: t("model.automaticRefresh"),
+                  baseUrl: baseUrl ?? t("model.configuredDiscoveryTargets"),
+                  detail: message
+                }
+              ]
+            }
+          });
+        }
+      } finally {
+        if (activeDiscoveryRequestIdRef.current === requestId) {
+          activeDiscoveryRequestIdRef.current = null;
+        }
+        if (options.automatic) {
+          setIsAutoRefreshingModels(false);
+        }
       }
-    } finally {
-      if (activeDiscoveryRequestIdRef.current === requestId) {
-        activeDiscoveryRequestIdRef.current = null;
-      }
-      if (options.automatic) {
-        setIsAutoRefreshingModels(false);
-      }
-    }
-  }, [t]);
+    },
+    [t]
+  );
 
   const runReachabilityCheck = useCallback(async () => {
     const requestId = ++reachabilityRequestIdRef.current;
@@ -225,9 +230,10 @@ export function useModelWorkspace(
 
   useEffect(() => {
     let isCurrent = true;
-    if (view !== "model") return () => {
-      isCurrent = false;
-    };
+    if (view !== "model")
+      return () => {
+        isCurrent = false;
+      };
 
     setLlmState({ status: "loading" });
     setSettingsState({ status: "loading" });
@@ -271,7 +277,7 @@ export function useModelWorkspace(
       isCurrent = false;
       discoveryRequestIdRef.current += 1;
     };
-  }, [startModelDiscovery, view]);
+  }, [startModelDiscovery, t, view]);
 
   useEffect(() => {
     if (view !== "model" || llmState.status !== "ready" || !isRealModelProvider(llmState.data)) {
@@ -335,32 +341,35 @@ export function useModelWorkspace(
     }
   }
 
-  async function handleSaveSettings(payload: RuntimeSettingsUpdate) {
-    setIsSavingSettings(true);
-    setSettingsSaveResult(null);
-    setSettingsSaveError(null);
-    setReachabilityError(null);
-    setReachabilityResult(null);
-    setModelTestResult(null);
-    setModelTestIsPlaceholder(false);
-    try {
-      const nextSettings = await updateRuntimeSettings(payload);
-      configuredDiscoveryBaseUrlRef.current = nextSettings.settings.baseUrl.trim() || undefined;
-      setSettingsState({ status: "ready", data: nextSettings });
-      setLlmState({ status: "ready", data: nextSettings.status });
-      setSettingsSaveResult(t("model.settingsSaved"));
-      void startModelDiscovery(configuredDiscoveryBaseUrlRef.current, {
-        automatic: true,
-        includeCommonTargets: true,
-        force: true
-      });
-    } catch (error) {
-      setSettingsSaveError(localizeApiError(error, t, "model.errSettingsSaveFailed"));
-      throw error;
-    } finally {
-      setIsSavingSettings(false);
-    }
-  }
+  const handleSaveSettings = useCallback(
+    async (payload: RuntimeSettingsUpdate) => {
+      setIsSavingSettings(true);
+      setSettingsSaveResult(null);
+      setSettingsSaveError(null);
+      setReachabilityError(null);
+      setReachabilityResult(null);
+      setModelTestResult(null);
+      setModelTestIsPlaceholder(false);
+      try {
+        const nextSettings = await updateRuntimeSettings(payload);
+        configuredDiscoveryBaseUrlRef.current = nextSettings.settings.baseUrl.trim() || undefined;
+        setSettingsState({ status: "ready", data: nextSettings });
+        setLlmState({ status: "ready", data: nextSettings.status });
+        setSettingsSaveResult(t("model.settingsSaved"));
+        void startModelDiscovery(configuredDiscoveryBaseUrlRef.current, {
+          automatic: true,
+          includeCommonTargets: true,
+          force: true
+        });
+      } catch (error) {
+        setSettingsSaveError(localizeApiError(error, t, "model.errSettingsSaveFailed"));
+        throw error;
+      } finally {
+        setIsSavingSettings(false);
+      }
+    },
+    [startModelDiscovery, t]
+  );
 
   function applyRuntimeSettingsResponse(nextSettings: RuntimeSettingsResponse) {
     configuredDiscoveryBaseUrlRef.current = nextSettings.settings.baseUrl.trim() || undefined;
@@ -454,7 +463,7 @@ export function useModelWorkspace(
     void handleSaveSettings(payloadForDiscoveredModel(settingsState.data.settings, candidate)).catch((error) => {
       setSettingsSaveError(localizeApiError(error, t, "model.errSettingsSaveFailed"));
     });
-  }, [modelDiscoveryState, settingsState, view, t]);
+  }, [handleSaveSettings, modelDiscoveryState, settingsState, t, view]);
 
   async function handleModelSmokeTest() {
     if (!data) return;

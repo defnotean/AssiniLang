@@ -41,8 +41,7 @@ function createConflictDraft(overrides: Partial<ExtractionDraftView> = {}): Extr
     grounding: [
       {
         kind: "segmentation_conflict",
-        message:
-          'Segment "mira" is glossed "lake" in this draft, but the accepted lexeme "mira" is glossed "river".'
+        message: 'Segment "mira" is glossed "lake" in this draft, but the accepted lexeme "mira" is glossed "river".'
       }
     ],
     lexiconSegmentationProposal: [

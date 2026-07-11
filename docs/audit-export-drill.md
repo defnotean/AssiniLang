@@ -6,20 +6,20 @@ Related: [Operator Recovery Runbook](operator-recovery.md), [API — sanitized e
 
 ## What you prove
 
-| Check | Pass criteria |
-| --- | --- |
-| Snapshot export | `exportVersion` is `language-snapshot-v2`; integrity verifies; private fields absent |
-| Evaluation artifact | `exportVersion` is `evaluation-artifact-v2`; integrity verifies; private fields absent |
-| Audit receipts | `language_snapshot.exported` and `evaluation_artifact.exported` appear with `contentHash` metadata (not private payload) |
-| Golden fixtures | Committed samples under `fixtures/exports/` stay redacted and signed |
+| Check               | Pass criteria                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Snapshot export     | `exportVersion` is `language-snapshot-v2`; integrity verifies; private fields absent                                     |
+| Evaluation artifact | `exportVersion` is `evaluation-artifact-v2`; integrity verifies; private fields absent                                   |
+| Audit receipts      | `language_snapshot.exported` and `evaluation_artifact.exported` appear with `contentHash` metadata (not private payload) |
+| Golden fixtures     | Committed samples under `fixtures/exports/` stay redacted and signed                                                     |
 
 ## Fixtures and automated guard
 
-| Artifact | Path |
-| --- | --- |
-| Language snapshot sample | `fixtures/exports/language-snapshot.sample.json` |
-| Evaluation artifact sample | `fixtures/exports/evaluation-artifact.sample.json` |
-| Redaction / integrity tests | `scripts/reviewAccountability.test.ts` |
+| Artifact                    | Path                                               |
+| --------------------------- | -------------------------------------------------- |
+| Language snapshot sample    | `fixtures/exports/language-snapshot.sample.json`   |
+| Evaluation artifact sample  | `fixtures/exports/evaluation-artifact.sample.json` |
+| Redaction / integrity tests | `scripts/reviewAccountability.test.ts`             |
 
 Run the fixture guard first (no server required):
 

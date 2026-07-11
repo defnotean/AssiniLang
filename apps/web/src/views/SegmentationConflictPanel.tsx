@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Morpheme } from "@assini/db";
+import type { Morpheme } from "@assini/api-contract";
 import type { AcceptExtractionDraftOptions, ExtractionDraftView } from "../api";
 import { useI18n, type Translate } from "../i18n";
 
@@ -18,8 +18,9 @@ function formatMorphemeLine(morpheme: Pick<Morpheme, "surface" | "gloss">, t: Tr
 }
 
 export function hasSegmentationConflict(draft: ExtractionDraftView): boolean {
-  return draft.kind === "corpus_passage"
-    && (draft.grounding?.some((flag) => flag.kind === "segmentation_conflict") ?? false);
+  return (
+    draft.kind === "corpus_passage" && (draft.grounding?.some((flag) => flag.kind === "segmentation_conflict") ?? false)
+  );
 }
 
 export function SegmentationConflictPanel({
@@ -50,10 +51,9 @@ export function SegmentationConflictPanel({
     );
   }
 
-  const editedReady = editedSegmentation.every((morpheme) =>
-    morpheme.surface.trim().length > 0
-    && morpheme.lemma.trim().length > 0
-    && morpheme.gloss.trim().length > 0
+  const editedReady = editedSegmentation.every(
+    (morpheme) =>
+      morpheme.surface.trim().length > 0 && morpheme.lemma.trim().length > 0 && morpheme.gloss.trim().length > 0
   );
 
   return (
@@ -84,7 +84,11 @@ export function SegmentationConflictPanel({
         </div>
 
         {editing && (
-          <div className="segmentation-conflict-edit" role="group" aria-label={t("ingest.segmentationConflict.editGroupAria")}>
+          <div
+            className="segmentation-conflict-edit"
+            role="group"
+            aria-label={t("ingest.segmentationConflict.editGroupAria")}
+          >
             {editedSegmentation.map((morpheme, index) => (
               <label key={`edit-${index}-${morpheme.surface}`} className="segmentation-conflict-edit-row">
                 <span>{morpheme.surface}</span>
@@ -135,21 +139,20 @@ export function SegmentationConflictPanel({
                 className="secondary"
                 disabled={disabled || busy || !editedReady}
                 aria-busy={busy || undefined}
-                onClick={() => onAccept({ morphologicalSegmentation: editedSegmentation.map((morpheme) => ({
-                  ...morpheme,
-                  surface: morpheme.surface.trim(),
-                  lemma: morpheme.lemma.trim(),
-                  gloss: morpheme.gloss.trim()
-                })) })}
+                onClick={() =>
+                  onAccept({
+                    morphologicalSegmentation: editedSegmentation.map((morpheme) => ({
+                      ...morpheme,
+                      surface: morpheme.surface.trim(),
+                      lemma: morpheme.lemma.trim(),
+                      gloss: morpheme.gloss.trim()
+                    }))
+                  })
+                }
               >
                 {t("ingest.segmentationConflict.acceptEdited")}
               </button>
-              <button
-                type="button"
-                className="secondary"
-                disabled={disabled || busy}
-                onClick={() => setEditing(false)}
-              >
+              <button type="button" className="secondary" disabled={disabled || busy} onClick={() => setEditing(false)}>
                 {t("ingest.segmentationConflict.cancelEdit")}
               </button>
             </>

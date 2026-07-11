@@ -6,7 +6,7 @@ describe("process helpers", () => {
 
     expect(quoteCmdArg("run")).toBe("run");
     expect(quoteCmdArg("desktop:package")).toBe("desktop:package");
-    expect(quoteCmdArg("hello world")).toBe("\"hello world\"");
+    expect(quoteCmdArg("hello world")).toBe('"hello world"');
   });
 
   it("uses npm directly on non-Windows platforms", async () => {
@@ -21,10 +21,12 @@ describe("process helpers", () => {
   it("uses npm.cmd through cmd.exe on Windows", async () => {
     const { npmSpawnSpec } = await import("./lib/processHelpers.mjs");
 
-    expect(npmSpawnSpec(["run", "desktop:package"], {
-      comSpec: "C:\\Windows\\System32\\cmd.exe",
-      platform: "win32"
-    })).toEqual({
+    expect(
+      npmSpawnSpec(["run", "desktop:package"], {
+        comSpec: "C:\\Windows\\System32\\cmd.exe",
+        platform: "win32"
+      })
+    ).toEqual({
       command: "C:\\Windows\\System32\\cmd.exe",
       args: ["/d", "/s", "/c", "npm.cmd run desktop:package"]
     });

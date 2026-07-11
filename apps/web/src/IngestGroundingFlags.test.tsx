@@ -53,7 +53,8 @@ describe("IngestView grounding flag badges", () => {
         grounding: [
           {
             kind: "decomposable_form",
-            message: 'Form decomposes into accepted lexemes talu ("water") + ne ("locative case marker"); the draft gloss may belong to a different word.'
+            message:
+              'Form decomposes into accepted lexemes talu ("water") + ne ("locative case marker"); the draft gloss may belong to a different word.'
           }
         ]
       }),
@@ -67,7 +68,10 @@ describe("IngestView grounding flag badges", () => {
           }
         ]
       }),
-      createLexemeDraft({ id: "draft-clean", payload: { form: "miro", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] } })
+      createLexemeDraft({
+        id: "draft-clean",
+        payload: { form: "miro", gloss: "river", tags: [], morphologicalSegmentation: [], topicTags: [] }
+      })
     ]);
 
     render(
@@ -94,12 +98,16 @@ describe("IngestView grounding flag badges", () => {
     const cleanRow = screen.getByRole("article", { name: "Extraction draft draft-clean" });
     expect(within(cleanRow).queryByText("Form decomposes into accepted lexemes")).not.toBeInTheDocument();
     expect(within(cleanRow).queryByText("Conflicts with accepted gloss")).not.toBeInTheDocument();
-  });  it("renders grounding badges alongside an existing duplicate badge", async () => {
+  });
+  it("renders grounding badges alongside an existing duplicate badge", async () => {
     apiMock.fetchExtractionDrafts.mockResolvedValue([
       createLexemeDraft({
         duplicate: { kind: "form", entityId: "lex-talu" },
         grounding: [
-          { kind: "gloss_conflict", message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".' }
+          {
+            kind: "gloss_conflict",
+            message: 'Accepted lexeme "talu" is glossed "water", but this draft glosses it "swims".'
+          }
         ]
       })
     ]);

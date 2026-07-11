@@ -50,7 +50,17 @@ describe("dev launcher", () => {
 
     expect(specs.map((spec) => spec.command)).toEqual(["npm", "npm"]);
     expect(specs[0].options.env).toMatchObject({ PORT: "4321" });
-    expect(specs[1].args).toEqual(["--workspace", "@assini/web", "run", "dev", "--", "--host", "127.0.0.1", "--port", "5173"]);
+    expect(specs[1].args).toEqual([
+      "--workspace",
+      "@assini/web",
+      "run",
+      "dev",
+      "--",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "5173"
+    ]);
     expect(specs[1].options.env).toMatchObject({ ASSINI_API_PORT: "4321" });
   });
 });

@@ -10,7 +10,6 @@
     "test": "vitest run --root ../.. apps/web/src --environment jsdom"
   },
   "dependencies": {
-    "@assini/db": "0.1.0",
     "@assini/api-contract": "0.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

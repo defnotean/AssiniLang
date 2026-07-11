@@ -1,11 +1,11 @@
 type SafeParseResult<T> =
   | {
-    success: true;
-    data: T;
-  }
+      success: true;
+      data: T;
+    }
   | {
-    success: false;
-  };
+      success: false;
+    };
 
 type RequestBodySchema<T> = {
   safeParse(input: unknown): SafeParseResult<T>;

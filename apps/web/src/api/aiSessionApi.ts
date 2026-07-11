@@ -1,4 +1,4 @@
-import type { AiSession, AiSessionMode, NeuralMap } from "@assini/db";
+import type { AiSession, AiSessionMode, NeuralMap } from "@assini/api-contract";
 import { actorRequest, assertOk, getJson, type LocalActor } from "../lib/apiClient";
 
 export type ObservabilityData = {
@@ -47,7 +47,10 @@ export async function fetchObservability(): Promise<ObservabilityData> {
 }
 
 export async function fetchNeuralMap(languageId: string): Promise<NeuralMapResponse> {
-  return getJson<NeuralMapResponse>(`/observability/neural-map?languageId=${encodeURIComponent(languageId)}`, "programmer");
+  return getJson<NeuralMapResponse>(
+    `/observability/neural-map?languageId=${encodeURIComponent(languageId)}`,
+    "programmer"
+  );
 }
 
 export async function createAiSession(payload: CreateAiSessionPayload): Promise<AiSession> {

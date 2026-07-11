@@ -6,13 +6,13 @@ Short procedures for local operators running AssiniLang as a research console or
 
 AssiniLang keeps all workspace data under the configured data directory (repo checkout default: `data/` at the project root). Override the database location with `ASSINI_DB_PATH`; sibling folders are resolved next to that path.
 
-| Path | Purpose |
-| --- | --- |
-| `data/local-db.json` | Default JSON workspace (languages, sources, drafts, audit events, users). A path that does not end in `.json` selects the SQLite backend instead. |
-| `data/backups/` | Timestamped backups from `npm.cmd run db:backup` (CLI) or the desktop app's backup tools. |
-| `data/assets/<languageId>/` | Uploaded source files (images, audio, PDF, DOCX) referenced by `sourceAssets.filePath`. |
-| `data/ocr-cache/` | Cached tesseract.js trained data for the local OCR image fallback (`ASSINI_OCR_LANG`); scanned PDFs use the configured vision OCR model (`ASSINI_OCR_BASE_URL`) on pages 1..N (cap via `ASSINI_OCR_PDF_MAX_PAGES`). |
-| `data/ingestion-uploads/` | Temporary multipart upload staging (ignored by Git). |
+| Path                        | Purpose                                                                                                                                                                                                             |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `data/local-db.json`        | Default JSON workspace (languages, sources, drafts, audit events, users). A path that does not end in `.json` selects the SQLite backend instead.                                                                   |
+| `data/backups/`             | Timestamped backups from `npm.cmd run db:backup` (CLI) or the desktop app's backup tools.                                                                                                                           |
+| `data/assets/<languageId>/` | Uploaded source files (images, audio, PDF, DOCX) referenced by `sourceAssets.filePath`.                                                                                                                             |
+| `data/ocr-cache/`           | Cached tesseract.js trained data for the local OCR image fallback (`ASSINI_OCR_LANG`); scanned PDFs use the configured vision OCR model (`ASSINI_OCR_BASE_URL`) on pages 1..N (cap via `ASSINI_OCR_PDF_MAX_PAGES`). |
+| `data/ingestion-uploads/`   | Temporary multipart upload staging (ignored by Git).                                                                                                                                                                |
 
 **Desktop packaged app:** Settings → Desktop app tools shows the install folder, local data directory, backups folder, and latest backup path. Backups and data live under the per-user app data root (for example `%APPDATA%\AssiniLang\`), not necessarily the repo `data/` tree.
 
@@ -57,8 +57,10 @@ If the API **crashes or restarts** while a source is `processing`:
 
 If a source stays **`processing` while the API is still running** (background task never persisted a result):
 
-1. Restart the API so the startup sweep runs, **or** wait for the web console's 10-minute poll timeout, then restart if the server is stuck.
-2. Re-run processing on the source once it shows `failed`.
+1. The in-process stale-heartbeat sweep checks once per minute and reclaims work with no progress for more than 10 minutes, while skipping ids still pending or active in the queue.
+2. Check privileged `GET /observability/metrics`: `recovery.staleSweep` shows sanitized run/failure/recovered totals, and `jobs` shows aggregate outcomes without job ids or error text.
+3. If the sweep status is `failed`, stop new async ingestion, create a backup, and restart once. `/ready` stays unavailable if startup recovery fails.
+4. Re-run processing on the source once it shows `failed` and confirm its recovery audit event.
 
 See [Ingestion Deep Dive — sync vs async processing](ingestion.md#sync-vs-async-processing) for the full flow.
 
@@ -120,16 +122,17 @@ Reseed writes an empty workspace (prototype users, no languages) and **discards*
 
 ## Logs and diagnostics
 
-| Source | What to collect |
-| --- | --- |
-| API terminal | Fastify request logs, validation errors, LLM/OCR/transcription failures, recovery sweep counts at startup. |
-| Web dev server | Vite proxy errors if the UI cannot reach the API. |
-| `GET /health`, `GET /ready` | Liveness and readiness (recovery runs on ready). |
-| Settings → Model Setup | Provider mode, readiness warnings, **Test connection** (`POST /llm/health-check`) for reachability (not just config shape). |
-| Settings → Desktop app tools → **Copy diagnostics** / **Save diagnostics** | Redacted bundle: paths, backup summary, model discovery, observability counts — no API keys or answer keys. |
-| Audit events (Review / export) | `source_asset.process_started`, `source_asset.processing_recovered`, draft accept/reject, language mutations, plus export receipts (`language_snapshot.exported`, `evaluation_artifact.exported`) from the [audit/export drill](audit-export-drill.md). |
+| Source                                                                     | What to collect                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API terminal                                                               | Fastify request logs, validation errors, LLM/OCR/transcription failures, recovery sweep counts at startup.                                                                                                                                              |
+| Web dev server                                                             | Vite proxy errors if the UI cannot reach the API.                                                                                                                                                                                                       |
+| `GET /health`, `GET /ready`                                                | Independent liveness and storage/queue/startup-recovery readiness.                                                                                                                                                                                      |
+| `GET /observability/metrics` (programmer/lead/admin)                       | Sanitized request latency/error buckets, queue depth, aggregate job outcomes, recovery status, and storage status.                                                                                                                                      |
+| Settings → Model Setup                                                     | Provider mode, readiness warnings, **Test connection** (`POST /llm/health-check`) for reachability (not just config shape).                                                                                                                             |
+| Settings → Desktop app tools → **Copy diagnostics** / **Save diagnostics** | Redacted bundle: paths, backup summary, model discovery, observability counts — no API keys or answer keys.                                                                                                                                             |
+| Audit events (Review / export)                                             | `source_asset.process_started`, `source_asset.processing_recovered`, draft accept/reject, language mutations, plus export receipts (`language_snapshot.exported`, `evaluation_artifact.exported`) from the [audit/export drill](audit-export-drill.md). |
 
-When filing an issue, include the sanitized diagnostics text, the source kind and title, and whether processing was sync or async.
+When filing an issue, follow [Local Incident Response](incident-response.md): include sanitized diagnostics, request ids, timestamps, operation category, and whether processing was sync or async. Do not attach raw source titles/content, logs, database files, credentials, or `.env`.
 
 ## Reset steps
 

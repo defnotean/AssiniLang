@@ -1,10 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { elderCorrectionPayloadSchema } from "@assini/api-contract";
-import {
-  ELDER_CORRECTION_MUTATION_ROLES,
-  type ElderCorrection,
-  type Note
-} from "@assini/db";
+import { ELDER_CORRECTION_MUTATION_ROLES, type ElderCorrection, type Note } from "@assini/db";
 import { toPublicNote, toPublicNotes } from "../publicLanguageViews.js";
 import { appendAuditEvent, appendAuditEvents, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
@@ -61,7 +57,12 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
   app.get("/languages/:languageId/elder-context", async (request, reply) => {
     const { languageId } = request.params as { languageId: string };
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["elder", "reviewer", "lead", "admin"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "elder",
+      "reviewer",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
     const language = state.languages.find((item) => item.id === languageId);
@@ -85,7 +86,12 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
   app.get("/elder/corrections", async (request, reply) => {
     const query = request.query as { languageId?: string };
     const state = await readState();
-    const actor = requireActor(state, request, reply, authToken, prototypeSessions, ["elder", "reviewer", "lead", "admin"]);
+    const actor = requireActor(state, request, reply, authToken, prototypeSessions, [
+      "elder",
+      "reviewer",
+      "lead",
+      "admin"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
 
     if (query.languageId && !state.languages.some((language) => language.id === query.languageId)) {
@@ -133,7 +139,10 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
       };
     }
 
-    if (body.passageId && !current.corpus.some((passage) => passage.id === body.passageId && passage.languageId === body.languageId)) {
+    if (
+      body.passageId &&
+      !current.corpus.some((passage) => passage.id === body.passageId && passage.languageId === body.languageId)
+    ) {
       reply.code(400);
       return {
         error: `Passage not found for language: ${body.passageId}`,
@@ -160,23 +169,26 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
         reviewedAt: null
       };
 
-      return appendAuditEvent({
-        ...state,
-        elderCorrections: [...state.elderCorrections, correction as ElderCorrection]
-      }, {
-        actor,
-        at: proposedAt,
-        action: "elder_correction.created",
-        entityType: "elder_correction",
-        entityId: correction.id,
-        languageId: correction.languageId,
-        summary: "Submitted elder correction for review.",
-        metadata: {
-          severity: correction.severity,
-          hasNoteTarget: correction.noteId !== undefined,
-          hasPassageTarget: correction.passageId !== undefined
+      return appendAuditEvent(
+        {
+          ...state,
+          elderCorrections: [...state.elderCorrections, correction as ElderCorrection]
+        },
+        {
+          actor,
+          at: proposedAt,
+          action: "elder_correction.created",
+          entityType: "elder_correction",
+          entityId: correction.id,
+          languageId: correction.languageId,
+          summary: "Submitted elder correction for review.",
+          metadata: {
+            severity: correction.severity,
+            hasNoteTarget: correction.noteId !== undefined,
+            hasPassageTarget: correction.passageId !== undefined
+          }
         }
-      });
+      );
     });
 
     reply.code(201);
@@ -231,22 +243,25 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
         return reviewedCorrection;
       });
 
-      return appendAuditEvent({
-        ...state,
-        elderCorrections
-      }, {
-        actor,
-        at: reviewedAt,
-        action: "elder_correction.reviewed",
-        entityType: "elder_correction",
-        entityId: correctionId,
-        languageId: reviewedCorrection?.languageId ?? null,
-        summary: `Marked elder correction ${body.status}.`,
-        metadata: {
-          status: body.status,
-          severity: reviewedCorrection?.severity ?? "unknown"
+      return appendAuditEvent(
+        {
+          ...state,
+          elderCorrections
+        },
+        {
+          actor,
+          at: reviewedAt,
+          action: "elder_correction.reviewed",
+          entityType: "elder_correction",
+          entityId: correctionId,
+          languageId: reviewedCorrection?.languageId ?? null,
+          summary: `Marked elder correction ${body.status}.`,
+          metadata: {
+            status: body.status,
+            severity: reviewedCorrection?.severity ?? "unknown"
+          }
         }
-      });
+      );
     });
 
     return reviewedCorrection;
@@ -343,38 +358,41 @@ export function registerElderRoutes(app: FastifyInstance, ctx: RouteContext): vo
         return appliedNote;
       });
 
-      return appendAuditEvents({
-        ...state,
-        elderCorrections,
-        notes
-      }, [
+      return appendAuditEvents(
         {
-          actor,
-          at: appliedAt,
-          action: "elder_correction.applied",
-          entityType: "elder_correction",
-          entityId: correctionId,
-          languageId: existingCorrection.languageId,
-          summary: `Applied elder correction ${correctionId}.`,
-          metadata: {
-            noteId: linkedNoteId,
-            severity: existingCorrection.severity
-          }
+          ...state,
+          elderCorrections,
+          notes
         },
-        {
-          actor,
-          at: appliedAt,
-          action: "note.elder_correction_applied",
-          entityType: "note",
-          entityId: linkedNoteId,
-          languageId: existingCorrection.languageId,
-          summary,
-          metadata: {
-            correctionId,
-            status: "under_review"
+        [
+          {
+            actor,
+            at: appliedAt,
+            action: "elder_correction.applied",
+            entityType: "elder_correction",
+            entityId: correctionId,
+            languageId: existingCorrection.languageId,
+            summary: `Applied elder correction ${correctionId}.`,
+            metadata: {
+              noteId: linkedNoteId,
+              severity: existingCorrection.severity
+            }
+          },
+          {
+            actor,
+            at: appliedAt,
+            action: "note.elder_correction_applied",
+            entityType: "note",
+            entityId: linkedNoteId,
+            languageId: existingCorrection.languageId,
+            summary,
+            metadata: {
+              correctionId,
+              status: "under_review"
+            }
           }
-        }
-      ]);
+        ]
+      );
     });
 
     return {

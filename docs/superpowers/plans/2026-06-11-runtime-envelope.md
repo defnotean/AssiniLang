@@ -13,6 +13,7 @@
 ## Task 1: Production Package Metadata
 
 **Files:**
+
 - Modify: `apps/api/package.json`
 - Modify: `packages/db/package.json`
 - Modify: `packages/eval/package.json`
@@ -27,6 +28,7 @@
 ## Task 2: Runtime Config Parser
 
 **Files:**
+
 - Create: `apps/api/src/runtimeConfig.ts`
 - Create: `apps/api/src/runtimeConfig.test.ts`
 - Modify: `docs/configuration.md`
@@ -42,6 +44,7 @@
 ## Task 3: Startup Lifecycle
 
 **Files:**
+
 - Create: `apps/api/src/runtimeLifecycle.ts`
 - Create: `apps/api/src/runtimeLifecycle.test.ts`
 - Modify: `apps/api/src/index.ts`
@@ -55,6 +58,7 @@
 ## Task 4: Built Startup Smoke
 
 **Files:**
+
 - Modify: `scripts/repositoryHygiene.test.ts` or create focused runtime smoke test if needed.
 
 - [x] Run `npm.cmd run build`.
@@ -64,6 +68,7 @@
 ## Task 5: Verification
 
 **Files:**
+
 - Modify as needed only for type or doc fixes.
 
 - [x] Run `npm.cmd test`.

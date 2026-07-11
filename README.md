@@ -79,40 +79,42 @@ Without a model, ingestion still works through offline heuristic parsing and loc
 
 The most common variables; the [Configuration Reference](docs/configuration.md) documents all of them with defaults and ready-to-paste recipes.
 
-| Variable | Purpose |
-| --- | --- |
-| `ASSINI_LLM_PROVIDER` / `ASSINI_LLM_BASE_URL` / `ASSINI_LLM_MODEL` | Select and locate the extraction/chat model. |
-| `ASSINI_LLM_API_KEY` | Server-side key for remote endpoints. |
-| `ASSINI_TRANSCRIBE_BASE_URL` | Whisper-style endpoint required for audio sources. |
-| `ASSINI_OCR_LANG` | OCR language for image sources without a vision model. |
-| `ASSINI_ALLOW_PRIVATE_URLS` | Allow LAN models and private source URLs. Defaults on only for loopback-bound installs; network-facing APIs stay guarded. |
-| `ASSINI_DEV_API_PORT` / `ASSINI_DEV_WEB_PORT` | Alternate dev ports. |
-| `ASSINI_ALLOW_INSECURE_NETWORK_AUTH` | Explicitly acknowledge prototype auth on a non-loopback API host; never use for production. |
+| Variable                                                           | Purpose                                                                                                                   |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `ASSINI_LLM_PROVIDER` / `ASSINI_LLM_BASE_URL` / `ASSINI_LLM_MODEL` | Select and locate the extraction/chat model.                                                                              |
+| `ASSINI_LLM_API_KEY`                                               | Server-side key for remote endpoints.                                                                                     |
+| `ASSINI_TRANSCRIBE_BASE_URL`                                       | Whisper-style endpoint required for audio sources.                                                                        |
+| `ASSINI_OCR_LANG`                                                  | OCR language for image sources without a vision model.                                                                    |
+| `ASSINI_ALLOW_PRIVATE_URLS`                                        | Allow LAN models and private source URLs. Defaults on only for loopback-bound installs; network-facing APIs stay guarded. |
+| `ASSINI_DEV_API_PORT` / `ASSINI_DEV_WEB_PORT`                      | Alternate dev ports.                                                                                                      |
+| `ASSINI_ALLOW_INSECURE_NETWORK_AUTH`                               | Explicitly acknowledge prototype auth on a non-loopback API host; never use for production.                               |
 
 ## Common commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm.cmd run dev` | Start the API and web console together. |
-| `npm.cmd run desktop` | Build and open the Electron desktop shell with the API started in the background. |
-| `npm.cmd run desktop:package` | Build `dist-desktop\AssiniLang-win32-x64\AssiniLang.exe` plus `dist-desktop\AssiniLang-win32-x64.zip` for a click-to-run Windows desktop release. |
-| `npm.cmd run desktop:smoke` | Launch the packaged `.exe` with a temporary profile and verify the rendered desktop UI plus screenshot. |
-| `npm.cmd run desktop:package:smoke` | Rebuild the Windows package and immediately run the packaged desktop visual smoke check. |
-| `npm.cmd run smoke:web` | Render the built web app in Electron and fail on blank output, fatal renderer events, or console errors. |
-| `AssiniLang Desktop.cmd` | Windows double-click launcher for the desktop shell. |
-| `npm.cmd run verify` | Full quality gate: tests, type checks, seed, eval, builds. |
-| `npm.cmd run verify:beta` | Optional live-model gate; skips cleanly unless `ASSINI_VERIFY_MODEL=1`. |
-| `npm.cmd run ci:green` | Fast pre-push production-dependency audit (`npm audit --omit=dev`). |
-| `npm.cmd test` | All Vitest tests. |
-| `npm.cmd run check` | TypeScript project checks. |
-| `npm.cmd run seed` | Reset to an empty workspace at `data/local-db.json`. |
-| `npm.cmd run eval` | Deterministic evaluation CLI. |
-| `npm.cmd run build` | Build all workspaces. |
-| `npm.cmd run smoke` | End-to-end ingestion smoke script. |
-| `npm.cmd run smoke:backup` | Backup → corrupt → restore smoke plus CLI refusal / SQLite force / dry-run validation checks (also run in CI). |
-| `npm.cmd run model:verify` | Probe discovered local models and run a model-backed language workflow check. |
-| `npm.cmd run db:backup` | Validated backup of the local database to `data/backups/`. |
-| `npm.cmd run demo` | Seed, evaluate, and start the prototype. |
+| Command                                         | Purpose                                                                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm.cmd run dev`                               | Start the API and web console together.                                                                                                           |
+| `npm.cmd run desktop`                           | Build and open the Electron desktop shell with the API started in the background.                                                                 |
+| `npm.cmd run desktop:package`                   | Build `dist-desktop\AssiniLang-win32-x64\AssiniLang.exe` plus `dist-desktop\AssiniLang-win32-x64.zip` for a click-to-run Windows desktop release. |
+| `npm.cmd run desktop:smoke`                     | Launch the packaged `.exe` with a temporary profile and verify the rendered desktop UI plus screenshot.                                           |
+| `npm.cmd run desktop:package:smoke`             | Rebuild the Windows package and immediately run the packaged desktop visual smoke check.                                                          |
+| `npm.cmd run smoke:web`                         | Render the built web app in Electron and fail on blank output, fatal renderer events, or console errors.                                          |
+| `AssiniLang Desktop.cmd`                        | Windows double-click launcher for the desktop shell.                                                                                              |
+| `npm.cmd run verify`                            | Full quality gate: formatting, lint, tests, type checks, isolated fixture seed, eval, builds.                                                     |
+| `npm.cmd run verify:beta`                       | Optional live-model gate; skips cleanly unless `ASSINI_VERIFY_MODEL=1`.                                                                           |
+| `npm.cmd run ci:green`                          | Fast pre-push production-dependency audit (`npm audit --omit=dev`).                                                                               |
+| `npm.cmd run lint` / `npm.cmd run format:check` | Enforce ESLint/React Hooks correctness and repository formatting.                                                                                 |
+| `npm.cmd run e2e`                               | Run Chromium E2E, WCAG A/AA accessibility, keyboard, and responsive visual-contract checks after the one-time `e2e:install`.                      |
+| `npm.cmd test` / `npm.cmd run test:coverage`    | Run all Vitest tests, optionally enforcing coverage thresholds.                                                                                   |
+| `npm.cmd run check`                             | TypeScript project checks.                                                                                                                        |
+| `npm.cmd run seed`                              | Reset to an empty workspace at `data/local-db.json`.                                                                                              |
+| `npm.cmd run eval`                              | Deterministic evaluation CLI.                                                                                                                     |
+| `npm.cmd run build`                             | Build all workspaces.                                                                                                                             |
+| `npm.cmd run smoke`                             | End-to-end ingestion smoke script.                                                                                                                |
+| `npm.cmd run smoke:backup`                      | Backup → corrupt → restore smoke plus CLI refusal / SQLite force / dry-run validation checks (also run in CI).                                    |
+| `npm.cmd run model:verify`                      | Probe discovered local models and run a model-backed language workflow check.                                                                     |
+| `npm.cmd run db:backup`                         | Validated backup of the local database to `data/backups/`.                                                                                        |
+| `npm.cmd run demo`                              | Seed, evaluate, and start the prototype.                                                                                                          |
 
 ## Documentation
 

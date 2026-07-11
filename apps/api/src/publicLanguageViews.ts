@@ -17,6 +17,7 @@ import { summarizeEvaluationGate } from "@assini/eval";
 import { computeDraftGroundingFlags, type DraftGroundingFlag } from "./draftGrounding.js";
 import { detectParadigmGaps, type ParadigmGap } from "./paradigmGaps.js";
 import { proposeLexiconSegmentation } from "./segmentationProposals.js";
+import { extractionDraftIdentity } from "./sourceProcessingDurability.js";
 
 export type { DraftGroundingFlag } from "./draftGrounding.js";
 export type { ParadigmGap } from "./paradigmGaps.js";
@@ -159,11 +160,14 @@ export type EvaluationTrend = {
   previousAverageScore: number | null;
   averageDelta: number | null;
   status: EvaluationTrendStatus;
-  categoryDeltas: Record<string, {
-    latestScore: number;
-    previousScore: number | null;
-    delta: number | null;
-  }>;
+  categoryDeltas: Record<
+    string,
+    {
+      latestScore: number;
+      previousScore: number | null;
+      delta: number | null;
+    }
+  >;
 };
 
 const LANGUAGE_SNAPSHOT_EXPORT_VERSION = "language-snapshot-v2";
@@ -179,10 +183,7 @@ const EXPORT_REDACTION_POLICY = [
   "local-users-omitted"
 ];
 
-const INTERNAL_NOTE_MARKERS = [
-  /answer key/i,
-  /test-generator/i
-];
+const INTERNAL_NOTE_MARKERS = [/answer key/i, /test-generator/i];
 
 function containsInternalNoteMarker(value: string): boolean {
   return INTERNAL_NOTE_MARKERS.some((pattern) => pattern.test(value));
@@ -195,13 +196,15 @@ function normalizeForStableJson(value: unknown): unknown {
 
   if (value !== null && typeof value === "object") {
     const record = value as Record<string, unknown>;
-    return Object.keys(record).sort().reduce<Record<string, unknown>>((normalized, key) => {
-      const item = record[key];
-      if (item !== undefined) {
-        normalized[key] = normalizeForStableJson(item);
-      }
-      return normalized;
-    }, {});
+    return Object.keys(record)
+      .sort()
+      .reduce<Record<string, unknown>>((normalized, key) => {
+        const item = record[key];
+        if (item !== undefined) {
+          normalized[key] = normalizeForStableJson(item);
+        }
+        return normalized;
+      }, {});
   }
 
   return value;
@@ -220,10 +223,7 @@ function buildExportIntegrity(payload: unknown): PublicExportIntegrity {
   };
 }
 
-const KNOWN_EXPORT_VERSIONS = new Set([
-  LANGUAGE_SNAPSHOT_EXPORT_VERSION,
-  EVALUATION_ARTIFACT_EXPORT_VERSION
-]);
+const KNOWN_EXPORT_VERSIONS = new Set([LANGUAGE_SNAPSHOT_EXPORT_VERSION, EVALUATION_ARTIFACT_EXPORT_VERSION]);
 
 /**
  * Recomputes the SHA-256 content hash over the export payload with `integrity`
@@ -243,22 +243,19 @@ export function verifyExportIntegrity(exported: {
 }): boolean {
   const integrity = exported.integrity;
   if (
-    !integrity
-    || typeof integrity !== "object"
-    || Array.isArray(integrity)
-    || !Object.hasOwn(integrity, "algorithm")
-    || !Object.hasOwn(integrity, "generatedBy")
-    || !Object.hasOwn(integrity, "contentHash")
-    || !Object.hasOwn(integrity, "redactionPolicy")
-    || integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM
-    || integrity.generatedBy !== EXPORT_GENERATOR_ID
+    !integrity ||
+    typeof integrity !== "object" ||
+    Array.isArray(integrity) ||
+    !Object.hasOwn(integrity, "algorithm") ||
+    !Object.hasOwn(integrity, "generatedBy") ||
+    !Object.hasOwn(integrity, "contentHash") ||
+    !Object.hasOwn(integrity, "redactionPolicy") ||
+    integrity.algorithm !== EXPORT_INTEGRITY_ALGORITHM ||
+    integrity.generatedBy !== EXPORT_GENERATOR_ID
   ) {
     return false;
   }
-  if (
-    typeof exported.exportVersion !== "string"
-    || !KNOWN_EXPORT_VERSIONS.has(exported.exportVersion)
-  ) {
+  if (typeof exported.exportVersion !== "string" || !KNOWN_EXPORT_VERSIONS.has(exported.exportVersion)) {
     return false;
   }
   // Accept upper- or lower-case hex; digests are compared in lowercase.
@@ -266,9 +263,9 @@ export function verifyExportIntegrity(exported: {
     return false;
   }
   if (
-    !Array.isArray(integrity.redactionPolicy)
-    || integrity.redactionPolicy.length !== EXPORT_REDACTION_POLICY.length
-    || integrity.redactionPolicy.some((entry, index) => entry !== EXPORT_REDACTION_POLICY[index])
+    !Array.isArray(integrity.redactionPolicy) ||
+    integrity.redactionPolicy.length !== EXPORT_REDACTION_POLICY.length ||
+    integrity.redactionPolicy.some((entry, index) => entry !== EXPORT_REDACTION_POLICY[index])
   ) {
     return false;
   }
@@ -323,10 +320,7 @@ function compareRunsForTrend(latest: EvaluationRun, previous: EvaluationRun | un
   const latestAverageScore = roundedScore(averageScore(latest));
   const previousAverageScore = previous ? roundedScore(averageScore(previous)) : null;
   const averageDelta = previousAverageScore === null ? null : roundedScore(latestAverageScore - previousAverageScore);
-  const categories = new Set([
-    ...Object.keys(latest.scores),
-    ...Object.keys(previous?.scores ?? {})
-  ]);
+  const categories = new Set([...Object.keys(latest.scores), ...Object.keys(previous?.scores ?? {})]);
   const categoryDeltas = [...categories].sort().reduce<EvaluationTrend["categoryDeltas"]>((deltas, category) => {
     const latestScore = roundedScore(latest.scores[category] ?? 0);
     const previousScore = previous?.scores[category] === undefined ? null : roundedScore(previous.scores[category]);
@@ -364,7 +358,9 @@ function compareRunsForTrend(latest: EvaluationRun, previous: EvaluationRun | un
 function evaluationTrendsForRuns(runs: EvaluationRun[]): EvaluationTrend[] {
   return Object.entries(runsByLanguageChronological(runs))
     .map(([languageId, languageRuns]) => {
-      const sorted = languageRuns.slice().sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+      const sorted = languageRuns
+        .slice()
+        .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
       const latest = sorted[sorted.length - 1];
       if (!latest) return undefined;
       const previous = sorted[sorted.length - 2];
@@ -394,19 +390,21 @@ export function toPublicExerciseSubmission(submission: ExerciseSubmission): Publ
 
 export function toPublicNote(note: Note): Note {
   const publicComments = note.reviewer.comments.filter((comment) => !containsInternalNoteMarker(comment));
-  const publicEditHistory = note.editHistory.filter((entry) => (
-    !containsInternalNoteMarker(entry.by)
-    && !containsInternalNoteMarker(entry.summary)
-    && !containsInternalNoteMarker(entry.action)
-  ));
+  const publicEditHistory = note.editHistory.filter(
+    (entry) =>
+      !containsInternalNoteMarker(entry.by) &&
+      !containsInternalNoteMarker(entry.summary) &&
+      !containsInternalNoteMarker(entry.action)
+  );
 
   return {
     ...note,
     reviewer: {
       ...note.reviewer,
-      lastReviewedBy: note.reviewer.lastReviewedBy && containsInternalNoteMarker(note.reviewer.lastReviewedBy)
-        ? "internal-review"
-        : note.reviewer.lastReviewedBy,
+      lastReviewedBy:
+        note.reviewer.lastReviewedBy && containsInternalNoteMarker(note.reviewer.lastReviewedBy)
+          ? "internal-review"
+          : note.reviewer.lastReviewedBy,
       comments: publicComments
     },
     editHistory: publicEditHistory
@@ -433,23 +431,27 @@ function buildMorphemeInventory(
   vocabulary: PublicVocabularyItem[]
 ): MorphemeInventoryItem[] {
   const vocabularyByForm = new Map(vocabulary.map((item) => [item.form.toLowerCase(), item]));
-  const inventory = new Map<string, {
-    surface: string;
-    lemma: string;
-    glosses: Set<string>;
-    features: Set<string>;
-    occurrenceCount: number;
-    passageIds: Set<string>;
-    vocabulary: PublicVocabularyItem | null;
-  }>();
+  const inventory = new Map<
+    string,
+    {
+      surface: string;
+      lemma: string;
+      glosses: Set<string>;
+      features: Set<string>;
+      occurrenceCount: number;
+      passageIds: Set<string>;
+      vocabulary: PublicVocabularyItem | null;
+    }
+  >();
 
   for (const passage of state.corpus.filter((item) => item.languageId === languageId)) {
     for (const morpheme of passage.morphologicalSegmentation) {
       const key = `${morpheme.surface}|${morpheme.lemma}`;
       const existing = inventory.get(key);
-      const vocabularyMatch = vocabularyByForm.get(morpheme.surface.toLowerCase())
-        ?? vocabularyByForm.get(morpheme.lemma.toLowerCase())
-        ?? null;
+      const vocabularyMatch =
+        vocabularyByForm.get(morpheme.surface.toLowerCase()) ??
+        vocabularyByForm.get(morpheme.lemma.toLowerCase()) ??
+        null;
 
       if (!existing) {
         inventory.set(key, {
@@ -482,36 +484,28 @@ function buildMorphemeInventory(
       passageIds: [...item.passageIds].sort(),
       vocabulary: item.vocabulary ? { ...item.vocabulary, tags: [...item.vocabulary.tags] } : null
     }))
-    .sort((left, right) => (
-      left.surface.localeCompare(right.surface)
-      || left.lemma.localeCompare(right.lemma)
-    ));
+    .sort((left, right) => left.surface.localeCompare(right.surface) || left.lemma.localeCompare(right.lemma));
 }
 
 const EMPTY_WORKSPACE_EVAL_FAILURE =
   "No languages available to evaluate. Create a language from the sidebar first, then run System Eval.";
-const NO_EVAL_RUNS_FAILURE =
-  "No evaluation runs recorded. Run System Eval before exporting an evaluation artifact.";
+const NO_EVAL_RUNS_FAILURE = "No evaluation runs recorded. Run System Eval before exporting an evaluation artifact.";
 
 export function toPublicEvaluationArtifact(
   state: AppState,
   exportedAt = new Date().toISOString()
 ): PublicEvaluationArtifact {
   const latestRuns = latestRunsByLanguage(state.evaluationRuns).map(cloneEvaluationRun);
-  const averageLatestScore = latestRuns.length === 0
-    ? 0
-    : latestRuns.reduce((total, run) => total + averageScore(run), 0) / latestRuns.length;
+  const averageLatestScore =
+    latestRuns.length === 0 ? 0 : latestRuns.reduce((total, run) => total + averageScore(run), 0) / latestRuns.length;
   const gateSummary = summarizeEvaluationGate(latestRuns);
   const failedLatestRuns = latestRuns.filter((run) => !summarizeEvaluationGate([run]).passed).length;
   const trends = evaluationTrendsForRuns(state.evaluationRuns);
 
   // An empty workspace or a workspace that has never run System Eval must not
   // export as a green gate (summarizeEvaluationGate([]) is vacuously true).
-  const emptyWorkspaceGuidance = state.languages.length === 0
-    ? EMPTY_WORKSPACE_EVAL_FAILURE
-    : latestRuns.length === 0
-      ? NO_EVAL_RUNS_FAILURE
-      : null;
+  const emptyWorkspaceGuidance =
+    state.languages.length === 0 ? EMPTY_WORKSPACE_EVAL_FAILURE : latestRuns.length === 0 ? NO_EVAL_RUNS_FAILURE : null;
   const failureLines = emptyWorkspaceGuidance
     ? [emptyWorkspaceGuidance, ...gateSummary.failureLines]
     : gateSummary.failureLines;
@@ -611,25 +605,11 @@ function normalizeDuplicateKey(value: string): string {
 /**
  * Identity key for "two drafts proposing the same thing" within the pending
  * queue: form+gloss for lexemes, normalized target text for passages, and
- * the topic for grammar notes. Returns undefined for incomplete payloads.
+ * the topic for grammar notes. Persisted draft validation guarantees the
+ * identity fields are present.
  */
 function extractionDraftIdentityKey(draft: ExtractionDraft): string | undefined {
-  if (draft.kind === "lexeme") {
-    const form = draft.payload.form?.trim();
-    const gloss = draft.payload.gloss?.trim();
-    if (!form || !gloss) return undefined;
-    return `lexeme:${normalizeDuplicateKey(form)}::${normalizeDuplicateKey(gloss)}`;
-  }
-
-  if (draft.kind === "corpus_passage") {
-    const textTarget = draft.payload.textTarget?.trim();
-    if (!textTarget) return undefined;
-    return `corpus_passage:${normalizeDuplicateKey(textTarget)}`;
-  }
-
-  const topic = draft.payload.topic?.trim();
-  if (!topic) return undefined;
-  return `grammar_note:${normalizeDuplicateKey(topic)}`;
+  return extractionDraftIdentity(draft.kind, draft.payload);
 }
 
 function existingEntityDuplicate(state: AppState, draft: ExtractionDraft): ExtractionDraftDuplicate | undefined {
@@ -643,9 +623,10 @@ function existingEntityDuplicate(state: AppState, draft: ExtractionDraft): Extra
     const sameLanguageLexemes = state.lexemes.filter(
       (lexeme) => lexeme.languageId === draft.languageId && normalizeDuplicateKey(lexeme.form) === normalizedForm
     );
-    const exactMatch = normalizedGloss === undefined
-      ? undefined
-      : sameLanguageLexemes.find((lexeme) => normalizeDuplicateKey(lexeme.gloss) === normalizedGloss);
+    const exactMatch =
+      normalizedGloss === undefined
+        ? undefined
+        : sameLanguageLexemes.find((lexeme) => normalizeDuplicateKey(lexeme.gloss) === normalizedGloss);
     if (exactMatch) return { kind: "exact", entityId: exactMatch.id };
 
     const formMatch = sameLanguageLexemes[0];
@@ -657,8 +638,8 @@ function existingEntityDuplicate(state: AppState, draft: ExtractionDraft): Extra
     if (!textTarget) return undefined;
     const normalizedTarget = normalizeDuplicateKey(textTarget);
     const match = state.corpus.find(
-      (passage) => passage.languageId === draft.languageId
-        && normalizeDuplicateKey(passage.textTarget) === normalizedTarget
+      (passage) =>
+        passage.languageId === draft.languageId && normalizeDuplicateKey(passage.textTarget) === normalizedTarget
     );
     return match ? { kind: "exact", entityId: match.id } : undefined;
   }
@@ -682,10 +663,9 @@ export function toExtractionDraftViews(state: AppState, drafts: ExtractionDraft[
   const pendingQueue = state.extractionDrafts
     .map((draft, index) => ({ draft, index }))
     .filter(({ draft }) => draft.status === "proposed")
-    .sort((left, right) => (
-      Date.parse(left.draft.createdAt) - Date.parse(right.draft.createdAt)
-      || left.index - right.index
-    ));
+    .sort(
+      (left, right) => Date.parse(left.draft.createdAt) - Date.parse(right.draft.createdAt) || left.index - right.index
+    );
 
   const earliestPendingByKey = new Map<string, string>();
   const pendingDuplicateOf = new Map<string, string>();
@@ -719,10 +699,7 @@ export function toExtractionDraftViews(state: AppState, drafts: ExtractionDraft[
       view.grounding = grounding;
     }
 
-    if (
-      draft.kind === "corpus_passage"
-      && grounding.some((flag) => flag.kind === "segmentation_conflict")
-    ) {
+    if (draft.kind === "corpus_passage" && grounding.some((flag) => flag.kind === "segmentation_conflict")) {
       const textTarget = draft.payload.textTarget?.trim().replace(/\s+/g, " ") ?? "";
       const languageLexemes = state.lexemes.filter((lexeme) => lexeme.languageId === draft.languageId);
       if (textTarget && languageLexemes.length > 0) {

@@ -7,12 +7,7 @@ import { desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
 import { readJsonFile } from "./lib/jsonHelpers.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const {
-  defaultReportPath,
-  defaultScreenshotPath,
-  executablePath,
-  packageRoot
-} = desktopPackagePaths(repoRoot);
+const { defaultReportPath, defaultScreenshotPath, executablePath, packageRoot } = desktopPackagePaths(repoRoot);
 const DEFAULT_TIMEOUT_MS = 120_000;
 const MIN_SCREENSHOT_BYTES = 10_000;
 const MIN_NON_WHITE_RATIO = 0.01;
@@ -46,7 +41,10 @@ export function validateSmokeReport(report) {
   assert(report.ok === true, `Desktop smoke did not pass: ${report.error?.message ?? "unknown failure"}`);
   assert(report.isPackaged === true, "Desktop smoke did not run against a packaged app.");
   assert(Array.isArray(report.bridge), "Desktop bridge checks are missing.");
-  assert(report.bridge[0] === true && report.bridge[1] === true && report.bridge[2] === true, "Desktop bridge preload checks failed.");
+  assert(
+    report.bridge[0] === true && report.bridge[1] === true && report.bridge[2] === true,
+    "Desktop bridge preload checks failed."
+  );
   assert(report.bridge[3]?.ok === true, "Desktop API health check failed.");
 
   const screens = report.ui?.screens ?? {};
@@ -63,9 +61,15 @@ export function validateSmokeReport(report) {
     assert((layoutFit[screen].noteTopicOverflow?.length ?? 999) === 0, `${screen} screen clips note topic text.`);
   }
   const settingsLayout = layoutFit.settings ?? {};
-  assert((settingsLayout.modelGridColumns ?? 0) === 1, "Settings model grid did not collapse at the packaged minimum width.");
+  assert(
+    (settingsLayout.modelGridColumns ?? 0) === 1,
+    "Settings model grid did not collapse at the packaged minimum width."
+  );
   const settingControls = new Map((settingsLayout.controls ?? []).map((control) => [control.label, control.width]));
-  assert((settingControls.get("Discovered models") ?? 0) >= 320, "Discovered models control is too narrow in desktop smoke.");
+  assert(
+    (settingControls.get("Discovered models") ?? 0) >= 320,
+    "Discovered models control is too narrow in desktop smoke."
+  );
   assert((settingControls.get("Base URL") ?? 0) >= 240, "Base URL control is too narrow in desktop smoke.");
   assert((settingControls.get("Model") ?? 0) >= 240, "Model control is too narrow in desktop smoke.");
   assert((settingControls.get("Timeout") ?? 0) >= 120, "Timeout control is too narrow in desktop smoke.");
@@ -73,7 +77,10 @@ export function validateSmokeReport(report) {
   assert(settingsLayout.desktopActionGroups?.length === 5, "Desktop action groups did not render in desktop smoke.");
   for (const group of settingsLayout.desktopActionGroups ?? []) {
     assert((group.buttonCount ?? 0) > 0, `Desktop action group ${group.group ?? "unknown"} has no buttons.`);
-    assert((group.clippedButtons?.length ?? 0) === 0, `Desktop action group ${group.group ?? "unknown"} has clipped buttons.`);
+    assert(
+      (group.clippedButtons?.length ?? 0) === 0,
+      `Desktop action group ${group.group ?? "unknown"} has clipped buttons.`
+    );
   }
 
   const bridge = report.ui?.controls?.desktopBridge ?? {};
@@ -119,7 +126,10 @@ export function validateSmokeReport(report) {
 
   const providerForm = report.ui?.controls?.providerForm ?? {};
   assert(typeof providerForm.providerValue === "string", "Provider form value was not captured.");
-  assert(providerForm.baseUrlPlaceholder === "http://127.0.0.1:11434/v1", "Provider base URL placeholder changed unexpectedly.");
+  assert(
+    providerForm.baseUrlPlaceholder === "http://127.0.0.1:11434/v1",
+    "Provider base URL placeholder changed unexpectedly."
+  );
   assert(providerForm.modelPlaceholder === "irene-fusion", "Provider model placeholder changed unexpectedly.");
   assert(Number.parseInt(providerForm.timeoutValue, 10) > 0, "Provider timeout value is invalid.");
   assert(Number.parseInt(providerForm.maxTokensValue, 10) > 0, "Provider max token value is invalid.");
@@ -153,7 +163,9 @@ async function waitForReport(reportPath, child, timeoutMs) {
       return;
     } catch {
       if (childExit && childExit.code !== 0) {
-        throw new Error(`AssiniLang.exe exited before writing a smoke report (${childExit.signal ?? `exit code ${childExit.code}`}).`);
+        throw new Error(
+          `AssiniLang.exe exited before writing a smoke report (${childExit.signal ?? `exit code ${childExit.code}`}).`
+        );
       }
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
     }
@@ -218,7 +230,10 @@ export async function runDesktopPackageSmoke({
     const report = await readJsonFile(reportPath);
     const summary = validateSmokeReport(report);
     const screenshot = await stat(screenshotPath);
-    assert(screenshot.size >= MIN_SCREENSHOT_BYTES, `Desktop smoke screenshot is unexpectedly small (${screenshot.size} bytes).`);
+    assert(
+      screenshot.size >= MIN_SCREENSHOT_BYTES,
+      `Desktop smoke screenshot is unexpectedly small (${screenshot.size} bytes).`
+    );
     await waitForExit(child, 10_000);
     if (child.exitCode === null && child.signalCode === null) {
       await killProcessTree(child.pid);
@@ -242,7 +257,9 @@ async function main() {
   console.log(`[desktop-smoke] Report: ${summary.reportPath}`);
   console.log(`[desktop-smoke] Screenshot: ${summary.screenshotPath}`);
   console.log(`[desktop-smoke] Screens: ${summary.screens.join(", ")}`);
-  console.log(`[desktop-smoke] Screenshot pixels: ${summary.screenshotPixels}; non-white ratio: ${summary.nonWhiteRatio}`);
+  console.log(
+    `[desktop-smoke] Screenshot pixels: ${summary.screenshotPixels}; non-white ratio: ${summary.nonWhiteRatio}`
+  );
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

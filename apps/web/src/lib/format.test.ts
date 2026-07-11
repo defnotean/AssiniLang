@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AiSession } from "@assini/db";
+import type { AiSession } from "@assini/api-contract";
 import type { LanguageSnapshot, LlmReachability } from "../api";
 import { ApiError } from "./apiClient";
 import {
@@ -108,76 +108,86 @@ function createSnapshot(notes: LanguageSnapshot["notes"]): LanguageSnapshot {
 
 describe("formatSnapshotReviewAccountability", () => {
   it("returns undefined when every note is approved", () => {
-    expect(formatSnapshotReviewAccountability([
-      {
-        id: "note-1",
-        languageId: "avenik",
-        topic: "verb chains",
-        explanation: "Approved note.",
-        examples: [],
-        evidencePassageIds: [],
-        evidenceCount: 0,
-        confidence: "high",
-        status: "approved",
-        reviewer: { lastReviewedBy: "reviewer-1", lastReviewedAt: "2026-06-01T00:00:00.000Z", comments: [] },
-        dialectScope: "baseline",
-        editHistory: []
-      }
-    ])).toBeUndefined();
+    expect(
+      formatSnapshotReviewAccountability([
+        {
+          id: "note-1",
+          languageId: "avenik",
+          topic: "verb chains",
+          explanation: "Approved note.",
+          examples: [],
+          evidencePassageIds: [],
+          evidenceCount: 0,
+          confidence: "high",
+          status: "approved",
+          reviewer: { lastReviewedBy: "reviewer-1", lastReviewedAt: "2026-06-01T00:00:00.000Z", comments: [] },
+          dialectScope: "baseline",
+          editHistory: []
+        }
+      ])
+    ).toBeUndefined();
   });
 
   it("counts notes that still need review accountability", () => {
-    expect(formatSnapshotReviewAccountability([
-      {
-        id: "note-1",
-        languageId: "avenik",
-        topic: "verb chains",
-        explanation: "Draft note.",
-        examples: [],
-        evidencePassageIds: [],
-        evidenceCount: 0,
-        confidence: "medium",
-        status: "draft",
-        reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
-        dialectScope: "baseline",
-        editHistory: []
-      },
-      {
-        id: "note-2",
-        languageId: "avenik",
-        topic: "case particles",
-        explanation: "Under review note.",
-        examples: [],
-        evidencePassageIds: [],
-        evidenceCount: 0,
-        confidence: "medium",
-        status: "under_review",
-        reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
-        dialectScope: "baseline",
-        editHistory: []
-      }
-    ], t)).toBe("2 notes still need review");
+    expect(
+      formatSnapshotReviewAccountability(
+        [
+          {
+            id: "note-1",
+            languageId: "avenik",
+            topic: "verb chains",
+            explanation: "Draft note.",
+            examples: [],
+            evidencePassageIds: [],
+            evidenceCount: 0,
+            confidence: "medium",
+            status: "draft",
+            reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
+            dialectScope: "baseline",
+            editHistory: []
+          },
+          {
+            id: "note-2",
+            languageId: "avenik",
+            topic: "case particles",
+            explanation: "Under review note.",
+            examples: [],
+            evidencePassageIds: [],
+            evidenceCount: 0,
+            confidence: "medium",
+            status: "under_review",
+            reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
+            dialectScope: "baseline",
+            editHistory: []
+          }
+        ],
+        t
+      )
+    ).toBe("2 notes still need review");
   });
 });
 
 describe("buildSnapshotDownload", () => {
   it("includes review accountability in the export summary when notes are not all approved", () => {
-    const download = buildSnapshotDownload(createSnapshot([
-      {
-        id: "note-1",
-        languageId: "avenik",
-        topic: "verb chains",
-        explanation: "Draft note.",
-        examples: [],
-        evidencePassageIds: [],
-        evidenceCount: 0,
-        confidence: "medium",
-        status: "draft",
-        reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
-        dialectScope: "baseline",
-        editHistory: []
-      }
-    ]), t);
+    const download = buildSnapshotDownload(
+      createSnapshot([
+        {
+          id: "note-1",
+          languageId: "avenik",
+          topic: "verb chains",
+          explanation: "Draft note.",
+          examples: [],
+          evidencePassageIds: [],
+          evidenceCount: 0,
+          confidence: "medium",
+          status: "draft",
+          reviewer: { lastReviewedBy: null, lastReviewedAt: null, comments: [] },
+          dialectScope: "baseline",
+          editHistory: []
+        }
+      ]),
+      t
+    );
 
     expect(download.summary).toContain("1 note still needs review");
     expect(download.summary).toContain("integrity sha256:0123456789ab");
@@ -186,12 +196,17 @@ describe("buildSnapshotDownload", () => {
 
 describe("formatIntegrityLabel and evaluation artifact summaries", () => {
   it("localizes integrity labels and evaluation artifact ready summaries", () => {
-    expect(formatIntegrityLabel({
-      algorithm: "sha256",
-      contentHash: "fedcba9876543210",
-      generatedBy: "assini-local-export-v1",
-      redactionPolicy: [...EXPORT_REDACTION_POLICY]
-    }, t)).toBe("integrity sha256:fedcba987654");
+    expect(
+      formatIntegrityLabel(
+        {
+          algorithm: "sha256",
+          contentHash: "fedcba9876543210",
+          generatedBy: "assini-local-export-v1",
+          redactionPolicy: [...EXPORT_REDACTION_POLICY]
+        },
+        t
+      )
+    ).toBe("integrity sha256:fedcba987654");
 
     const artifact = {
       exportVersion: "evaluation-artifact-v2",
@@ -243,23 +258,38 @@ describe("extractionDraftSummary", () => {
       }
     };
 
-    expect(extractionDraftSummary({
-      ...base,
-      kind: "lexeme",
-      payload: { ...base.payload }
-    } as ExtractionDraft, t)).toBe("(no form) — (no gloss)");
+    expect(
+      extractionDraftSummary(
+        {
+          ...base,
+          kind: "lexeme",
+          payload: { ...base.payload }
+        } as ExtractionDraft,
+        t
+      )
+    ).toBe("(no form) — (no gloss)");
 
-    expect(extractionDraftSummary({
-      ...base,
-      kind: "corpus_passage",
-      payload: { ...base.payload, textTarget: "mira talo" }
-    } as ExtractionDraft, t)).toBe("mira talo — (no translation)");
+    expect(
+      extractionDraftSummary(
+        {
+          ...base,
+          kind: "corpus_passage",
+          payload: { ...base.payload, textTarget: "mira talo" }
+        } as ExtractionDraft,
+        t
+      )
+    ).toBe("mira talo — (no translation)");
 
-    expect(extractionDraftSummary({
-      ...base,
-      kind: "grammar_note",
-      payload: { ...base.payload, topic: "verb chains", explanation: "Suffix chains." }
-    } as ExtractionDraft, t)).toBe("verb chains — Suffix chains.");
+    expect(
+      extractionDraftSummary(
+        {
+          ...base,
+          kind: "grammar_note",
+          payload: { ...base.payload, topic: "verb chains", explanation: "Suffix chains." }
+        } as ExtractionDraft,
+        t
+      )
+    ).toBe("verb chains — Suffix chains.");
   });
 });
 
@@ -499,7 +529,7 @@ describe("localizeApiError", () => {
 
     expect(
       localizeApiError(
-        new ApiError("Body must include action: \"accept\" or \"reject\".", {
+        new ApiError('Body must include action: "accept" or "reject".', {
           status: 400,
           i18nKey: "errors.bulkReviewInvalidAction"
         }),
@@ -664,9 +694,7 @@ describe("localizeApiError", () => {
       "governance.errSnapshotExportFailed"
     );
 
-    expect(message).toBe(
-      "That language was not found. Select another language or create one first."
-    );
+    expect(message).toBe("That language was not found. Select another language or create one first.");
   });
 
   it("localizes elder apply negatives from i18n metadata", () => {
@@ -1090,9 +1118,12 @@ describe("localizeApiError", () => {
 
     expect(
       localizeApiError(
-        new ApiError("Request failed: /languages/avenik/exercises (400): Exercise references unknown rule: missing-rule", {
-          status: 400
-        }),
+        new ApiError(
+          "Request failed: /languages/avenik/exercises (400): Exercise references unknown rule: missing-rule",
+          {
+            status: 400
+          }
+        ),
         t,
         "learner.exerciseAuthoringFailed"
       )
@@ -1136,9 +1167,7 @@ describe("localizeApiError", () => {
   });
 
   it("localizes oversized vault Markdown skip reasons and upload title failures", () => {
-    expect(
-      localizeVaultImportSkipReason("Markdown file is larger than the 1 MB import limit.", t)
-    ).toBe(
+    expect(localizeVaultImportSkipReason("Markdown file is larger than the 1 MB import limit.", t)).toBe(
       "That Markdown note is larger than the 1 MB vault import limit. Split or shorten the note, then import again."
     );
     expect(
@@ -1212,9 +1241,7 @@ describe("localizeApiError", () => {
       "ingest.vaultImportFailed"
     );
 
-    expect(message).toBe(
-      "That folder could not be read. Check the path exists and AssiniLang can access it."
-    );
+    expect(message).toBe("That folder could not be read. Check the path exists and AssiniLang can access it.");
   });
 
   it("localizes OCR setup failures from persisted source errors", () => {
@@ -1230,12 +1257,7 @@ describe("localizeApiError", () => {
   });
 
   it("passes fallback params when a processing error is empty", () => {
-    const message = localizeSourceProcessingError(
-      "   ",
-      t,
-      "ingest.processingFailed",
-      { title: "River notes" }
-    );
+    const message = localizeSourceProcessingError("   ", t, "ingest.processingFailed", { title: "River notes" });
 
     expect(message).toBe("Processing River notes failed.");
   });
@@ -1257,9 +1279,7 @@ describe("localizeApiError", () => {
       t
     );
 
-    expect(message).toBe(
-      "Used configured OCR model to read scanned document (2 of 3 pages)."
-    );
+    expect(message).toBe("Used configured OCR model to read scanned document (2 of 3 pages).");
   });
 
   it("localizes empty DOCX OCR-unsupported failures from persisted source errors", () => {
@@ -1281,9 +1301,7 @@ describe("localizeApiError", () => {
       "ingest.sourceProcessingFailed"
     );
 
-    expect(message).toBe(
-      "Processing was interrupted by a server restart. Re-run processing on this source."
-    );
+    expect(message).toBe("Processing was interrupted by a server restart. Re-run processing on this source.");
   });
 
   it("localizes cancelled queued processing from persisted source errors", () => {
@@ -1336,13 +1354,9 @@ describe("formatSubmissionExplanation", () => {
     } as PublicExerciseSubmission;
 
     expect(formatSubmissionExplanation(accepted, t)).toBe("Submission accepted.");
-    expect(formatSubmissionExplanation(rejected, t)).toBe(
-      "Answer did not match the exercise answer key."
-    );
+    expect(formatSubmissionExplanation(rejected, t)).toBe("Answer did not match the exercise answer key.");
     expect(formatSubmissionExplanation(accepted)).toBe("Submission accepted.");
-    expect(formatSubmissionExplanation(rejected)).toBe(
-      "Answer did not match the exercise answer key."
-    );
+    expect(formatSubmissionExplanation(rejected)).toBe("Answer did not match the exercise answer key.");
   });
 
   it("maps from accepted flag even when the API explanation string differs", () => {
@@ -1356,9 +1370,7 @@ describe("formatSubmissionExplanation", () => {
     } as PublicExerciseSubmission;
 
     expect(formatSubmissionExplanation(accepted, t)).toBe("Submission accepted.");
-    expect(formatSubmissionExplanation(rejected, t)).toBe(
-      "Answer did not match the exercise answer key."
-    );
+    expect(formatSubmissionExplanation(rejected, t)).toBe("Answer did not match the exercise answer key.");
   });
 });
 
@@ -1384,9 +1396,7 @@ describe("latestAssistantMessage", () => {
     expect(latestAssistantMessage(withReply, t)).toBe("Practice with verb chains.");
 
     const empty = { messages: [] } as unknown as AiSession;
-    expect(latestAssistantMessage(empty, t)).toBe(
-      "Session created, but no assistant message was returned."
-    );
+    expect(latestAssistantMessage(empty, t)).toBe("Session created, but no assistant message was returned.");
   });
 });
 
@@ -1457,22 +1467,17 @@ describe("audit ledger formatters", () => {
     expect(formatAuditAction("note.reviewed", t)).toBe("Note reviewed");
     expect(formatAuditAction("custom.event_code")).toBe("custom event code");
 
-    expect(formatAuditEntityPill("governance_record", "governance-1", t)).toBe(
-      "Governance record / governance-1"
-    );
+    expect(formatAuditEntityPill("governance_record", "governance-1", t)).toBe("Governance record / governance-1");
     expect(formatAuditEntityPill("note", "note-1")).toBe("note / note-1");
-  });  it("localizes known audit summary lines and leaves custom text unchanged", () => {
-    expect(formatAuditSummary('Created language Avenik.', t)).toBe("Created language Avenik.");
-    expect(formatAuditSummary('Created consent governance policy record.', t)).toBe(
+  });
+  it("localizes known audit summary lines and leaves custom text unchanged", () => {
+    expect(formatAuditSummary("Created language Avenik.", t)).toBe("Created language Avenik.");
+    expect(formatAuditSummary("Created consent governance policy record.", t)).toBe(
       "Created Consent governance policy record."
     );
-    expect(formatAuditSummary('Registered text source "Word list".', t)).toBe(
-      'Registered Text source "Word list".'
-    );
+    expect(formatAuditSummary('Registered text source "Word list".', t)).toBe('Registered Text source "Word list".');
     expect(formatAuditSummary("Custom operator note.", t)).toBe("Custom operator note.");
-    expect(formatAuditSummary('Created language Avenik.')).toBe("Created language Avenik.");
-
-
+    expect(formatAuditSummary("Created language Avenik.")).toBe("Created language Avenik.");
   });
 
   it("localizes profile POS, paradigm dimensions, and local user names", () => {
@@ -1483,7 +1488,5 @@ describe("audit ledger formatters", () => {
     expect(formatParadigmDimension("tense", t)).toBe("tense");
     expect(formatLocalUserName("Local Reviewer", t)).toBe("Local Reviewer");
     expect(formatLocalUserName(undefined, t)).toBeUndefined();
-
-
   });
 });

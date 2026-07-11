@@ -1,9 +1,5 @@
 import { useI18n } from "../i18n";
-import type {
-  DesktopBackupSummary,
-  DesktopBridgeInfo,
-  DesktopShortcutSummary
-} from "../lib/desktopBridge";
+import type { DesktopBackupSummary, DesktopBridgeInfo, DesktopShortcutSummary } from "../lib/desktopBridge";
 import { formatDesktopBackupTime } from "../lib/desktopDiagnostics";
 
 type DesktopAppDetailsProps = {
@@ -32,31 +28,41 @@ export function DesktopAppDetails({
         {desktopBridge.appFolder && (
           <div data-desktop-path="app">
             <dt>{t("model.desktopAppFolder")}</dt>
-            <dd><code>{desktopBridge.appFolder}</code></dd>
+            <dd>
+              <code>{desktopBridge.appFolder}</code>
+            </dd>
           </div>
         )}
         {desktopBridge.dataDir && (
           <div data-desktop-path="data">
             <dt>{t("model.desktopDataPath")}</dt>
-            <dd><code>{desktopBridge.dataDir}</code></dd>
+            <dd>
+              <code>{desktopBridge.dataDir}</code>
+            </dd>
           </div>
         )}
         {desktopBridge.settingsPath && (
           <div data-desktop-path="settings">
             <dt>{t("model.desktopSettingsPath")}</dt>
-            <dd><code>{desktopBridge.settingsPath}</code></dd>
+            <dd>
+              <code>{desktopBridge.settingsPath}</code>
+            </dd>
           </div>
         )}
         {desktopBridge.backupsDir && (
           <div data-desktop-path="backups">
             <dt>{t("model.desktopBackupsPath")}</dt>
-            <dd><code>{desktopBridge.backupsDir}</code></dd>
+            <dd>
+              <code>{desktopBridge.backupsDir}</code>
+            </dd>
           </div>
         )}
         {desktopBridge.diagnosticsDir && (
           <div data-desktop-path="diagnostics">
             <dt>{t("model.desktopDiagnosticsPath")}</dt>
-            <dd><code>{desktopBridge.diagnosticsDir}</code></dd>
+            <dd>
+              <code>{desktopBridge.diagnosticsDir}</code>
+            </dd>
           </div>
         )}
         {desktopBackupSummary && (
@@ -83,7 +89,11 @@ export function DesktopAppDetails({
             <dd>
               <code>{desktopBackupSummary.latestName}</code>
               {desktopBackupSummary.latestCreatedAt && (
-                <span>{t("model.desktopLatestBackupCreated", { time: formatDesktopBackupTime(desktopBackupSummary.latestCreatedAt) })}</span>
+                <span>
+                  {t("model.desktopLatestBackupCreated", {
+                    time: formatDesktopBackupTime(desktopBackupSummary.latestCreatedAt)
+                  })}
+                </span>
               )}
             </dd>
           </div>
@@ -93,14 +103,18 @@ export function DesktopAppDetails({
             <div data-desktop-shortcut-summary="desktop">
               <dt>{t("model.desktopShortcutDesktop")}</dt>
               <dd className="desktop-shortcut-status">
-                <span>{desktopShortcutSummary.desktopExists ? t("model.shortcutInstalled") : t("model.shortcutMissing")}</span>
+                <span>
+                  {desktopShortcutSummary.desktopExists ? t("model.shortcutInstalled") : t("model.shortcutMissing")}
+                </span>
                 {desktopShortcutSummary.desktopPath && <code>{desktopShortcutSummary.desktopPath}</code>}
               </dd>
             </div>
             <div data-desktop-shortcut-summary="start-menu">
               <dt>{t("model.desktopShortcutStartMenu")}</dt>
               <dd className="desktop-shortcut-status">
-                <span>{desktopShortcutSummary.startMenuExists ? t("model.shortcutInstalled") : t("model.shortcutMissing")}</span>
+                <span>
+                  {desktopShortcutSummary.startMenuExists ? t("model.shortcutInstalled") : t("model.shortcutMissing")}
+                </span>
                 {desktopShortcutSummary.startMenuPath && <code>{desktopShortcutSummary.startMenuPath}</code>}
               </dd>
             </div>

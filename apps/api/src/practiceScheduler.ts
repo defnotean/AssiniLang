@@ -96,9 +96,5 @@ export function rankExercisesForPractice<E extends { id: string }>(
   overdue.sort((left, right) => left.dueAtMs - right.dueAtMs || left.index - right.index);
   scheduled.sort((left, right) => left.dueAtMs - right.dueAtMs || left.index - right.index);
 
-  return [
-    ...fresh,
-    ...overdue.map((entry) => entry.recommendation),
-    ...scheduled.map((entry) => entry.recommendation)
-  ];
+  return [...fresh, ...overdue.map((entry) => entry.recommendation), ...scheduled.map((entry) => entry.recommendation)];
 }

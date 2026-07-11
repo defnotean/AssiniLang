@@ -82,7 +82,9 @@ describe("evaluation scoring", () => {
     );
 
     expect(result.scores.noteAccuracy).toBeLessThan(1);
-    const failure = result.failures.find((f: any) => f.category === "noteAccuracy" && f.itemId === "testlang-note-basic-order");
+    const failure = result.failures.find(
+      (f: any) => f.category === "noteAccuracy" && f.itemId === "testlang-note-basic-order"
+    );
     expect(failure).toBeDefined();
     expect(failure?.message).toContain("draft confidence:");
   });
@@ -133,9 +135,7 @@ describe("evaluation scoring", () => {
 
     expect(result.scores.generationPolicy).toBeLessThan(1);
     expect(result.failures).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ category: "generationPolicy", itemId: "testlang-ex-002" })
-      ])
+      expect.arrayContaining([expect.objectContaining({ category: "generationPolicy", itemId: "testlang-ex-002" })])
     );
   });
 
@@ -209,9 +209,7 @@ describe("evaluation scoring", () => {
 
   it("maps each exercise grading failure branch to the matching message", () => {
     expect(exerciseGradingFailureMessage(true, true, true)).toBeNull();
-    expect(exerciseGradingFailureMessage(false, true, true)).toBe(
-      "Expected answer was rejected by the grader."
-    );
+    expect(exerciseGradingFailureMessage(false, true, true)).toBe("Expected answer was rejected by the grader.");
     expect(exerciseGradingFailureMessage(true, false, true)).toBe(
       "Deterministic invalid answer was accepted by the grader."
     );

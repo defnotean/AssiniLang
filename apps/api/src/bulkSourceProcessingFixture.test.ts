@@ -49,11 +49,7 @@ describe("bulk source-processing fixture pack", () => {
     expect(manifest.fixtureVersion).toBe("bulk-source-processing-v1");
     expect(manifest.languageId).toBe(TEST_LANGUAGE_ID);
     expect(manifest.sources).toHaveLength(3);
-    expect(manifest.sources.map((source) => source.key)).toEqual([
-      "wordlist-core",
-      "passages",
-      "mixed"
-    ]);
+    expect(manifest.sources.map((source) => source.key)).toEqual(["wordlist-core", "passages", "mixed"]);
   });
 
   it("registers and processes every fixture source, asserting draft outcomes", async () => {
@@ -144,8 +140,8 @@ describe("bulk source-processing fixture pack", () => {
     });
     expect(sources.statusCode).toBe(200);
     const fixtureTitles = new Set(manifest.sources.map((entry) => entry.title));
-    const storedFixture = (sources.json() as Array<{ id: string; title: string; status: string }>).filter(
-      (source) => fixtureTitles.has(source.title)
+    const storedFixture = (sources.json() as Array<{ id: string; title: string; status: string }>).filter((source) =>
+      fixtureTitles.has(source.title)
     );
     expect(storedFixture).toHaveLength(manifest.sources.length);
     expect(storedFixture.every((source) => source.status === "processed")).toBe(true);
@@ -172,9 +168,7 @@ describe("bulk source-processing fixture pack", () => {
       .map((draft) => String(draft.payload.textTarget ?? ""));
 
     expect(allLexemeForms).toEqual(expect.arrayContaining(["vel", "mir", "saku", "tora", "nala"]));
-    expect(allPassageTargets).toEqual(
-      expect.arrayContaining(["saku vel mir", "tora vel", "saku tora-na"])
-    );
+    expect(allPassageTargets).toEqual(expect.arrayContaining(["saku vel mir", "tora vel", "saku tora-na"]));
 
     const audit = await app.inject({
       method: "GET",
@@ -182,9 +176,7 @@ describe("bulk source-processing fixture pack", () => {
       headers: authHeaders("programmer-1")
     });
     expect(audit.statusCode).toBe(200);
-    const actions = (audit.json() as Array<{ action: string; entityId?: string }>).map(
-      (event) => event.action
-    );
+    const actions = (audit.json() as Array<{ action: string; entityId?: string }>).map((event) => event.action);
     expect(actions.filter((action) => action === "source_asset.process_started").length).toBeGreaterThanOrEqual(
       manifest.sources.length
     );

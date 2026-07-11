@@ -14,16 +14,16 @@ export function sourceAssetFilePathIssue(filePath: string, languageId: string): 
   const parts = normalized.split("/");
 
   if (
-    trimmed.length === 0
-    || trimmed !== filePath
-    || normalized !== trimmed
-    || pathHasUnsafeControlChars(filePath)
-    || normalized.startsWith("/")
-    || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(normalized)
-    || parts.length < 3
-    || parts.some((part) => part.length === 0 || part === "." || part === ".." || part.includes(":"))
-    || parts[0] !== "assets"
-    || parts[1] !== languageId
+    trimmed.length === 0 ||
+    trimmed !== filePath ||
+    normalized !== trimmed ||
+    pathHasUnsafeControlChars(filePath) ||
+    normalized.startsWith("/") ||
+    /^[A-Za-z][A-Za-z0-9+.-]*:/.test(normalized) ||
+    parts.length < 3 ||
+    parts.some((part) => part.length === 0 || part === "." || part === ".." || part.includes(":")) ||
+    parts[0] !== "assets" ||
+    parts[1] !== languageId
   ) {
     return unsafeSourceAssetPathMessage(languageId);
   }

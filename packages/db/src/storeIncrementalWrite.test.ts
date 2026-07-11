@@ -152,7 +152,8 @@ describe("incremental SQLite writes", () => {
     const db = new Database(dbPath, { readonly: true });
     let removedRowid: number;
     try {
-      removedRowid = (db.prepare("SELECT rowid AS rid FROM lexemes WHERE id = ?").get(removedId) as { rid: number }).rid;
+      removedRowid = (db.prepare("SELECT rowid AS rid FROM lexemes WHERE id = ?").get(removedId) as { rid: number })
+        .rid;
     } finally {
       db.close();
     }

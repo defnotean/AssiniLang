@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   DiscoveredLlmModel,
   LlmModelDiscoveryResponse,
@@ -77,7 +77,7 @@ export function DesktopToolsPanel({
   const [desktopPreferenceBusy, setDesktopPreferenceBusy] = useState<DesktopPreferenceKey | null>(null);
   const [isCopyingDiagnostics, setIsCopyingDiagnostics] = useState(false);
   const [isSavingDiagnostics, setIsSavingDiagnostics] = useState(false);
-  const desktopBridge = getDesktopBridgeInfo();
+  const desktopBridge = useMemo(getDesktopBridgeInfo, []);
   const [desktopBackupSummary, setDesktopBackupSummary] = useState<DesktopBackupSummary | null>(
     () => desktopBridge?.backupSummary ?? null
   );
@@ -87,29 +87,16 @@ export function DesktopToolsPanel({
   const [desktopPreferences, setDesktopPreferencesState] = useState<DesktopPreferences | null>(
     () => desktopBridge?.preferences ?? null
   );
-  const desktopControlsBusy = desktopActionBusy !== null
-    || desktopPreferenceBusy !== null
-    || isCopyingDiagnostics
-    || isSavingDiagnostics;
+  const desktopControlsBusy =
+    desktopActionBusy !== null || desktopPreferenceBusy !== null || isCopyingDiagnostics || isSavingDiagnostics;
 
   useEffect(() => {
     setDesktopBackupSummary(desktopBridge?.backupSummary ?? null);
-  }, [
-    desktopBridge?.backupSummary?.backupsDir,
-    desktopBridge?.backupSummary?.count,
-    desktopBridge?.backupSummary?.latestCreatedAt,
-    desktopBridge?.backupSummary?.latestName,
-    desktopBridge?.backupSummary?.latestPath
-  ]);
+  }, [desktopBridge]);
 
   useEffect(() => {
     setDesktopShortcutSummary(desktopBridge?.shortcutSummary ?? null);
-  }, [
-    desktopBridge?.shortcutSummary?.desktopExists,
-    desktopBridge?.shortcutSummary?.desktopPath,
-    desktopBridge?.shortcutSummary?.startMenuExists,
-    desktopBridge?.shortcutSummary?.startMenuPath
-  ]);
+  }, [desktopBridge]);
 
   useEffect(() => {
     if (!desktopBridge) return;
@@ -122,7 +109,7 @@ export function DesktopToolsPanel({
     return () => {
       cancelled = true;
     };
-  }, [desktopBridge?.backupsDir]);
+  }, [desktopBridge]);
 
   useEffect(() => {
     if (!desktopBridge) return;
@@ -135,16 +122,11 @@ export function DesktopToolsPanel({
     return () => {
       cancelled = true;
     };
-  }, [desktopBridge?.isPackaged]);
+  }, [desktopBridge]);
 
   useEffect(() => {
     setDesktopPreferencesState(desktopBridge?.preferences ?? null);
-  }, [
-    desktopBridge?.preferences?.hideToTray,
-    desktopBridge?.preferences?.hideToTraySupported,
-    desktopBridge?.preferences?.launchAtLogin,
-    desktopBridge?.preferences?.launchAtLoginSupported
-  ]);
+  }, [desktopBridge]);
 
   if (!desktopBridge) {
     return null;
@@ -219,10 +201,7 @@ export function DesktopToolsPanel({
     }
   }
 
-  async function handleDesktopPreferenceChange(
-    key: DesktopPreferenceKey,
-    value: boolean
-  ) {
+  async function handleDesktopPreferenceChange(key: DesktopPreferenceKey, value: boolean) {
     setDesktopPreferenceBusy(key);
     setDesktopActionNotice(null);
     try {
@@ -322,9 +301,7 @@ export function DesktopToolsPanel({
     {
       id: "recovery",
       label: t("model.desktopGroupRecovery"),
-      buttons: [
-        desktopActionButton("resetWindowLayout", "model.resetWindowLayout", "model.resettingWindowLayout")
-      ]
+      buttons: [desktopActionButton("resetWindowLayout", "model.resetWindowLayout", "model.resettingWindowLayout")]
     },
     {
       id: "diagnostics",
@@ -386,17 +363,19 @@ export function DesktopToolsPanel({
         })
       ]
     },
-    ...(desktopBridge?.isPackaged ? [
-      {
-        id: "shortcuts",
-        label: t("model.desktopGroupShortcuts"),
-        buttons: [
-          desktopActionButton("createAppShortcuts", "model.createAppShortcuts", "model.creatingShortcut"),
-          desktopActionButton("createDesktopShortcut", "model.createDesktopShortcut", "model.creatingShortcut"),
-          desktopActionButton("createStartMenuShortcut", "model.createStartMenuShortcut", "model.creatingShortcut")
+    ...(desktopBridge?.isPackaged
+      ? [
+          {
+            id: "shortcuts",
+            label: t("model.desktopGroupShortcuts"),
+            buttons: [
+              desktopActionButton("createAppShortcuts", "model.createAppShortcuts", "model.creatingShortcut"),
+              desktopActionButton("createDesktopShortcut", "model.createDesktopShortcut", "model.creatingShortcut"),
+              desktopActionButton("createStartMenuShortcut", "model.createStartMenuShortcut", "model.creatingShortcut")
+            ]
+          }
         ]
-      }
-    ] : [])
+      : [])
   ];
 
   return (
@@ -418,10 +397,7 @@ export function DesktopToolsPanel({
           savingDesktopPreferenceLabel={t("model.savingDesktopPreference")}
         />
       )}
-      <DesktopActionGroups
-        ariaLabel={t("model.desktopActionGroupsAria")}
-        groups={desktopActionGroups}
-      />
+      <DesktopActionGroups ariaLabel={t("model.desktopActionGroupsAria")} groups={desktopActionGroups} />
       {desktopActionNotice && (
         <p
           className={`result-notice ${desktopActionNotice.kind === "error" ? "error" : ""}`}

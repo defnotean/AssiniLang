@@ -89,6 +89,7 @@ describe("repository production hygiene", () => {
     expect(ingestionSmoke).toContain('url: "/ready"');
     expect(ingestionSmoke).toContain("checks?.storage?.ok");
     expect(ingestionSmoke).toContain("checks?.jobQueue?.ok");
+    expect(ingestionSmoke).toContain("checks?.recovery?.ok");
     expect(developmentDocs).toContain("npm.cmd run smoke:backup");
     expect(developmentDocs).toContain("timed backup/restore drill log");
     expect(ciGreen).toContain("npm run smoke:backup");
@@ -98,17 +99,24 @@ describe("repository production hygiene", () => {
     const workflow = await readProjectFile(".github/workflows/ci.yml");
 
     expect(workflow).toContain("name: CI");
-    expect(workflow).toContain("actions/checkout@v4");
-    expect(workflow).toContain("actions/setup-node@v4");
+    expect(workflow).toContain("actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4");
+    expect(workflow).toContain("actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4");
+    expect(workflow).toContain("actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4");
+    expect(workflow).not.toMatch(/uses:\s+[^\s@]+@v\d+\b/);
     expect(workflow).toContain("node-version: 24.x");
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("npm run verify");
+    expect(workflow).toContain("npm run format:check");
+    expect(workflow).toContain("npm run test:coverage");
     expect(workflow).toContain("npm run smoke");
     expect(workflow).toContain("npm run smoke:backup");
     expect(workflow).toContain("Built-dist startup smoke (/health + /ready)");
     expect(workflow).toContain("body.checks?.storage?.ok");
     expect(workflow).toContain("body.checks?.jobQueue?.ok");
+    expect(workflow).toContain("body.checks?.recovery?.ok");
     expect(workflow).toContain("npm audit --audit-level=moderate");
+    expect(workflow).toContain("npm sbom --sbom-format cyclonedx --omit dev");
+    expect(workflow).toContain("sha256sum assini-sbom.cdx.json");
     // Live-model verify stays opt-in; default CI must not require a reachable model.
     expect(workflow).not.toContain("npm run verify:beta");
     expect(workflow).not.toContain("ASSINI_VERIFY_MODEL");

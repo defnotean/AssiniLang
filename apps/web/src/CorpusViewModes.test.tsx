@@ -10,11 +10,18 @@ const validateCorpusImportMock = vi.fn();
 const validateCorpusBulkMock = vi.fn();
 const onImportCorpusBulkMock = vi.fn();
 
-vi.mock("./api", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./api")>();
+vi.mock("./api/aiSessionApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/aiSessionApi")>();
   return {
     ...actual,
-    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args),
+    fetchNeuralMap: (...args: unknown[]) => fetchNeuralMapMock(...args)
+  };
+});
+
+vi.mock("./api/studyApi", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./api/studyApi")>();
+  return {
+    ...actual,
     validateCorpusImport: (...args: unknown[]) => validateCorpusImportMock(...args),
     validateCorpusBulk: (...args: unknown[]) => validateCorpusBulkMock(...args)
   };
@@ -322,9 +329,7 @@ describe("CorpusView network graph mode", () => {
     expect(loading).toHaveClass("empty-state");
     expect(loading).toHaveAttribute("aria-busy", "true");
     expect(loading).toHaveTextContent("Loading corpus graph...");
-    expect(loading).toHaveTextContent(
-      "Fetching linked passages, notes, sources, and morphemes for this language."
-    );
+    expect(loading).toHaveTextContent("Fetching linked passages, notes, sources, and morphemes for this language.");
     expect(fetchNeuralMapMock).toHaveBeenCalledWith("avenik");
   });
 
@@ -513,9 +518,7 @@ describe("CorpusView network graph mode", () => {
     fireEvent.click(screen.getByRole("button", { name: "Graph" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert")).toHaveTextContent(
-        "Too many requests. Wait 5 seconds, then retry."
-      );
+      expect(screen.getByRole("alert")).toHaveTextContent("Too many requests. Wait 5 seconds, then retry.");
     });
 
     fetchNeuralMapMock.mockRejectedValueOnce(
@@ -561,9 +564,12 @@ describe("CorpusView import validation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Validate corpus passage import" }));
 
     await waitFor(() => {
-      expect(validateCorpusImportMock).toHaveBeenCalledWith("avenik", expect.objectContaining({
-        textTarget: "saku nemi-na"
-      }));
+      expect(validateCorpusImportMock).toHaveBeenCalledWith(
+        "avenik",
+        expect.objectContaining({
+          textTarget: "saku nemi-na"
+        })
+      );
     });
     expect(screen.getByRole("alert")).toHaveTextContent("ghost");
   });
@@ -597,28 +603,26 @@ describe("CorpusView import validation", () => {
       target: { value: "saku|child|child|noun\nnemi-na|teach|teach-1sg|present,1sg" }
     });
 
-    expect(screen.getByText("Validate checks morpheme segmentation and consent fields without importing the passage.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Validate checks morpheme segmentation and consent fields without importing the passage.")
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Validate corpus passage import" }));
 
-    await waitFor(() => {
-      expect(validateCorpusImportMock).toHaveBeenCalled();
-    });
-    expect(screen.getByRole("status")).toHaveTextContent("Dry-run only — nothing saved yet.");
-    expect(screen.getByRole("status")).toHaveTextContent("Validation passed: 2 morphemes, 1 tags ready to import.");
+    const status = await screen.findByRole("status");
+    expect(validateCorpusImportMock).toHaveBeenCalled();
+    expect(status).toHaveTextContent("Dry-run only — nothing saved yet.");
+    expect(status).toHaveTextContent("Validation passed: 2 morphemes, 1 tags ready to import.");
   });
 
   it("marks validate busy while dry-run validation is in flight", async () => {
-    let resolveValidate: (value: {
-      ok: boolean;
-      errors: string[];
-      warnings: string[];
-      preview: null;
-    }) => void = () => undefined;
+    let resolveValidate: (value: { ok: boolean; errors: string[]; warnings: string[]; preview: null }) => void = () =>
+      undefined;
     validateCorpusImportMock.mockImplementation(
-      () => new Promise((resolve) => {
-        resolveValidate = resolve;
-      })
+      () =>
+        new Promise((resolve) => {
+          resolveValidate = resolve;
+        })
     );
 
     renderCorpusView();
@@ -646,7 +650,10 @@ describe("CorpusView import validation", () => {
 
     resolveValidate({ ok: true, errors: [], warnings: [], preview: null });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Validate corpus passage import" })).not.toHaveAttribute("aria-busy", "true");
+      expect(screen.getByRole("button", { name: "Validate corpus passage import" })).not.toHaveAttribute(
+        "aria-busy",
+        "true"
+      );
     });
     expect(screen.getByRole("button", { name: "Validate corpus passage import" })).toHaveTextContent("Validate");
   });
@@ -699,9 +706,7 @@ describe("CorpusView bulk import", () => {
     fireEvent.click(screen.getByRole("button", { name: "Import valid rows" }));
 
     await waitFor(() => {
-      expect(onImportCorpusBulkMock).toHaveBeenCalledWith([
-        expect.objectContaining({ textTarget: "mira talo-mi-na" })
-      ]);
+      expect(onImportCorpusBulkMock).toHaveBeenCalledWith([expect.objectContaining({ textTarget: "mira talo-mi-na" })]);
     });
     expect(screen.getByRole("status")).toHaveTextContent("Imported 1 passage(s).");
     expect(screen.getByLabelText("Bulk TSV or CSV paste")).toHaveValue("");

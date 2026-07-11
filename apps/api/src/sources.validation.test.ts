@@ -10,19 +10,20 @@ function authHeaders(userId: string) {
   return { "x-assini-user-id": userId, "x-assini-dev-token": "test" };
 }
 
-function multipartPayload(parts: Array<{
-  name: string;
-  filename?: string;
-  contentType?: string;
-  body: string;
-}>, boundary: string): string {
+function multipartPayload(
+  parts: Array<{
+    name: string;
+    filename?: string;
+    contentType?: string;
+    body: string;
+  }>,
+  boundary: string
+): string {
   const chunks: string[] = [];
   for (const part of parts) {
     chunks.push(`--${boundary}`);
     if (part.filename !== undefined) {
-      chunks.push(
-        `Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"`
-      );
+      chunks.push(`Content-Disposition: form-data; name="${part.name}"; filename="${part.filename}"`);
       chunks.push(`Content-Type: ${part.contentType ?? "application/octet-stream"}`);
     } else {
       chunks.push(`Content-Disposition: form-data; name="${part.name}"`);
@@ -93,9 +94,10 @@ describe("source route validation i18nKeys", () => {
   it("rejects empty uploaded files with i18nKey", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const boundary = "----assini-empty";
-    const payload = multipartPayload([
-      { name: "file", filename: "empty.txt", contentType: "text/plain", body: "" }
-    ], boundary);
+    const payload = multipartPayload(
+      [{ name: "file", filename: "empty.txt", contentType: "text/plain", body: "" }],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",
@@ -122,14 +124,17 @@ describe("source route validation i18nKeys", () => {
       multipartFileSizeBytes: 32
     });
     const boundary = "----assini-oversize";
-    const payload = multipartPayload([
-      {
-        name: "file",
-        filename: "big.txt",
-        contentType: "text/plain",
-        body: "x".repeat(64)
-      }
-    ], boundary);
+    const payload = multipartPayload(
+      [
+        {
+          name: "file",
+          filename: "big.txt",
+          contentType: "text/plain",
+          body: "x".repeat(64)
+        }
+      ],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",
@@ -163,18 +168,21 @@ describe("source route validation i18nKeys", () => {
       dataDir
     });
     const boundary = "----assini-path";
-    const payload = multipartPayload([
-      {
-        name: "title",
-        body: "Safe notes"
-      },
-      {
-        name: "file",
-        filename: "../../etc/passwd.txt",
-        contentType: "text/plain",
-        body: "talu water"
-      }
-    ], boundary);
+    const payload = multipartPayload(
+      [
+        {
+          name: "title",
+          body: "Safe notes"
+        },
+        {
+          name: "file",
+          filename: "../../etc/passwd.txt",
+          contentType: "text/plain",
+          body: "talu water"
+        }
+      ],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",
@@ -196,11 +204,13 @@ describe("source route validation i18nKeys", () => {
       originalName: "passwd.txt",
       status: "pending"
     });
-    expect(asset.filePath).toMatch(new RegExp(`^assets/${TEST_LANGUAGE_ID}/source-[^/]+__passwd\\.txt$`));
-    expect(asset.filePath).not.toContain("..");
-    expect(asset.filePath).not.toContain("\\");
+    expect(asset).not.toHaveProperty("filePath");
 
-    const absolutePath = join(dataDir, ...asset.filePath.split("/"));
+    const relativePath = `assets/${TEST_LANGUAGE_ID}/${asset.id}__passwd.txt`;
+    expect(relativePath).toMatch(new RegExp(`^assets/${TEST_LANGUAGE_ID}/source-[^/]+__passwd\\.txt$`));
+    expect(relativePath).not.toContain("..");
+    expect(relativePath).not.toContain("\\");
+    const absolutePath = join(dataDir, ...relativePath.split("/"));
     await access(absolutePath);
     expect(await readFile(absolutePath, "utf8")).toBe("talu water");
   });
@@ -208,18 +218,21 @@ describe("source route validation i18nKeys", () => {
   it("rejects oversized upload titles with i18nKey", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const boundary = "----assini-title";
-    const payload = multipartPayload([
-      {
-        name: "title",
-        body: "t".repeat(MAX_SOURCE_UPLOAD_TITLE_CHARS + 1)
-      },
-      {
-        name: "file",
-        filename: "notes.txt",
-        contentType: "text/plain",
-        body: "ok"
-      }
-    ], boundary);
+    const payload = multipartPayload(
+      [
+        {
+          name: "title",
+          body: "t".repeat(MAX_SOURCE_UPLOAD_TITLE_CHARS + 1)
+        },
+        {
+          name: "file",
+          filename: "notes.txt",
+          contentType: "text/plain",
+          body: "ok"
+        }
+      ],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",
@@ -241,16 +254,19 @@ describe("source route validation i18nKeys", () => {
   it("rejects duplicate upload title fields with i18nKey", async () => {
     const app = createServer({ initialState: buildTestWorkspaceState() });
     const boundary = "----assini-title-dup";
-    const payload = multipartPayload([
-      { name: "title", body: "First" },
-      { name: "title", body: "Second" },
-      {
-        name: "file",
-        filename: "notes.txt",
-        contentType: "text/plain",
-        body: "ok"
-      }
-    ], boundary);
+    const payload = multipartPayload(
+      [
+        { name: "title", body: "First" },
+        { name: "title", body: "Second" },
+        {
+          name: "file",
+          filename: "notes.txt",
+          contentType: "text/plain",
+          body: "ok"
+        }
+      ],
+      boundary
+    );
 
     const response = await app.inject({
       method: "POST",

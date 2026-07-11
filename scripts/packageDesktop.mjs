@@ -11,11 +11,7 @@ import {
   publishStagedDirectory
 } from "./lib/desktopPackageIntegrity.mjs";
 import { desktopPackageLayout, desktopPackagePaths } from "./lib/desktopPackagePaths.mjs";
-import {
-  createIExpressSed,
-  desktopSetupLayout,
-  setupExtractorPowerShell
-} from "./lib/desktopSetup.mjs";
+import { createIExpressSed, desktopSetupLayout, setupExtractorPowerShell } from "./lib/desktopSetup.mjs";
 import { readJsonFile } from "./lib/jsonHelpers.mjs";
 import { npmSpawnSpec, run } from "./lib/processHelpers.mjs";
 
@@ -149,11 +145,11 @@ function cmdWrapper(scriptName) {
     "@echo off",
     "setlocal",
     `set "SCRIPT=%~dp0${scriptName}"`,
-    "pushd \"%TEMP%\"",
-    "powershell -NoProfile -ExecutionPolicy Bypass -File \"%SCRIPT%\"",
-    "set \"EXIT_CODE=%ERRORLEVEL%\"",
+    'pushd "%TEMP%"',
+    'powershell -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT%"',
+    'set "EXIT_CODE=%ERRORLEVEL%"',
     "popd",
-    "if not \"%EXIT_CODE%\"==\"0\" (",
+    'if not "%EXIT_CODE%"=="0" (',
     "  echo.",
     "  echo The operation failed. Check the messages above.",
     ")",
@@ -167,8 +163,8 @@ export function outputRootLauncherScript() {
   return [
     "@echo off",
     "setlocal",
-    "set \"APP_EXE=%~dp0AssiniLang-win32-x64\\AssiniLang.exe\"",
-    "if not exist \"%APP_EXE%\" (",
+    'set "APP_EXE=%~dp0AssiniLang-win32-x64\\AssiniLang.exe"',
+    'if not exist "%APP_EXE%" (',
     "  echo AssiniLang packaged app was not found.",
     "  echo Expected: %APP_EXE%",
     "  echo.",
@@ -176,7 +172,7 @@ export function outputRootLauncherScript() {
     "  pause",
     "  exit /b 1",
     ")",
-    "start \"\" \"%APP_EXE%\"",
+    'start "" "%APP_EXE%"',
     "exit /b 0",
     ""
   ].join("\r\n");
@@ -186,8 +182,8 @@ export function outputRootInstallScript() {
   return [
     "@echo off",
     "setlocal",
-    "set \"INSTALLER=%~dp0AssiniLang-win32-x64\\Install AssiniLang.cmd\"",
-    "if not exist \"%INSTALLER%\" (",
+    'set "INSTALLER=%~dp0AssiniLang-win32-x64\\Install AssiniLang.cmd"',
+    'if not exist "%INSTALLER%" (',
     "  echo AssiniLang installer was not found.",
     "  echo Expected: %INSTALLER%",
     "  echo.",
@@ -195,7 +191,7 @@ export function outputRootInstallScript() {
     "  pause",
     "  exit /b 1",
     ")",
-    "call \"%INSTALLER%\"",
+    'call "%INSTALLER%"',
     "exit /b %ERRORLEVEL%",
     ""
   ].join("\r\n");
@@ -223,14 +219,14 @@ export function packageRootLauncherScript() {
   return [
     "@echo off",
     "setlocal",
-    "set \"APP_EXE=%~dp0AssiniLang.exe\"",
-    "if not exist \"%APP_EXE%\" (",
+    'set "APP_EXE=%~dp0AssiniLang.exe"',
+    'if not exist "%APP_EXE%" (',
     "  echo AssiniLang.exe was not found next to this launcher.",
     "  echo Expected: %APP_EXE%",
     "  pause",
     "  exit /b 1",
     ")",
-    "start \"\" \"%APP_EXE%\"",
+    'start "" "%APP_EXE%"',
     "exit /b 0",
     ""
   ].join("\r\n");
@@ -277,14 +273,14 @@ function installScript() {
     "}",
     "",
     "if (-not (Same-Path $sourceDir $installDir)) {",
-    "  Write-Host \"Installing AssiniLang to $installDir\"",
+    '  Write-Host "Installing AssiniLang to $installDir"',
     "  if (Test-Path -LiteralPath $installDir) {",
     "    Remove-Item -LiteralPath $installDir -Recurse -Force",
     "  }",
     "  New-Item -ItemType Directory -Force -Path $installDir | Out-Null",
     "  Get-ChildItem -LiteralPath $sourceDir -Force | Copy-Item -Destination $installDir -Recurse -Force",
     "} else {",
-    "  Write-Host \"AssiniLang is already running from the install folder.\"",
+    '  Write-Host "AssiniLang is already running from the install folder."',
     "}",
     "",
     "$desktopShortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'AssiniLang.lnk'",
@@ -293,10 +289,10 @@ function installScript() {
     "New-AssiniShortcut -ShortcutPath $desktopShortcut -TargetPath $installedExe",
     "New-AssiniShortcut -ShortcutPath $startMenuShortcut -TargetPath $installedExe",
     "",
-    "Write-Host \"Installed AssiniLang.\"",
-    "Write-Host \"Desktop shortcut: $desktopShortcut\"",
-    "Write-Host \"Start Menu shortcut: $startMenuShortcut\"",
-    "Write-Host \"Local data stays in $env:APPDATA\\AssiniLang\"",
+    'Write-Host "Installed AssiniLang."',
+    'Write-Host "Desktop shortcut: $desktopShortcut"',
+    'Write-Host "Start Menu shortcut: $startMenuShortcut"',
+    'Write-Host "Local data stays in $env:APPDATA\\AssiniLang"',
     ""
   ].join("\r\n");
 }
@@ -321,22 +317,19 @@ function uninstallScript() {
     "  Remove-Item -LiteralPath $installDir -Recurse -Force",
     "}",
     "",
-    "Write-Host \"Removed AssiniLang program files and shortcuts.\"",
-    "Write-Host \"Local data was kept in $env:APPDATA\\AssiniLang.\"",
+    'Write-Host "Removed AssiniLang program files and shortcuts."',
+    'Write-Host "Local data was kept in $env:APPDATA\\AssiniLang."',
     ""
   ].join("\r\n");
 }
 
 async function prepareDesktopRuntimeMetadata() {
-  const [repositoryLockfile, installedElectronManifest, electronRuntimeVersion, manifestEntries] =
-    await Promise.all([
-      readJsonFile(join(repoRoot, "package-lock.json")),
-      readJsonFile(join(repoRoot, "node_modules", "electron", "package.json")),
-      readFile(join(electronDist, "version"), "utf8"),
-      Promise.all(
-        runtimePackageFiles.map(async ([packagePath, filePath]) => [packagePath, await readJsonFile(filePath)])
-      )
-    ]);
+  const [repositoryLockfile, installedElectronManifest, electronRuntimeVersion, manifestEntries] = await Promise.all([
+    readJsonFile(join(repoRoot, "package-lock.json")),
+    readJsonFile(join(repoRoot, "node_modules", "electron", "package.json")),
+    readFile(join(electronDist, "version"), "utf8"),
+    Promise.all(runtimePackageFiles.map(async ([packagePath, filePath]) => [packagePath, await readJsonFile(filePath)]))
+  ]);
 
   const runtimeManifests = Object.fromEntries(manifestEntries);
   assertRuntimeManifestsMatchLock(repositoryLockfile, runtimeManifests);
@@ -435,7 +428,7 @@ async function stageDesktopApp(paths, runtimeMetadata) {
     [
       "@echo off",
       "setlocal",
-      "set \"APP_EXE=%~dp0AssiniLang.exe\"",
+      'set "APP_EXE=%~dp0AssiniLang.exe"',
       "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$shortcutPath = Join-Path ([Environment]::GetFolderPath('Desktop')) 'AssiniLang.lnk'; $shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut($shortcutPath); $shortcut.TargetPath = $env:APP_EXE; $shortcut.WorkingDirectory = Split-Path $env:APP_EXE; $shortcut.IconLocation = $env:APP_EXE; $shortcut.Save(); Write-Host ('Created ' + $shortcutPath)\"",
       "if errorlevel 1 (",
       "  echo Failed to create the desktop shortcut.",

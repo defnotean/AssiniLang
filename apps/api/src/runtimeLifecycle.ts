@@ -19,7 +19,8 @@ export function registerShutdownHandlers({
   const close = () => {
     if (closing) return;
     closing = true;
-    void app.close()
+    void app
+      .close()
       .then(() => processLike.exit?.(0))
       .catch(() => processLike.exit?.(1));
   };

@@ -18,7 +18,13 @@ vi.mock("../i18n", () => ({
 }));
 
 function context(languageId: string): ElderContext {
-  return { language: { id: languageId } as ElderContext["language"], corpus: [], notes: [], corrections: [], governance: [] };
+  return {
+    language: { id: languageId } as ElderContext["language"],
+    corpus: [],
+    notes: [],
+    corrections: [],
+    governance: []
+  };
 }
 
 function deferred<T>() {
@@ -35,9 +41,17 @@ describe("useElderWorkspace stale request guards", () => {
   it("ignores elder context from a language that was left during loading", async () => {
     const first = deferred<ElderContext>();
     const second = deferred<ElderContext>();
-    apiMock.fetchElderContext.mockImplementation((languageId: string) => languageId === "avenik" ? first.promise : second.promise);
+    apiMock.fetchElderContext.mockImplementation((languageId: string) =>
+      languageId === "avenik" ? first.promise : second.promise
+    );
     const { result, rerender } = renderHook(
-      ({ languageId }) => useElderWorkspace(languageId, true, async () => undefined, async () => undefined),
+      ({ languageId }) =>
+        useElderWorkspace(
+          languageId,
+          true,
+          async () => undefined,
+          async () => undefined
+        ),
       { initialProps: { languageId: "avenik" } }
     );
 

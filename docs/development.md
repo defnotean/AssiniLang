@@ -26,16 +26,20 @@ npm.cmd run verify
 
 The verifier runs:
 
-1. Vitest.
-2. TypeScript project checks.
-3. Empty-workspace seed.
-4. Deterministic evaluation.
-5. Workspace builds.
+1. Prettier formatting verification.
+2. ESLint, including React Hooks correctness checks.
+3. Vitest.
+4. TypeScript project checks.
+5. Isolated fixture-workspace seed.
+6. Deterministic evaluation.
+7. Workspace builds.
 
 For narrower loops:
 
 ```powershell
 npm.cmd test
+npm.cmd run test:coverage
+npm.cmd run format:check
 npm.cmd run check
 npm.cmd run seed
 npm.cmd run eval
@@ -43,6 +47,7 @@ npm.cmd run build
 npm.cmd run smoke
 npm.cmd run smoke:backup
 npm.cmd run ci:green
+npm.cmd run e2e
 ```
 
 `npm.cmd run smoke` exercises the ingestion workflow end to end against an in-memory server.
@@ -50,6 +55,19 @@ npm.cmd run ci:green
 `npm.cmd run smoke:backup` runs a JsonStore backup → corrupt live → restore round-trip, plus CLI refusal checks (directory / same-path / existing without `--force`), SQLite force-overwrite restore, dry-run validation of an invalid workspace, and a timed backup/restore drill log for the operator recovery pack (CI also runs this after ingestion smoke).
 
 `npm.cmd run ci:green` is a fast pre-push helper that audits production dependencies only (`npm audit --omit=dev --audit-level=moderate`). It complements CI’s full `npm audit` (which includes devDependencies) and does **not** replace `verify`, `smoke`, or `smoke:backup`.
+
+CI pins third-party actions to reviewed commit SHAs and emits a CycloneDX production-dependency SBOM plus SHA-256 digest as a retained build artifact. Dependabot proposes weekly npm and GitHub Actions updates; review and repin action SHAs when accepting those updates.
+
+### Browser E2E and accessibility gate
+
+Install the pinned Playwright Chromium runtime once, then run the browser gate:
+
+```powershell
+npm.cmd run e2e:install
+npm.cmd run e2e
+```
+
+The gate starts the API and Vite dev server on dedicated loopback ports, writes only synthetic test records to a unique temporary database, and covers app identity/rendering, language creation, skip-link focus, command-palette keyboard navigation, WCAG A/AA checks with axe, and console/page errors. Its desktop/mobile visual regression combines real screenshots with committed, cross-platform snapshots of critical computed colors, borders, layout columns, landmark geometry, and overflow relationships; this avoids font-rendering noise while still failing CI on meaningful visual drift. Successful screenshots are attached to the transient Playwright result and test artifacts (`test-results/`, `playwright-report/`, and `blob-report/`) are ignored by Git. CI runs this gate on Linux with zero retries after installing Chromium and its system dependencies; the existing Windows packaged-desktop smoke remains the Windows-native rendered check.
 
 ### Deterministic evaluation baseline
 

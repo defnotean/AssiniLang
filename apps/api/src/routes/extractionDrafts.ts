@@ -18,10 +18,7 @@ import {
   parseStringArray,
   requireActor
 } from "../routeHelpers.js";
-import {
-  enrichSegmentationFromLexicon,
-  proposeLexiconSegmentation
-} from "../segmentationProposals.js";
+import { enrichSegmentationFromLexicon, proposeLexiconSegmentation } from "../segmentationProposals.js";
 import type { RouteContext } from "./context.js";
 
 const BULK_REVIEW_MAX_IDS = 50;
@@ -39,9 +36,7 @@ export type AcceptDraftOptions = {
   morphologicalSegmentation?: CorpusPassage["morphologicalSegmentation"];
 };
 
-function parseAcceptDraftMorphemes(
-  value: unknown
-): CorpusPassage["morphologicalSegmentation"] | undefined {
+function parseAcceptDraftMorphemes(value: unknown): CorpusPassage["morphologicalSegmentation"] | undefined {
   if (!Array.isArray(value)) return undefined;
   const morphemes: CorpusPassage["morphologicalSegmentation"] = [];
 
@@ -63,9 +58,9 @@ function parseAcceptDraftMorphemes(
  * Parses the optional accept-body override used by Build segmentation
  * conflict resolution. Empty / missing body is fine (keep draft).
  */
-export function parseAcceptDraftBody(input: unknown):
-  | { ok: true; options: AcceptDraftOptions }
-  | { ok: false; error: string; i18nKey: string } {
+export function parseAcceptDraftBody(
+  input: unknown
+): { ok: true; options: AcceptDraftOptions } | { ok: false; error: string; i18nKey: string } {
   if (input === undefined || input === null || input === "") {
     return { ok: true, options: {} };
   }
@@ -105,7 +100,8 @@ export function parseAcceptDraftBody(input: unknown):
     if (!morphologicalSegmentation) {
       return {
         ok: false,
-        error: "morphologicalSegmentation must be a non-empty array of morphemes with surface, lemma, gloss, and features.",
+        error:
+          "morphologicalSegmentation must be a non-empty array of morphemes with surface, lemma, gloss, and features.",
         i18nKey: "errors.invalidExtractionDraftAcceptBody"
       };
     }
@@ -140,10 +136,9 @@ function ensureCorpusDraftSegmentation(
   lexemes: Lexeme[]
 ): CorpusPassage["morphologicalSegmentation"] {
   const candidate = enrichSegmentationFromLexicon(textTarget, proposed, lexemes);
-  const usable = candidate.filter((morpheme) =>
-    morpheme.surface.trim().length > 0
-    && morpheme.lemma.trim().length > 0
-    && morpheme.gloss.trim().length > 0
+  const usable = candidate.filter(
+    (morpheme) =>
+      morpheme.surface.trim().length > 0 && morpheme.lemma.trim().length > 0 && morpheme.gloss.trim().length > 0
   );
   if (usable.length > 0 && findUncoveredCorpusTargetTokens(textTarget, usable).length === 0) {
     const coveredInText = usable.every((morpheme) => corpusTargetContainsSurface(textTarget, morpheme.surface));
@@ -227,10 +222,7 @@ function applyAcceptDraft(
     };
   }
 
-  if (
-    (options.preferLexiconSegmentation || options.morphologicalSegmentation)
-    && draft.kind !== "corpus_passage"
-  ) {
+  if ((options.preferLexiconSegmentation || options.morphologicalSegmentation) && draft.kind !== "corpus_passage") {
     return {
       state,
       validationError: "Segmentation accept overrides are only valid for corpus_passage drafts.",
@@ -251,10 +243,11 @@ function applyAcceptDraft(
       };
     }
 
-    const duplicate = state.lexemes.some((lexeme) =>
-      lexeme.languageId === draft.languageId
-      && lexeme.form.trim().toLowerCase() === form.toLowerCase()
-      && lexeme.gloss.trim().toLowerCase() === gloss.toLowerCase()
+    const duplicate = state.lexemes.some(
+      (lexeme) =>
+        lexeme.languageId === draft.languageId &&
+        lexeme.form.trim().toLowerCase() === form.toLowerCase() &&
+        lexeme.gloss.trim().toLowerCase() === gloss.toLowerCase()
     );
     if (duplicate) {
       return {
@@ -287,20 +280,23 @@ function applyAcceptDraft(
 
     return {
       committed: { draft: updatedDraft, entity: lexeme },
-      state: appendAuditEvent({
-        ...state,
-        lexemes: [...state.lexemes, lexeme],
-        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
-      }, {
-        actor,
-        at: reviewedAt,
-        action: "extraction_draft.accepted",
-        entityType: "lexeme",
-        entityId: lexeme.id,
-        languageId: draft.languageId,
-        summary: `Accepted lexeme draft ${form}.`,
-        metadata: { draftId, kind: draft.kind }
-      })
+      state: appendAuditEvent(
+        {
+          ...state,
+          lexemes: [...state.lexemes, lexeme],
+          extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+        },
+        {
+          actor,
+          at: reviewedAt,
+          action: "extraction_draft.accepted",
+          entityType: "lexeme",
+          entityId: lexeme.id,
+          languageId: draft.languageId,
+          summary: `Accepted lexeme draft ${form}.`,
+          metadata: { draftId, kind: draft.kind }
+        }
+      )
     };
   }
 
@@ -316,9 +312,10 @@ function applyAcceptDraft(
     }
 
     const normalizedTarget = textTarget.toLowerCase();
-    const duplicate = state.corpus.some((passage) =>
-      passage.languageId === draft.languageId
-      && passage.textTarget.trim().replace(/\s+/g, " ").toLowerCase() === normalizedTarget
+    const duplicate = state.corpus.some(
+      (passage) =>
+        passage.languageId === draft.languageId &&
+        passage.textTarget.trim().replace(/\s+/g, " ").toLowerCase() === normalizedTarget
     );
     if (duplicate) {
       return {
@@ -334,11 +331,7 @@ function applyAcceptDraft(
     const proposedSegmentation = options.preferLexiconSegmentation
       ? proposeLexiconSegmentation(textTarget, languageLexemes)
       : (options.morphologicalSegmentation ?? draft.payload.morphologicalSegmentation);
-    const segmentation = ensureCorpusDraftSegmentation(
-      textTarget,
-      proposedSegmentation,
-      languageLexemes
-    );
+    const segmentation = ensureCorpusDraftSegmentation(textTarget, proposedSegmentation, languageLexemes);
     const passage: CorpusPassage = {
       id: `ingested-corpus-${draft.languageId}-${randomUUID()}`,
       languageId: draft.languageId,
@@ -379,27 +372,30 @@ function applyAcceptDraft(
 
     return {
       committed: { draft: updatedDraft, entity: passage },
-      state: appendAuditEvent({
-        ...state,
-        corpus: [...state.corpus, passage],
-        corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)],
-        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
-      }, {
-        actor,
-        at: reviewedAt,
-        action: "extraction_draft.accepted",
-        entityType: "corpus",
-        entityId: passage.id,
-        languageId: draft.languageId,
-        summary: `Accepted corpus draft into passage ${passage.id}.`,
-        metadata: {
-          draftId,
-          kind: draft.kind,
-          morphemeCount: passage.morphologicalSegmentation.length,
-          ...(options.preferLexiconSegmentation ? { preferLexiconSegmentation: true } : {}),
-          ...(options.morphologicalSegmentation ? { segmentationOverride: true } : {})
+      state: appendAuditEvent(
+        {
+          ...state,
+          corpus: [...state.corpus, passage],
+          corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)],
+          extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+        },
+        {
+          actor,
+          at: reviewedAt,
+          action: "extraction_draft.accepted",
+          entityType: "corpus",
+          entityId: passage.id,
+          languageId: draft.languageId,
+          summary: `Accepted corpus draft into passage ${passage.id}.`,
+          metadata: {
+            draftId,
+            kind: draft.kind,
+            morphemeCount: passage.morphologicalSegmentation.length,
+            ...(options.preferLexiconSegmentation ? { preferLexiconSegmentation: true } : {}),
+            ...(options.morphologicalSegmentation ? { segmentationOverride: true } : {})
+          }
         }
-      })
+      )
     };
   }
 
@@ -449,20 +445,23 @@ function applyAcceptDraft(
 
   return {
     committed: { draft: updatedDraft, entity: note },
-    state: appendAuditEvent({
-      ...state,
-      notes: [...state.notes, note],
-      extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
-    }, {
-      actor,
-      at: reviewedAt,
-      action: "extraction_draft.accepted",
-      entityType: "note",
-      entityId: note.id,
-      languageId: draft.languageId,
-      summary: `Accepted grammar-note draft into note ${note.id}.`,
-      metadata: { draftId, kind: draft.kind }
-    })
+    state: appendAuditEvent(
+      {
+        ...state,
+        notes: [...state.notes, note],
+        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? updatedDraft : item))
+      },
+      {
+        actor,
+        at: reviewedAt,
+        action: "extraction_draft.accepted",
+        entityType: "note",
+        entityId: note.id,
+        languageId: draft.languageId,
+        summary: `Accepted grammar-note draft into note ${note.id}.`,
+        metadata: { draftId, kind: draft.kind }
+      }
+    )
   };
 }
 
@@ -495,19 +494,22 @@ function applyRejectDraft(state: AppState, draftId: string, actor: User): Reject
 
   return {
     rejected,
-    state: appendAuditEvent({
-      ...state,
-      extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? rejected : item))
-    }, {
-      actor,
-      at: reviewedAt,
-      action: "extraction_draft.rejected",
-      entityType: "extraction_draft",
-      entityId: draftId,
-      languageId: draft.languageId,
-      summary: `Rejected extraction draft ${draftId}.`,
-      metadata: { kind: draft.kind }
-    })
+    state: appendAuditEvent(
+      {
+        ...state,
+        extractionDrafts: state.extractionDrafts.map((item) => (item.id === draftId ? rejected : item))
+      },
+      {
+        actor,
+        at: reviewedAt,
+        action: "extraction_draft.rejected",
+        entityType: "extraction_draft",
+        entityId: draftId,
+        languageId: draft.languageId,
+        summary: `Rejected extraction draft ${draftId}.`,
+        metadata: { kind: draft.kind }
+      }
+    )
   };
 }
 
@@ -520,11 +522,7 @@ type BulkReviewItemResult = {
   committedEntityId?: string;
 };
 
-function bulkItemFailure(
-  draftId: string,
-  error: string,
-  i18n?: DraftReviewI18n
-): BulkReviewItemResult {
+function bulkItemFailure(draftId: string, error: string, i18n?: DraftReviewI18n): BulkReviewItemResult {
   return {
     draftId,
     ok: false,
@@ -552,7 +550,10 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
 
     const drafts = state.extractionDrafts.filter((draft) => draft.languageId === languageId);
     if (status === "proposed" || status === "accepted" || status === "rejected") {
-      return toExtractionDraftViews(state, drafts.filter((draft) => draft.status === status));
+      return toExtractionDraftViews(
+        state,
+        drafts.filter((draft) => draft.status === status)
+      );
     }
     return toExtractionDraftViews(state, drafts);
   });
@@ -590,7 +591,9 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
       reply.code(400);
       return {
         error: outcome.validationError,
-        ...(outcome.i18nKey ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) } : {})
+        ...(outcome.i18nKey
+          ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) }
+          : {})
       };
     }
 
@@ -633,7 +636,9 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
       reply.code(400);
       return {
         error: outcome.validationError,
-        ...(outcome.i18nKey ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) } : {})
+        ...(outcome.i18nKey
+          ? { i18nKey: outcome.i18nKey, ...(outcome.i18nParams ? { i18nParams: outcome.i18nParams } : {}) }
+          : {})
       };
     }
 
@@ -656,16 +661,16 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
     if (action !== "accept" && action !== "reject") {
       reply.code(400);
       return {
-        error: "Body must include action: \"accept\" or \"reject\".",
+        error: 'Body must include action: "accept" or "reject".',
         i18nKey: "errors.bulkReviewInvalidAction"
       };
     }
 
     const rawDraftIds = body?.draftIds;
     if (
-      !Array.isArray(rawDraftIds)
-      || rawDraftIds.length === 0
-      || rawDraftIds.some((id) => typeof id !== "string" || id.trim().length === 0)
+      !Array.isArray(rawDraftIds) ||
+      rawDraftIds.length === 0 ||
+      rawDraftIds.some((id) => typeof id !== "string" || id.trim().length === 0)
     ) {
       reply.code(400);
       return {
@@ -708,19 +713,20 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
       for (const draftId of draftIds) {
         const draft = working.extractionDrafts.find((item) => item.id === draftId);
         if (!draft) {
-          results.push(bulkItemFailure(
-            draftId,
-            `Extraction draft not found: ${draftId}`,
-            { i18nKey: "errors.extractionDraftNotFound" }
-          ));
+          results.push(
+            bulkItemFailure(draftId, `Extraction draft not found: ${draftId}`, {
+              i18nKey: "errors.extractionDraftNotFound"
+            })
+          );
           continue;
         }
         if (draft.languageId !== languageId) {
-          results.push(bulkItemFailure(
-            draftId,
-            `Extraction draft does not belong to language ${languageId}.`,
-            { i18nKey: "errors.extractionDraftWrongLanguage", i18nParams: { languageId } }
-          ));
+          results.push(
+            bulkItemFailure(draftId, `Extraction draft does not belong to language ${languageId}.`, {
+              i18nKey: "errors.extractionDraftWrongLanguage",
+              i18nParams: { languageId }
+            })
+          );
           continue;
         }
 
@@ -730,13 +736,15 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
           if (outcome.committed) {
             results.push({ draftId, ok: true, committedEntityId: outcome.committed.draft.committedEntityId });
           } else {
-            results.push(bulkItemFailure(
-              draftId,
-              outcome.validationError ?? `Extraction draft not found: ${draftId}`,
-              outcome.i18nKey
-                ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
-                : { i18nKey: "errors.extractionDraftNotFound" }
-            ));
+            results.push(
+              bulkItemFailure(
+                draftId,
+                outcome.validationError ?? `Extraction draft not found: ${draftId}`,
+                outcome.i18nKey
+                  ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
+                  : { i18nKey: "errors.extractionDraftNotFound" }
+              )
+            );
           }
         } else {
           const outcome = applyRejectDraft(working, draftId, actor);
@@ -744,13 +752,15 @@ export function registerExtractionDraftRoutes(app: FastifyInstance, ctx: RouteCo
           if (outcome.rejected) {
             results.push({ draftId, ok: true });
           } else {
-            results.push(bulkItemFailure(
-              draftId,
-              outcome.validationError ?? `Extraction draft not found: ${draftId}`,
-              outcome.i18nKey
-                ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
-                : { i18nKey: "errors.extractionDraftNotFound" }
-            ));
+            results.push(
+              bulkItemFailure(
+                draftId,
+                outcome.validationError ?? `Extraction draft not found: ${draftId}`,
+                outcome.i18nKey
+                  ? { i18nKey: outcome.i18nKey, i18nParams: outcome.i18nParams }
+                  : { i18nKey: "errors.extractionDraftNotFound" }
+              )
+            );
           }
         }
       }

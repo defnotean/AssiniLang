@@ -13,6 +13,7 @@
 ## Task 1: Persisted-State Regression Tests
 
 **Files:**
+
 - Modify: `packages/db/src/store.test.ts`
 
 - [x] Add source-asset fixtures with a valid `assets/avenik/source-1__notes.txt` path.
@@ -22,6 +23,7 @@
 ## Task 2: Runtime Ingestion Regression Tests
 
 **Files:**
+
 - Modify: `apps/api/src/ingestion.test.ts`
 
 - [x] Add a failing extraction test where `filePath: "../outside.txt"` would otherwise read outside `dataDir`.
@@ -31,6 +33,7 @@
 ## Task 3: Shared Path Guard
 
 **Files:**
+
 - Create: `packages/db/src/sourceAssetPaths.ts`
 - Modify: `packages/db/src/index.ts`
 - Modify: `packages/db/src/schema.ts`
@@ -45,6 +48,7 @@
 ## Task 4: Positive Coverage and Docs
 
 **Files:**
+
 - Modify: `apps/api/src/ingestion.test.ts`
 - Modify: `docs/architecture.md`
 
@@ -55,6 +59,7 @@
 ## Task 5: Verification
 
 **Files:**
+
 - Modify as needed only for type or doc fixes.
 
 - [x] Run `npm.cmd test`.
@@ -67,6 +72,7 @@
 ## Task 6: Review Follow-Ups
 
 **Files:**
+
 - Modify: `packages/db/src/schema.ts`
 - Modify: `packages/db/src/store.test.ts`
 - Modify: `apps/api/src/server.ts`

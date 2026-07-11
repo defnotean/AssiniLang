@@ -25,10 +25,7 @@ const {
   normalizeDesktopAction: (
     action: unknown
   ) => { ok: true; action: string } | { ok: false; code: string; i18nKey: string; message: string };
-  normalizeDesktopIpcResult: (
-    result: unknown,
-    error?: unknown
-  ) => Record<string, unknown>;
+  normalizeDesktopIpcResult: (result: unknown, error?: unknown) => Record<string, unknown>;
   normalizeDesktopPreferencesPatch: (
     patch: unknown
   ) =>
@@ -75,13 +72,15 @@ describe("desktop IPC action validation", () => {
   });
 
   it("lists every action the desktop bridge exposes", () => {
-    expect(KNOWN_DESKTOP_ACTIONS).toEqual(expect.arrayContaining([
-      "openDataFolder",
-      "createDataBackup",
-      "restoreLatestDataBackup",
-      "createAppShortcuts",
-      "resetWindowLayout"
-    ]));
+    expect(KNOWN_DESKTOP_ACTIONS).toEqual(
+      expect.arrayContaining([
+        "openDataFolder",
+        "createDataBackup",
+        "restoreLatestDataBackup",
+        "createAppShortcuts",
+        "resetWindowLayout"
+      ])
+    );
     expect(new Set(KNOWN_DESKTOP_ACTIONS).size).toBe(KNOWN_DESKTOP_ACTIONS.length);
   });
 });
@@ -170,9 +169,11 @@ describe("desktop IPC failure helpers", () => {
       i18nKey: "model.desktopNoWindow",
       message: "No desktop window is open."
     });
-    expect(desktopIpcFailure(DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY, {
-      message: "Desktop shortcut creation is available in the packaged app."
-    })).toMatchObject({
+    expect(
+      desktopIpcFailure(DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY, {
+        message: "Desktop shortcut creation is available in the packaged app."
+      })
+    ).toMatchObject({
       ok: false,
       code: DESKTOP_IPC_ERRORS.SHORTCUT_PACKAGED_ONLY.code,
       i18nKey: "model.desktopShortcutPackagedOnly",

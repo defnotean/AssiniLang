@@ -22,10 +22,7 @@ function buildBulkReviewState(extraDrafts: AppState["extractionDrafts"] = []): A
   const baseLanguage = baseState.languages[0]!;
   return {
     ...baseState,
-    languages: [
-      ...baseState.languages,
-      { ...baseLanguage, id: OTHER_LANGUAGE_ID, name: "Other Language" }
-    ],
+    languages: [...baseState.languages, { ...baseLanguage, id: OTHER_LANGUAGE_ID, name: "Other Language" }],
     sourceAssets: [
       ...baseState.sourceAssets,
       {
@@ -227,9 +224,10 @@ describe("bulk extraction draft review", () => {
     expect(body.accepted).toBe(1);
     expect(body.failed).toBe(5);
 
-    const byId = new Map<string, { ok: boolean; error?: string; i18nKey?: string; i18nParams?: Record<string, string | number> }>(
-      body.results.map((result: { draftId: string }) => [result.draftId, result])
-    );
+    const byId = new Map<
+      string,
+      { ok: boolean; error?: string; i18nKey?: string; i18nParams?: Record<string, string | number> }
+    >(body.results.map((result: { draftId: string }) => [result.draftId, result]));
     expect(byId.get("bulk-draft-lexeme")?.ok).toBe(true);
     expect(byId.get("missing-draft")).toMatchObject({
       ok: false,
@@ -298,7 +296,7 @@ describe("bulk extraction draft review", () => {
     const badAction = await bulkReview(app, { action: "destroy", draftIds: ["bulk-draft-lexeme"] });
     expect(badAction.statusCode).toBe(400);
     expect(badAction.json()).toEqual({
-      error: "Body must include action: \"accept\" or \"reject\".",
+      error: 'Body must include action: "accept" or "reject".',
       i18nKey: "errors.bulkReviewInvalidAction"
     });
 
@@ -362,7 +360,11 @@ describe("bulk extraction draft review", () => {
   it("returns 404 for an unknown language", async () => {
     const app = createServer({ initialState: buildBulkReviewState() });
 
-    const response = await bulkReview(app, { action: "accept", draftIds: ["bulk-draft-lexeme"] }, { languageId: "nope" });
+    const response = await bulkReview(
+      app,
+      { action: "accept", draftIds: ["bulk-draft-lexeme"] },
+      { languageId: "nope" }
+    );
 
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({
@@ -386,11 +388,13 @@ describe("bulk extraction draft review", () => {
       headers: authHeaders("programmer-1")
     });
     expect(audit.statusCode).toBe(200);
-    const acceptedEvents = audit.json().filter(
-      (event: { action: string; metadata?: { draftId?: string } }) =>
-        event.action === "extraction_draft.accepted"
-        && (event.metadata?.draftId === "bulk-draft-lexeme" || event.metadata?.draftId === "bulk-draft-note")
-    );
+    const acceptedEvents = audit
+      .json()
+      .filter(
+        (event: { action: string; metadata?: { draftId?: string } }) =>
+          event.action === "extraction_draft.accepted" &&
+          (event.metadata?.draftId === "bulk-draft-lexeme" || event.metadata?.draftId === "bulk-draft-note")
+      );
     expect(acceptedEvents).toHaveLength(2);
   });
 });

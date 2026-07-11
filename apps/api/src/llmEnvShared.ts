@@ -38,11 +38,7 @@ export function parsePositiveInteger(value: string | undefined, fallback: number
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function parseBoundedPositiveInteger(
-  value: string | undefined,
-  fallback: number,
-  maximum: number
-): number {
+export function parseBoundedPositiveInteger(value: string | undefined, fallback: number, maximum: number): number {
   const parsed = parsePositiveInteger(value, fallback);
   return Math.min(parsed, maximum);
 }

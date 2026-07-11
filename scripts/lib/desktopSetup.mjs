@@ -118,10 +118,7 @@ export function setupExtractorPowerShell({
 }) {
   const safeArchiveName = assertSafeWindowsFileName(archiveName, "Portable archive");
   const safeInstallerName = assertSafeWindowsFileName(installerName, "Packaged installer");
-  const safePackageDirectoryName = assertSafeWindowsFileName(
-    packageDirectoryName,
-    "Packaged app directory"
-  );
+  const safePackageDirectoryName = assertSafeWindowsFileName(packageDirectoryName, "Packaged app directory");
   const installerRelativePath = win32.join(safePackageDirectoryName, safeInstallerName);
 
   return [
@@ -131,7 +128,7 @@ export function setupExtractorPowerShell({
     "$exitCode = 0",
     "try {",
     "  if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {",
-    "    throw \"Portable archive was not found: $archivePath\"",
+    '    throw "Portable archive was not found: $archivePath"',
     "  }",
     "  [void][System.IO.Directory]::CreateDirectory($extractRoot)",
     "  $extractRootFull = [System.IO.Path]::GetFullPath($extractRoot)",
@@ -151,11 +148,11 @@ export function setupExtractorPowerShell({
     "      if ([string]::IsNullOrEmpty($entry.FullName)) { continue }",
     "      $entryName = $entry.FullName.Replace([char]47, [System.IO.Path]::DirectorySeparatorChar)",
     "      if ([System.IO.Path]::IsPathRooted($entryName)) {",
-    "        throw \"Archive entry uses a rooted path: $($entry.FullName)\"",
+    '        throw "Archive entry uses a rooted path: $($entry.FullName)"',
     "      }",
     "      $destinationPath = [System.IO.Path]::GetFullPath((Join-Path $extractRootFull $entryName))",
     "      if (-not $destinationPath.StartsWith($extractRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {",
-    "        throw \"Archive entry escapes the setup directory: $($entry.FullName)\"",
+    '        throw "Archive entry escapes the setup directory: $($entry.FullName)"',
     "      }",
     "      if ([string]::IsNullOrEmpty($entry.Name)) {",
     "        [void][System.IO.Directory]::CreateDirectory($destinationPath)",
@@ -171,11 +168,11 @@ export function setupExtractorPowerShell({
     "  } finally { $zip.Dispose() }",
     `  $installerPath = Join-Path $extractRootFull ${psLiteral(installerRelativePath)}`,
     "  if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {",
-    "    throw \"Packaged installer was not found: $installerPath\"",
+    '    throw "Packaged installer was not found: $installerPath"',
     "  }",
     "  $powershellPath = Join-Path $env:SystemRoot 'System32\\WindowsPowerShell\\v1.0\\powershell.exe'",
     "  & $powershellPath -NoLogo -NoProfile -ExecutionPolicy Bypass -File $installerPath",
-    "  if ($LASTEXITCODE -ne 0) { throw \"Packaged installer failed with exit code $LASTEXITCODE.\" }",
+    '  if ($LASTEXITCODE -ne 0) { throw "Packaged installer failed with exit code $LASTEXITCODE." }',
     "} catch {",
     "  [Console]::Error.WriteLine(('AssiniLang setup failed: ' + $_.Exception.Message))",
     "  $exitCode = 1",

@@ -8,13 +8,17 @@ describe("runtime env file loading", () => {
   it("fills missing and blank env values while preserving nonblank shell overrides", async () => {
     const dir = await mkdtemp(join(tmpdir(), "assini-env-"));
     const path = join(dir, ".env");
-    await writeFile(path, [
-      "# local settings",
-      "ASSINI_LLM_PROVIDER=openai-compatible",
-      "ASSINI_LLM_BASE_URL=http://127.0.0.1:12345/v1",
-      "ASSINI_LLM_MODEL=Irene",
-      "ASSINI_LLM_MAX_TOKENS=4096"
-    ].join("\n"), "utf8");
+    await writeFile(
+      path,
+      [
+        "# local settings",
+        "ASSINI_LLM_PROVIDER=openai-compatible",
+        "ASSINI_LLM_BASE_URL=http://127.0.0.1:12345/v1",
+        "ASSINI_LLM_MODEL=Irene",
+        "ASSINI_LLM_MAX_TOKENS=4096"
+      ].join("\n"),
+      "utf8"
+    );
     const env: Record<string, string | undefined> = {
       ASSINI_LLM_PROVIDER: "",
       ASSINI_LLM_MODEL: "shell-model"

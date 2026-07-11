@@ -11,9 +11,7 @@ export function assertCorsAllowedOrigin(origin: string, envName = "ASSINI_ALLOWE
     throw new Error(`${envName} contains an empty origin`);
   }
   if (trimmed === "*" || trimmed.toLowerCase() === "null") {
-    throw new Error(
-      `${envName} does not allow wildcard or null origins (credentials-safe allow-list only): ${origin}`
-    );
+    throw new Error(`${envName} does not allow wildcard or null origins (credentials-safe allow-list only): ${origin}`);
   }
 
   let parsed: URL;
@@ -44,10 +42,7 @@ export function assertCorsAllowedOrigin(origin: string, envName = "ASSINI_ALLOWE
  * Parses a comma-separated ASSINI_ALLOWED_ORIGINS value into a validated allow-list.
  * Blank / empty lists fall back to the local Vite defaults.
  */
-export function readAllowedOrigins(
-  value: string | undefined,
-  envName = "ASSINI_ALLOWED_ORIGINS"
-): string[] {
+export function readAllowedOrigins(value: string | undefined, envName = "ASSINI_ALLOWED_ORIGINS"): string[] {
   const origins = value
     ?.split(",")
     .map((origin) => origin.trim())
@@ -80,10 +75,7 @@ export function resolveAllowedOrigins(origins: readonly string[] | undefined): s
  * Wildcard, opaque `null`, and non-allow-listed Origins are always denied — even if a
  * misconfigured allow-list somehow contained them.
  */
-export function isCorsOriginAllowed(
-  origin: string | undefined,
-  allowedOrigins: readonly string[]
-): boolean {
+export function isCorsOriginAllowed(origin: string | undefined, allowedOrigins: readonly string[]): boolean {
   if (origin === undefined) return true;
   if (origin === "*" || origin === "null") return false;
   return allowedOrigins.includes(origin);

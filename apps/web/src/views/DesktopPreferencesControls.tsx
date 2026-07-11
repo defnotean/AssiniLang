@@ -30,10 +30,7 @@ export function DesktopPreferencesControls({
           id="desktop-launch-at-login"
           type="checkbox"
           checked={preferences.launchAtLogin}
-          disabled={
-            controlsBusy
-            || preferences.launchAtLoginSupported === false
-          }
+          disabled={controlsBusy || preferences.launchAtLoginSupported === false}
           aria-busy={preferenceBusy === "launchAtLogin" || undefined}
           onChange={(event) => void onPreferenceChange("launchAtLogin", event.target.checked)}
         />
@@ -44,10 +41,7 @@ export function DesktopPreferencesControls({
           id="desktop-hide-to-tray"
           type="checkbox"
           checked={preferences.hideToTray}
-          disabled={
-            controlsBusy
-            || preferences.hideToTraySupported === false
-          }
+          disabled={controlsBusy || preferences.hideToTraySupported === false}
           aria-busy={preferenceBusy === "hideToTray" || undefined}
           onChange={(event) => void onPreferenceChange("hideToTray", event.target.checked)}
         />

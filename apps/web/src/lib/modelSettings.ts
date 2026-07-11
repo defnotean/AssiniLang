@@ -152,10 +152,7 @@ function checkboxValue(formElement: HTMLFormElement, id: string, fallback: boole
   return control ? control.checked : fallback;
 }
 
-export function formStateFromControls(
-  formElement: HTMLFormElement,
-  fallback: SettingsFormState
-): SettingsFormState {
+export function formStateFromControls(formElement: HTMLFormElement, fallback: SettingsFormState): SettingsFormState {
   return {
     provider: inputValue(formElement, "model-provider", fallback.provider),
     baseUrl: inputValue(formElement, "model-base-url", fallback.baseUrl),
@@ -168,24 +165,12 @@ export function formStateFromControls(
     embeddingBaseUrl: inputValue(formElement, "embedding-base-url", fallback.embeddingBaseUrl),
     embeddingModel: inputValue(formElement, "embedding-model", fallback.embeddingModel),
     embeddingApiKey: inputValue(formElement, "embedding-api-key", fallback.embeddingApiKey),
-    clearEmbeddingApiKey: checkboxValue(
-      formElement,
-      "clear-embedding-key",
-      fallback.clearEmbeddingApiKey
-    ),
-    embeddingTimeoutMs: inputValue(
-      formElement,
-      "embedding-timeout",
-      fallback.embeddingTimeoutMs
-    ),
+    clearEmbeddingApiKey: checkboxValue(formElement, "clear-embedding-key", fallback.clearEmbeddingApiKey),
+    embeddingTimeoutMs: inputValue(formElement, "embedding-timeout", fallback.embeddingTimeoutMs),
     transcriptionBaseUrl: inputValue(formElement, "transcribe-base-url", fallback.transcriptionBaseUrl),
     transcriptionModel: inputValue(formElement, "transcribe-model", fallback.transcriptionModel),
     transcriptionApiKey: inputValue(formElement, "transcribe-api-key", fallback.transcriptionApiKey),
-    clearTranscriptionApiKey: checkboxValue(
-      formElement,
-      "clear-transcribe-key",
-      fallback.clearTranscriptionApiKey
-    ),
+    clearTranscriptionApiKey: checkboxValue(formElement, "clear-transcribe-key", fallback.clearTranscriptionApiKey),
     ocrBaseUrl: inputValue(formElement, "ocr-base-url", fallback.ocrBaseUrl),
     ocrModel: inputValue(formElement, "ocr-model", fallback.ocrModel),
     ocrApiKey: inputValue(formElement, "ocr-api-key", fallback.ocrApiKey),
@@ -203,19 +188,19 @@ export function findStaleActiveModel(
   const savedBaseUrl = settings.baseUrl.trim();
   if (!savedModel || !savedBaseUrl) return null;
 
-  const savedEndpointConnected = discovery.endpoints.some((endpoint) => (
-    endpoint.connected && sameModelBaseUrl(endpoint.baseUrl, savedBaseUrl)
-  ));
+  const savedEndpointConnected = discovery.endpoints.some(
+    (endpoint) => endpoint.connected && sameModelBaseUrl(endpoint.baseUrl, savedBaseUrl)
+  );
   if (!savedEndpointConnected) return null;
 
-  const savedModelStillLoaded = discovery.models.some((candidate) => (
-    sameModelBaseUrl(candidate.baseUrl, savedBaseUrl) && candidate.model === savedModel
-  ));
+  const savedModelStillLoaded = discovery.models.some(
+    (candidate) => sameModelBaseUrl(candidate.baseUrl, savedBaseUrl) && candidate.model === savedModel
+  );
   if (savedModelStillLoaded) return null;
 
-  const modelsForSavedEndpoint = discovery.models.filter((candidate) => (
+  const modelsForSavedEndpoint = discovery.models.filter((candidate) =>
     sameModelBaseUrl(candidate.baseUrl, savedBaseUrl)
-  ));
+  );
 
   return {
     baseUrl: savedBaseUrl,
@@ -236,9 +221,11 @@ export function formatScanTime(value: string): string {
 }
 
 export function discoveredModelMatchesForm(candidate: DiscoveredLlmModel, form: SettingsFormState): boolean {
-  return candidate.provider === form.provider
-    && sameModelBaseUrl(candidate.baseUrl, form.baseUrl)
-    && candidate.model === form.model.trim();
+  return (
+    candidate.provider === form.provider &&
+    sameModelBaseUrl(candidate.baseUrl, form.baseUrl) &&
+    candidate.model === form.model.trim()
+  );
 }
 
 export function applyDiscoveredModelToForm(form: SettingsFormState, candidate: DiscoveredLlmModel): SettingsFormState {
@@ -254,9 +241,11 @@ function modelSelectionMatchesSettings(
   form: SettingsFormState,
   settings: RuntimeSettingsResponse["settings"]
 ): boolean {
-  return form.provider === settings.provider
-    && sameModelBaseUrl(form.baseUrl, settings.baseUrl)
-    && form.model.trim() === settings.model.trim();
+  return (
+    form.provider === settings.provider &&
+    sameModelBaseUrl(form.baseUrl, settings.baseUrl) &&
+    form.model.trim() === settings.model.trim()
+  );
 }
 
 export function syncFormWithDiscoveredModels(
@@ -277,19 +266,20 @@ export function syncFormWithDiscoveredModels(
 
   if (!currentModel) {
     if (!canUpdateModelSelection) return form;
-    const candidate = modelsForCurrentEndpoint.length === 1
-      ? modelsForCurrentEndpoint[0]
-      : discovery.models.length === 1
-        ? discovery.models[0]
-        : undefined;
+    const candidate =
+      modelsForCurrentEndpoint.length === 1
+        ? modelsForCurrentEndpoint[0]
+        : discovery.models.length === 1
+          ? discovery.models[0]
+          : undefined;
     return candidate ? applyDiscoveredModelToForm(form, candidate) : form;
   }
 
   if (!currentBaseUrl) return form;
 
-  const currentEndpointConnected = discovery.endpoints.some((endpoint) => (
-    endpoint.connected && sameModelBaseUrl(endpoint.baseUrl, currentBaseUrl)
-  ));
+  const currentEndpointConnected = discovery.endpoints.some(
+    (endpoint) => endpoint.connected && sameModelBaseUrl(endpoint.baseUrl, currentBaseUrl)
+  );
   if (!currentEndpointConnected) return form;
 
   if (modelsForCurrentEndpoint.length === 1) {

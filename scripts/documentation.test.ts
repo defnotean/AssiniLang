@@ -15,6 +15,7 @@ const DOC_FILES = [
   "docs/ingestion.md",
   "docs/maintenance.md",
   "docs/operator-recovery.md",
+  "docs/incident-response.md",
   "docs/audit-export-drill.md",
   "docs/product-guide.md",
   "docs/roadmap.md",
@@ -67,7 +68,10 @@ async function readRegisteredRoutePaths(): Promise<string[]> {
 
 // Members of a named `z.enum([...])` declaration in schema.ts.
 async function readEnumMembers(exportName: string): Promise<string[]> {
-  const schema = await readProjectFile("packages/db/src/schema.ts");
+  const schema = [
+    await readProjectFile("packages/db/src/schema.ts"),
+    await readProjectFile("packages/db/src/schemaDomains.ts")
+  ].join("\n");
   const declaration = new RegExp(`export const ${exportName} = z\\.enum\\(\\[([^\\]]*)\\]`);
   const match = schema.match(declaration);
   if (!match || match[1] === undefined) {
@@ -80,7 +84,7 @@ async function readEnumMembers(exportName: string): Promise<string[]> {
 // derived from schema.ts so a new collection cannot ship undocumented.
 async function readAppStateShape(): Promise<{ collections: string[]; schemaVersion: number }> {
   const schema = await readProjectFile("packages/db/src/schema.ts");
-  const block = schema.match(/export const appStateSchema = z\.object\(\{([\s\S]*?)\}\)\.superRefine/);
+  const block = schema.match(/export const appStateSchema = z\s*\.object\(\{([\s\S]*?)\}\)\s*\.superRefine/);
   if (!block || block[1] === undefined) {
     throw new Error("Could not find appStateSchema z.object({...}).superRefine in schema.ts");
   }
@@ -100,13 +104,9 @@ async function readAppStateShape(): Promise<{ collections: string[]; schemaVersi
   if (/^\d+$/.test(versionExpression)) {
     schemaVersion = Number(versionExpression);
   } else {
-    const constantMatch = schema.match(
-      new RegExp(`export const ${versionExpression} = (\\d+) as const`)
-    );
+    const constantMatch = schema.match(new RegExp(`export const ${versionExpression} = (\\d+) as const`));
     if (!constantMatch || constantMatch[1] === undefined) {
-      throw new Error(
-        `Could not resolve schemaVersion literal ${versionExpression} from schema.ts`
-      );
+      throw new Error(`Could not resolve schemaVersion literal ${versionExpression} from schema.ts`);
     }
     schemaVersion = Number(constantMatch[1]);
   }
@@ -155,7 +155,7 @@ describe("project documentation", () => {
         "## Route index",
         "Lead and admin users remain server-token actors",
         "Review-policy updates have a prototype-only reviewer exception",
-        "\"async\": true",
+        '"async": true',
         "duplicate",
         "processingAttempts",
         "ingest.sourceMaxProcessingAttempts",
@@ -212,7 +212,7 @@ describe("project documentation", () => {
         "capped asset stays blocked",
         "ASSINI_OCR_PDF_MAX_PAGES",
         "pages 1..N",
-        "\"schemaVersion\": 9"
+        '"schemaVersion": 9'
       ],
       "docs/architecture.md": [
         "## Ingestion pipeline",
@@ -371,7 +371,17 @@ describe("project documentation", () => {
         "timed backup/restore drill log:",
         "Interrupted-processing drill log",
         "interrupted-processing drill log",
-        "metadata.reason: \"interrupted_restart\""
+        'metadata.reason: "interrupted_restart"'
+      ],
+      "docs/incident-response.md": [
+        "## First five minutes",
+        "## Signal interpretation",
+        "Startup recovery failed",
+        "requests.errors.server",
+        "job.failed",
+        "request.unhandled",
+        "Never attach `.env`",
+        "## Closure checklist"
       ],
       "docs/audit-export-drill.md": [
         "## What you prove",
@@ -472,7 +482,14 @@ describe("project documentation", () => {
         "ASSINI_OCR_PDF_MAX_PAGES",
         "pages 1..N"
       ],
-      "docs/ui-design.md": ["## Implemented direction", "source of truth", "Atlas layout", "night-sky", "local-first", "Sources & intake"]
+      "docs/ui-design.md": [
+        "## Implemented direction",
+        "source of truth",
+        "Atlas layout",
+        "night-sky",
+        "local-first",
+        "Sources & intake"
+      ]
     };
 
     for (const [file, sentinels] of Object.entries(expectedContent)) {
@@ -512,18 +529,21 @@ describe("project documentation", () => {
       for (const match of content.matchAll(linkPattern)) {
         const rawTarget = (match[1] ?? "").trim();
         if (
-          rawTarget.length === 0
-          || rawTarget.startsWith("http://")
-          || rawTarget.startsWith("https://")
-          || rawTarget.startsWith("mailto:")
-          || rawTarget.startsWith("#")
+          rawTarget.length === 0 ||
+          rawTarget.startsWith("http://") ||
+          rawTarget.startsWith("https://") ||
+          rawTarget.startsWith("mailto:") ||
+          rawTarget.startsWith("#")
         ) {
           continue;
         }
         const targetPath = (rawTarget.split("#")[0] ?? "").trim();
         if (targetPath.length === 0) continue;
         const resolved = resolve(baseDir, targetPath);
-        const exists = await stat(resolved).then(() => true, () => false);
+        const exists = await stat(resolved).then(
+          () => true,
+          () => false
+        );
         if (!exists) {
           broken.push(`${file} -> ${rawTarget}`);
         }
@@ -582,7 +602,9 @@ describe("project documentation", () => {
 
     expect(kinds).toContain("document");
     const undocumented = kinds.filter((kind) => !ingestionDoc.includes(`\`${kind}\``)).sort();
-    expect(undocumented, `Add these source kinds to the docs/ingestion.md table: ${undocumented.join(", ")}`).toEqual([]);
+    expect(undocumented, `Add these source kinds to the docs/ingestion.md table: ${undocumented.join(", ")}`).toEqual(
+      []
+    );
   });
 
   it("enumerates every persisted collection and the schema version in architecture.md", async () => {
@@ -620,12 +642,8 @@ describe("project documentation", () => {
 
     for (const file of ["docs/api.md", "docs/ingestion.md", "docs/roadmap.md", "docs/troubleshooting.md"] as const) {
       const content = docs.get(file) ?? "";
-      expect(content, `${file} should document the scanned-PDF page cap`).toContain(
-        "ASSINI_OCR_PDF_MAX_PAGES"
-      );
-      expect(content, `${file} should document the default scanned-PDF page cap`).toMatch(
-        /default `?10`?/
-      );
+      expect(content, `${file} should document the scanned-PDF page cap`).toContain("ASSINI_OCR_PDF_MAX_PAGES");
+      expect(content, `${file} should document the default scanned-PDF page cap`).toMatch(/default `?10`?/);
     }
 
     expect(maintenance).toContain("`api.ts` is the public barrel");

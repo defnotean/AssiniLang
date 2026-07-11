@@ -13,14 +13,16 @@ describe("runtime env bootstrap", () => {
     const cwdDir = join(dir, "cwd");
     await mkdir(cwdDir, { recursive: true });
 
-    await writeFile(join(cwdDir, ".env"), [
-      "ASSINI_LLM_PROVIDER=from-cwd",
-      "ASSINI_LLM_BASE_URL=http://127.0.0.1:9999/v1"
-    ].join("\n"), "utf8");
-    await writeFile(join(dir, ".env"), [
-      "ASSINI_LLM_PROVIDER=from-repo",
-      "ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1"
-    ].join("\n"), "utf8");
+    await writeFile(
+      join(cwdDir, ".env"),
+      ["ASSINI_LLM_PROVIDER=from-cwd", "ASSINI_LLM_BASE_URL=http://127.0.0.1:9999/v1"].join("\n"),
+      "utf8"
+    );
+    await writeFile(
+      join(dir, ".env"),
+      ["ASSINI_LLM_PROVIDER=from-repo", "ASSINI_LLM_BASE_URL=http://127.0.0.1:11434/v1"].join("\n"),
+      "utf8"
+    );
 
     const env: Record<string, string | undefined> = {
       ASSINI_LLM_MODEL: "shell-model"

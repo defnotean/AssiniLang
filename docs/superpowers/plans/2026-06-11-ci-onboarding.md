@@ -13,6 +13,7 @@
 ## Task 1: Repository Hygiene Tests
 
 **Files:**
+
 - Create: `scripts/repositoryHygiene.test.ts`
 
 - [x] Write a failing test that expects `.github/workflows/ci.yml` to exist and contain `npm ci`, `npm run verify`, `npm run smoke`, and `npm audit --audit-level=moderate`.
@@ -22,6 +23,7 @@
 ## Task 2: CI Workflow
 
 **Files:**
+
 - Create: `.github/workflows/ci.yml`
 
 - [x] Add a workflow named `CI` for pushes and pull requests to `master`.
@@ -31,6 +33,7 @@
 ## Task 3: Environment Example
 
 **Files:**
+
 - Create: `.env.example`
 - Modify: `docs/configuration.md`
 
@@ -41,6 +44,7 @@
 ## Task 4: Verification
 
 **Files:**
+
 - Modify as needed only for test or doc fixes.
 
 - [x] Run `npm.cmd test -- scripts/repositoryHygiene.test.ts scripts/documentation.test.ts`.

@@ -1,14 +1,9 @@
 import type { Dirent } from "node:fs";
 import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import {
-  buildTestWorkspaceState,
-  JsonStore,
-  TEST_LANGUAGE_ID,
-  type AppState
-} from "@assini/db";
+import { buildTestWorkspaceState, JsonStore, TEST_LANGUAGE_ID, type AppState } from "@assini/db";
 import { createServer } from "./server.js";
 
 function authHeaders(userId: string) {
@@ -101,12 +96,17 @@ describe("source upload durability", () => {
           ...authHeaders("reviewer-1"),
           "content-type": `multipart/form-data; boundary=${boundary}`
         },
-        payload: multipartPayload([{
-          name: "file",
-          filename: "notes.txt",
-          contentType: "text/plain",
-          body: "talu water"
-        }], boundary)
+        payload: multipartPayload(
+          [
+            {
+              name: "file",
+              filename: "notes.txt",
+              contentType: "text/plain",
+              body: "talu water"
+            }
+          ],
+          boundary
+        )
       });
 
       expect(response.statusCode).toBe(500);
@@ -132,24 +132,27 @@ describe("source upload durability", () => {
           ...authHeaders("reviewer-1"),
           "content-type": `multipart/form-data; boundary=${boundary}`
         },
-        payload: multipartPayload([
-          { name: "title", body: "Field notes" },
-          {
-            name: "file",
-            filename: "notes.txt",
-            contentType: "text/plain",
-            body: "talu water"
-          }
-        ], boundary)
+        payload: multipartPayload(
+          [
+            { name: "title", body: "Field notes" },
+            {
+              name: "file",
+              filename: "notes.txt",
+              contentType: "text/plain",
+              body: "talu water"
+            }
+          ],
+          boundary
+        )
       });
 
       expect(response.statusCode).toBe(201);
-      const asset = response.json() as { filePath: string; title: string };
+      const asset = response.json() as { id: string; title: string };
       expect(asset.title).toBe("Field notes");
-      expect(await listFiles(dataDir)).toEqual([
-        join("assets", TEST_LANGUAGE_ID, basename(asset.filePath))
-      ]);
-      expect(await readFile(join(dataDir, ...asset.filePath.split("/")), "utf8")).toBe("talu water");
+      expect(response.json()).not.toHaveProperty("filePath");
+      const storedRelativePath = join("assets", TEST_LANGUAGE_ID, `${asset.id}__notes.txt`);
+      expect(await listFiles(dataDir)).toEqual([storedRelativePath]);
+      expect(await readFile(join(dataDir, storedRelativePath), "utf8")).toBe("talu water");
     } finally {
       await app.close();
       await rm(dataDir, { recursive: true, force: true });

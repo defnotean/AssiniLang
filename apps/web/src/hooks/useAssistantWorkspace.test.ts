@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AiSession } from "@assini/db";
+import type { AiSession } from "@assini/api-contract";
 import { useAssistantWorkspace } from "./useAssistantWorkspace";
 
 const apiMock = vi.hoisted(() => ({ fetchAiSession: vi.fn() }));
@@ -36,13 +36,17 @@ function deferred<T>() {
 describe("useAssistantWorkspace stale request guards", () => {
   beforeEach(() => {
     apiMock.fetchAiSession.mockReset();
-    storageMock.getItem.mockImplementation((key: string) => key.endsWith("avenik") ? "session-avenik" : "session-boreal");
+    storageMock.getItem.mockImplementation((key: string) =>
+      key.endsWith("avenik") ? "session-avenik" : "session-boreal"
+    );
   });
 
   it("does not restore an earlier language after a reset and fast switch", async () => {
     const first = deferred<AiSession>();
     const second = deferred<AiSession>();
-    apiMock.fetchAiSession.mockImplementation((id: string) => id === "session-avenik" ? first.promise : second.promise);
+    apiMock.fetchAiSession.mockImplementation((id: string) =>
+      id === "session-avenik" ? first.promise : second.promise
+    );
     const { result } = renderHook(() => useAssistantWorkspace());
 
     act(() => {

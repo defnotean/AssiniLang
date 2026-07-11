@@ -8,7 +8,10 @@ function parseSmokeReport(report) {
   assert(report.rootChildCount > 0, "Web app root is empty.");
   assert(report.headingCount > 0, `Web app rendered no heading (text length ${report.bodyTextLength}).`);
   assert(report.fatalEvents.length === 0, `Renderer reported fatal events: ${JSON.stringify(report.fatalEvents)}`);
-  assert(report.consoleErrors.length === 0, `Renderer reported console errors: ${JSON.stringify(report.consoleErrors)}`);
+  assert(
+    report.consoleErrors.length === 0,
+    `Renderer reported console errors: ${JSON.stringify(report.consoleErrors)}`
+  );
   return report;
 }
 

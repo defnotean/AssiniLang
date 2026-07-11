@@ -1,15 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { createAiSessionPayloadSchema } from "@assini/api-contract";
-import {
-  AI_SESSION_MODE_ROLES,
-  type AiMessage,
-  type AiSession
-} from "@assini/db";
+import { AI_SESSION_MODE_ROLES, type AiMessage, type AiSession } from "@assini/db";
 import { buildLlmGenerationInputFromState, type LlmGenerationResult } from "../llmProvider.js";
-import {
-  appendAuditEvent,
-  requireActor
-} from "../routeHelpers.js";
+import { appendAuditEvent, requireActor } from "../routeHelpers.js";
 import {
   buildAiSession,
   buildFailedAiSession,
@@ -99,35 +92,40 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
 
     let generation: LlmGenerationResult;
     try {
-      generation = await llmProvider.generateAssistantMessage(buildLlmGenerationInputFromState(current, {
-        languageId: body.languageId,
-        mode: body.mode,
-        prompt: body.seedPrompt,
-        contextNoteIds: body.contextNoteIds,
-        contextPassageIds: body.contextPassageIds
-      }));
+      generation = await llmProvider.generateAssistantMessage(
+        buildLlmGenerationInputFromState(current, {
+          languageId: body.languageId,
+          mode: body.mode,
+          prompt: body.seedPrompt,
+          contextNoteIds: body.contextNoteIds,
+          contextPassageIds: body.contextPassageIds
+        })
+      );
     } catch (error) {
       const failureMessage = llmGenerationErrorMessage(error);
       await updateState((state) => {
         const now = new Date().toISOString();
         const failedSession = buildFailedAiSession(state, body, actor, now, failureMessage);
-        return appendAuditEvent({
-          ...state,
-          aiSessions: [...state.aiSessions, failedSession]
-        }, {
-          actor,
-          at: now,
-          action: "ai_session.failed",
-          entityType: "ai_session",
-          entityId: failedSession.id,
-          languageId: failedSession.languageId,
-          summary: "Stored failed AI session attempt with sanitized diagnostics.",
-          metadata: {
-            mode: failedSession.mode,
-            contextNoteCount: failedSession.contextNoteIds.length,
-            contextPassageCount: failedSession.contextPassageIds.length
+        return appendAuditEvent(
+          {
+            ...state,
+            aiSessions: [...state.aiSessions, failedSession]
+          },
+          {
+            actor,
+            at: now,
+            action: "ai_session.failed",
+            entityType: "ai_session",
+            entityId: failedSession.id,
+            languageId: failedSession.languageId,
+            summary: "Stored failed AI session attempt with sanitized diagnostics.",
+            metadata: {
+              mode: failedSession.mode,
+              contextNoteCount: failedSession.contextNoteIds.length,
+              contextPassageCount: failedSession.contextPassageIds.length
+            }
           }
-        });
+        );
       });
       reply.code(502);
       return {
@@ -140,24 +138,27 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
     await updateState((state) => {
       const now = new Date().toISOString();
       session = buildAiSession(state, body, actor, now, generation);
-      return appendAuditEvent({
-        ...state,
-        aiSessions: [...state.aiSessions, session as AiSession]
-      }, {
-        actor,
-        at: now,
-        action: "ai_session.created",
-        entityType: "ai_session",
-        entityId: session.id,
-        languageId: session.languageId,
-        summary: `Created ${session.mode.replace(/_/g, " ")} AI session.`,
-        metadata: {
-          mode: session.mode,
-          status: session.status,
-          contextNoteCount: session.contextNoteIds.length,
-          contextPassageCount: session.contextPassageIds.length
+      return appendAuditEvent(
+        {
+          ...state,
+          aiSessions: [...state.aiSessions, session as AiSession]
+        },
+        {
+          actor,
+          at: now,
+          action: "ai_session.created",
+          entityType: "ai_session",
+          entityId: session.id,
+          languageId: session.languageId,
+          summary: `Created ${session.mode.replace(/_/g, " ")} AI session.`,
+          metadata: {
+            mode: session.mode,
+            status: session.status,
+            contextNoteCount: session.contextNoteIds.length,
+            contextPassageCount: session.contextPassageIds.length
+          }
         }
-      });
+      );
     });
 
     reply.code(201);
@@ -221,41 +222,46 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
 
       let generation: LlmGenerationResult;
       try {
-        generation = await llmProvider.generateAssistantMessage(buildLlmGenerationInputFromState(current, {
-          languageId: currentSession.languageId,
-          mode: currentSession.mode,
-          prompt: body.content,
-          contextNoteIds: currentSession.contextNoteIds,
-          contextPassageIds: currentSession.contextPassageIds,
-          previousMessages: currentSession.messages
-        }));
+        generation = await llmProvider.generateAssistantMessage(
+          buildLlmGenerationInputFromState(current, {
+            languageId: currentSession.languageId,
+            mode: currentSession.mode,
+            prompt: body.content,
+            contextNoteIds: currentSession.contextNoteIds,
+            contextPassageIds: currentSession.contextPassageIds,
+            previousMessages: currentSession.messages
+          })
+        );
       } catch (error) {
         const failureMessage = llmGenerationErrorMessage(error);
         await updateState((state) => {
           const now = new Date().toISOString();
           const failedSession = state.aiSessions.find((session) => session.id === sessionId);
           const failedMessageIndex = (failedSession?.messages.length ?? 0) + 1;
-          const nextSessions = state.aiSessions.map((session) => (
+          const nextSessions = state.aiSessions.map((session) =>
             session.id === sessionId
               ? markAiSessionGenerationFailed(session, actor, body.content, now, failureMessage)
               : session
-          ));
-          return appendAuditEvent({
-            ...state,
-            aiSessions: nextSessions
-          }, {
-            actor,
-            at: now,
-            action: "ai_message.failed",
-            entityType: "ai_message",
-            entityId: `${sessionId}-failed-message-${failedMessageIndex}`,
-            languageId: failedSession?.languageId ?? null,
-            summary: "Stored failed AI follow-up attempt with sanitized diagnostics.",
-            metadata: {
-              sessionId,
-              mode: failedSession?.mode ?? "unknown"
+          );
+          return appendAuditEvent(
+            {
+              ...state,
+              aiSessions: nextSessions
+            },
+            {
+              actor,
+              at: now,
+              action: "ai_message.failed",
+              entityType: "ai_message",
+              entityId: `${sessionId}-failed-message-${failedMessageIndex}`,
+              languageId: failedSession?.languageId ?? null,
+              summary: "Stored failed AI follow-up attempt with sanitized diagnostics.",
+              metadata: {
+                sessionId,
+                mode: failedSession?.mode ?? "unknown"
+              }
             }
-          });
+          );
         });
         reply.code(502);
         return {
@@ -305,23 +311,26 @@ export function registerAiSessionRoutes(app: FastifyInstance, ctx: RouteContext)
           ]
         };
 
-        return appendAuditEvent({
-          ...state,
-          aiSessions: state.aiSessions.map((item) => (item.id === sessionId ? updatedSession as AiSession : item))
-        }, {
-          actor,
-          at: now,
-          action: "ai_message.created",
-          entityType: "ai_message",
-          entityId: nextMessages[nextMessages.length - 2].id,
-          languageId: session.languageId,
-          summary: "Appended AI session follow-up message and response.",
-          metadata: {
-            sessionId: session.id,
-            mode: session.mode,
-            messageCount: nextMessages.length
+        return appendAuditEvent(
+          {
+            ...state,
+            aiSessions: state.aiSessions.map((item) => (item.id === sessionId ? (updatedSession as AiSession) : item))
+          },
+          {
+            actor,
+            at: now,
+            action: "ai_message.created",
+            entityType: "ai_message",
+            entityId: nextMessages[nextMessages.length - 2].id,
+            languageId: session.languageId,
+            summary: "Appended AI session follow-up message and response.",
+            metadata: {
+              sessionId: session.id,
+              mode: session.mode,
+              messageCount: nextMessages.length
+            }
           }
-        });
+        );
       });
 
       return toPublicAiSession(updatedSession as AiSession, actor);

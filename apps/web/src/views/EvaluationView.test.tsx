@@ -32,10 +32,7 @@ function createRun(overrides: Partial<EvaluationRun> = {}): EvaluationRun {
   };
 }
 
-function renderEvaluationView(
-  overrides: Partial<Parameters<typeof EvaluationView>[0]> = {},
-  locale: "en" = "en"
-) {
+function renderEvaluationView(overrides: Partial<Parameters<typeof EvaluationView>[0]> = {}, locale: "en" = "en") {
   return render(
     <I18nProvider initialLocale={locale}>
       <EvaluationView
@@ -166,4 +163,5 @@ describe("EvaluationView", () => {
 
     expect(screen.getByText("Note accuracy note-1: Missing note content for verb chains")).toBeInTheDocument();
     expect(screen.queryByText(/noteAccuracy/)).not.toBeInTheDocument();
-  });});
+  });
+});

@@ -7,7 +7,7 @@ import type { RouteContext } from "./context.js";
 const PRIVILEGED_OBSERVABILITY_ROLES = ["programmer", "admin", "lead"] as const;
 
 export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, authToken, prototypeSessions, jobQueue, requestMetrics, now } = ctx;
+  const { readState, authToken, prototypeSessions, jobQueue, requestMetrics, recoveryMetrics, now } = ctx;
 
   app.get("/observability/metrics", async (request, reply) => {
     let state: AppState | undefined;
@@ -33,6 +33,8 @@ export function registerObservabilityRoutes(app: FastifyInstance, ctx: RouteCont
       nowMs: now(),
       requestMetrics,
       readJobQueueStatus: () => jobQueue.getStatus(),
+      readJobQueueMetrics: () => jobQueue.getMetrics(),
+      recoveryMetrics,
       state
     });
   });

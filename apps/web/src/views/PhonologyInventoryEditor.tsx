@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type FormEvent, type KeyboardEvent } from "react";
-import type { Language, LanguagePhonology } from "@assini/db";
+import type { Language, LanguagePhonology } from "@assini/api-contract";
 import { updateLanguage } from "../api";
 import { localizeApiError } from "../lib/format";
 import {
@@ -160,14 +160,21 @@ export function PhonologyInventoryEditor({
   const empty = !hasDeclaredInventory(draft);
 
   return (
-    <section className="simple-section surface-section phonology-inventory-section" aria-label={t("profile.phonologyAriaLabel")}>
+    <section
+      className="simple-section surface-section phonology-inventory-section"
+      aria-label={t("profile.phonologyAriaLabel")}
+    >
       <div className="simple-section-heading">
         <span className="detail-label">{t("profile.phonologyProfile")}</span>
         <h2>{empty ? t("profile.noPhonologyDeclared") : t("profile.inventoryEditorTitle")}</h2>
         <p>{empty ? t("profile.phonologyEmptyState") : t("profile.inventoryEditorBody")}</p>
       </div>
 
-      <form className="form-panel compact phonology-inventory-form" aria-label={t("profile.inventoryEditorAria")} onSubmit={handleSave}>
+      <form
+        className="form-panel compact phonology-inventory-form"
+        aria-label={t("profile.inventoryEditorAria")}
+        onSubmit={handleSave}
+      >
         {(validationError || saveError) && (
           <p className="result-notice error" role="alert">
             {validationError ?? saveError}
@@ -190,7 +197,9 @@ export function PhonologyInventoryEditor({
               onRemove={(symbol) => removeSymbol("consonants", symbol)}
             />
             <div className="phonology-inventory-add-row">
-              <label className="visually-hidden" htmlFor={consonantInputId}>{t("profile.consonantInputLabel")}</label>
+              <label className="visually-hidden" htmlFor={consonantInputId}>
+                {t("profile.consonantInputLabel")}
+              </label>
               <input
                 id={consonantInputId}
                 value={consonantInput}
@@ -203,7 +212,12 @@ export function PhonologyInventoryEditor({
                 }}
                 onKeyDown={(event) => handleAddKeyDown("consonants", event)}
               />
-              <button type="button" className="secondary" disabled={controlsDisabled} onClick={() => addSymbol("consonants")}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={controlsDisabled}
+                onClick={() => addSymbol("consonants")}
+              >
                 {t("profile.addConsonant")}
               </button>
             </div>
@@ -219,7 +233,9 @@ export function PhonologyInventoryEditor({
               onRemove={(symbol) => removeSymbol("vowels", symbol)}
             />
             <div className="phonology-inventory-add-row">
-              <label className="visually-hidden" htmlFor={vowelInputId}>{t("profile.vowelInputLabel")}</label>
+              <label className="visually-hidden" htmlFor={vowelInputId}>
+                {t("profile.vowelInputLabel")}
+              </label>
               <input
                 id={vowelInputId}
                 value={vowelInput}
@@ -232,7 +248,12 @@ export function PhonologyInventoryEditor({
                 }}
                 onKeyDown={(event) => handleAddKeyDown("vowels", event)}
               />
-              <button type="button" className="secondary" disabled={controlsDisabled} onClick={() => addSymbol("vowels")}>
+              <button
+                type="button"
+                className="secondary"
+                disabled={controlsDisabled}
+                onClick={() => addSymbol("vowels")}
+              >
                 {t("profile.addVowel")}
               </button>
             </div>

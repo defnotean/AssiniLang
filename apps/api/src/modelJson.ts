@@ -3,10 +3,7 @@ function stripCodeFences(content: string): string {
   return fenced?.[1] ?? content;
 }
 
-function extractFirstJsonObject(content: string): string | undefined {
-  const start = content.indexOf("{");
-  if (start < 0) return undefined;
-
+function jsonObjectEnd(content: string, start: number): number | undefined {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -29,7 +26,7 @@ function extractFirstJsonObject(content: string): string | undefined {
     } else if (char === "}") {
       depth -= 1;
       if (depth === 0) {
-        return content.slice(start, index + 1);
+        return index + 1;
       }
     }
   }
@@ -37,11 +34,26 @@ function extractFirstJsonObject(content: string): string | undefined {
 }
 
 export function parseModelJson(content: string): unknown | undefined {
-  const candidate = extractFirstJsonObject(stripCodeFences(content));
-  if (!candidate) return undefined;
-  try {
-    return JSON.parse(candidate);
-  } catch {
-    return undefined;
+  const normalized = stripCodeFences(content);
+  let searchFrom = 0;
+
+  // A model may mention a non-JSON brace expression before its final answer.
+  // Try balanced object candidates in source order instead of rejecting the
+  // entire response when only the first brace-delimited fragment is invalid.
+  // The attempt limit bounds work for adversarial brace-heavy responses.
+  for (let attempts = 0; attempts < 256; attempts += 1) {
+    const start = normalized.indexOf("{", searchFrom);
+    if (start < 0) return undefined;
+    const end = jsonObjectEnd(normalized, start);
+    if (end !== undefined) {
+      try {
+        return JSON.parse(normalized.slice(start, end));
+      } catch {
+        // A later object can still be the model's structured final answer.
+      }
+    }
+    searchFrom = start + 1;
   }
+
+  return undefined;
 }

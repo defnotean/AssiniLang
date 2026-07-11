@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { AiSession } from "@assini/db";
+import type { AiSession } from "@assini/api-contract";
 import { continueAiSession, createAiSession, fetchAiSession } from "../api";
 import { useI18n, type Translate } from "../i18n";
 import { localizeApiError } from "../lib/format";
@@ -62,11 +62,7 @@ function storedSessionId(languageId: string): string | null {
  * conversation history to the model, the instructions keep applying for the
  * whole session - including after the user corrects the assistant.
  */
-export function composeSeedPrompt(
-  seedPrompt: string,
-  setupInstructions?: string,
-  t?: Translate
-): string {
+export function composeSeedPrompt(seedPrompt: string, setupInstructions?: string, t?: Translate): string {
   const instructions = setupInstructions?.trim();
   if (!instructions) return seedPrompt.trim();
   const prefix = t
@@ -90,7 +86,10 @@ function latestReplyUsedFallback(session: AiSession): boolean {
 }
 
 function latestAssistantMessageId(session: AiSession): string | null {
-  const assistant = session.messages.slice().reverse().find((message) => message.role === "assistant");
+  const assistant = session.messages
+    .slice()
+    .reverse()
+    .find((message) => message.role === "assistant");
   return assistant?.id ?? null;
 }
 

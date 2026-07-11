@@ -62,10 +62,7 @@ function mapModelProfileMutationError(
   return undefined;
 }
 
-function requireProfileId(
-  params: unknown,
-  reply: { code: (statusCode: number) => unknown }
-): string | undefined {
+function requireProfileId(params: unknown, reply: { code: (statusCode: number) => unknown }): string | undefined {
   const profileId = profileIdFromParams(params).trim();
   if (!profileId) {
     reply.code(400);
@@ -75,15 +72,8 @@ function requireProfileId(
 }
 
 export function registerLlmRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const {
-    readState,
-    checkRateLimit,
-    authToken,
-    prototypeSessions,
-    ingestionFetch,
-    settingsPath,
-    reloadLlmProvider
-  } = ctx;
+  const { readState, checkRateLimit, authToken, prototypeSessions, ingestionFetch, settingsPath, reloadLlmProvider } =
+    ctx;
 
   app.get("/llm/status", async (request, reply) => {
     const state = await readState();

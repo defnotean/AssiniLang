@@ -49,11 +49,14 @@ function basicSession(overrides: Partial<ObsidianMcpSession> = {}): ObsidianMcpS
 describe.sequential("Obsidian MCP routes", () => {
   const apps: Array<ReturnType<typeof createServer>> = [];
 
-  function makeServer(sessionFactory: ObsidianMcpSessionFactory, options: {
-    initialState?: ReturnType<typeof buildTestWorkspaceState>;
-    settingsPath?: string;
-    rateLimit?: { max: number; windowMs: number } | false;
-  } = {}) {
+  function makeServer(
+    sessionFactory: ObsidianMcpSessionFactory,
+    options: {
+      initialState?: ReturnType<typeof buildTestWorkspaceState>;
+      settingsPath?: string;
+      rateLimit?: { max: number; windowMs: number } | false;
+    } = {}
+  ) {
     const app = createServer({
       initialState: options.initialState ?? buildTestWorkspaceState(),
       obsidianMcpSessionFactory: sessionFactory,
@@ -167,12 +170,14 @@ describe.sequential("Obsidian MCP routes", () => {
         async listResources(cursor) {
           cursors.push(cursor);
           return {
-            resources: [{
-              uri: "obsidian://vault/Grammar.md",
-              name: "Grammar",
-              description: `private ${ROUTE_TOKEN}`,
-              mimeType: "text/markdown"
-            }],
+            resources: [
+              {
+                uri: "obsidian://vault/Grammar.md",
+                name: "Grammar",
+                description: `private ${ROUTE_TOKEN}`,
+                mimeType: "text/markdown"
+              }
+            ],
             nextCursor: "page-2"
           };
         },
@@ -216,16 +221,18 @@ describe.sequential("Obsidian MCP routes", () => {
 
   it("reports connection success and redacts failure details while closing sessions", async () => {
     let successClosed = false;
-    const successApp = makeServer(async () => basicSession({
-      async listResources() {
-        return {
-          resources: [{ uri: "obsidian://vault/one", name: "One" }]
-        };
-      },
-      async close() {
-        successClosed = true;
-      }
-    }));
+    const successApp = makeServer(async () =>
+      basicSession({
+        async listResources() {
+          return {
+            resources: [{ uri: "obsidian://vault/one", name: "One" }]
+          };
+        },
+        async close() {
+          successClosed = true;
+        }
+      })
+    );
     const success = await successApp.inject({
       method: "POST",
       url: "/integrations/obsidian-mcp/test",
@@ -241,14 +248,16 @@ describe.sequential("Obsidian MCP routes", () => {
     expect(successClosed).toBe(true);
 
     let failureClosed = false;
-    const failureApp = makeServer(async () => basicSession({
-      async listResources() {
-        throw new Error(`Authentication failed for ${ROUTE_TOKEN}`);
-      },
-      async close() {
-        failureClosed = true;
-      }
-    }));
+    const failureApp = makeServer(async () =>
+      basicSession({
+        async listResources() {
+          throw new Error(`Authentication failed for ${ROUTE_TOKEN}`);
+        },
+        async close() {
+          failureClosed = true;
+        }
+      })
+    );
     const failure = await failureApp.inject({
       method: "POST",
       url: "/integrations/obsidian-mcp/test",
@@ -285,39 +294,34 @@ describe.sequential("Obsidian MCP routes", () => {
     initialState.sourceAssets.push(existing);
     const reads: string[] = [];
     let closeCount = 0;
-    const app = makeServer(async () => basicSession({
-      async readTextResource(uri) {
-        reads.push(uri);
-        if (uri === goodUri) return { uri, text: "  # Grammar\n\nText note.  ", mimeType: "text/markdown" };
-        if (uri === oversizedUri) return { uri, text: "x".repeat(1_000_001), mimeType: "text/plain" };
-        if (uri === nonTextUri) return { uri, text: "not really text", mimeType: "image/png" };
-        if (uri === emptyUri) return { uri, text: "   ", mimeType: "text/plain" };
-        if (uri === secretContentUri) return { uri, text: `Leaked ${ROUTE_TOKEN}`, mimeType: "text/plain" };
-        throw new ObsidianMcpResourceReadError(
-          "non_text",
-          "MCP resource did not contain a supported text representation."
-        );
-      },
-      async close() {
-        closeCount += 1;
-      }
-    }), { initialState });
+    const app = makeServer(
+      async () =>
+        basicSession({
+          async readTextResource(uri) {
+            reads.push(uri);
+            if (uri === goodUri) return { uri, text: "  # Grammar\n\nText note.  ", mimeType: "text/markdown" };
+            if (uri === oversizedUri) return { uri, text: "x".repeat(1_000_001), mimeType: "text/plain" };
+            if (uri === nonTextUri) return { uri, text: "not really text", mimeType: "image/png" };
+            if (uri === emptyUri) return { uri, text: "   ", mimeType: "text/plain" };
+            if (uri === secretContentUri) return { uri, text: `Leaked ${ROUTE_TOKEN}`, mimeType: "text/plain" };
+            throw new ObsidianMcpResourceReadError(
+              "non_text",
+              "MCP resource did not contain a supported text representation."
+            );
+          },
+          async close() {
+            closeCount += 1;
+          }
+        }),
+      { initialState }
+    );
 
     const response = await app.inject({
       method: "POST",
       url: `/languages/${TEST_LANGUAGE_ID}/sources/obsidian-mcp`,
       headers: authHeaders("reviewer-1"),
       payload: {
-        uris: [
-          existingUri,
-          goodUri,
-          oversizedUri,
-          nonTextUri,
-          emptyUri,
-          blobOnlyUri,
-          secretContentUri,
-          credentialUri
-        ]
+        uris: [existingUri, goodUri, oversizedUri, nonTextUri, emptyUri, blobOnlyUri, secretContentUri, credentialUri]
       }
     });
     expect(response.statusCode).toBe(201);
@@ -326,11 +330,11 @@ describe.sequential("Obsidian MCP routes", () => {
       languageId: TEST_LANGUAGE_ID,
       kind: "text",
       title: "Grammar.md",
-      url: goodUri,
-      rawText: "# Grammar\n\nText note.",
       status: "pending",
       createdBy: "reviewer-1"
     });
+    expect(response.json().imported[0]).not.toHaveProperty("url");
+    expect(response.json().imported[0]).not.toHaveProperty("rawText");
     expect(response.body).not.toContain(ROUTE_TOKEN);
     expect(reads).toEqual([goodUri, oversizedUri, nonTextUri, emptyUri, blobOnlyUri, secretContentUri]);
     expect(closeCount).toBe(1);
@@ -340,18 +344,18 @@ describe.sequential("Obsidian MCP routes", () => {
       url: `/languages/${TEST_LANGUAGE_ID}/sources`,
       headers: authHeaders("reviewer-1")
     });
-    const matching = sources.json().filter((source: SourceAsset) => source.url === goodUri);
+    const matching = sources.json().filter((source: SourceAsset) => source.title === "Grammar.md");
     expect(matching).toHaveLength(1);
     expect(sources.body).not.toContain(ROUTE_TOKEN);
+    expect(sources.body).not.toContain(goodUri);
+    expect(sources.body).not.toContain("Text note.");
 
     const audit = await app.inject({
       method: "GET",
       url: `/audit/events?languageId=${TEST_LANGUAGE_ID}`,
       headers: authHeaders("programmer-1")
     });
-    const event = audit.json().find((item: { action: string }) => (
-      item.action === "source_asset.obsidian_mcp_imported"
-    ));
+    const event = audit.json().find((item: { action: string }) => item.action === "source_asset.obsidian_mcp_imported");
     expect(event).toMatchObject({
       actorId: "reviewer-1",
       entityType: "source_asset",

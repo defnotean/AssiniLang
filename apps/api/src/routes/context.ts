@@ -7,11 +7,35 @@ import type { ObsidianMcpSessionFactory } from "../obsidianMcpClient.js";
 
 export type RequestStatusClass = "1xx" | "2xx" | "3xx" | "4xx" | "5xx";
 
+export type RequestLatencyBucket = "le10" | "le50" | "le250" | "le1000" | "gt1000";
+
 export type RequestMetrics = {
   startedAtMs: number;
   requests: {
     total: number;
     byStatusClass: Record<RequestStatusClass, number>;
+    latencyMs: {
+      count: number;
+      total: number;
+      max: number;
+      byBucket: Record<RequestLatencyBucket, number>;
+    };
+  };
+};
+
+export type RecoveryMetrics = {
+  startup: {
+    status: "pending" | "succeeded" | "failed";
+    recovered: number;
+    completedAtMs?: number;
+  };
+  staleSweep: {
+    status: "idle" | "running" | "failed";
+    runs: number;
+    failures: number;
+    totalRecovered: number;
+    lastRunAtMs?: number;
+    lastSuccessAtMs?: number;
   };
 };
 
@@ -41,6 +65,8 @@ export type RouteContext = {
   prototypeSessionAbsoluteMaxMs: number;
   /** Injectable clock for session lifecycle tests; defaults to Date.now. */
   now: () => number;
+  /** Optional sleep injection for deterministic source-processing retry tests. */
+  sourceProcessingSleep?: (delayMs: number) => Promise<void>;
   llmProvider: LlmProvider;
   dataDir: string;
   /** Multipart file size cap for source uploads (bytes). */
@@ -51,4 +77,5 @@ export type RouteContext = {
   reloadLlmProvider?: () => void;
   jobQueue: JobQueue;
   requestMetrics: RequestMetrics;
+  recoveryMetrics: RecoveryMetrics;
 };

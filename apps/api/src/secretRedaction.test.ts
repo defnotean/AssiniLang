@@ -19,8 +19,7 @@ describe("secret redaction", () => {
   it("redacts configured long secret values", () => {
     process.env.ASSINI_LLM_API_KEY = "configured-secret";
 
-    expect(redactConfiguredSecrets("failed with configured-secret"))
-      .toBe("failed with [redacted-secret]");
+    expect(redactConfiguredSecrets("failed with configured-secret")).toBe("failed with [redacted-secret]");
   });
 
   it("does not redact very short configured values", () => {
@@ -32,15 +31,13 @@ describe("secret redaction", () => {
   it("redacts transcription API keys from configured env", () => {
     process.env.ASSINI_TRANSCRIBE_API_KEY = "transcribe-secret-value";
 
-    expect(redactConfiguredSecrets("failed with transcribe-secret-value"))
-      .toBe("failed with [redacted-secret]");
+    expect(redactConfiguredSecrets("failed with transcribe-secret-value")).toBe("failed with [redacted-secret]");
   });
 
   it("redacts OCR API keys from configured env", () => {
     process.env.ASSINI_OCR_API_KEY = "ocr-secret-value";
 
-    expect(redactConfiguredSecrets("failed with ocr-secret-value"))
-      .toBe("failed with [redacted-secret]");
+    expect(redactConfiguredSecrets("failed with ocr-secret-value")).toBe("failed with [redacted-secret]");
   });
 
   it("redacts common API key and bearer token shapes", () => {
@@ -76,7 +73,8 @@ describe("secret redaction", () => {
 
   it("censors credential log fields while scrubbing err.message in place", () => {
     expect(censorLogSecret("plain-provider-secret", ["body", "apiKey"])).toBe("[REDACTED]");
-    expect(censorLogSecret("failed with Bearer sk-live-token", ["err", "message"]))
-      .toBe("failed with [redacted-secret]");
+    expect(censorLogSecret("failed with Bearer sk-live-token", ["err", "message"])).toBe(
+      "failed with [redacted-secret]"
+    );
   });
 });

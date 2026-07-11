@@ -4,7 +4,9 @@ import vm from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
 const mainSource = readFileSync(new URL("./main.cjs", import.meta.url), "utf8");
+const desktopSmokeSource = readFileSync(new URL("./desktopSmoke.cjs", import.meta.url), "utf8");
 const preloadSource = readFileSync(new URL("./preload.cjs", import.meta.url), "utf8");
+const webStylesSource = readFileSync(new URL("../web/src/styles.css", import.meta.url), "utf8");
 
 function extractNamedFunction(name: string): string {
   const start = mainSource.indexOf(`function ${name}(`);
@@ -22,8 +24,8 @@ function extractNamedFunction(name: string): string {
 function loadDesktopUiPathResolver(): (requestPath: unknown, root: string) => string | null {
   const module = { exports: {} as Record<string, unknown> };
   vm.runInNewContext(
-    `${extractNamedFunction("isStrictChildPath")}\n${extractNamedFunction("resolveDesktopUiAssetPath")}\n`
-      + "module.exports.resolveDesktopUiAssetPath = resolveDesktopUiAssetPath;",
+    `${extractNamedFunction("isStrictChildPath")}\n${extractNamedFunction("resolveDesktopUiAssetPath")}\n` +
+      "module.exports.resolveDesktopUiAssetPath = resolveDesktopUiAssetPath;",
     { decodeURIComponent, module, path, realpathSync, statSync }
   );
   return module.exports.resolveDesktopUiAssetPath as (requestPath: unknown, root: string) => string | null;
@@ -32,8 +34,8 @@ function loadDesktopUiPathResolver(): (requestPath: unknown, root: string) => st
 function loadExternalNavigationResolver(): (value: unknown) => string | null {
   const module = { exports: {} as Record<string, unknown> };
   vm.runInNewContext(
-    `${extractNamedFunction("resolveExternalNavigationUrl")}\n`
-      + "module.exports.resolveExternalNavigationUrl = resolveExternalNavigationUrl;",
+    `${extractNamedFunction("resolveExternalNavigationUrl")}\n` +
+      "module.exports.resolveExternalNavigationUrl = resolveExternalNavigationUrl;",
     { module, URL }
   );
   return module.exports.resolveExternalNavigationUrl as (value: unknown) => string | null;
@@ -93,7 +95,7 @@ describe("desktop context isolation", () => {
   });
 
   it("exposes named operations through contextBridge without mutating the isolated window", async () => {
-    expect(preloadSource).toContain("contextBridge.exposeInMainWorld(\"assiniDesktop\", assiniDesktop)");
+    expect(preloadSource).toContain('contextBridge.exposeInMainWorld("assiniDesktop", assiniDesktop)');
     expect(preloadSource).not.toMatch(/window\.assiniDesktop\s*=/);
     expect(preloadSource).not.toMatch(/window\.fetch\s*=/);
 
@@ -186,40 +188,46 @@ describe("desktop UI static route", () => {
   it("registers a read-only same-origin route before listen with restrictive response headers", () => {
     const startApi = mainSource.slice(
       mainSource.indexOf("async function startApiServer"),
-      mainSource.indexOf("function serializeError")
+      mainSource.indexOf("async function createMainWindow")
     );
     const createWindow = mainSource.slice(
       mainSource.indexOf("async function createMainWindow"),
       mainSource.indexOf("async function boot")
     );
 
-    expect(mainSource).toContain('server.get(`${DESKTOP_UI_ROUTE_PREFIX}/*`');
-    expect(mainSource).not.toContain('server.post(`${DESKTOP_UI_ROUTE_PREFIX}/*`');
+    expect(mainSource).toContain("server.get(`${DESKTOP_UI_ROUTE_PREFIX}/*`");
+    expect(mainSource).not.toContain("server.post(`${DESKTOP_UI_ROUTE_PREFIX}/*`");
     expect(mainSource).toContain('"Cache-Control": "no-store"');
     expect(mainSource).toContain('"Content-Security-Policy"');
+    expect(mainSource).toContain("\"font-src 'self'\"");
+    expect(mainSource).not.toContain("fonts.googleapis.com");
+    expect(mainSource).not.toContain("fonts.gstatic.com");
+    expect(webStylesSource).not.toMatch(/@import\s+url\(["']?https?:\/\//i);
     expect(mainSource).toContain('"X-Content-Type-Options": "nosniff"');
     expect(mainSource).toContain("realpathSync(candidatePath)");
     expect(mainSource).toContain("statSync(resolvedPath).isFile()");
     expect(startApi).not.toContain('"file://"');
     expect(startApi).not.toContain('"null"');
-    expect(startApi.indexOf('applyLoopbackPrivateUrlDefault(process.env, "127.0.0.1")'))
-      .toBeLessThan(startApi.indexOf("createServer({"));
+    expect(startApi.indexOf('applyLoopbackPrivateUrlDefault(process.env, "127.0.0.1")')).toBeLessThan(
+      startApi.indexOf("createServer({")
+    );
     expect(startApi.indexOf("registerDesktopUiRoute(server)")).toBeLessThan(startApi.indexOf("server.listen"));
     expect(createWindow).toContain("mainWindow.loadURL(`${api.baseUrl}${DESKTOP_UI_ROUTE_PREFIX}/index.html`)");
     expect(createWindow).not.toContain("mainWindow.loadFile(");
   });
 
   it("adds desktop smoke probes for route headers, traversal, directories, writes, and same-origin loading", () => {
-    expect(mainSource).toContain("async function verifyDesktopUiRoute(server)");
-    expect(mainSource).toContain("%252e%252e%252fmain.cjs");
-    expect(mainSource).toContain('method: "POST", url: `${DESKTOP_UI_ROUTE_PREFIX}/index.html`');
-    expect(mainSource).toContain('window.location.origin === new URL(window.assiniDesktop.apiBaseUrl).origin');
-    expect(mainSource).toContain('sidebarBrandOverflow: visibleTextOverflow(".brand-copy strong")');
-    expect(mainSource).not.toContain('visibleTextOverflow(".brand-copy strong, .brand-copy span")');
-    expect(mainSource).toContain('webContents.on("console-message", (details) =>');
-    expect(mainSource).toContain("level: details.level");
-    expect(mainSource).toContain("line: details.lineNumber");
-    expect(mainSource).toContain("message: details.message");
-    expect(mainSource).toContain("sourceId: details.sourceId");
+    expect(mainSource).toContain('require("./desktopSmoke.cjs")');
+    expect(desktopSmokeSource).toContain("async function verifyDesktopUiRoute(server, desktopUiRoutePrefix)");
+    expect(desktopSmokeSource).toContain("%252e%252e%252fmain.cjs");
+    expect(desktopSmokeSource).toContain('method: "POST", url: `${desktopUiRoutePrefix}/index.html`');
+    expect(desktopSmokeSource).toContain("window.location.origin === new URL(window.assiniDesktop.apiBaseUrl).origin");
+    expect(desktopSmokeSource).toContain('sidebarBrandOverflow: visibleTextOverflow(".brand-copy strong")');
+    expect(desktopSmokeSource).not.toContain('visibleTextOverflow(".brand-copy strong, .brand-copy span")');
+    expect(desktopSmokeSource).toContain('webContents.on("console-message", (details) =>');
+    expect(desktopSmokeSource).toContain("level: details.level");
+    expect(desktopSmokeSource).toContain("line: details.lineNumber");
+    expect(desktopSmokeSource).toContain("message: details.message");
+    expect(desktopSmokeSource).toContain("sourceId: details.sourceId");
   });
 });

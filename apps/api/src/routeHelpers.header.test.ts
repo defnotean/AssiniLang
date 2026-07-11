@@ -8,9 +8,9 @@ function requestWithHeaders(headers: Record<string, string | string[] | undefine
 
 describe("getHeaderValue", () => {
   it("returns a string header as-is", () => {
-    expect(
-      getHeaderValue(requestWithHeaders({ "x-assini-user-id": "learner-1" }), "x-assini-user-id")
-    ).toBe("learner-1");
+    expect(getHeaderValue(requestWithHeaders({ "x-assini-user-id": "learner-1" }), "x-assini-user-id")).toBe(
+      "learner-1"
+    );
   });
 
   it("joins repeated Cookie header values so session pairs are not dropped", () => {
@@ -65,10 +65,7 @@ describe("cookieValue with array Cookie headers", () => {
     expect(
       cookieValue(
         requestWithHeaders({
-          cookie: [
-            "assini_prototype_session=stale-session",
-            "assini_prototype_session=session-id-2"
-          ]
+          cookie: ["assini_prototype_session=stale-session", "assini_prototype_session=session-id-2"]
         }),
         "assini_prototype_session"
       )

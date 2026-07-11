@@ -4,7 +4,7 @@ Recipes for the changes you will actually make, with the files and tests to touc
 
 ## Adding an API route
 
-Routes live in domain modules under `apps/api/src/routes/` (one file per domain: `languages.ts`, `sources.ts`, `governance.ts`, ...). Each module exports a `register...Routes(app, context)` function that `createServer` in `apps/api/src/server.ts` calls with the shared `RouteContext` (state accessors, auth, rate limiter, LLM provider, job queue - see `routes/context.ts`). Cross-domain helpers (audit-event builders, `requireActor`, redaction) live in `apps/api/src/routeHelpers.ts`.
+Routes live in domain modules under `apps/api/src/routes/` (for example `languages.ts` and `governance.ts`). Large domains may compose focused registrars: `sources.ts` owns source intake and registers the processing/cancellation routes from `sourceProcessing.ts`. Each module exports a `register...Routes(app, context)` function using the shared `RouteContext` (state accessors, auth, rate limiter, LLM provider, job queue - see `routes/context.ts`); top-level registrars are called by `createServer` in `apps/api/src/server.ts`. Cross-domain helpers (audit-event builders, `requireActor`, redaction) live in `apps/api/src/routeHelpers.ts`.
 
 Add a new route to the matching domain module (or create a new module and register it in `server.ts`). Use `POST /languages/:languageId/sources` in `routes/sources.ts` as the template - it is short and shows the full pattern:
 
@@ -29,19 +29,19 @@ The console is an App shell (`apps/web/src/App.tsx`: layout, sidebar, theme, top
 
 ## Adding a source kind or document format
 
-Seams in `apps/api/src/ingestion.ts`:
+Seams in `apps/api/src/ingestion.ts` and `apps/api/src/ingestionMedia.ts`:
 
 - New document format: extend `TEXT_DOCUMENT_EXTENSIONS` or add a branch in `resolveAssetText` under `asset.kind === "document"` (the PDF/DOCX branches show the dynamic-import pattern). Update the unsupported-type error message.
-- New source kind: add the enum value to `sourceAssetKindSchema` (the `z.enum`) in `packages/db/src/schema.ts`, which `sourceAssetSchema.kind` consumes; teach `sourceKindForUpload` in `apps/api/src/routes/sources.ts` (or the registration body parser) to produce it, and handle it in `resolveAssetText` or `extractCandidatesForAsset`.
+- New source kind: add the enum value to `sourceAssetKindSchema` (the `z.enum`) in `packages/db/src/schemaDomains.ts`, re-exported by the `schema.ts` compatibility facade; teach `sourceKindForUpload` in `apps/api/src/routes/sources.ts` (or the registration body parser) to produce it, and handle it in `resolveAssetText` or `extractCandidatesForAsset`.
 - Tests live in `apps/api/src/ingestion.test.ts` (pipeline behavior with fake providers/fetch) and `apps/api/src/server.test.ts` (route behavior). Update the source-kinds table and error catalogue in [ingestion.md](ingestion.md).
 
 ## Changing the persisted schema
 
-The persisted shape is `appStateSchema` in `packages/db/src/schema.ts` (currently `schemaVersion: 9`). The existing 8 -> 9 SQLite migration in `packages/db/src/sqliteMigrations.ts` adds the `source_assets` columns `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at`.
+The persisted shape is composed by `appStateSchema` in `packages/db/src/schema.ts` (currently `schemaVersion: 9`). Domain Zod schemas live in `schemaDomains.ts`; cross-record checks are grouped by concern in `schemaIntegrity*.ts`; `schema.ts` remains the public compatibility facade and owns versioned composition and legacy migration parsing. The existing 8 -> 9 SQLite migration in `packages/db/src/sqliteMigrations.ts` adds the `source_assets` columns `processing_started_at`, `processing_attempts`, and `processing_heartbeat_at`.
 
 1. Extend the relevant Zod record schema and, when the record is stored in SQLite, its table definition in `packages/db/src/dbSchema.ts`.
 2. When a persisted SQLite table changes, bump `CURRENT_SCHEMA_VERSION`, keep the old app-state version as a legacy schema (the v1-v8 schemas near the bottom of `schema.ts` are the pattern), extend `parseAppState` for JSON reads, and add the ordered physical migration to `SQLITE_MIGRATIONS`.
-3. Add integrity checks in the `superRefine` block when the new data references other collections - corrupted local JSON must fail loudly, not leak into public views.
+3. Add the check to the relevant `schemaIntegrity*.ts` module and invoke it from the facade's `superRefine` composition when new data references other collections - corrupted local JSON must fail loudly, not leak into public views.
 4. Tests: `packages/db/src/store.test.ts` covers parse/migrate/reject paths, `packages/db/src/sqliteMigrations.test.ts` covers physical SQLite migrations and rollback, and `packages/db/src/testing.ts` has state-building helpers. Add a migration test (old-version JSON parses and gains the new field/collection), a SQLite migration test when tables change, and a rejection test (malformed new data fails with a useful message).
 5. Update the collections list in [architecture.md](architecture.md). The doc test derives the collection names from `appStateSchema` in `schema.ts` and fails if any of them is missing from architecture.md's collections list, and it asserts the `schemaVersion` literal in architecture.md matches the one in `schema.ts` - so adding a collection or bumping the version without touching architecture.md breaks the build.
 
@@ -71,21 +71,21 @@ All public projection lives in `apps/api/src/publicLanguageViews.ts`: profiles, 
 
 Each doc owns one topic; link instead of repeating:
 
-| Doc | Owns |
-| --- | --- |
-| `README.md` | Landing page: overview, quick start, command table, doc index. Keep it at most 150 lines. |
-| `docs/configuration.md` | Every environment variable and setup recipe. The only place env vars are exhaustively listed. |
-| `docs/ingestion.md` | Source kinds, processing flow, chunking, SSRF guard, OCR, transcription, duplicate flags, ingestion errors. |
-| `docs/api.md` | Route index, auth model, per-route behavior and validation. |
-| `docs/architecture.md` | Component layout, data model, persistence, validation, projection, evaluation boundaries. |
-| `docs/development.md` | Setup, commands, quality gate, browser verification, the build-a-language walkthrough. |
-| `docs/maintenance.md` | This file: change recipes and doc conventions. |
-| `docs/troubleshooting.md` | Symptom-cause-fix tables. |
-| `docs/operator-recovery.md` | Local backup/restore, interrupted processing, corrupt DB, diagnostics, reset. |
-| `docs/audit-export-drill.md` | Operator audit/export drill using `fixtures/exports/` and export audit receipts. |
-| `docs/product-guide.md` / `docs/ui-design.md` | What the app does for users / how the design system maps to the React app. |
-| `docs/roadmap.md` | Honest gaps before real community data. |
-| `docs/specs/`, `docs/plans/` | Dated history. Do not edit. |
+| Doc                                           | Owns                                                                                                        |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `README.md`                                   | Landing page: overview, quick start, command table, doc index. Keep it at most 150 lines.                   |
+| `docs/configuration.md`                       | Every environment variable and setup recipe. The only place env vars are exhaustively listed.               |
+| `docs/ingestion.md`                           | Source kinds, processing flow, chunking, SSRF guard, OCR, transcription, duplicate flags, ingestion errors. |
+| `docs/api.md`                                 | Route index, auth model, per-route behavior and validation.                                                 |
+| `docs/architecture.md`                        | Component layout, data model, persistence, validation, projection, evaluation boundaries.                   |
+| `docs/development.md`                         | Setup, commands, quality gate, browser verification, the build-a-language walkthrough.                      |
+| `docs/maintenance.md`                         | This file: change recipes and doc conventions.                                                              |
+| `docs/troubleshooting.md`                     | Symptom-cause-fix tables.                                                                                   |
+| `docs/operator-recovery.md`                   | Local backup/restore, interrupted processing, corrupt DB, diagnostics, reset.                               |
+| `docs/audit-export-drill.md`                  | Operator audit/export drill using `fixtures/exports/` and export audit receipts.                            |
+| `docs/product-guide.md` / `docs/ui-design.md` | What the app does for users / how the design system maps to the React app.                                  |
+| `docs/roadmap.md`                             | Honest gaps before real community data.                                                                     |
+| `docs/specs/`, `docs/plans/`                  | Dated history. Do not edit.                                                                                 |
 
 When you change code, update docs in the same change:
 

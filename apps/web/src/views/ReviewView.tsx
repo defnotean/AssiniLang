@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { CorpusPassage, Note } from "@assini/db";
+import type { CorpusPassage, Note } from "@assini/api-contract";
 import { ConfidenceBadge, StatusBadge } from "../components/badges";
 import { DetailBlock } from "../components/DetailBlock";
 import { formatEvidenceLabel, formatNoteEditAction, localizeApiError } from "../lib/format";
@@ -93,17 +93,22 @@ export function ReviewView({
   const [passageToAdd, setPassageToAdd] = useState("");
   const [noteEditMessage, setNoteEditMessage] = useState<string | null>(null);
   const [noteEditError, setNoteEditError] = useState<string | null>(null);
-  const counts = useMemo(() => (
-    notes.reduce<Record<ReviewFilter, number>>((nextCounts, note) => {
-      nextCounts.all += 1;
-      if (note.status === "draft" || note.status === "under_review") {
-        nextCounts.pending += 1;
-      } else if (note.status in nextCounts) {
-        nextCounts[note.status as ReviewFilter] += 1;
-      }
-      return nextCounts;
-    }, { all: 0, pending: 0, contested: 0, rejected: 0, deferred: 0, escalated: 0, approved: 0 })
-  ), [notes]);
+  const counts = useMemo(
+    () =>
+      notes.reduce<Record<ReviewFilter, number>>(
+        (nextCounts, note) => {
+          nextCounts.all += 1;
+          if (note.status === "draft" || note.status === "under_review") {
+            nextCounts.pending += 1;
+          } else if (note.status in nextCounts) {
+            nextCounts[note.status as ReviewFilter] += 1;
+          }
+          return nextCounts;
+        },
+        { all: 0, pending: 0, contested: 0, rejected: 0, deferred: 0, escalated: 0, approved: 0 }
+      ),
+    [notes]
+  );
   const filteredNotes = useMemo(() => {
     const matched = filter === "all" ? notes : notes.filter((note) => matchesReviewFilter(note, filter));
     return matched.slice().sort((left, right) => compareReviewNotes(left, right, sort));
@@ -122,14 +127,14 @@ export function ReviewView({
     const used = new Set(examplesDraft.map((example) => example.passageId));
     return languagePassages.filter((passage) => !used.has(passage.id));
   }, [examplesDraft, languagePassages]);
-  const detailExamplesKey = detailNote ? JSON.stringify(detailNote.examples) : "";
+  const detailExamples = detailNote?.examples;
   useEffect(() => {
     setNoteExplanationDraft(detailNote?.explanation ?? "");
-    setExamplesDraft(cloneExamples(detailNote?.examples ?? []));
+    setExamplesDraft(cloneExamples(detailExamples ?? []));
     setPassageToAdd("");
     setNoteEditMessage(null);
     setNoteEditError(null);
-  }, [detailNote?.id, detailNote?.explanation, detailExamplesKey]);
+  }, [detailNote?.id, detailNote?.explanation, detailExamples]);
   useEffect(() => {
     if (passageToAdd && !availablePassages.some((passage) => passage.id === passageToAdd)) {
       setPassageToAdd(availablePassages[0]?.id ?? "");
@@ -139,14 +144,10 @@ export function ReviewView({
   }, [availablePassages, passageToAdd]);
   const trimmedDraft = noteExplanationDraft.trim();
   const reviewActionsDisabled = reviewingNoteId !== null || isWorkflowBusy;
-  const explanationChanged = detailNote !== null
-    && trimmedDraft.length > 0
-    && trimmedDraft !== detailNote.explanation;
+  const explanationChanged = detailNote !== null && trimmedDraft.length > 0 && trimmedDraft !== detailNote.explanation;
   const examplesChanged = detailNote !== null && !examplesEqual(examplesDraft, detailNote.examples);
-  const canSaveNoteEdits = detailNote !== null
-    && (explanationChanged || examplesChanged)
-    && trimmedDraft.length > 0
-    && !reviewActionsDisabled;
+  const canSaveNoteEdits =
+    detailNote !== null && (explanationChanged || examplesChanged) && trimmedDraft.length > 0 && !reviewActionsDisabled;
 
   function clearEditFeedback() {
     setNoteEditMessage(null);
@@ -168,9 +169,9 @@ export function ReviewView({
   function handleReplaceExample(index: number, passageId: string) {
     const passage = languagePassages.find((item) => item.id === passageId);
     if (!passage) return;
-    setExamplesDraft((current) => current.map((example, itemIndex) => (
-      itemIndex === index ? exampleFromPassage(passage) : example
-    )));
+    setExamplesDraft((current) =>
+      current.map((example, itemIndex) => (itemIndex === index ? exampleFromPassage(passage) : example))
+    );
     clearEditFeedback();
   }
 
@@ -244,9 +245,7 @@ export function ReviewView({
                   : t("reviewView.noNotesInFilterNamed", { filter: t(`reviewView.filter.${filter}`) })}
               </p>
               <p className="muted">
-                {filter === "all"
-                  ? t("reviewView.noNotesForLanguageHint")
-                  : t("reviewView.noNotesInFilterHint")}
+                {filter === "all" ? t("reviewView.noNotesForLanguageHint") : t("reviewView.noNotesInFilterHint")}
               </p>
             </div>
           ) : (
@@ -303,16 +302,19 @@ export function ReviewView({
               <div className="form-group note-examples-editor" aria-label={t("reviewView.examplesEditor")}>
                 <span className="detail-label">{t("reviewView.examples")}</span>
                 {examplesDraft.length === 0 ? (
-                  <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noExamplesSupplied")}</p>
+                  <p className="inline-empty" role="status" aria-live="polite">
+                    {t("reviewView.noExamplesSupplied")}
+                  </p>
                 ) : (
                   <div className="detail-list">
                     {examplesDraft.map((example, index) => {
-                      const replaceOptions = languagePassages.filter((passage) => (
-                        passage.id === example.passageId
-                        || !examplesDraft.some((other, otherIndex) => (
-                          otherIndex !== index && other.passageId === passage.id
-                        ))
-                      ));
+                      const replaceOptions = languagePassages.filter(
+                        (passage) =>
+                          passage.id === example.passageId ||
+                          !examplesDraft.some(
+                            (other, otherIndex) => otherIndex !== index && other.passageId === passage.id
+                          )
+                      );
                       return (
                         <div key={`${index}:${example.passageId}`} className="detail-row example-row example-edit-row">
                           <label className="visually-hidden" htmlFor={`note-example-passage-${index}`}>
@@ -435,7 +437,9 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.reviewerComments")}>
               {detailNote.reviewer.comments.length === 0 ? (
-                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noReviewerComments")}</p>
+                <p className="inline-empty" role="status" aria-live="polite">
+                  {t("reviewView.noReviewerComments")}
+                </p>
               ) : (
                 <div className="detail-list">
                   {detailNote.reviewer.comments.map((comment, index) => (
@@ -449,7 +453,9 @@ export function ReviewView({
 
             <DetailBlock title={t("reviewView.editHistory")}>
               {detailNote.editHistory.length === 0 ? (
-                <p className="inline-empty" role="status" aria-live="polite">{t("reviewView.noEditHistory")}</p>
+                <p className="inline-empty" role="status" aria-live="polite">
+                  {t("reviewView.noEditHistory")}
+                </p>
               ) : (
                 <div className="detail-list">
                   {detailNote.editHistory.map((entry, index) => (

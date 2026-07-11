@@ -31,9 +31,11 @@ function tryLoadEnvFile(path: string): void {
 export function bootstrapRuntimeEnvironment(options: RuntimeEnvLoadOptions = {}): string {
   const env = options.env ?? process.env;
   const cwd = options.cwd ?? process.cwd();
-  const settingsPath = options.settingsPath ?? resolveRuntimeSettingsPath({
-    moduleUrl: options.moduleUrl ?? import.meta.url
-  });
+  const settingsPath =
+    options.settingsPath ??
+    resolveRuntimeSettingsPath({
+      moduleUrl: options.moduleUrl ?? import.meta.url
+    });
   const cwdEnvPath = resolvePath(cwd, ".env");
 
   if (env === process.env) {

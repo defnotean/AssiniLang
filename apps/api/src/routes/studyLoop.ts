@@ -4,12 +4,7 @@ import type { CorpusPassage, Note } from "@assini/db";
 import { draftNotesForLanguage, scoreModelDraft } from "@assini/eval";
 import { generateModelDraftNotes, ModelRequiredError, type GeneratedNoteDraft } from "../generation.js";
 import { toPublicNotes } from "../publicLanguageViews.js";
-import {
-  appendAuditEvents,
-  MODEL_REQUIRED_MESSAGE,
-  redactErrorSecrets,
-  requireActor
-} from "../routeHelpers.js";
+import { appendAuditEvents, MODEL_REQUIRED_MESSAGE, redactErrorSecrets, requireActor } from "../routeHelpers.js";
 import type { RouteContext } from "./context.js";
 
 const STUDY_LOOP_DRAFT_AUTHOR = "deterministic-study-loop";
@@ -38,10 +33,12 @@ function isReplaceableGeneratedDraft(note: Note): boolean {
     (entry) => entry.by === STUDY_LOOP_DRAFT_AUTHOR && entry.action === STUDY_LOOP_DRAFT_ACTION
   );
 
-  return note.status === "draft"
-    && note.reviewer.lastReviewedBy === null
-    && note.reviewer.lastReviewedAt === null
-    && hasStudyLoopDraftMarker;
+  return (
+    note.status === "draft" &&
+    note.reviewer.lastReviewedBy === null &&
+    note.reviewer.lastReviewedAt === null &&
+    hasStudyLoopDraftMarker
+  );
 }
 
 function mergeGeneratedDraftNotes(existingNotes: Note[], languageId: string, generatedDrafts: Note[]): Note[] {
@@ -76,7 +73,12 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     }
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "lead",
+      "admin",
+      "elder"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
@@ -94,21 +96,24 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
       const drawnIds = new Set(drawn.map((note) => note.id));
       nextNotes = notes.filter((note) => note.languageId === body.languageId && drawnIds.has(note.id));
 
-      return appendAuditEvents({
-        ...state,
-        notes
-      }, nextNotes.map((note) => ({
-        actor,
-        action: "note.draft_generated",
-        entityType: "note",
-        entityId: note.id,
-        languageId: note.languageId,
-        summary: `Generated deterministic draft note for ${note.topic}.`,
-        metadata: {
-          topic: note.topic,
-          status: note.status
-        }
-      })));
+      return appendAuditEvents(
+        {
+          ...state,
+          notes
+        },
+        nextNotes.map((note) => ({
+          actor,
+          action: "note.draft_generated",
+          entityType: "note",
+          entityId: note.id,
+          languageId: note.languageId,
+          summary: `Generated deterministic draft note for ${note.topic}.`,
+          metadata: {
+            topic: note.topic,
+            status: note.status
+          }
+        }))
+      );
     });
 
     if (languageMissing) {
@@ -126,7 +131,12 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     const { languageId } = request.params as { languageId: string };
 
     const current = await readState();
-    const actor = requireActor(current, request, reply, authToken, prototypeSessions, ["reviewer", "lead", "admin", "elder"]);
+    const actor = requireActor(current, request, reply, authToken, prototypeSessions, [
+      "reviewer",
+      "lead",
+      "admin",
+      "elder"
+    ]);
     if (!actor) return { error: reply.statusCode === 403 ? "Forbidden" : "Unauthorized" };
     const rateLimited = checkRateLimit(request, reply, actor);
     if (rateLimited) return rateLimited;
@@ -210,25 +220,30 @@ export function registerStudyLoopRoutes(app: FastifyInstance, ctx: RouteContext)
     }));
 
     if (scoredNotes.length > 0) {
-      await updateState((state) => appendAuditEvents({
-        ...state,
-        notes: [...state.notes, ...createdNotes]
-      }, scoredNotes.map((note) => ({
-        actor,
-        at: generatedAt,
-        action: "note.draft_generated",
-        entityType: "note",
-        entityId: note.id,
-        languageId: note.languageId,
-        summary: `Generated model-backed draft note for ${note.topic}.`,
-        metadata: {
-          topic: note.topic,
-          status: note.status,
-          confidence: note.confidence,
-          groundingScore: note.grounding.score,
-          groundingFailureCodes: note.grounding.failureCodes
-        }
-      }))));
+      await updateState((state) =>
+        appendAuditEvents(
+          {
+            ...state,
+            notes: [...state.notes, ...createdNotes]
+          },
+          scoredNotes.map((note) => ({
+            actor,
+            at: generatedAt,
+            action: "note.draft_generated",
+            entityType: "note",
+            entityId: note.id,
+            languageId: note.languageId,
+            summary: `Generated model-backed draft note for ${note.topic}.`,
+            metadata: {
+              topic: note.topic,
+              status: note.status,
+              confidence: note.confidence,
+              groundingScore: note.grounding.score,
+              groundingFailureCodes: note.grounding.failureCodes
+            }
+          }))
+        )
+      );
     }
 
     return { notes: scoredNotes, warnings: generation.warnings, generated: createdNotes.length };

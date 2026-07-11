@@ -31,8 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@assini/api-contract/llm": `${repoRoot}/packages/api-contract/src/llmContract.ts`,
-      "@assini/api-contract/sourceProcessingErrors": `${repoRoot}/packages/api-contract/src/sourceProcessingErrors.ts`,
-      "@assini/db/schema": `${repoRoot}/packages/db/src/schema.ts`
+      "@assini/api-contract/sourceProcessingErrors": `${repoRoot}/packages/api-contract/src/sourceProcessingErrors.ts`
     }
   },
   optimizeDeps: {

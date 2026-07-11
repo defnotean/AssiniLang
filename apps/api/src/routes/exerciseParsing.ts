@@ -1,10 +1,6 @@
 import { exerciseSubmissionPayloadSchema } from "@assini/api-contract";
 import type { AppState, Exercise } from "@assini/db";
-import {
-  firstDuplicateNormalizedValue,
-  normalizeAuthoredAnswer,
-  parseStringArray
-} from "../routeHelpers.js";
+import { firstDuplicateNormalizedValue, normalizeAuthoredAnswer, parseStringArray } from "../routeHelpers.js";
 import { parseSchemaBody } from "./requestBody.js";
 
 type ExerciseSubmissionBody = {
@@ -13,7 +9,13 @@ type ExerciseSubmissionBody = {
 
 export type ExerciseAuthoringBody = Pick<
   Exercise,
-  "type" | "prompt" | "allowedVocabulary" | "allowedRuleIds" | "expectedAnswers" | "adversarialAnswers" | "gradingExplanation"
+  | "type"
+  | "prompt"
+  | "allowedVocabulary"
+  | "allowedRuleIds"
+  | "expectedAnswers"
+  | "adversarialAnswers"
+  | "gradingExplanation"
 >;
 
 const EXERCISE_TYPES: readonly Exercise["type"][] = [
@@ -60,17 +62,17 @@ export function parseExerciseAuthoringBody(input: unknown): ExerciseAuthoringBod
   }
 
   const body = input as Record<string, unknown>;
-  const type = typeof body.type === "string" && EXERCISE_TYPES.includes(body.type as Exercise["type"])
-    ? body.type as Exercise["type"]
-    : undefined;
+  const type =
+    typeof body.type === "string" && EXERCISE_TYPES.includes(body.type as Exercise["type"])
+      ? (body.type as Exercise["type"])
+      : undefined;
   const prompt = typeof body.prompt === "string" ? body.prompt.trim().replace(/\s+/g, " ") : "";
   const allowedVocabulary = parseStringArray(body.allowedVocabulary);
   const allowedRuleIds = parseStringArray(body.allowedRuleIds);
   const expectedAnswers = parseStringArray(body.expectedAnswers);
   const adversarialAnswers = parseAdversarialAnswers(body.adversarialAnswers);
-  const gradingExplanation = typeof body.gradingExplanation === "string"
-    ? body.gradingExplanation.trim().replace(/\s+/g, " ")
-    : "";
+  const gradingExplanation =
+    typeof body.gradingExplanation === "string" ? body.gradingExplanation.trim().replace(/\s+/g, " ") : "";
 
   if (!type || prompt.length === 0 || !allowedVocabulary || allowedVocabulary.length === 0) return undefined;
   if (!allowedRuleIds || allowedRuleIds.length === 0) return undefined;
@@ -117,7 +119,11 @@ export function validateExerciseAuthoring(
   return { errors: [], warnings };
 }
 
-export function exerciseAuthoringValidationError(state: AppState, languageId: string, body: ExerciseAuthoringBody): string | undefined {
+export function exerciseAuthoringValidationError(
+  state: AppState,
+  languageId: string,
+  body: ExerciseAuthoringBody
+): string | undefined {
   const language = state.languages.find((item) => item.id === languageId);
   if (!language) {
     return `Exercise authoring language not found: ${languageId}`;

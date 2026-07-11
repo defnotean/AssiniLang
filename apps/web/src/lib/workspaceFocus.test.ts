@@ -1,11 +1,7 @@
 /** @vitest-environment jsdom */
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  OPEN_CORPUS_BULK_EVENT,
-  scheduleWorkspaceFocus,
-  WORKSPACE_FOCUS
-} from "./workspaceFocus";
+import { OPEN_CORPUS_BULK_EVENT, scheduleWorkspaceFocus, WORKSPACE_FOCUS } from "./workspaceFocus";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -19,12 +15,10 @@ describe("scheduleWorkspaceFocus", () => {
     input.scrollIntoView = vi.fn();
     document.body.appendChild(input);
 
-    const raf = vi
-      .spyOn(window, "requestAnimationFrame")
-      .mockImplementation((callback: FrameRequestCallback) => {
-        callback(0);
-        return 1;
-      });
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback: FrameRequestCallback) => {
+      callback(0);
+      return 1;
+    });
 
     scheduleWorkspaceFocus(WORKSPACE_FOCUS.practiceAuthoring);
 

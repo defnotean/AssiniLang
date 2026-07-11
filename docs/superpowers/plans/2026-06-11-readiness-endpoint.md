@@ -15,6 +15,7 @@
 ## Task 1: Readiness Report Helper
 
 **Files:**
+
 - Create: `apps/api/src/readiness.ts`
 - Create: `apps/api/src/readiness.test.ts`
 
@@ -53,6 +54,7 @@
 ## Task 2: `/ready` API Route
 
 **Files:**
+
 - Modify: `apps/api/src/server.ts`
 - Modify: `apps/api/src/server.test.ts`
 
@@ -81,6 +83,7 @@ expect(JSON.stringify(ready.json())).not.toContain(dbPath);
 ## Task 3: Documentation
 
 **Files:**
+
 - Modify: `docs/api.md`
 
 - [x] Add `GET /ready` to the route index as a public readiness check.
@@ -90,6 +93,7 @@ expect(JSON.stringify(ready.json())).not.toContain(dbPath);
 ## Task 4: Verification
 
 **Files:**
+
 - Modify as needed only for type or doc fixes.
 
 - [x] Run `npm.cmd test`.

@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Language } from "@assini/db";
+import type { Language } from "@assini/api-contract";
 import { PhonologyInventoryEditor } from "./PhonologyInventoryEditor";
 
 const apiMock = vi.hoisted(() => ({
@@ -44,13 +44,7 @@ describe("PhonologyInventoryEditor", () => {
     });
     apiMock.updateLanguage.mockResolvedValue(savedLanguage);
 
-    render(
-      <PhonologyInventoryEditor
-        language={buildLanguage()}
-        isWorkflowBusy={false}
-        onSaved={onSaved}
-      />
-    );
+    render(<PhonologyInventoryEditor language={buildLanguage()} isWorkflowBusy={false} onSaved={onSaved} />);
 
     const panel = screen.getByRole("region", { name: "Phonology profile" });
     expect(within(panel).getByText("No phonology declared yet")).toBeInTheDocument();
@@ -115,13 +109,7 @@ describe("PhonologyInventoryEditor", () => {
       }
     });
 
-    render(
-      <PhonologyInventoryEditor
-        language={language}
-        isWorkflowBusy={false}
-        onSaved={onSaved}
-      />
-    );
+    render(<PhonologyInventoryEditor language={language} isWorkflowBusy={false} onSaved={onSaved} />);
 
     const form = screen.getByRole("form", { name: "Phonology inventory editor" });
     expect(screen.getByRole("heading", { level: 2, name: "Sound inventory" })).toBeInTheDocument();
@@ -129,25 +117,21 @@ describe("PhonologyInventoryEditor", () => {
     fireEvent.click(within(form).getByRole("button", { name: "Add consonant" }));
     fireEvent.click(within(form).getByRole("button", { name: "Save" }));
 
-    await waitFor(() => expect(apiMock.updateLanguage).toHaveBeenCalledWith("avenik", {
-      phonology: {
-        consonants: ["t", "k"],
-        vowels: ["a"],
-        syllableTemplate: "CV",
-        stress: "word-initial",
-        notes: ["No clusters."]
-      }
-    }));
+    await waitFor(() =>
+      expect(apiMock.updateLanguage).toHaveBeenCalledWith("avenik", {
+        phonology: {
+          consonants: ["t", "k"],
+          vowels: ["a"],
+          syllableTemplate: "CV",
+          stress: "word-initial",
+          notes: ["No clusters."]
+        }
+      })
+    );
   });
 
   it("rejects blank symbols before calling the API", () => {
-    render(
-      <PhonologyInventoryEditor
-        language={buildLanguage()}
-        isWorkflowBusy={false}
-        onSaved={vi.fn()}
-      />
-    );
+    render(<PhonologyInventoryEditor language={buildLanguage()} isWorkflowBusy={false} onSaved={vi.fn()} />);
 
     const form = screen.getByRole("form", { name: "Phonology inventory editor" });
     fireEvent.click(within(form).getByRole("button", { name: "Add consonant" }));

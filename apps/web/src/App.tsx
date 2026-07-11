@@ -1,9 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import type { Language, User } from "@assini/db";
-import type {
-  CorpusImportPayload,
-  LanguageCreatePayload
-} from "./api";
+import type { Language, User } from "@assini/api-contract";
+import type { CorpusImportPayload, LanguageCreatePayload } from "./api";
 import {
   createLanguage,
   deleteLanguage,
@@ -24,11 +21,7 @@ import { ApiError } from "./lib/apiClient";
 import { formatLocalUserName, localizeApiError } from "./lib/format";
 import { getDesktopBridgeInfo } from "./lib/desktopBridge";
 import { getBrowserThemeStorage, getInitialTheme } from "./lib/theme";
-import type {
-  DashboardLoadState,
-  Theme,
-  ViewMode
-} from "./lib/types";
+import type { DashboardLoadState, Theme, ViewMode } from "./lib/types";
 import { useI18n } from "./i18n";
 import { useAssistantWorkspace } from "./hooks/useAssistantWorkspace";
 import { useElderWorkspace } from "./hooks/useElderWorkspace";
@@ -47,24 +40,16 @@ import "./styles.css";
 const AssistantView = lazy(() =>
   import("./views/AssistantView").then(({ AssistantView }) => ({ default: AssistantView }))
 );
-const CorpusView = lazy(() =>
-  import("./views/CorpusView").then(({ CorpusView }) => ({ default: CorpusView }))
-);
-const ElderPage = lazy(() =>
-  import("./views/ElderPage").then(({ ElderPage }) => ({ default: ElderPage }))
-);
+const CorpusView = lazy(() => import("./views/CorpusView").then(({ CorpusView }) => ({ default: CorpusView })));
+const ElderPage = lazy(() => import("./views/ElderPage").then(({ ElderPage }) => ({ default: ElderPage })));
 const EvaluationView = lazy(() =>
   import("./views/EvaluationView").then(({ EvaluationView }) => ({ default: EvaluationView }))
 );
 const GovernanceView = lazy(() =>
   import("./views/GovernanceView").then(({ GovernanceView }) => ({ default: GovernanceView }))
 );
-const IngestView = lazy(() =>
-  import("./views/IngestView").then(({ IngestView }) => ({ default: IngestView }))
-);
-const LearnerView = lazy(() =>
-  import("./views/LearnerView").then(({ LearnerView }) => ({ default: LearnerView }))
-);
+const IngestView = lazy(() => import("./views/IngestView").then(({ IngestView }) => ({ default: IngestView })));
+const LearnerView = lazy(() => import("./views/LearnerView").then(({ LearnerView }) => ({ default: LearnerView })));
 const ModelSetupView = lazy(() =>
   import("./views/ModelSetupView").then(({ ModelSetupView }) => ({ default: ModelSetupView }))
 );
@@ -73,9 +58,7 @@ const PhonologyInventoryEditor = lazy(() =>
     default: PhonologyInventoryEditor
   }))
 );
-const ReviewView = lazy(() =>
-  import("./views/ReviewView").then(({ ReviewView }) => ({ default: ReviewView }))
-);
+const ReviewView = lazy(() => import("./views/ReviewView").then(({ ReviewView }) => ({ default: ReviewView })));
 
 export { getInitialTheme } from "./lib/theme";
 
@@ -94,7 +77,12 @@ export function App() {
   const data = loadState.status === "ready" ? loadState.data : null;
 
   const model = useModelWorkspace(view, selectedLanguageId, data);
-  const elder = useElderWorkspace(selectedLanguageId, view === "ingest", refreshDashboard, model.refreshModelObservability);
+  const elder = useElderWorkspace(
+    selectedLanguageId,
+    view === "ingest",
+    refreshDashboard,
+    model.refreshModelObservability
+  );
   const learner = useLearnerWorkspace(view, selectedLanguageId, data, refreshDashboard);
   const governance = useGovernanceWorkspace(selectedLanguageId, view, refreshDashboard);
   const assistant = useAssistantWorkspace();
@@ -190,21 +178,22 @@ export function App() {
   }, [selectedLanguageId, dashboardReloadKey]);
 
   const selectedLanguage = data?.languages.find((language) => language.id === selectedLanguageId) ?? null;
-  const isWorkflowBusy = review.isEvaluating
-    || review.isDrafting
-    || review.isModelDrafting
-    || review.reviewingNoteId !== null
-    || learner.isGrading
-    || elder.isSubmittingCorrection
-    || elder.reviewingCorrectionId !== null
-    || elder.applyingCorrectionId !== null
-    || governance.isSubmittingGovernance
-    || governance.isSubmittingReviewPolicy
-    || governance.resolvingReviewDispositionId !== null
-    || governance.isExportingSnapshot
-    || governance.isExportingEvaluationArtifact
-    || model.isTestingModel
-    || assistant.isSending;
+  const isWorkflowBusy =
+    review.isEvaluating ||
+    review.isDrafting ||
+    review.isModelDrafting ||
+    review.reviewingNoteId !== null ||
+    learner.isGrading ||
+    elder.isSubmittingCorrection ||
+    elder.reviewingCorrectionId !== null ||
+    elder.applyingCorrectionId !== null ||
+    governance.isSubmittingGovernance ||
+    governance.isSubmittingReviewPolicy ||
+    governance.resolvingReviewDispositionId !== null ||
+    governance.isExportingSnapshot ||
+    governance.isExportingEvaluationArtifact ||
+    model.isTestingModel ||
+    assistant.isSending;
 
   const overviewStats = useMemo(() => {
     if (!data) return [];
@@ -236,9 +225,7 @@ export function App() {
         status: "ready",
         data: {
           ...current.data,
-          languages: current.data.languages.map((language) =>
-            language.id === updated.id ? updated : language
-          )
+          languages: current.data.languages.map((language) => (language.id === updated.id ? updated : language))
         }
       };
     });
@@ -298,8 +285,7 @@ export function App() {
     // Reconnect guidance is for connectivity failures only — not auth/rate-limit.
     const statusCode = loadState.statusCode;
     const isAuthOrClientLimit = statusCode === 401 || statusCode === 403 || statusCode === 429;
-    const desktopHint =
-      getDesktopBridgeInfo() && !isAuthOrClientLimit ? t("app.desktopReconnectHint") : undefined;
+    const desktopHint = getDesktopBridgeInfo() && !isAuthOrClientLimit ? t("app.desktopReconnectHint") : undefined;
     return (
       <StatusScreen
         kind="error"
@@ -336,126 +322,124 @@ export function App() {
 
   return (
     <>
-      {isPaletteOpen && (
-        <CommandPalette commands={paletteCommands} onClose={() => setIsPaletteOpen(false)} />
-      )}
+      {isPaletteOpen && <CommandPalette commands={paletteCommands} onClose={() => setIsPaletteOpen(false)} />}
       {showTour && <GuidedTour steps={TOUR_STEPS} onClose={dismissTour} />}
       <div className="app-shell">
-      <a
-        className="skip-link"
-        href="#main-content"
-        onClick={(event) => {
-          const main = document.getElementById("main-content");
-          if (!main) return;
-          event.preventDefault();
-          main.scrollTop = 0;
-          main.focus({ preventScroll: false });
-        }}
-      >
-        {t("app.skipToMain")}
-      </a>
-      <aside className="sidebar" aria-label={t("sidebar.aria")}>
-        <div className="brand-card">
-          <div className="brand-mark">
-            <CompassMark />
+        <a
+          className="skip-link"
+          href="#main-content"
+          onClick={(event) => {
+            const main = document.getElementById("main-content");
+            if (!main) return;
+            event.preventDefault();
+            main.scrollTop = 0;
+            main.focus({ preventScroll: false });
+          }}
+        >
+          {t("app.skipToMain")}
+        </a>
+        <aside className="sidebar" aria-label={t("sidebar.aria")}>
+          <div className="brand-card">
+            <div className="brand-mark">
+              <CompassMark />
+            </div>
+            <div className="brand-copy">
+              <p className="brand-kicker">AssiniLang</p>
+              <strong>{t("sidebar.brandTitle")}</strong>
+              <span>{t("sidebar.brandSubtitle")}</span>
+            </div>
+            <div className="brand-controls">
+              <button
+                type="button"
+                className="theme-toggle"
+                role="switch"
+                aria-checked={theme === "dark"}
+                aria-label={t("theme.darkMode")}
+                onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+              >
+                {theme === "dark" ? t("theme.dark") : t("theme.light")}
+              </button>
+            </div>
           </div>
-          <div className="brand-copy">
-            <p className="brand-kicker">AssiniLang</p>
-            <strong>{t("sidebar.brandTitle")}</strong>
-            <span>{t("sidebar.brandSubtitle")}</span>
-          </div>
-          <div className="brand-controls">
-            <button
-              type="button"
-              className="theme-toggle"
-              role="switch"
-              aria-checked={theme === "dark"}
-              aria-label={t("theme.darkMode")}
-              onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-            >
-              {theme === "dark" ? t("theme.dark") : t("theme.light")}
-            </button>
-          </div>
-        </div>
 
-        <DiamondBand />
+          <DiamondBand />
 
-        <div className="sidebar-section-label">{t("sidebar.languages")}</div>
-        <SidebarLanguageNav
-          languages={data.languages}
-          selectedLanguageId={selectedLanguageId}
-          view={view}
-          sectionCounts={sectionCounts}
-          onLanguageSelect={handleLanguageSelect}
-          onViewSelect={handleViewSelect}
-        />
-
-        <div className="sidebar-footer">
-          <CreateLanguageForm isWorkflowBusy={isWorkflowBusy} onCreate={handleCreateLanguage} />
-          <DeleteLanguageForm
+          <div className="sidebar-section-label">{t("sidebar.languages")}</div>
+          <SidebarLanguageNav
             languages={data.languages}
             selectedLanguageId={selectedLanguageId}
-            isWorkflowBusy={isWorkflowBusy}
-            onDelete={handleDeleteLanguage}
+            view={view}
+            sectionCounts={sectionCounts}
+            onLanguageSelect={handleLanguageSelect}
+            onViewSelect={handleViewSelect}
           />
-          <button type="button" className="tour-trigger" onClick={() => setShowTour(true)}>
-            {t("tour.takeTour")}
-          </button>
-          <div className="user-card">
-            <span>{t("sidebar.signedIn")}</span>
-            <strong>{formatLocalUserName(currentUser?.name, t) ?? t("sidebar.localUser")}</strong>
-            <SignOutButton />
+
+          <div className="sidebar-footer">
+            <CreateLanguageForm isWorkflowBusy={isWorkflowBusy} onCreate={handleCreateLanguage} />
+            <DeleteLanguageForm
+              languages={data.languages}
+              selectedLanguageId={selectedLanguageId}
+              isWorkflowBusy={isWorkflowBusy}
+              onDelete={handleDeleteLanguage}
+            />
+            <button type="button" className="tour-trigger" onClick={() => setShowTour(true)}>
+              {t("tour.takeTour")}
+            </button>
+            <div className="user-card">
+              <span>{t("sidebar.signedIn")}</span>
+              <strong>{formatLocalUserName(currentUser?.name, t) ?? t("sidebar.localUser")}</strong>
+              <SignOutButton />
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      <main className="main-content" id="main-content" tabIndex={-1} aria-busy={isWorkflowBusy}>
-        <DesktopOfflineBanner />
-        <div className="prototype-notice">
-          <strong>{t("app.localPrototype")}</strong>
-          <span>{t("app.dataStaysLocal")}</span>
-        </div>
+        <main className="main-content" id="main-content" tabIndex={0} aria-busy={isWorkflowBusy}>
+          <DesktopOfflineBanner />
+          <div className="prototype-notice">
+            <strong>{t("app.localPrototype")}</strong>
+            <span>{t("app.dataStaysLocal")}</span>
+          </div>
 
-        <WorkspaceHeader
-          view={view}
-          currentTitle={currentTitle}
-          currentEyebrow={currentEyebrow}
-          currentBreadcrumb={currentBreadcrumb}
-          selectedLanguage={selectedLanguage}
-          isWorkflowBusy={isWorkflowBusy}
-          isDrafting={review.isDrafting}
-          isModelDrafting={review.isModelDrafting}
-          isEvaluating={review.isEvaluating}
-          modelDraftMessage={review.modelDraftMessage}
-          modelDraftError={review.modelDraftError}
-          actionError={review.workspaceActionError}
-          onGenerateDrafts={review.handleGenerateDrafts}
-          onGenerateModelDrafts={review.handleGenerateModelDrafts}
-          onRunEval={review.handleRunEval}
-        />
+          <WorkspaceHeader
+            view={view}
+            currentTitle={currentTitle}
+            currentEyebrow={currentEyebrow}
+            currentBreadcrumb={currentBreadcrumb}
+            selectedLanguage={selectedLanguage}
+            isWorkflowBusy={isWorkflowBusy}
+            isDrafting={review.isDrafting}
+            isModelDrafting={review.isModelDrafting}
+            isEvaluating={review.isEvaluating}
+            modelDraftMessage={review.modelDraftMessage}
+            modelDraftError={review.modelDraftError}
+            actionError={review.workspaceActionError}
+            onGenerateDrafts={review.handleGenerateDrafts}
+            onGenerateModelDrafts={review.handleGenerateModelDrafts}
+            onRunEval={review.handleRunEval}
+          />
 
-        <DiamondBand compact />
+          <DiamondBand compact />
 
-        {selectedLanguage && view !== "elder" && (
-          <section className="stat-strip" aria-label={t("header.statStripAria")}>
-            {overviewStats.map((stat) => (
-              <div key={stat.label} className="stat-card">
-                <span>{stat.label}</span>
-                <strong>{stat.value}</strong>
-                <em>{stat.hint}</em>
-              </div>
-            ))}
-          </section>
-        )}
+          {selectedLanguage && view !== "elder" && (
+            <section className="stat-strip" aria-label={t("header.statStripAria")}>
+              {overviewStats.map((stat) => (
+                <div key={stat.label} className="stat-card">
+                  <span>{stat.label}</span>
+                  <strong>{stat.value}</strong>
+                  <em>{stat.hint}</em>
+                </div>
+              ))}
+            </section>
+          )}
 
-        <section className="view-container simple-view-container" aria-labelledby="current-view-title">
-          <h2 id="current-view-title" className="visually-hidden">
-            {currentTitle}
-          </h2>
+          <section className="view-container simple-view-container" aria-labelledby="current-view-title">
+            <h2 id="current-view-title" className="visually-hidden">
+              {currentTitle}
+            </h2>
 
-          <Suspense fallback={<StatusScreen kind="loading" message={t("app.loadingWorkspace")} />}>
-              {view === "profile" && (
-                selectedLanguageId ? (
+            <Suspense fallback={<StatusScreen kind="loading" message={t("app.loadingWorkspace")} />}>
+              {view === "profile" &&
+                (selectedLanguageId ? (
                   <div className="simple-workspace-stack">
                     <section className="simple-intro" aria-label={t("simple.languageOverviewAria")}>
                       <div>
@@ -506,10 +490,11 @@ export function App() {
                       />
                     </section>
                   </div>
-                ) : <NoLanguageNotice />
-              )}
-              {view === "ingest" && (
-                selectedLanguageId ? (
+                ) : (
+                  <NoLanguageNotice />
+                ))}
+              {view === "ingest" &&
+                (selectedLanguageId ? (
                   <div className="simple-workspace-stack">
                     <section className="simple-section surface-section" aria-label={t("simple.addMaterialAria")}>
                       <div className="simple-section-heading">
@@ -540,7 +525,10 @@ export function App() {
                         onSaveExplanation={review.handleSaveNoteExplanation}
                       />
                     </section>
-                    <section className="simple-section surface-section" aria-label={t("simple.communityCorrectionsAria")}>
+                    <section
+                      className="simple-section surface-section"
+                      aria-label={t("simple.communityCorrectionsAria")}
+                    >
                       <div className="simple-section-heading">
                         <span className="detail-label">{t("simple.corrections")}</span>
                         <h2>{t("simple.correctionsTitle")}</h2>
@@ -549,10 +537,11 @@ export function App() {
                       <ElderPage elder={elder} data={data} isWorkflowBusy={isWorkflowBusy} />
                     </section>
                   </div>
-                ) : <NoLanguageNotice />
-              )}
-              {view === "learner" && (
-                selectedLanguageId ? (
+                ) : (
+                  <NoLanguageNotice />
+                ))}
+              {view === "learner" &&
+                (selectedLanguageId ? (
                   <div className="simple-workspace-stack">
                     <section className="simple-section surface-section" aria-label={t("simple.practiceExercisesAria")}>
                       <div className="simple-section-heading">
@@ -583,8 +572,9 @@ export function App() {
                       />
                     </section>
                   </div>
-                ) : <NoLanguageNotice />
-              )}
+                ) : (
+                  <NoLanguageNotice />
+                ))}
               {view === "model" && (
                 <div className="simple-workspace-stack">
                   <section className="simple-section surface-section" aria-label={t("simple.modelConnectionAria")}>
@@ -620,17 +610,16 @@ export function App() {
                         <h2>{t("simple.rulesTitle")}</h2>
                         <p>{t("simple.rulesBody")}</p>
                       </div>
-                      <GovernanceView
-                        selectedLanguageId={selectedLanguageId}
-                        governance={governance}
-                      />
+                      <GovernanceView selectedLanguageId={selectedLanguageId} governance={governance} />
                     </section>
-                  ) : <NoLanguageNotice />}
+                  ) : (
+                    <NoLanguageNotice />
+                  )}
                 </div>
               )}
-          </Suspense>
-        </section>
-      </main>
+            </Suspense>
+          </section>
+        </main>
       </div>
     </>
   );

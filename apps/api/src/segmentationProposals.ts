@@ -49,9 +49,7 @@ function buildKnownForms(lexemes: LexemeSegmentationHint[]): KnownForm[] {
     forms.push({ ...lexeme, form, key });
   }
 
-  return forms.sort((left, right) =>
-    right.key.length - left.key.length || left.key.localeCompare(right.key)
-  );
+  return forms.sort((left, right) => right.key.length - left.key.length || left.key.localeCompare(right.key));
 }
 
 /**
@@ -120,13 +118,9 @@ function segmentToken(token: string, knownForms: KnownForm[]): Morpheme[] {
  * Returns true when segmentation is absent or every morpheme is an honest
  * token-level fallback with gloss "unanalyzed".
  */
-export function isSegmentationEmptyOrAllUnanalyzed(
-  morphologicalSegmentation: Array<Pick<Morpheme, "gloss">>
-): boolean {
+export function isSegmentationEmptyOrAllUnanalyzed(morphologicalSegmentation: Array<Pick<Morpheme, "gloss">>): boolean {
   if (morphologicalSegmentation.length === 0) return true;
-  return morphologicalSegmentation.every((morpheme) =>
-    morpheme.gloss.trim().toLowerCase() === "unanalyzed"
-  );
+  return morphologicalSegmentation.every((morpheme) => morpheme.gloss.trim().toLowerCase() === "unanalyzed");
 }
 
 /**
@@ -134,14 +128,13 @@ export function isSegmentationEmptyOrAllUnanalyzed(
  * Whitespace separates tokens; hyphens inside a token are boundary markers.
  * Unmatched spans become `unanalyzed` morphemes.
  */
-export function proposeLexiconSegmentation(
-  textTarget: string,
-  lexemes: LexemeSegmentationHint[]
-): Morpheme[] {
+export function proposeLexiconSegmentation(textTarget: string, lexemes: LexemeSegmentationHint[]): Morpheme[] {
   const knownForms = buildKnownForms(lexemes);
   if (knownForms.length === 0) return [];
 
-  const tokens = normalizeTargetText(textTarget).split(/\s+/).filter((token) => token.length > 0);
+  const tokens = normalizeTargetText(textTarget)
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
   return tokens.flatMap((token) => segmentToken(token, knownForms));
 }
 
@@ -154,10 +147,9 @@ export function enrichSegmentationFromLexicon(
   proposed: Morpheme[],
   lexemes: LexemeSegmentationHint[]
 ): Morpheme[] {
-  const usable = proposed.filter((morpheme) =>
-    morpheme.surface.trim().length > 0
-    && morpheme.lemma.trim().length > 0
-    && morpheme.gloss.trim().length > 0
+  const usable = proposed.filter(
+    (morpheme) =>
+      morpheme.surface.trim().length > 0 && morpheme.lemma.trim().length > 0 && morpheme.gloss.trim().length > 0
   );
 
   if (!isSegmentationEmptyOrAllUnanalyzed(usable)) {

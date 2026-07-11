@@ -21,10 +21,7 @@ export const EVALUATION_CATEGORY_THRESHOLDS: Record<string, number> = {
   generationPolicy: 1
 };
 
-function modelDraftsCoverAnswerKeyTopics(
-  modelDrafts: { topic: string }[],
-  answerKeyTopics: string[]
-): boolean {
+function modelDraftsCoverAnswerKeyTopics(modelDrafts: { topic: string }[], answerKeyTopics: string[]): boolean {
   if (answerKeyTopics.length === 0 || modelDrafts.length === 0) return false;
   const draftTopics = new Set(modelDrafts.map((draft) => draft.topic));
   return answerKeyTopics.every((topic) => draftTopics.has(topic));
@@ -36,20 +33,15 @@ export function runEvaluationForState(state: AppState): EvaluationRun[] {
       (note) => note.languageId === language.id && note.id.startsWith("model-draft-")
     );
     const answerKeyTopics = [
-      ...new Set(
-        state.noteAnswerKeys
-          .filter((note) => note.languageId === language.id)
-          .map((note) => note.topic)
-      )
+      ...new Set(state.noteAnswerKeys.filter((note) => note.languageId === language.id).map((note) => note.topic))
     ];
     const useModelDrafts = modelDraftsCoverAnswerKeyTopics(modelDrafts, answerKeyTopics);
     const drafted = useModelDrafts ? modelDrafts : draftNotesForLanguage(language.id, state);
     const result = scoreLanguageEvaluation(language.id, state, drafted);
     const scoreValues = Object.values(result.scores) as number[];
     const categoryCount = scoreValues.length;
-    const average = categoryCount === 0
-      ? 0
-      : scoreValues.reduce((sum: number, score: number) => sum + score, 0) / categoryCount;
+    const average =
+      categoryCount === 0 ? 0 : scoreValues.reduce((sum: number, score: number) => sum + score, 0) / categoryCount;
 
     return {
       id: `eval-${language.id}-${randomUUID()}`,
@@ -93,9 +85,7 @@ function unscoredCriticalCategoryLines(run: EvaluationRun): string[] {
   // Do not treat real 0% scores from graded items as "unscored".
   const criticalCategories = Object.keys(EVALUATION_CATEGORY_THRESHOLDS);
   const emptyCategories = new Set(
-    run.failures
-      .filter((failure) => failure.itemId === `${failure.category}:empty`)
-      .map((failure) => failure.category)
+    run.failures.filter((failure) => failure.itemId === `${failure.category}:empty`).map((failure) => failure.category)
   );
   if (!criticalCategories.every((category) => emptyCategories.has(category))) {
     return [];
@@ -107,15 +97,14 @@ function unscoredCriticalCategoryLines(run: EvaluationRun): string[] {
 }
 
 export function summarizeEvaluationGate(runs: EvaluationRun[]): EvaluationGateSummary {
-  const failureLines = runs.flatMap((run) =>
-    [
-      ...run.failures.map((failure) =>
+  const failureLines = runs.flatMap((run) => [
+    ...run.failures.map(
+      (failure) =>
         `${languageLabelForRun(run, failure.languageId)} ${failure.category} ${failure.itemId}: ${failure.message}`
-      ),
-      ...thresholdFailureLines(run),
-      ...unscoredCriticalCategoryLines(run)
-    ]
-  );
+    ),
+    ...thresholdFailureLines(run),
+    ...unscoredCriticalCategoryLines(run)
+  ]);
 
   return {
     passed: failureLines.length === 0,

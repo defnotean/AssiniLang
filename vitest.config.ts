@@ -7,7 +7,10 @@ const rootDir = fileURLToPath(new URL(".", import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
-      "@assini/api-contract/sourceProcessingErrors": resolve(rootDir, "packages/api-contract/src/sourceProcessingErrors.ts"),
+      "@assini/api-contract/sourceProcessingErrors": resolve(
+        rootDir,
+        "packages/api-contract/src/sourceProcessingErrors.ts"
+      ),
       "@assini/api-contract": resolve(rootDir, "packages/api-contract/src/index.ts"),
       "@assini/api-contract/llm": resolve(rootDir, "packages/api-contract/src/llmContract.ts"),
       "@assini/db": resolve(rootDir, "packages/db/src/index.ts"),
@@ -22,7 +25,13 @@ export default defineConfig({
     testTimeout: 20000,
     coverage: {
       provider: "v8",
-      reporter: ["text", "html"]
+      reporter: ["text", "html"],
+      thresholds: {
+        statements: 83,
+        branches: 75,
+        functions: 87,
+        lines: 84
+      }
     },
     projects: [
       {
@@ -37,7 +46,10 @@ export default defineConfig({
         extends: true,
         resolve: {
           alias: {
-            "@assini/api-contract/sourceProcessingErrors": resolve(rootDir, "packages/api-contract/src/sourceProcessingErrors.ts"),
+            "@assini/api-contract/sourceProcessingErrors": resolve(
+              rootDir,
+              "packages/api-contract/src/sourceProcessingErrors.ts"
+            ),
             "@assini/api-contract/llm": resolve(rootDir, "packages/api-contract/src/llmContract.ts"),
             "@assini/db/schema": resolve(rootDir, "packages/db/src/schema.ts")
           }

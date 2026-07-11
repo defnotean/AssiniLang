@@ -6,7 +6,7 @@ import type {
   LanguagePhonology,
   Lexeme,
   Note
-} from "@assini/db";
+} from "@assini/api-contract";
 import type { LanguageCreatePayload, LanguagePatchPayload } from "@assini/api-contract";
 import { actorRequest, assertOk, getJson } from "../lib/apiClient";
 import type { PublicExercise } from "./exerciseApi";
@@ -122,11 +122,14 @@ export type EvaluationArtifact = {
     previousAverageScore: number | null;
     averageDelta: number | null;
     status: "improved" | "regressed" | "stable" | "single-run";
-    categoryDeltas: Record<string, {
-      latestScore: number;
-      previousScore: number | null;
-      delta: number | null;
-    }>;
+    categoryDeltas: Record<
+      string,
+      {
+        latestScore: number;
+        previousScore: number | null;
+        delta: number | null;
+      }
+    >;
   }>;
   failureLines: string[];
 };

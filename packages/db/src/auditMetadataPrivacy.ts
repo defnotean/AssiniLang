@@ -27,7 +27,8 @@ const privateAuditMetadataKeys = new Set([
   "sessiontoken"
 ]);
 
-const secretLikeAuditMetadataValuePattern = /\b(?:bearer\s+\S+|sk-[A-Za-z0-9._-]+|(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY|ASSINI_TRANSCRIBE_API_KEY|ASSINI_OCR_API_KEY)\s*=|api[_-]?key\s*[:=]|secret\s*[:=]|password\s*[:=]|refresh[_-]?token\s*[:=]|client[_-]?secret\s*[:=])/i;
+const secretLikeAuditMetadataValuePattern =
+  /\b(?:bearer\s+\S+|sk-[A-Za-z0-9._-]+|(?:ASSINI_LLM_API_KEY|OPENAI_API_KEY|ASSINI_TRANSCRIBE_API_KEY|ASSINI_OCR_API_KEY)\s*=|api[_-]?key\s*[:=]|secret\s*[:=]|password\s*[:=]|refresh[_-]?token\s*[:=]|client[_-]?secret\s*[:=])/i;
 
 function normalizeAuditMetadataKey(key: string): string {
   return key.toLowerCase().replace(/[^a-z0-9]/g, "");

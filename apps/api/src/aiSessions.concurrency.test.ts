@@ -58,11 +58,7 @@ describe("AI session follow-up concurrency", () => {
 
     expect(firstResponse.statusCode).toBe(200);
     expect(secondResponse.statusCode).toBe(200);
-    expect(inputs.map((input) => input.prompt)).toEqual([
-      "Start",
-      "First follow-up",
-      "Second follow-up"
-    ]);
+    expect(inputs.map((input) => input.prompt)).toEqual(["Start", "First follow-up", "Second follow-up"]);
     expect(inputs[2]?.previousMessages).toEqual([
       "user:Start",
       "assistant:Response to Start",
@@ -72,7 +68,9 @@ describe("AI session follow-up concurrency", () => {
 
     const session = secondResponse.json();
     expect(session.messages).toHaveLength(6);
-    expect(session.messages.map((message: { role: string; content: string }) => `${message.role}:${message.content}`)).toEqual([
+    expect(
+      session.messages.map((message: { role: string; content: string }) => `${message.role}:${message.content}`)
+    ).toEqual([
       "user:Start",
       "assistant:Response to Start",
       "user:First follow-up",

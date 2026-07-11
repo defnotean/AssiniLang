@@ -7,7 +7,9 @@ import {
   type EvaluationRun
 } from "./evaluationTrends";
 
-function evaluationRun(overrides: Partial<EvaluationRun> & Pick<EvaluationRun, "id" | "languageId" | "createdAt" | "scores">): EvaluationRun {
+function evaluationRun(
+  overrides: Partial<EvaluationRun> & Pick<EvaluationRun, "id" | "languageId" | "createdAt" | "scores">
+): EvaluationRun {
   return {
     systemVersion: "test-system",
     fixtureVersion: "test-fixture",

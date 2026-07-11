@@ -78,9 +78,7 @@ export function AssistantView({
       <section className="panel-card assistant-empty" aria-label={t("assistant.startConversationAriaLabel")}>
         <span className="detail-label">{t("assistant.groundedChat")}</span>
         <h2>{t("assistant.chatWithLocalModelHeading")}</h2>
-        <p className="assistant-explainer">
-          {t("assistant.explainer")}
-        </p>
+        <p className="assistant-explainer">{t("assistant.explainer")}</p>
         <div className="empty-state assistant-empty-hint" role="status" aria-live="polite">
           <p>{t("assistant.emptyState")}</p>
           <p className="muted">{t("assistant.emptyStateHint")}</p>
@@ -148,14 +146,15 @@ export function AssistantView({
           .map((message) => (
             <div key={message.id} className={`assistant-message ${message.role}`}>
               <div className="assistant-message-meta">
-                <span className="assistant-author">{message.role === "user" ? t("assistant.authorYou") : t("assistant.authorAssistant")}</span>
-                {message.role === "assistant" && (
-                  fallbackMessageIds.has(message.id) ? (
+                <span className="assistant-author">
+                  {message.role === "user" ? t("assistant.authorYou") : t("assistant.authorAssistant")}
+                </span>
+                {message.role === "assistant" &&
+                  (fallbackMessageIds.has(message.id) ? (
                     <span className="assistant-chip warning">{t("assistant.deterministicFallbackChip")}</span>
                   ) : (
                     <span className="assistant-chip">{t("assistant.modelReplyChip")}</span>
-                  )
-                )}
+                  ))}
               </div>
               <div className="assistant-message-body">{renderMarkdownLite(message.content)}</div>
             </div>
@@ -191,9 +190,7 @@ export function AssistantView({
           {isSending ? t("assistant.thinking") : t("assistant.send")}
         </button>
       </div>
-      <p className="privacy-note">
-        {t("assistant.privacyNote")}
-      </p>
+      <p className="privacy-note">{t("assistant.privacyNote")}</p>
     </section>
   );
 }

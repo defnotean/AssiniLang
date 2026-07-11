@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { z } from "zod";
 import {
   LLM_PROVIDERS,
@@ -12,13 +10,28 @@ import {
   type ModelProfileSavePayload,
   type ObsidianMcpSettings,
   type ObsidianMcpSettingsPatch,
-  type RuntimeSettings,
   type RuntimeSettingsPatch,
   type RuntimeSettingsResponse
 } from "@assini/api-contract";
 import { describeLlmProviderFromEnv } from "./llmProvider.js";
-import { redactErrorSecrets } from "./secretRedaction.js";
-import { assertOutboundHttpUrlAllowed } from "./urlSafety.js";
+import {
+  readObsidianMcpConnectionConfigFromEnv,
+  readObsidianMcpSettingsFromEnv,
+  readRuntimeSettingsFromEnv
+} from "./appSettingsRead.js";
+import {
+  applyUpdatesToEnv,
+  readOptionalText,
+  updateEnvFileText,
+  writeEnvFileAtomically,
+  type RuntimeEnvUpdates
+} from "./appSettingsPersistence.js";
+import {
+  assertObsidianMcpEndpointAllowed,
+  assertRuntimeSettingsPatchUrlsAllowed,
+  assertStoredProfileUrlsAllowed,
+  RuntimeSettingsUrlValidationError
+} from "./appSettingsUrlValidation.js";
 import {
   canonicalLlmEndpointIdentity,
   DEFAULT_EMBEDDING_TIMEOUT_MS,
@@ -29,13 +42,15 @@ import {
   DEFAULT_TRANSCRIPTION_MODEL,
   type Env,
   envValue,
-  parseBooleanFlag,
-  parsePositiveInteger,
-  readEmbeddingEnvConfig,
   readLlmEnvConfig,
   trimValue
 } from "./llmEnvShared.js";
 
+export {
+  readObsidianMcpConnectionConfigFromEnv,
+  readObsidianMcpSettingsFromEnv,
+  readRuntimeSettingsFromEnv
+} from "./appSettingsRead.js";
 export {
   modelProfileSavePayloadSchema,
   obsidianMcpSettingsPatchSchema,
@@ -48,35 +63,11 @@ export {
   type RuntimeSettingsResponse
 } from "@assini/api-contract";
 
-const RUNTIME_ENV_KEYS = [
-  "ASSINI_LLM_PROVIDER",
-  "ASSINI_LLM_BASE_URL",
-  "ASSINI_LLM_MODEL",
-  "ASSINI_LLM_API_KEY",
-  "OPENAI_API_KEY",
-  "ASSINI_LLM_TIMEOUT_MS",
-  "ASSINI_LLM_MAX_TOKENS",
-  "ASSINI_LLM_JSON_MODE",
-  "ASSINI_EMBEDDING_BASE_URL",
-  "ASSINI_EMBEDDING_MODEL",
-  "ASSINI_EMBEDDING_API_KEY",
-  "ASSINI_EMBEDDING_TIMEOUT_MS",
-  "ASSINI_TRANSCRIBE_BASE_URL",
-  "ASSINI_TRANSCRIBE_MODEL",
-  "ASSINI_TRANSCRIBE_API_KEY",
-  "ASSINI_OCR_BASE_URL",
-  "ASSINI_OCR_MODEL",
-  "ASSINI_OCR_API_KEY",
-  "ASSINI_OCR_LANG",
-  "ASSINI_ALLOW_PRIVATE_URLS",
-  "ASSINI_LLM_ACTIVE_PROFILE_ID",
-  "ASSINI_LLM_MODEL_PROFILES",
-  "ASSINI_OBSIDIAN_MCP_ENDPOINT_URL",
-  "ASSINI_OBSIDIAN_MCP_TOKEN",
-  "ASSINI_OBSIDIAN_MCP_TIMEOUT_MS"
-] as const;
-
-const DEFAULT_OBSIDIAN_MCP_TIMEOUT_MS = 15_000;
+export { updateEnvFileText, writeEnvFileAtomically } from "./appSettingsPersistence.js";
+export {
+  assertRuntimeSettingsPatchUrlsAllowed,
+  RuntimeSettingsUrlValidationError
+} from "./appSettingsUrlValidation.js";
 
 let settingsWriteQueue: Promise<void> = Promise.resolve();
 
@@ -91,129 +82,6 @@ export class RuntimeModelProfilesCorruptError extends Error {
   constructor() {
     super("Stored model profiles JSON is corrupt and must be repaired before profiles can be changed.");
     this.name = "RuntimeModelProfilesCorruptError";
-  }
-}
-
-export class RuntimeSettingsUrlValidationError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeSettingsUrlValidationError";
-  }
-}
-
-type RuntimeSettingsUrlFieldLabel =
-  | "LLM base URL"
-  | "embedding base URL"
-  | "transcription base URL"
-  | "OCR base URL"
-  | "Obsidian MCP endpoint URL";
-
-function effectiveEnvForPatchValidation(patch: RuntimeSettingsPatch, env: Env): Env {
-  if (patch.allowPrivateUrls === undefined) return env;
-  return {
-    ...env,
-    ASSINI_ALLOW_PRIVATE_URLS: patch.allowPrivateUrls ? "1" : ""
-  };
-}
-
-async function assertRuntimeSettingsUrlFieldAllowed(
-  label: RuntimeSettingsUrlFieldLabel,
-  url: string,
-  env: Env
-): Promise<URL> {
-  try {
-    return await assertOutboundHttpUrlAllowed(url, { env });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new RuntimeSettingsUrlValidationError(`Invalid ${label}: ${redactErrorSecrets(message)}`);
-  }
-}
-
-async function assertObsidianMcpEndpointAllowed(
-  endpointUrl: string,
-  env: Env,
-  token?: string
-): Promise<void> {
-  let parsed: URL;
-  try {
-    parsed = await assertRuntimeSettingsUrlFieldAllowed(
-      "Obsidian MCP endpoint URL",
-      endpointUrl,
-      env
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new RuntimeSettingsUrlValidationError(
-      token ? message.split(token).join("[redacted-secret]") : message
-    );
-  }
-  if (parsed.username || parsed.password) {
-    throw new RuntimeSettingsUrlValidationError(
-      "Invalid Obsidian MCP endpoint URL: URL credentials are not allowed. Use the token field instead."
-    );
-  }
-}
-
-export async function assertRuntimeSettingsPatchUrlsAllowed(
-  patch: RuntimeSettingsPatch,
-  env: Env = process.env
-): Promise<void> {
-  const validationEnv = effectiveEnvForPatchValidation(patch, env);
-
-  if (patch.baseUrl !== undefined) {
-    const baseUrl = trimValue(patch.baseUrl);
-    if (baseUrl) {
-      await assertRuntimeSettingsUrlFieldAllowed("LLM base URL", baseUrl, validationEnv);
-    }
-  }
-
-  if (patch.transcriptionBaseUrl !== undefined) {
-    const transcriptionBaseUrl = trimValue(patch.transcriptionBaseUrl);
-    if (transcriptionBaseUrl) {
-      await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
-    }
-  }
-
-  if (patch.embeddingBaseUrl !== undefined) {
-    const embeddingBaseUrl = trimValue(patch.embeddingBaseUrl);
-    if (embeddingBaseUrl) {
-      await assertRuntimeSettingsUrlFieldAllowed("embedding base URL", embeddingBaseUrl, validationEnv);
-    }
-  }
-
-  if (patch.ocrBaseUrl !== undefined) {
-    const ocrBaseUrl = trimValue(patch.ocrBaseUrl);
-    if (ocrBaseUrl) {
-      await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
-    }
-  }
-}
-
-/** Validates the URLs a stored profile would actually persist (including inherited fields). */
-async function assertStoredProfileUrlsAllowed(profile: StoredModelProfile, env: Env): Promise<void> {
-  const validationEnv: Env = {
-    ...env,
-    ASSINI_ALLOW_PRIVATE_URLS: profile.allowPrivateUrls ? "1" : ""
-  };
-
-  const baseUrl = trimValue(profile.baseUrl);
-  if (baseUrl) {
-    await assertRuntimeSettingsUrlFieldAllowed("LLM base URL", baseUrl, validationEnv);
-  }
-
-  const transcriptionBaseUrl = trimValue(profile.transcriptionBaseUrl);
-  if (transcriptionBaseUrl) {
-    await assertRuntimeSettingsUrlFieldAllowed("transcription base URL", transcriptionBaseUrl, validationEnv);
-  }
-
-  const embeddingBaseUrl = trimValue(profile.embeddingBaseUrl);
-  if (embeddingBaseUrl) {
-    await assertRuntimeSettingsUrlFieldAllowed("embedding base URL", embeddingBaseUrl, validationEnv);
-  }
-
-  const ocrBaseUrl = trimValue(profile.ocrBaseUrl);
-  if (ocrBaseUrl) {
-    await assertRuntimeSettingsUrlFieldAllowed("OCR base URL", ocrBaseUrl, validationEnv);
   }
 }
 
@@ -245,61 +113,7 @@ const storedModelProfileSchema = z.object({
 
 type StoredModelProfile = z.infer<typeof storedModelProfileSchema>;
 
-export function readRuntimeSettingsFromEnv(env: Env = process.env): RuntimeSettings {
-  const llmEnv = readLlmEnvConfig(env);
-
-  return {
-    provider: envValue(env.ASSINI_LLM_PROVIDER, "deterministic"),
-    baseUrl: llmEnv.baseUrl ?? "",
-    model: envValue(env.ASSINI_LLM_MODEL ?? llmEnv.model),
-    apiKeyConfigured: llmEnv.apiKeyConfigured,
-    timeoutMs: parsePositiveInteger(env.ASSINI_LLM_TIMEOUT_MS, DEFAULT_LLM_TIMEOUT_MS),
-    maxTokens: parsePositiveInteger(env.ASSINI_LLM_MAX_TOKENS, DEFAULT_LLM_MAX_TOKENS),
-    jsonMode: parseBooleanFlag(env.ASSINI_LLM_JSON_MODE),
-    embeddingBaseUrl: envValue(env.ASSINI_EMBEDDING_BASE_URL),
-    embeddingModel: envValue(env.ASSINI_EMBEDDING_MODEL),
-    embeddingApiKeyConfigured: Boolean(trimValue(env.ASSINI_EMBEDDING_API_KEY)),
-    embeddingTimeoutMs: readEmbeddingEnvConfig(env).timeoutMs,
-    transcriptionBaseUrl: envValue(env.ASSINI_TRANSCRIBE_BASE_URL),
-    transcriptionModel: envValue(env.ASSINI_TRANSCRIBE_MODEL, DEFAULT_TRANSCRIPTION_MODEL),
-    transcriptionApiKeyConfigured: Boolean(trimValue(env.ASSINI_TRANSCRIBE_API_KEY)),
-    ocrBaseUrl: envValue(env.ASSINI_OCR_BASE_URL),
-    ocrModel: envValue(env.ASSINI_OCR_MODEL, DEFAULT_OCR_MODEL),
-    ocrApiKeyConfigured: Boolean(trimValue(env.ASSINI_OCR_API_KEY)),
-    ocrLang: envValue(env.ASSINI_OCR_LANG, DEFAULT_OCR_LANG),
-    allowPrivateUrls: parseBooleanFlag(env.ASSINI_ALLOW_PRIVATE_URLS)
-  };
-}
-
-export function readObsidianMcpSettingsFromEnv(env: Env = process.env): ObsidianMcpSettings {
-  const token = trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN);
-  const endpointUrl = envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL);
-  return {
-    endpointUrl: token ? endpointUrl.split(token).join("[redacted-secret]") : endpointUrl,
-    tokenConfigured: Boolean(token),
-    timeoutMs: parsePositiveInteger(
-      env.ASSINI_OBSIDIAN_MCP_TIMEOUT_MS,
-      DEFAULT_OBSIDIAN_MCP_TIMEOUT_MS
-    )
-  };
-}
-
-export function readObsidianMcpConnectionConfigFromEnv(env: Env = process.env): {
-  endpointUrl: string;
-  token?: string;
-  timeoutMs: number;
-} {
-  const settings = readObsidianMcpSettingsFromEnv(env);
-  return {
-    endpointUrl: envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL),
-    token: trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN),
-    timeoutMs: settings.timeoutMs
-  };
-}
-
-type StoredProfilesReadResult =
-  | { ok: true; profiles: StoredModelProfile[] }
-  | { ok: false; reason: "corrupt" };
+type StoredProfilesReadResult = { ok: true; profiles: StoredModelProfile[] } | { ok: false; reason: "corrupt" };
 
 function readStoredProfilesResult(env: Env = process.env): StoredProfilesReadResult {
   const raw = trimValue(env.ASSINI_LLM_MODEL_PROFILES);
@@ -369,11 +183,7 @@ function profileIdFromName(name: string): string {
   return normalizeProfileId(name.toLowerCase()) || `profile-${Date.now()}`;
 }
 
-function resolveStoredProfileId(
-  payloadId: string | undefined,
-  existingId: string | undefined,
-  name: string
-): string {
+function resolveStoredProfileId(payloadId: string | undefined, existingId: string | undefined, name: string): string {
   const fromPayload = payloadId ? normalizeProfileId(payloadId) : "";
   if (fromPayload) return fromPayload;
   const fromExisting = existingId ? normalizeProfileId(existingId) : "";
@@ -382,7 +192,7 @@ function resolveStoredProfileId(
 }
 
 function providerFromValue(value: string | undefined): LlmProviderName {
-  return LLM_PROVIDERS.includes(value as LlmProviderName) ? value as LlmProviderName : "deterministic";
+  return LLM_PROVIDERS.includes(value as LlmProviderName) ? (value as LlmProviderName) : "deterministic";
 }
 
 const DEFAULT_REMOTE_OPENAI_BASE_URL = "https://api.openai.com/v1";
@@ -396,9 +206,7 @@ function endpointIdentityForProvider(provider: string | undefined, baseUrl: stri
   return undefined;
 }
 
-function currentLlmCredential(
-  env: Env
-): { apiKey?: string; endpointIdentity?: string; provider?: LlmProviderName } {
+function currentLlmCredential(env: Env): { apiKey?: string; endpointIdentity?: string; provider?: LlmProviderName } {
   const llmEnv = readLlmEnvConfig(env);
   const provider = llmEnv.provider;
 
@@ -437,9 +245,7 @@ function inheritedProfileApiKey(
   const targetIdentity = endpointIdentityForProvider(targetProvider, targetBaseUrl);
   if (!targetIdentity) return undefined;
 
-  const existingIdentity = existing
-    ? endpointIdentityForProvider(existing.provider, existing.baseUrl)
-    : undefined;
+  const existingIdentity = existing ? endpointIdentityForProvider(existing.provider, existing.baseUrl) : undefined;
   const existingApiKey = trimValue(existing?.apiKey);
   if (existingApiKey && existing?.provider === targetProvider && existingIdentity === targetIdentity) {
     return existingApiKey;
@@ -447,9 +253,9 @@ function inheritedProfileApiKey(
 
   const currentCredential = currentLlmCredential(env);
   if (
-    currentCredential.apiKey
-    && currentCredential.provider === targetProvider
-    && currentCredential.endpointIdentity === targetIdentity
+    currentCredential.apiKey &&
+    currentCredential.provider === targetProvider &&
+    currentCredential.endpointIdentity === targetIdentity
   ) {
     return currentCredential.apiKey;
   }
@@ -469,18 +275,12 @@ function inheritedProfileEmbeddingApiKey(
   if (!targetIdentity) return undefined;
 
   const existingApiKey = trimValue(existing?.embeddingApiKey);
-  if (
-    existingApiKey
-    && embeddingEndpointIdentity(existing?.embeddingBaseUrl) === targetIdentity
-  ) {
+  if (existingApiKey && embeddingEndpointIdentity(existing?.embeddingBaseUrl) === targetIdentity) {
     return existingApiKey;
   }
 
   const currentApiKey = trimValue(env.ASSINI_EMBEDDING_API_KEY);
-  if (
-    currentApiKey
-    && embeddingEndpointIdentity(env.ASSINI_EMBEDDING_BASE_URL) === targetIdentity
-  ) {
+  if (currentApiKey && embeddingEndpointIdentity(env.ASSINI_EMBEDDING_BASE_URL) === targetIdentity) {
     return currentApiKey;
   }
   return undefined;
@@ -499,9 +299,7 @@ function storedProfileFromPayload(
   const ocrApiKey = trimValue(payload.ocrApiKey);
   const provider = providerFromValue(payload.provider ?? existing?.provider ?? currentSettings.provider);
   const baseUrl = payload.baseUrl ?? existing?.baseUrl ?? currentSettings.baseUrl;
-  const embeddingBaseUrl = payload.embeddingBaseUrl
-    ?? existing?.embeddingBaseUrl
-    ?? currentSettings.embeddingBaseUrl;
+  const embeddingBaseUrl = payload.embeddingBaseUrl ?? existing?.embeddingBaseUrl ?? currentSettings.embeddingBaseUrl;
 
   return {
     id: resolveStoredProfileId(payload.id, existing?.id, payload.name),
@@ -509,40 +307,29 @@ function storedProfileFromPayload(
     provider,
     baseUrl,
     model: payload.model ?? existing?.model ?? currentSettings.model,
-    apiKey: payload.clearApiKey
-      ? undefined
-      : apiKey ?? inheritedProfileApiKey(provider, baseUrl, existing, env),
+    apiKey: payload.clearApiKey ? undefined : (apiKey ?? inheritedProfileApiKey(provider, baseUrl, existing, env)),
     timeoutMs: payload.timeoutMs ?? existing?.timeoutMs ?? currentSettings.timeoutMs,
     maxTokens: payload.maxTokens ?? existing?.maxTokens ?? currentSettings.maxTokens,
     jsonMode: payload.jsonMode ?? existing?.jsonMode ?? currentSettings.jsonMode,
     embeddingBaseUrl,
-    embeddingModel: payload.embeddingModel
-      ?? existing?.embeddingModel
-      ?? currentSettings.embeddingModel,
+    embeddingModel: payload.embeddingModel ?? existing?.embeddingModel ?? currentSettings.embeddingModel,
     embeddingApiKey: payload.clearEmbeddingApiKey
       ? undefined
-      : embeddingApiKey ?? inheritedProfileEmbeddingApiKey(embeddingBaseUrl, existing, env),
-    embeddingTimeoutMs: payload.embeddingTimeoutMs
-      ?? existing?.embeddingTimeoutMs
-      ?? currentSettings.embeddingTimeoutMs,
-    transcriptionBaseUrl: payload.transcriptionBaseUrl
-      ?? existing?.transcriptionBaseUrl
-      ?? currentSettings.transcriptionBaseUrl,
-    transcriptionModel: payload.transcriptionModel
-      ?? existing?.transcriptionModel
-      ?? currentSettings.transcriptionModel,
+      : (embeddingApiKey ?? inheritedProfileEmbeddingApiKey(embeddingBaseUrl, existing, env)),
+    embeddingTimeoutMs:
+      payload.embeddingTimeoutMs ?? existing?.embeddingTimeoutMs ?? currentSettings.embeddingTimeoutMs,
+    transcriptionBaseUrl:
+      payload.transcriptionBaseUrl ?? existing?.transcriptionBaseUrl ?? currentSettings.transcriptionBaseUrl,
+    transcriptionModel:
+      payload.transcriptionModel ?? existing?.transcriptionModel ?? currentSettings.transcriptionModel,
     transcriptionApiKey: payload.clearTranscriptionApiKey
       ? undefined
-      : transcriptionApiKey ?? existing?.transcriptionApiKey ?? trimValue(env.ASSINI_TRANSCRIBE_API_KEY),
-    ocrBaseUrl: payload.ocrBaseUrl
-      ?? existing?.ocrBaseUrl
-      ?? currentSettings.ocrBaseUrl,
-    ocrModel: payload.ocrModel
-      ?? existing?.ocrModel
-      ?? currentSettings.ocrModel,
+      : (transcriptionApiKey ?? existing?.transcriptionApiKey ?? trimValue(env.ASSINI_TRANSCRIBE_API_KEY)),
+    ocrBaseUrl: payload.ocrBaseUrl ?? existing?.ocrBaseUrl ?? currentSettings.ocrBaseUrl,
+    ocrModel: payload.ocrModel ?? existing?.ocrModel ?? currentSettings.ocrModel,
     ocrApiKey: payload.clearOcrApiKey
       ? undefined
-      : ocrApiKey ?? existing?.ocrApiKey ?? trimValue(env.ASSINI_OCR_API_KEY),
+      : (ocrApiKey ?? existing?.ocrApiKey ?? trimValue(env.ASSINI_OCR_API_KEY)),
     ocrLang: payload.ocrLang ?? existing?.ocrLang ?? currentSettings.ocrLang,
     allowPrivateUrls: payload.allowPrivateUrls ?? existing?.allowPrivateUrls ?? currentSettings.allowPrivateUrls,
     createdAt: existing?.createdAt ?? now,
@@ -550,7 +337,7 @@ function storedProfileFromPayload(
   };
 }
 
-function envUpdatesFromStoredProfile(profile: StoredModelProfile): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
+function envUpdatesFromStoredProfile(profile: StoredModelProfile): RuntimeEnvUpdates {
   return {
     ASSINI_LLM_PROVIDER: profile.provider,
     ASSINI_LLM_BASE_URL: profile.baseUrl,
@@ -576,10 +363,7 @@ function envUpdatesFromStoredProfile(profile: StoredModelProfile): Partial<Recor
   };
 }
 
-function envUpdatesFromProfiles(
-  profiles: StoredModelProfile[],
-  activeProfileId?: string
-): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
+function envUpdatesFromProfiles(profiles: StoredModelProfile[], activeProfileId?: string): RuntimeEnvUpdates {
   return {
     ASSINI_LLM_MODEL_PROFILES: JSON.stringify(profiles),
     ...(activeProfileId !== undefined ? { ASSINI_LLM_ACTIVE_PROFILE_ID: activeProfileId } : {})
@@ -587,7 +371,7 @@ function envUpdatesFromProfiles(
 }
 
 /** Clears live provider env so a deleted active profile cannot keep driving LLM calls. */
-function envUpdatesForClearedActiveProfile(): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
+function envUpdatesForClearedActiveProfile(): RuntimeEnvUpdates {
   return {
     ASSINI_LLM_PROVIDER: "deterministic",
     ASSINI_LLM_BASE_URL: "",
@@ -613,11 +397,8 @@ function envUpdatesForClearedActiveProfile(): Partial<Record<typeof RUNTIME_ENV_
   };
 }
 
-function envUpdatesFromPatch(
-  patch: RuntimeSettingsPatch,
-  env: Env
-): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
-  const updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> = {};
+function envUpdatesFromPatch(patch: RuntimeSettingsPatch, env: Env): RuntimeEnvUpdates {
+  const updates: RuntimeEnvUpdates = {};
 
   if (patch.provider !== undefined) updates.ASSINI_LLM_PROVIDER = patch.provider;
   if (patch.baseUrl !== undefined) updates.ASSINI_LLM_BASE_URL = patch.baseUrl;
@@ -644,16 +425,10 @@ function envUpdatesFromPatch(
   const currentProvider = providerFromValue(trimValue(env.ASSINI_LLM_PROVIDER));
   const nextProvider = patch.provider ?? currentProvider;
   const currentEndpointIdentity = endpointIdentityForProvider(currentProvider, env.ASSINI_LLM_BASE_URL);
-  const nextEndpointIdentity = endpointIdentityForProvider(
-    nextProvider,
-    patch.baseUrl ?? env.ASSINI_LLM_BASE_URL
-  );
-  const credentialBindingChanged = nextProvider !== currentProvider
-    || nextEndpointIdentity !== currentEndpointIdentity;
+  const nextEndpointIdentity = endpointIdentityForProvider(nextProvider, patch.baseUrl ?? env.ASSINI_LLM_BASE_URL);
+  const credentialBindingChanged = nextProvider !== currentProvider || nextEndpointIdentity !== currentEndpointIdentity;
   const currentEmbeddingIdentity = embeddingEndpointIdentity(env.ASSINI_EMBEDDING_BASE_URL);
-  const nextEmbeddingIdentity = embeddingEndpointIdentity(
-    patch.embeddingBaseUrl ?? env.ASSINI_EMBEDDING_BASE_URL
-  );
+  const nextEmbeddingIdentity = embeddingEndpointIdentity(patch.embeddingBaseUrl ?? env.ASSINI_EMBEDDING_BASE_URL);
   const embeddingCredentialBindingChanged = nextEmbeddingIdentity !== currentEmbeddingIdentity;
 
   if (patch.clearApiKey) {
@@ -692,83 +467,12 @@ function envUpdatesFromPatch(
   return updates;
 }
 
-function formatEnvValue(value: string): string {
-  if (value.length === 0) return "";
-  if (/^[A-Za-z0-9_./:@-]+$/.test(value)) return value;
-  return JSON.stringify(value);
-}
-
-export function updateEnvFileText(
-  existingText: string,
-  updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>>
-): string {
-  const pending = new Map(Object.entries(updates));
-  const seen = new Set<string>();
-  const sourceLines = existingText.length > 0 ? existingText.split(/\r?\n/) : [
-    "# AssiniLang local configuration.",
-    "# Edited by the Model Setup screen."
-  ];
-  const nextLines = sourceLines.map((line) => {
-    const match = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*=).*/);
-    const key = match?.[2];
-    if (!key || !pending.has(key)) return line;
-
-    seen.add(key);
-    return `${key}=${formatEnvValue(pending.get(key) ?? "")}`;
-  });
-
-  for (const [key, value] of pending) {
-    if (!seen.has(key)) {
-      nextLines.push(`${key}=${formatEnvValue(value)}`);
-    }
-  }
-
-  return `${nextLines.join("\n").replace(/\n+$/g, "")}\n`;
-}
-
-/** Replaces the settings file only after the complete replacement has been written. */
-export async function writeEnvFileAtomically(settingsPath: string, text: string): Promise<void> {
-  const tempPath = `${settingsPath}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(tempPath, text, { encoding: "utf8", flag: "wx" });
-    await rename(tempPath, settingsPath);
-  } catch (error) {
-    try {
-      await unlink(tempPath);
-    } catch {
-      // Preserve the original write or rename failure if cleanup also fails.
-    }
-    throw error;
-  }
-}
-
-async function readOptionalText(path: string): Promise<string> {
-  try {
-    return await readFile(path, "utf8");
-  } catch (error) {
-    const code = (error as { code?: string }).code;
-    if (code === "ENOENT") return "";
-    throw error;
-  }
-}
-
-function applyUpdatesToEnv(
-  updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>>,
-  env: Env = process.env
-): void {
-  for (const [key, value] of Object.entries(updates)) {
-    env[key] = value ?? "";
-  }
-}
-
-async function applyRuntimeSettingsPatchUnlocked(
-  params: {
-    settingsPath: string;
-    patch: RuntimeSettingsPatch;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+async function applyRuntimeSettingsPatchUnlocked(params: {
+  settingsPath: string;
+  patch: RuntimeSettingsPatch;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
   await assertRuntimeSettingsPatchUrlsAllowed(params.patch, env);
   const updates = envUpdatesFromPatch(params.patch, env);
@@ -786,14 +490,12 @@ async function applyRuntimeSettingsPatchUnlocked(
   };
 }
 
-export async function applyRuntimeSettingsPatch(
-  params: {
-    settingsPath: string;
-    patch: RuntimeSettingsPatch;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+export async function applyRuntimeSettingsPatch(params: {
+  settingsPath: string;
+  patch: RuntimeSettingsPatch;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const operation = settingsWriteQueue.then(() => applyRuntimeSettingsPatchUnlocked(params));
   settingsWriteQueue = operation.then(
     () => undefined,
@@ -802,10 +504,8 @@ export async function applyRuntimeSettingsPatch(
   return operation;
 }
 
-function envUpdatesFromObsidianMcpPatch(
-  patch: ObsidianMcpSettingsPatch
-): Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> {
-  const updates: Partial<Record<typeof RUNTIME_ENV_KEYS[number], string>> = {};
+function envUpdatesFromObsidianMcpPatch(patch: ObsidianMcpSettingsPatch): RuntimeEnvUpdates {
+  const updates: RuntimeEnvUpdates = {};
   if (patch.endpointUrl !== undefined) {
     updates.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL = patch.endpointUrl;
   }
@@ -828,7 +528,7 @@ async function applyObsidianMcpSettingsPatchUnlocked(params: {
   const env = params.env ?? process.env;
   const effectiveToken = params.patch.clearToken
     ? undefined
-    : params.patch.token ?? trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN);
+    : (params.patch.token ?? trimValue(env.ASSINI_OBSIDIAN_MCP_TOKEN));
   const effectiveEndpoint = params.patch.endpointUrl ?? envValue(env.ASSINI_OBSIDIAN_MCP_ENDPOINT_URL);
   if (effectiveToken && effectiveEndpoint.includes(effectiveToken)) {
     throw new RuntimeSettingsUrlValidationError(
@@ -868,14 +568,12 @@ export function runtimeSettingsResponse(env: Env = process.env): RuntimeSettings
   };
 }
 
-async function saveRuntimeModelProfileUnlocked(
-  params: {
-    settingsPath: string;
-    payload: ModelProfileSavePayload;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+async function saveRuntimeModelProfileUnlocked(params: {
+  settingsPath: string;
+  payload: ModelProfileSavePayload;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
   const profiles = requireStoredProfilesForMutation(env);
   const normalizedId = params.payload.id ? normalizeProfileId(params.payload.id) : undefined;
@@ -885,15 +583,17 @@ async function saveRuntimeModelProfileUnlocked(
   const existing = existingIndex >= 0 ? profiles[existingIndex] : undefined;
   const profile = storedProfileFromPayload(params.payload, existing, env, new Date().toISOString());
   await assertStoredProfileUrlsAllowed(profile, env);
-  const nextProfiles = existingIndex >= 0
-    ? profiles.map((item, index) => (index === existingIndex ? profile : item))
-    : [...profiles, profile];
+  const nextProfiles =
+    existingIndex >= 0
+      ? profiles.map((item, index) => (index === existingIndex ? profile : item))
+      : [...profiles, profile];
   const activeProfileId = trimValue(env.ASSINI_LLM_ACTIVE_PROFILE_ID);
-  const shouldActivate = params.payload.activate === true
-    || activeProfileId === profile.id
-    || (activeProfileId !== undefined && normalizeProfileId(activeProfileId) === profile.id);
+  const shouldActivate =
+    params.payload.activate === true ||
+    activeProfileId === profile.id ||
+    (activeProfileId !== undefined && normalizeProfileId(activeProfileId) === profile.id);
   const updates = {
-    ...envUpdatesFromProfiles(nextProfiles, shouldActivate ? profile.id : activeProfileId ?? ""),
+    ...envUpdatesFromProfiles(nextProfiles, shouldActivate ? profile.id : (activeProfileId ?? "")),
     ...(shouldActivate ? envUpdatesFromStoredProfile(profile) : {})
   };
   const existingText = await readOptionalText(params.settingsPath);
@@ -903,14 +603,12 @@ async function saveRuntimeModelProfileUnlocked(
   return runtimeSettingsResponse(env);
 }
 
-export async function saveRuntimeModelProfile(
-  params: {
-    settingsPath: string;
-    payload: ModelProfileSavePayload;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+export async function saveRuntimeModelProfile(params: {
+  settingsPath: string;
+  payload: ModelProfileSavePayload;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const operation = settingsWriteQueue.then(() => saveRuntimeModelProfileUnlocked(params));
   settingsWriteQueue = operation.then(
     () => undefined,
@@ -919,14 +617,12 @@ export async function saveRuntimeModelProfile(
   return operation;
 }
 
-async function activateRuntimeModelProfileUnlocked(
-  params: {
-    settingsPath: string;
-    profileId: string;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+async function activateRuntimeModelProfileUnlocked(params: {
+  settingsPath: string;
+  profileId: string;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
   const profiles = requireStoredProfilesForMutation(env);
   const normalizedId = normalizeProfileId(params.profileId);
@@ -941,14 +637,12 @@ async function activateRuntimeModelProfileUnlocked(
   return runtimeSettingsResponse(env);
 }
 
-export async function activateRuntimeModelProfile(
-  params: {
-    settingsPath: string;
-    profileId: string;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+export async function activateRuntimeModelProfile(params: {
+  settingsPath: string;
+  profileId: string;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const operation = settingsWriteQueue.then(() => activateRuntimeModelProfileUnlocked(params));
   settingsWriteQueue = operation.then(
     () => undefined,
@@ -957,29 +651,26 @@ export async function activateRuntimeModelProfile(
   return operation;
 }
 
-async function deleteRuntimeModelProfileUnlocked(
-  params: {
-    settingsPath: string;
-    profileId: string;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+async function deleteRuntimeModelProfileUnlocked(params: {
+  settingsPath: string;
+  profileId: string;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const env = params.env ?? process.env;
   const profiles = requireStoredProfilesForMutation(env);
   const normalizedId = normalizeProfileId(params.profileId);
-  const nextProfiles = profiles.filter(
-    (profile) => profile.id !== normalizedId && profile.id !== params.profileId
-  );
+  const nextProfiles = profiles.filter((profile) => profile.id !== normalizedId && profile.id !== params.profileId);
   if (!normalizedId || nextProfiles.length === profiles.length) {
     throw new RuntimeModelProfileNotFoundError(params.profileId);
   }
 
   const activeProfileId = trimValue(env.ASSINI_LLM_ACTIVE_PROFILE_ID);
-  const deletingActive = activeProfileId === params.profileId
-    || (activeProfileId !== undefined && normalizeProfileId(activeProfileId) === normalizedId);
+  const deletingActive =
+    activeProfileId === params.profileId ||
+    (activeProfileId !== undefined && normalizeProfileId(activeProfileId) === normalizedId);
   const updates = {
-    ...envUpdatesFromProfiles(nextProfiles, deletingActive ? "" : activeProfileId ?? ""),
+    ...envUpdatesFromProfiles(nextProfiles, deletingActive ? "" : (activeProfileId ?? "")),
     ...(deletingActive ? envUpdatesForClearedActiveProfile() : {})
   };
   const existingText = await readOptionalText(params.settingsPath);
@@ -989,14 +680,12 @@ async function deleteRuntimeModelProfileUnlocked(
   return runtimeSettingsResponse(env);
 }
 
-export async function deleteRuntimeModelProfile(
-  params: {
-    settingsPath: string;
-    profileId: string;
-    env?: Env;
-    reloadLlmProvider?: () => void;
-  }
-): Promise<RuntimeSettingsResponse> {
+export async function deleteRuntimeModelProfile(params: {
+  settingsPath: string;
+  profileId: string;
+  env?: Env;
+  reloadLlmProvider?: () => void;
+}): Promise<RuntimeSettingsResponse> {
   const operation = settingsWriteQueue.then(() => deleteRuntimeModelProfileUnlocked(params));
   settingsWriteQueue = operation.then(
     () => undefined,

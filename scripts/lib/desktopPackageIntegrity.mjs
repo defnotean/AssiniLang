@@ -117,7 +117,9 @@ function enqueueDependency(packages, queue, sourcePath, dependencyName, optional
     throw new Error(`package-lock.json cannot resolve ${dependencyName} from ${sourcePath || "the root package"}.`);
   }
   if (!dependencyPath.startsWith("node_modules/")) {
-    throw new Error(`Desktop runtime dependency ${dependencyName} is not hoisted into node_modules in package-lock.json.`);
+    throw new Error(
+      `Desktop runtime dependency ${dependencyName} is not hoisted into node_modules in package-lock.json.`
+    );
   }
 
   queue.push(dependencyPath);
@@ -149,10 +151,7 @@ function collectRuntimePackageEntries(packages, directDependencyNames) {
 
     selectedEntries.set(packagePath, entry);
 
-    const optionalDependencies = dependencyMap(
-      entry.optionalDependencies,
-      `${packagePath} optionalDependencies`
-    );
+    const optionalDependencies = dependencyMap(entry.optionalDependencies, `${packagePath} optionalDependencies`);
     const requiredDependencyNames = new Set(
       Object.keys(dependencyMap(entry.dependencies, `${packagePath} dependencies`)).filter(
         (dependencyName) => !(dependencyName in optionalDependencies)
@@ -160,10 +159,7 @@ function collectRuntimePackageEntries(packages, directDependencyNames) {
     );
     const optionalDependencyNames = new Set(Object.keys(optionalDependencies));
     const peerDependencies = dependencyMap(entry.peerDependencies, `${packagePath} peerDependencies`);
-    const peerDependenciesMeta = dependencyMap(
-      entry.peerDependenciesMeta,
-      `${packagePath} peerDependenciesMeta`
-    );
+    const peerDependenciesMeta = dependencyMap(entry.peerDependenciesMeta, `${packagePath} peerDependenciesMeta`);
 
     for (const dependencyName of Object.keys(peerDependencies)) {
       if (requiredDependencyNames.has(dependencyName) || optionalDependencyNames.has(dependencyName)) continue;
@@ -282,7 +278,9 @@ export function assertRuntimeManifestsMatchLock(repositoryLockfile, runtimeManif
       const manifestValue = comparableDependencyMap(manifest[field], `${displayPath} ${field}`);
       const lockValue = comparableDependencyMap(lockEntry[field], `package-lock.json ${packagePath} ${field}`);
       if (manifestValue !== lockValue) {
-        throw new Error(`${displayPath} ${field} does not match package-lock.json. Refresh the npm lockfile before packaging.`);
+        throw new Error(
+          `${displayPath} ${field} does not match package-lock.json. Refresh the npm lockfile before packaging.`
+        );
       }
     }
   }
@@ -400,10 +398,7 @@ export async function publishStagedDirectory(stagedPath, targetPath) {
     throw new Error("Staged and target release directories must be siblings for a same-volume release swap.");
   }
 
-  const backupPath = join(
-    dirname(absoluteTargetPath),
-    `.${basename(absoluteTargetPath)}.previous-${randomUUID()}`
-  );
+  const backupPath = join(dirname(absoluteTargetPath), `.${basename(absoluteTargetPath)}.previous-${randomUUID()}`);
   const hadExistingTarget = await pathExists(absoluteTargetPath);
   if (hadExistingTarget) await rename(absoluteTargetPath, backupPath);
 

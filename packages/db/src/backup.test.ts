@@ -167,9 +167,7 @@ it("treats Windows case-only path aliases as the same file for backup and restor
 });
 
 it("strips Windows extended-length prefixes for path identity compares", () => {
-  expect(stripWindowsExtendedPrefix("\\\\?\\C:\\Users\\op\\local-db.json")).toBe(
-    "C:\\Users\\op\\local-db.json"
-  );
+  expect(stripWindowsExtendedPrefix("\\\\?\\C:\\Users\\op\\local-db.json")).toBe("C:\\Users\\op\\local-db.json");
   expect(stripWindowsExtendedPrefix("\\\\?\\UNC\\server\\share\\local-db.json")).toBe(
     "\\\\server\\share\\local-db.json"
   );
@@ -270,9 +268,9 @@ it("keeps the live json database readable when restore write fails after backup 
 
   // Backup is already validated inside restoreFrom before any write; fail the
   // temp write so the live file must remain untouched.
-  const writeSpy = vi.spyOn(JsonStore.prototype, "write").mockRejectedValueOnce(
-    new Error("simulated restore write failure")
-  );
+  const writeSpy = vi
+    .spyOn(JsonStore.prototype, "write")
+    .mockRejectedValueOnce(new Error("simulated restore write failure"));
   try {
     await expect(store.restoreFrom(backupPath)).rejects.toThrow(dbPath);
     expect(await store.read()).toEqual(before);

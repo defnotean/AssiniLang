@@ -1,4 +1,4 @@
-import type { Language, LanguagePhonology } from "@assini/db";
+import type { Language, LanguagePhonology } from "@assini/api-contract";
 
 export type PhonologyInventoryKind = "consonants" | "vowels";
 
@@ -8,8 +8,7 @@ export type PhonologyInventoryDraft = {
 };
 
 export type PhonologyInventoryValidation =
-  | { ok: true; symbol: string }
-  | { ok: false; reason: "blank" | "duplicate" | "whitespace" };
+  { ok: true; symbol: string } | { ok: false; reason: "blank" | "duplicate" | "whitespace" };
 
 /** Normalize a typed inventory symbol the same way the API trims payloads. */
 export function normalizeInventorySymbol(raw: string): string {
@@ -21,10 +20,7 @@ export function normalizeInventorySymbol(raw: string): string {
  * Rejects blanks, internal whitespace, and case-sensitive duplicates in the
  * target list (API allows any non-empty trimmed string; this keeps the UI tidy).
  */
-export function validateInventorySymbol(
-  raw: string,
-  existing: readonly string[]
-): PhonologyInventoryValidation {
+export function validateInventorySymbol(raw: string, existing: readonly string[]): PhonologyInventoryValidation {
   const symbol = normalizeInventorySymbol(raw);
   if (!symbol) {
     return { ok: false, reason: "blank" };
@@ -48,10 +44,10 @@ export function draftFromLanguage(language: Pick<Language, "phonology"> | null |
 
 export function inventoriesEqual(a: PhonologyInventoryDraft, b: PhonologyInventoryDraft): boolean {
   return (
-    a.consonants.length === b.consonants.length
-    && a.vowels.length === b.vowels.length
-    && a.consonants.every((symbol, index) => symbol === b.consonants[index])
-    && a.vowels.every((symbol, index) => symbol === b.vowels[index])
+    a.consonants.length === b.consonants.length &&
+    a.vowels.length === b.vowels.length &&
+    a.consonants.every((symbol, index) => symbol === b.consonants[index]) &&
+    a.vowels.every((symbol, index) => symbol === b.vowels[index])
   );
 }
 

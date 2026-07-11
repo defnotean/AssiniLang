@@ -43,10 +43,7 @@ function scoreTestlangFixture() {
   return { state, scored, run, gate };
 }
 
-function assertScoresMatchBaseline(
-  actual: Record<string, number>,
-  baseline: TestlangBaseline
-): void {
+function assertScoresMatchBaseline(actual: Record<string, number>, baseline: TestlangBaseline): void {
   const { exactMatchCategories, tolerance } = baseline.scorePolicy;
 
   for (const category of exactMatchCategories) {

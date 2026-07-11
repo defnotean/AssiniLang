@@ -1,11 +1,6 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
-import {
-  createVerifyBetaStep,
-  modelVerifyRequested,
-  resolveModelNameForVerify,
-  runVerifyBeta
-} from "./verifyBeta.mjs";
+import { createVerifyBetaStep, modelVerifyRequested, resolveModelNameForVerify, runVerifyBeta } from "./verifyBeta.mjs";
 
 function exitOnNextTick(code: number | null, signal: NodeJS.Signals | null = null) {
   const child = new EventEmitter();
@@ -39,7 +34,11 @@ describe("verify:beta launcher", () => {
     const stdout: string[] = [];
     const result = await runVerifyBeta({
       env: {},
-      stdout: { write(message) { stdout.push(String(message)); } },
+      stdout: {
+        write(message) {
+          stdout.push(String(message));
+        }
+      },
       stderr: { write() {} }
     });
 

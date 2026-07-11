@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sourceAssetSchema } from "@assini/db";
+import { sourceAssetSchema } from "./publicModels.js";
 
 const nonEmptyTrimmedStringSchema = z.string().trim().min(1);
 const resourceUriSchema = nonEmptyTrimmedStringSchema.max(4096);
@@ -10,20 +10,23 @@ export const obsidianMcpSettingsSchema = z.object({
   timeoutMs: z.number().int().positive()
 });
 
-export const obsidianMcpSettingsPatchSchema = z.object({
-  endpointUrl: z.string().trim().max(2048).optional(),
-  token: z.string().trim().min(1).max(4096).optional(),
-  clearToken: z.boolean().optional(),
-  timeoutMs: z.number().int().positive().max(120_000).optional()
-}).strict().superRefine((value, context) => {
-  if (value.token !== undefined && value.clearToken) {
-    context.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "token and clearToken cannot be supplied together",
-      path: ["clearToken"]
-    });
-  }
-});
+export const obsidianMcpSettingsPatchSchema = z
+  .object({
+    endpointUrl: z.string().trim().max(2048).optional(),
+    token: z.string().trim().min(1).max(4096).optional(),
+    clearToken: z.boolean().optional(),
+    timeoutMs: z.number().int().positive().max(120_000).optional()
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.token !== undefined && value.clearToken) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "token and clearToken cannot be supplied together",
+        path: ["clearToken"]
+      });
+    }
+  });
 
 export const obsidianMcpConnectionStatusSchema = z.object({
   configured: z.boolean(),
@@ -50,22 +53,29 @@ export const obsidianMcpResourceListSchema = z.object({
   serverName: z.string().optional()
 });
 
-export const obsidianMcpResourceListQuerySchema = z.object({
-  cursor: nonEmptyTrimmedStringSchema.max(4096).optional()
-}).strict();
+export const obsidianMcpResourceListQuerySchema = z
+  .object({
+    cursor: nonEmptyTrimmedStringSchema.max(4096).optional()
+  })
+  .strict();
 
-export const obsidianMcpImportPayloadSchema = z.object({
-  uris: z.array(resourceUriSchema).min(1).max(50)
-}).strict().transform((data) => ({
-  uris: [...new Set(data.uris)]
-}));
+export const obsidianMcpImportPayloadSchema = z
+  .object({
+    uris: z.array(resourceUriSchema).min(1).max(50)
+  })
+  .strict()
+  .transform((data) => ({
+    uris: [...new Set(data.uris)]
+  }));
 
 export const obsidianMcpImportResponseSchema = z.object({
   imported: z.array(sourceAssetSchema),
-  skipped: z.array(z.object({
-    uri: z.string(),
-    reason: z.string()
-  })),
+  skipped: z.array(
+    z.object({
+      uri: z.string(),
+      reason: z.string()
+    })
+  ),
   summary: z.object({
     requested: z.number().int().nonnegative(),
     imported: z.number().int().nonnegative(),

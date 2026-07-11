@@ -51,15 +51,9 @@ describe("ModelSettingsFormFields", () => {
       target: { value: "15000" }
     });
 
-    expect(screen.getByLabelText("form state")).toHaveTextContent(
-      '"embeddingBaseUrl":"http://127.0.0.1:8080/v1"'
-    );
-    expect(screen.getByLabelText("form state")).toHaveTextContent(
-      '"embeddingModel":"nomic-embed-text"'
-    );
-    expect(screen.getByLabelText("form state")).toHaveTextContent(
-      '"embeddingTimeoutMs":"15000"'
-    );
+    expect(screen.getByLabelText("form state")).toHaveTextContent('"embeddingBaseUrl":"http://127.0.0.1:8080/v1"');
+    expect(screen.getByLabelText("form state")).toHaveTextContent('"embeddingModel":"nomic-embed-text"');
+    expect(screen.getByLabelText("form state")).toHaveTextContent('"embeddingTimeoutMs":"15000"');
 
     fireEvent.click(screen.getByLabelText("Clear embedding key"));
     expect(screen.getByLabelText("Replace embedding key")).toBeDisabled();

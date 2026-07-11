@@ -10,7 +10,7 @@ import type { RouteContext } from "./context.js";
 const PROBE_CACHE_CONTROL = "no-store, max-age=0";
 
 export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): void {
-  const { readState, authToken, prototypeSessions, jobQueue } = ctx;
+  const { readState, authToken, prototypeSessions, jobQueue, recoveryMetrics } = ctx;
 
   app.get("/health", async (_request, reply) => {
     // Liveness must stay cheap and independent of storage/queue readiness.
@@ -34,7 +34,11 @@ export function registerSystemRoutes(app: FastifyInstance, ctx: RouteContext): v
   app.get("/ready", async (_request, reply) => {
     reply.header("Cache-Control", PROBE_CACHE_CONTROL);
     reply.header("Pragma", "no-cache");
-    const report = await createReadinessReport(readState, () => jobQueue.getStatus());
+    const report = await createReadinessReport(
+      readState,
+      () => jobQueue.getStatus(),
+      () => recoveryMetrics.startup
+    );
     if (!report.ok) {
       reply.code(503);
     }

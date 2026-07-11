@@ -108,8 +108,6 @@ describe("GET /languages/:languageId/exercises/recommended", () => {
       headers: authHeaders("reviewer-1")
     });
     expect(reviewerView.statusCode).toBe(200);
-    expect(
-      reviewerView.json().rationale.every((entry: { status: string }) => entry.status === "new")
-    ).toBe(true);
+    expect(reviewerView.json().rationale.every((entry: { status: string }) => entry.status === "new")).toBe(true);
   });
 });

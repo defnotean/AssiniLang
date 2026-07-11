@@ -11,7 +11,11 @@ function Probe() {
 
 describe("English-only i18n", () => {
   it("sets document direction and language to English", () => {
-    render(<I18nProvider><Probe /></I18nProvider>);
+    render(
+      <I18nProvider>
+        <Probe />
+      </I18nProvider>
+    );
     expect(document.documentElement.lang).toBe("en");
     expect(document.documentElement.dir).toBe("ltr");
     expect(screen.getByTestId("probe")).toHaveTextContent("en:ltr:Language");

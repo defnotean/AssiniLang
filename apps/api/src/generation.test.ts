@@ -65,7 +65,7 @@ function providerWithChatQueue(responses: Array<string | Error>): { provider: Ll
       calls.push(messages);
       const next = queue.shift();
       if (next instanceof Error) throw next;
-      return next ?? "{\"notes\":[]}";
+      return next ?? '{"notes":[]}';
     }
   };
   return { provider, calls };
@@ -128,7 +128,9 @@ describe("parseGeneratedNotes", () => {
     expect(result.notes).toHaveLength(1);
     expect(result.notes[0]?.topic).toBe("morphology/person/first-singular");
     expect(result.notes[0]?.evidencePassageIds).toEqual([`${TEST_LANGUAGE_ID}-c001`]);
-    expect(result.warnings.some((warning) => warning.includes("ungrounded") && warning.includes("phonology/invented"))).toBe(true);
+    expect(
+      result.warnings.some((warning) => warning.includes("ungrounded") && warning.includes("phonology/invented"))
+    ).toBe(true);
   });
 
   it("dedupes against an existing note topic and within the batch", () => {
@@ -163,7 +165,11 @@ describe("parseGeneratedNotes", () => {
   it("drops notes with an empty topic or too-short explanation", () => {
     const content = JSON.stringify({
       notes: [
-        { topic: "  ", explanation: "A long enough explanation that should still be dropped.", evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`] },
+        {
+          topic: "  ",
+          explanation: "A long enough explanation that should still be dropped.",
+          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`]
+        },
         { topic: "syntax/short", explanation: "too short", evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`] }
       ]
     });
@@ -202,7 +208,9 @@ describe("parseGeneratedExercise", () => {
     expect(result.exercise.allowedRuleIds).toEqual([`${TEST_LANGUAGE_ID}-note-basic-order`]);
     expect(result.exercise.expectedAnswers).toEqual(["saku talo-ki"]);
     expect(result.exercise.adversarialAnswers).toHaveLength(2);
-    expect(result.warnings.some((warning) => warning.includes("hallucinated vocabulary") && warning.includes("zzz-fake"))).toBe(true);
+    expect(
+      result.warnings.some((warning) => warning.includes("hallucinated vocabulary") && warning.includes("zzz-fake"))
+    ).toBe(true);
     expect(result.warnings.some((warning) => warning.includes("rule-that-does-not-exist"))).toBe(true);
   });
 
@@ -291,31 +299,35 @@ describe("parseGeneratedExercise", () => {
 
 describe("generateModelDraftNotes", () => {
   it("throws ModelRequiredError when the provider has no completeChat", async () => {
-    await expect(generateModelDraftNotes({
-      language,
-      corpus,
-      lexemes,
-      existingNotes: notes,
-      provider: providerWithoutChat
-    })).rejects.toBeInstanceOf(ModelRequiredError);
+    await expect(
+      generateModelDraftNotes({
+        language,
+        corpus,
+        lexemes,
+        existingNotes: notes,
+        provider: providerWithoutChat
+      })
+    ).rejects.toBeInstanceOf(ModelRequiredError);
   });
 
   it("calls the model and returns the grounded notes", async () => {
-    const { provider, calls } = providerWithChat(JSON.stringify({
-      notes: [
-        {
-          topic: "morphology/person/first-singular",
-          explanation: "The suffix -na marks a first-person singular subject on the verb.",
-          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
-          confidence: "high"
-        },
-        {
-          topic: "phonology/invented",
-          explanation: "A claim grounded in a passage id that does not exist in the corpus.",
-          evidencePassageIds: ["nope"]
-        }
-      ]
-    }));
+    const { provider, calls } = providerWithChat(
+      JSON.stringify({
+        notes: [
+          {
+            topic: "morphology/person/first-singular",
+            explanation: "The suffix -na marks a first-person singular subject on the verb.",
+            evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
+            confidence: "high"
+          },
+          {
+            topic: "phonology/invented",
+            explanation: "A claim grounded in a passage id that does not exist in the corpus.",
+            evidencePassageIds: ["nope"]
+          }
+        ]
+      })
+    );
 
     const result = await generateModelDraftNotes({
       language,
@@ -364,16 +376,18 @@ describe("generateModelDraftNotes", () => {
         }))
       })
     } as Response);
-    const { provider } = providerWithChat(JSON.stringify({
-      notes: [
-        {
-          topic: "morphology/person/first-singular",
-          explanation: "The suffix -na marks a first-person singular subject on the verb.",
-          evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
-          confidence: "high"
-        }
-      ]
-    }));
+    const { provider } = providerWithChat(
+      JSON.stringify({
+        notes: [
+          {
+            topic: "morphology/person/first-singular",
+            explanation: "The suffix -na marks a first-person singular subject on the verb.",
+            evidencePassageIds: [`${TEST_LANGUAGE_ID}-c001`],
+            confidence: "high"
+          }
+        ]
+      })
+    );
 
     await generateModelDraftNotes({
       language,
@@ -426,13 +440,15 @@ describe("generateModelDraftNotes", () => {
 
   it("throws when the model returns unparseable output", async () => {
     const { provider } = providerWithChat("I cannot do that.");
-    await expect(generateModelDraftNotes({
-      language,
-      corpus,
-      lexemes,
-      existingNotes: notes,
-      provider
-    })).rejects.toThrow(/valid JSON/);
+    await expect(
+      generateModelDraftNotes({
+        language,
+        corpus,
+        lexemes,
+        existingNotes: notes,
+        provider
+      })
+    ).rejects.toThrow(/valid JSON/);
   });
 
   it("retries draft notes with compact context after reasoning-only provider output", async () => {
@@ -485,30 +501,34 @@ describe("generateModelDraftNotes", () => {
 
 describe("generateModelExercise", () => {
   it("throws ModelRequiredError when the provider has no completeChat", async () => {
-    await expect(generateModelExercise({
-      language,
-      lexemes,
-      notes,
-      corpus,
-      provider: providerWithoutChat
-    })).rejects.toBeInstanceOf(ModelRequiredError);
+    await expect(
+      generateModelExercise({
+        language,
+        lexemes,
+        notes,
+        corpus,
+        provider: providerWithoutChat
+      })
+    ).rejects.toBeInstanceOf(ModelRequiredError);
   });
 
   it("calls the model and returns a grounded exercise", async () => {
-    const { provider, calls } = providerWithChat(JSON.stringify({
-      exercise: {
-        type: "translate_to_target",
-        prompt: "Translate to the target language: The child walks.",
-        allowedVocabulary: ["saku", "talo", "-ki", "ghost-form"],
-        allowedRuleIds: [`${TEST_LANGUAGE_ID}-note-basic-order`],
-        expectedAnswers: ["saku talo-ki"],
-        adversarialAnswers: [
-          { answer: "saku talo-na", reason: "Wrong person suffix." },
-          { answer: "talo saku-ki", reason: "Wrong word order." }
-        ],
-        gradingExplanation: "Subject saku precedes the verb talo with third-person -ki."
-      }
-    }));
+    const { provider, calls } = providerWithChat(
+      JSON.stringify({
+        exercise: {
+          type: "translate_to_target",
+          prompt: "Translate to the target language: The child walks.",
+          allowedVocabulary: ["saku", "talo", "-ki", "ghost-form"],
+          allowedRuleIds: [`${TEST_LANGUAGE_ID}-note-basic-order`],
+          expectedAnswers: ["saku talo-ki"],
+          adversarialAnswers: [
+            { answer: "saku talo-na", reason: "Wrong person suffix." },
+            { answer: "talo saku-ki", reason: "Wrong word order." }
+          ],
+          gradingExplanation: "Subject saku precedes the verb talo with third-person -ki."
+        }
+      })
+    );
 
     const result = await generateModelExercise({
       language,
@@ -564,38 +584,44 @@ describe("generateModelExercise", () => {
       new Error("LLM provider returned only reasoning_content without visible assistant content.")
     ]);
 
-    await expect(generateModelExercise({
-      language,
-      lexemes,
-      notes,
-      corpus,
-      provider
-    })).rejects.toThrow(/only reasoning_content for exercise generation twice/);
+    await expect(
+      generateModelExercise({
+        language,
+        lexemes,
+        notes,
+        corpus,
+        provider
+      })
+    ).rejects.toThrow(/only reasoning_content for exercise generation twice/);
     expect(calls).toHaveLength(2);
   });
 
   it("throws when the grounded exercise is unusable", async () => {
-    const { provider } = providerWithChat(JSON.stringify({
-      exercise: {
-        type: "translate_to_target",
-        prompt: "Translate something.",
-        allowedVocabulary: ["only-fake"],
-        allowedRuleIds: [],
-        expectedAnswers: ["only-fake"],
-        adversarialAnswers: [
-          { answer: "x", reason: "wrong" },
-          { answer: "y", reason: "wrong" }
-        ],
-        gradingExplanation: "A grading explanation long enough to pass the check."
-      }
-    }));
+    const { provider } = providerWithChat(
+      JSON.stringify({
+        exercise: {
+          type: "translate_to_target",
+          prompt: "Translate something.",
+          allowedVocabulary: ["only-fake"],
+          allowedRuleIds: [],
+          expectedAnswers: ["only-fake"],
+          adversarialAnswers: [
+            { answer: "x", reason: "wrong" },
+            { answer: "y", reason: "wrong" }
+          ],
+          gradingExplanation: "A grading explanation long enough to pass the check."
+        }
+      })
+    );
 
-    await expect(generateModelExercise({
-      language,
-      lexemes,
-      notes,
-      corpus,
-      provider
-    })).rejects.toThrow(/could not be grounded/);
+    await expect(
+      generateModelExercise({
+        language,
+        lexemes,
+        notes,
+        corpus,
+        provider
+      })
+    ).rejects.toThrow(/could not be grounded/);
   });
 });

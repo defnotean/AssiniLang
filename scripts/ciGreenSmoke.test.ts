@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CI_GREEN_AUDIT_ARGS,
-  createCiGreenAuditSpec,
-  runCiGreenSmoke
-} from "./ciGreenSmoke.mjs";
+import { CI_GREEN_AUDIT_ARGS, createCiGreenAuditSpec, runCiGreenSmoke } from "./ciGreenSmoke.mjs";
 
 describe("ci:green smoke helper", () => {
   it("audits production dependencies only at the moderate level", () => {

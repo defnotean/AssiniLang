@@ -30,8 +30,7 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
     const trapRoot = containerRef.current;
     if (!trapRoot) return;
 
-    const previouslyFocused =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const focusables = getFocusableElements(trapRoot);
     if (!trapRoot.contains(document.activeElement)) {

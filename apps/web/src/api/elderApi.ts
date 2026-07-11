@@ -1,4 +1,4 @@
-import type { CorpusPassage, ElderCorrection, GovernanceRecord, Language, Note } from "@assini/db";
+import type { CorpusPassage, ElderCorrection, GovernanceRecord, Language, Note } from "@assini/api-contract";
 import type { ElderCorrectionPayload } from "@assini/api-contract";
 import { actorRequest, assertOk, getJson } from "../lib/apiClient";
 

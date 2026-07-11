@@ -113,10 +113,11 @@ export function validateCorpusImport(
 ): { errors: string[]; warnings: string[] } {
   const warnings = corpusImportValidationWarnings(state, languageId);
   const normalizedTarget = normalizeAuthoredAnswer(body.textTarget).toLowerCase();
-  const duplicate = state.corpus.some((passage) => (
-    passage.languageId === languageId
-    && normalizeAuthoredAnswer(passage.textTarget).toLowerCase() === normalizedTarget
-  ));
+  const duplicate = state.corpus.some(
+    (passage) =>
+      passage.languageId === languageId &&
+      normalizeAuthoredAnswer(passage.textTarget).toLowerCase() === normalizedTarget
+  );
 
   if (duplicate) {
     return {
@@ -367,27 +368,30 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
           body,
           nextState.corpus.filter((item) => item.languageId === languageId).length
         );
-        nextState = appendAuditEvent({
-          ...nextState,
-          corpus: [...nextState.corpus, passage],
-          corpusAnswerKeys: [...(nextState.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
-        }, {
-          actor,
-          at: importedAt,
-          action: "corpus.imported",
-          entityType: "corpus",
-          entityId: passage.id,
-          languageId,
-          summary: `Imported corpus passage ${passage.id}.`,
-          metadata: {
-            source: passage.source,
-            morphemeCount: passage.morphologicalSegmentation.length,
-            tagCount: passage.topicTags.length,
-            consentUse: passage.consentStatus.use,
-            restrictionCount: passage.consentStatus.restrictions.length,
-            bulk: true
+        nextState = appendAuditEvent(
+          {
+            ...nextState,
+            corpus: [...nextState.corpus, passage],
+            corpusAnswerKeys: [...(nextState.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
+          },
+          {
+            actor,
+            at: importedAt,
+            action: "corpus.imported",
+            entityType: "corpus",
+            entityId: passage.id,
+            languageId,
+            summary: `Imported corpus passage ${passage.id}.`,
+            metadata: {
+              source: passage.source,
+              morphemeCount: passage.morphologicalSegmentation.length,
+              tagCount: passage.topicTags.length,
+              consentUse: passage.consentStatus.use,
+              restrictionCount: passage.consentStatus.restrictions.length,
+              bulk: true
+            }
           }
-        });
+        );
         nextResults.push({
           index,
           ok: true,
@@ -486,26 +490,29 @@ export function registerCorpusRoutes(app: FastifyInstance, ctx: RouteContext): v
         ...body
       };
 
-      return appendAuditEvent({
-        ...state,
-        corpus: [...state.corpus, passage],
-        corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
-      }, {
-        actor,
-        at: importedAt,
-        action: "corpus.imported",
-        entityType: "corpus",
-        entityId: passage.id,
-        languageId,
-        summary: `Imported corpus passage ${passage.id}.`,
-        metadata: {
-          source: passage.source,
-          morphemeCount: passage.morphologicalSegmentation.length,
-          tagCount: passage.topicTags.length,
-          consentUse: passage.consentStatus.use,
-          restrictionCount: passage.consentStatus.restrictions.length
+      return appendAuditEvent(
+        {
+          ...state,
+          corpus: [...state.corpus, passage],
+          corpusAnswerKeys: [...(state.corpusAnswerKeys ?? []), corpusPassageToAnswerKey(passage)]
+        },
+        {
+          actor,
+          at: importedAt,
+          action: "corpus.imported",
+          entityType: "corpus",
+          entityId: passage.id,
+          languageId,
+          summary: `Imported corpus passage ${passage.id}.`,
+          metadata: {
+            source: passage.source,
+            morphemeCount: passage.morphologicalSegmentation.length,
+            tagCount: passage.topicTags.length,
+            consentUse: passage.consentStatus.use,
+            restrictionCount: passage.consentStatus.restrictions.length
+          }
         }
-      });
+      );
     });
 
     if (languageMissing) {

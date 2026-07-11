@@ -21,4 +21,5 @@ describe("StatusBadge and ConfidenceBadge", () => {
 
     render(<ConfidenceBadge confidence="low" />);
     expect(screen.getByRole("status", { name: "low confidence" })).toBeInTheDocument();
-  });});
+  });
+});

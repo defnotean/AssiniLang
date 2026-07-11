@@ -105,19 +105,16 @@ export async function runBackupCli({
     await store.read();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `Cannot back up: local database at ${dbPath} is not a valid workspace: ${message}`,
-      { cause: error }
-    );
+    throw new Error(`Cannot back up: local database at ${dbPath} is not a valid workspace: ${message}`, {
+      cause: error
+    });
   }
 
   if (dryRun) {
     stdout(`Dry run: would back up local database at ${dbPath}`);
     stdout(`Dry run: backup destination would be ${destination}`);
     if (destinationExists && !force) {
-      stdout(
-        `Dry run: destination already exists; a real backup would need --force to overwrite ${destination}`
-      );
+      stdout(`Dry run: destination already exists; a real backup would need --force to overwrite ${destination}`);
     }
     return { dryRun: true, dbPath, destination };
   }

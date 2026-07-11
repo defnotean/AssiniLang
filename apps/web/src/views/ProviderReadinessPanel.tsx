@@ -57,9 +57,7 @@ export function ProviderReadinessPanel({
           <span className="detail-label">{t("model.providerReadiness")}</span>
           <h2>{heading}</h2>
         </div>
-        <span className={`status-badge ${badgeClass}`}>
-          {badge}
-        </span>
+        <span className={`status-badge ${badgeClass}`}>{badge}</span>
       </div>
       {!status.configured && (
         <p className="muted empty-state" role="status" aria-live="polite">
@@ -85,16 +83,20 @@ export function ProviderReadinessPanel({
         </div>
         <div>
           <dt>{t("model.apiKey")}</dt>
-          <dd>{status.apiKey.configured ? t("model.configuredServerSide") : status.apiKey.required ? t("model.required") : t("model.optionalNotSet")}</dd>
+          <dd>
+            {status.apiKey.configured
+              ? t("model.configuredServerSide")
+              : status.apiKey.required
+                ? t("model.required")
+                : t("model.optionalNotSet")}
+          </dd>
         </div>
         <div>
           <dt>{t("model.timeout")}</dt>
           <dd>{t("model.timeoutValue", { ms: status.timeoutMs })}</dd>
         </div>
       </dl>
-      <p className="privacy-note">
-        {t("model.privacyNote")}
-      </p>
+      <p className="privacy-note">{t("model.privacyNote")}</p>
       {status.warnings.length > 0 && (
         <div className="warning-list">
           {status.warnings.map((warning, index) => (

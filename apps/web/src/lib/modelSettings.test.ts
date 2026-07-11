@@ -135,26 +135,34 @@ describe("model settings helpers", () => {
   });
 
   it("rejects invalid OCR settings before save", () => {
-    expect(validateSettingsForm({
-      ...DEFAULT_FORM,
-      ocrLang: "english"
-    })).toEqual({ ok: false, errorKey: "model.ocrLangInvalid" });
+    expect(
+      validateSettingsForm({
+        ...DEFAULT_FORM,
+        ocrLang: "english"
+      })
+    ).toEqual({ ok: false, errorKey: "model.ocrLangInvalid" });
 
-    expect(validateSettingsForm({
-      ...DEFAULT_FORM,
-      ocrBaseUrl: "not-a-url"
-    })).toEqual({ ok: false, errorKey: "model.ocrBaseUrlInvalid" });
+    expect(
+      validateSettingsForm({
+        ...DEFAULT_FORM,
+        ocrBaseUrl: "not-a-url"
+      })
+    ).toEqual({ ok: false, errorKey: "model.ocrBaseUrlInvalid" });
   });
 
   it("validates dedicated embedding controls", () => {
-    expect(validateSettingsForm({
-      ...DEFAULT_FORM,
-      embeddingBaseUrl: "ftp://bad.example/v1"
-    })).toEqual({ ok: false, errorKey: "model.embeddingBaseUrlInvalid" });
-    expect(validateSettingsForm({
-      ...DEFAULT_FORM,
-      embeddingTimeoutMs: "600001"
-    })).toEqual({ ok: false, errorKey: "model.embeddingTimeoutInvalid" });
+    expect(
+      validateSettingsForm({
+        ...DEFAULT_FORM,
+        embeddingBaseUrl: "ftp://bad.example/v1"
+      })
+    ).toEqual({ ok: false, errorKey: "model.embeddingBaseUrlInvalid" });
+    expect(
+      validateSettingsForm({
+        ...DEFAULT_FORM,
+        embeddingTimeoutMs: "600001"
+      })
+    ).toEqual({ ok: false, errorKey: "model.embeddingTimeoutInvalid" });
   });
 
   it("auto-selects the only discovered model when no model is saved", () => {
@@ -178,14 +186,16 @@ describe("model settings helpers", () => {
       {
         scannedAt: "2026-07-06T00:00:00.000Z",
         models: [],
-        endpoints: [{
-          source: "local",
-          baseUrl: "http://127.0.0.1:1234/v1",
-          provider: "openai-compatible",
-          providerLabel: "Local OpenAI-compatible",
-          connected: true,
-          modelCount: 0
-        }],
+        endpoints: [
+          {
+            source: "local",
+            baseUrl: "http://127.0.0.1:1234/v1",
+            provider: "openai-compatible",
+            providerLabel: "Local OpenAI-compatible",
+            connected: true,
+            modelCount: 0
+          }
+        ],
         errors: []
       }
     );

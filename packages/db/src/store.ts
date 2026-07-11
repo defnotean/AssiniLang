@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { realpathSync, statSync } from "node:fs";
-import { copyFile, mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { basename, dirname, resolve, join } from "node:path";
 import type Database from "better-sqlite3";
 import { eq, getTableColumns } from "drizzle-orm";
@@ -9,6 +8,13 @@ import type { SQLiteTable } from "drizzle-orm/sqlite-core";
 import { appStateSchema, CURRENT_SCHEMA_VERSION, parseAppState, type AppState, type Note } from "./schema.js";
 import * as schema from "./dbSchema.js";
 import { runSqliteMigrations } from "./sqliteMigrations.js";
+import { resolveStoreBackend, type JsonStoreOptions, type StoreBackend } from "./storeConfig.js";
+import { pathsReferToSameFile, replaceFileAtomically } from "./storeFileIdentity.js";
+import { createEmptyState } from "./storeState.js";
+
+export type { JsonStoreOptions, StoreBackend } from "./storeConfig.js";
+export { pathsReferToSameFile, replaceFileAtomically, stripWindowsExtendedPrefix } from "./storeFileIdentity.js";
+export { createEmptyState } from "./storeState.js";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
 
@@ -19,158 +25,6 @@ export const DEFAULT_DB_PATH = resolve(process.cwd(), "data", "local-db.json");
  * failing on the first lock collision.
  */
 export const SQLITE_BUSY_TIMEOUT_MS = 5_000;
-
-export type StoreBackend = "json" | "sqlite";
-
-export interface JsonStoreOptions {
-  /**
-   * Explicit storage backend. When provided it wins over the path extension;
-   * when omitted the backend is inferred from the path (`.json` -> JSON file,
-   * anything else -> SQLite).
-   */
-  backend?: StoreBackend;
-}
-
-function inferBackend(dbPath: string): StoreBackend {
-  return dbPath.endsWith(".json") ? "json" : "sqlite";
-}
-
-/**
- * Strips Windows extended-length path prefixes so realpath (`\\?\...`) and
- * resolve(...) paths compare equal. `\\?\UNC\server\share` -> `\\server\share`;
- * `\\?\C:\foo` -> `C:\foo`. Always applied (not platform-gated) so Linux CI can
- * still validate Windows path strings.
- */
-export function stripWindowsExtendedPrefix(pathValue: string): string {
-  if (pathValue.startsWith("\\\\?\\UNC\\")) {
-    return `\\\\${pathValue.slice("\\\\?\\UNC\\".length)}`;
-  }
-  if (pathValue.startsWith("\\\\?\\")) {
-    return pathValue.slice("\\\\?\\".length);
-  }
-  return pathValue;
-}
-
-function normalizeWindowsPathForIdentity(pathValue: string): string {
-  return stripWindowsExtendedPrefix(pathValue).replace(/\//g, "\\").toLowerCase();
-}
-
-/**
- * Canonicalize a path for same-file checks. Prefer realpath so a symlink alias
- * of the live database is treated as the same file; fall back to resolve when
- * the path does not exist yet (typical for a new backup destination). Strip
- * Windows `\\?\` prefixes first — Node's realpath/resolve leave them intact and
- * string compares would otherwise miss same-file aliases.
- */
-function canonicalizePathForIdentity(pathValue: string): string {
-  const resolved = resolve(stripWindowsExtendedPrefix(pathValue));
-  try {
-    return realpathSync(resolved);
-  } catch {
-    return resolved;
-  }
-}
-
-/**
- * True when two filesystem paths refer to the same location after resolve +
- * realpath (case-insensitive on Windows, including `\\?\` extended prefixes),
- * or when both exist as the same inode/device (hard-link aliases). Catches
- * symlink and hard-link aliases of the live database so backup/restore cannot
- * overwrite the source through a different path string.
- */
-export function pathsReferToSameFile(left: string, right: string): boolean {
-  const normalizedLeft = canonicalizePathForIdentity(left);
-  const normalizedRight = canonicalizePathForIdentity(right);
-  const sameResolvedPath =
-    process.platform === "win32"
-      ? normalizeWindowsPathForIdentity(normalizedLeft) === normalizeWindowsPathForIdentity(normalizedRight)
-      : normalizedLeft === normalizedRight;
-  if (sameResolvedPath) {
-    return true;
-  }
-
-  // Hard links share device+inode while keeping distinct path strings (realpath
-  // does not collapse them the way it collapses symlink aliases).
-  try {
-    const leftStat = statSync(normalizedLeft);
-    const rightStat = statSync(normalizedRight);
-    if (
-      leftStat.isFile()
-      && rightStat.isFile()
-      && leftStat.dev === rightStat.dev
-      && leftStat.ino === rightStat.ino
-      && leftStat.ino !== 0
-    ) {
-      return true;
-    }
-  } catch {
-    // One or both paths may not exist yet (typical for a new backup destination).
-  }
-
-  return false;
-}
-
-function resolveBackend(dbPath: string, options?: JsonStoreOptions): StoreBackend {
-  const backend = options?.backend;
-  if (backend === undefined) {
-    return inferBackend(dbPath);
-  }
-  if (backend !== "json" && backend !== "sqlite") {
-    throw new Error(`Invalid store backend "${String(backend)}": expected "json" or "sqlite".`);
-  }
-  return backend;
-}
-
-/**
- * Replaces `destPath` with `tempPath`. Prefers a single rename; on platforms
- * that cannot rename over an existing file (Windows), moves the live file
- * aside first and restores it if the final rename fails.
- */
-export async function replaceFileAtomically(tempPath: string, destPath: string): Promise<void> {
-  try {
-    await rename(tempPath, destPath);
-    return;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException).code;
-    if (code !== "EEXIST" && code !== "EPERM" && code !== "EACCES") {
-      throw error;
-    }
-  }
-
-  const previousPath = join(dirname(destPath), `.${basename(destPath)}.${randomUUID()}.prev`);
-  await rename(destPath, previousPath);
-  try {
-    await rename(tempPath, destPath);
-  } catch (error) {
-    await rename(previousPath, destPath).catch(() => undefined);
-    throw error;
-  }
-  await unlink(previousPath).catch(() => undefined);
-}
-
-export function createEmptyState(): AppState {
-  return {
-    schemaVersion: CURRENT_SCHEMA_VERSION,
-    languages: [],
-    corpus: [],
-    noteAnswerKeys: [],
-    notes: [],
-    exercises: [],
-    exerciseSubmissions: [],
-    evaluationRuns: [],
-    governance: [],
-    users: [],
-    aiSessions: [],
-    elderCorrections: [],
-    auditEvents: [],
-    reviewPolicies: [],
-    reviewApprovals: [],
-    reviewDispositions: [],
-    lexemes: [],
-    sourceAssets: [],
-    extractionDrafts: []
-  };
-}
 
 const NULLABLE_KEYS = new Set([
   "lastReviewedBy",
@@ -248,8 +102,11 @@ export class JsonStore {
   // newer-version database is still refused.
   private schemaVerifiedKey: SnapshotKey | null = null;
 
-  constructor(private readonly dbPath = DEFAULT_DB_PATH, options?: JsonStoreOptions) {
-    this.backend = resolveBackend(this.dbPath, options);
+  constructor(
+    private readonly dbPath = DEFAULT_DB_PATH,
+    options?: JsonStoreOptions
+  ) {
+    this.backend = resolveStoreBackend(this.dbPath, options);
     this.isSqlite = this.backend === "sqlite";
   }
 
@@ -504,10 +361,10 @@ export class JsonStore {
   // full ensure + migration/version check.
   private ensureTablesOnce(db: Database.Database, key: SnapshotKey | null): void {
     if (
-      key === null
-      || this.schemaVerifiedKey === null
-      || this.schemaVerifiedKey.mtimeMs !== key.mtimeMs
-      || this.schemaVerifiedKey.size !== key.size
+      key === null ||
+      this.schemaVerifiedKey === null ||
+      this.schemaVerifiedKey.mtimeMs !== key.mtimeMs ||
+      this.schemaVerifiedKey.size !== key.size
     ) {
       this.ensureTables(db);
       this.schemaVerifiedKey = key;
@@ -607,9 +464,9 @@ export class JsonStore {
       // lost a TOCTOU). Match JSON ENOENT -> empty-state semantics.
       const code = (error as NodeJS.ErrnoException).code;
       if (
-        code === "ENOENT"
-        || code === "SQLITE_CANTOPEN"
-        || (error instanceof Error && /unable to open database file/i.test(error.message))
+        code === "ENOENT" ||
+        code === "SQLITE_CANTOPEN" ||
+        (error instanceof Error && /unable to open database file/i.test(error.message))
       ) {
         return createEmptyState();
       }
@@ -626,11 +483,7 @@ export class JsonStore {
    * declaration order; only differing rows are INSERTed/UPDATEd/DELETEd, so an
    * unchanged collection produces zero row changes.
    */
-  private syncTable(
-    drizzleDb: DrizzleDatabase,
-    table: SQLiteTable,
-    records: readonly Record<string, unknown>[]
-  ): void {
+  private syncTable(drizzleDb: DrizzleDatabase, table: SQLiteTable, records: readonly Record<string, unknown>[]): void {
     const columns = getTableColumns(table) as Record<string, any>;
     const columnKeys = Object.keys(columns);
     const pkKey = columnKeys.find((key) => columns[key].primary);
@@ -665,9 +518,16 @@ export class JsonStore {
       seen.add(pk);
       const existingFingerprint = existing.get(pk);
       if (existingFingerprint === undefined) {
-        drizzleDb.insert(table).values(row as any).run();
+        drizzleDb
+          .insert(table)
+          .values(row as any)
+          .run();
       } else if (existingFingerprint !== fingerprint(row)) {
-        drizzleDb.update(table).set(row as any).where(eq(pkColumn, pk)).run();
+        drizzleDb
+          .update(table)
+          .set(row as any)
+          .where(eq(pkColumn, pk))
+          .run();
       }
     }
 
@@ -890,7 +750,10 @@ export class JsonStore {
     return operation;
   }
 
-  async updateNote(noteId: string, patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>): Promise<Note> {
+  async updateNote(
+    noteId: string,
+    patch: Partial<Pick<Note, "status" | "explanation" | "reviewer" | "editHistory">>
+  ): Promise<Note> {
     let updated: Note | undefined;
     await this.update((state) => {
       const notesList = state.notes.map((note) => {

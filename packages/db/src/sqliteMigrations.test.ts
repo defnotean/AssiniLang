@@ -3,11 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  SQLITE_SCHEMA_VERSION,
-  runSqliteMigrations,
-  type SqliteMigration
-} from "./sqliteMigrations.js";
+import { SQLITE_SCHEMA_VERSION, runSqliteMigrations, type SqliteMigration } from "./sqliteMigrations.js";
 import { JsonStore, openStore } from "./store.js";
 import { createEmptyState } from "./store.js";
 
@@ -25,8 +21,7 @@ function readMeta(dbPath: string): { schema_version: number; migrated_at: string
   const db = new Database(dbPath);
   try {
     return db.prepare("SELECT schema_version, migrated_at FROM schema_meta LIMIT 1").get() as
-      | { schema_version: number; migrated_at: string }
-      | undefined;
+      { schema_version: number; migrated_at: string } | undefined;
   } finally {
     db.close();
   }
@@ -35,9 +30,7 @@ function readMeta(dbPath: string): { schema_version: number; migrated_at: string
 function setVersion(dbPath: string, version: number): void {
   const db = new Database(dbPath);
   try {
-    db.exec(
-      "CREATE TABLE IF NOT EXISTS schema_meta (schema_version INTEGER NOT NULL, migrated_at TEXT NOT NULL)"
-    );
+    db.exec("CREATE TABLE IF NOT EXISTS schema_meta (schema_version INTEGER NOT NULL, migrated_at TEXT NOT NULL)");
     db.prepare("DELETE FROM schema_meta").run();
     db.prepare("INSERT INTO schema_meta (schema_version, migrated_at) VALUES (?, ?)").run(
       version,
@@ -87,20 +80,24 @@ describe("runSqliteMigrations", () => {
           processed_at TEXT
         );
       `);
-      setup.prepare(`
+      setup
+        .prepare(
+          `
         INSERT INTO source_assets (
           id, language_id, kind, title, raw_text, status, created_by, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        "source-v8",
-        "language-v8",
-        "text",
-        "Legacy source",
-        "mira talo",
-        "pending",
-        "programmer-1",
-        "2026-06-06T00:00:00.000Z"
-      );
+      `
+        )
+        .run(
+          "source-v8",
+          "language-v8",
+          "text",
+          "Legacy source",
+          "mira talo",
+          "pending",
+          "programmer-1",
+          "2026-06-06T00:00:00.000Z"
+        );
     } finally {
       setup.close();
     }
@@ -110,15 +107,19 @@ describe("runSqliteMigrations", () => {
     try {
       runSqliteMigrations(db, dbPath);
       const columns = db.prepare("PRAGMA table_info(source_assets)").all() as Array<{ name: string }>;
-      expect(columns.map((column) => column.name)).toEqual(expect.arrayContaining([
-        "processing_started_at",
-        "processing_attempts",
-        "processing_heartbeat_at"
-      ]));
-      expect(db.prepare(`
+      expect(columns.map((column) => column.name)).toEqual(
+        expect.arrayContaining(["processing_started_at", "processing_attempts", "processing_heartbeat_at"])
+      );
+      expect(
+        db
+          .prepare(
+            `
         SELECT id, processing_started_at, processing_attempts, processing_heartbeat_at
         FROM source_assets WHERE id = ?
-      `).get("source-v8")).toEqual({
+      `
+          )
+          .get("source-v8")
+      ).toEqual({
         id: "source-v8",
         processing_started_at: null,
         processing_attempts: null,
@@ -181,9 +182,7 @@ describe("runSqliteMigrations", () => {
         /migration 8 -> 9 failed.*failing\.sqlite.*boom in migration body/s
       );
       // Rolled back: table from the partial migration must not exist.
-      const tables = db
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_done'")
-        .all();
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_done'").all();
       expect(tables).toEqual([]);
     } finally {
       db.close();
@@ -274,9 +273,7 @@ describe("JsonStore backend selection", () => {
   });
 
   it("rejects an invalid backend value", () => {
-    expect(() => new JsonStore(join(dir, "db.json"), { backend: "mongo" as never })).toThrow(
-      /Invalid store backend/
-    );
+    expect(() => new JsonStore(join(dir, "db.json"), { backend: "mongo" as never })).toThrow(/Invalid store backend/);
   });
 
   it("openStore mirrors the constructor", () => {

@@ -51,12 +51,30 @@ function runtimeLockFixture(reversePackageOrder = false) {
 }
 
 describe("desktop package helper scripts", () => {
+  it("copies the complete desktop runtime so entrypoint sibling modules ship together", async () => {
+    const [packageSource, mainSource, smokeModule, operationsModule, windowStateModule] = await Promise.all([
+      readFile(new URL("./packageDesktop.mjs", import.meta.url), "utf8"),
+      readFile(new URL("../apps/desktop/main.cjs", import.meta.url), "utf8"),
+      readFile(new URL("../apps/desktop/desktopSmoke.cjs", import.meta.url), "utf8"),
+      readFile(new URL("../apps/desktop/desktopOperations.cjs", import.meta.url), "utf8"),
+      readFile(new URL("../apps/desktop/desktopWindowState.cjs", import.meta.url), "utf8")
+    ]);
+
+    expect(packageSource).toContain('copyDir(join(repoRoot, "apps", "desktop"), join(appRoot, "apps", "desktop"))');
+    expect(mainSource).toContain('require("./desktopSmoke.cjs")');
+    expect(mainSource).toContain('require("./desktopOperations.cjs")');
+    expect(mainSource).toContain('require("./desktopWindowState.cjs")');
+    expect(smokeModule).toContain("module.exports = {");
+    expect(operationsModule).toContain("module.exports = { createDesktopOperations }");
+    expect(windowStateModule).toContain("module.exports = { createDesktopWindowState }");
+  });
+
   it("generates a top-level launcher that opens the packaged app", async () => {
     const { outputRootLauncherScript } = await import("./packageDesktop.mjs");
     const script = outputRootLauncherScript();
 
     expect(script).toContain("AssiniLang-win32-x64\\AssiniLang.exe");
-    expect(script).toContain("start \"\" \"%APP_EXE%\"");
+    expect(script).toContain('start "" "%APP_EXE%"');
     expect(script).toContain("Run npm.cmd run desktop:package first.");
   });
 
@@ -65,7 +83,7 @@ describe("desktop package helper scripts", () => {
     const script = packageRootLauncherScript();
 
     expect(script).toContain("AssiniLang.exe");
-    expect(script).toContain("start \"\" \"%APP_EXE%\"");
+    expect(script).toContain('start "" "%APP_EXE%"');
     expect(script).toContain("was not found next to this launcher");
   });
 
@@ -74,7 +92,7 @@ describe("desktop package helper scripts", () => {
     const script = outputRootInstallScript();
 
     expect(script).toContain("AssiniLang-win32-x64\\Install AssiniLang.cmd");
-    expect(script).toContain("call \"%INSTALLER%\"");
+    expect(script).toContain('call "%INSTALLER%"');
     expect(script).toContain("Run npm.cmd run desktop:package first.");
   });
 
@@ -220,7 +238,9 @@ describe("IExpress setup helpers", () => {
     expect(first).toBe(second);
     expect(first).toContain('TargetName="C:\\Release Build\\AssiniLang-Setup-x64.exe"');
     expect(first).toContain('SourceFiles0="C:\\Release Build\\Payload Files"');
-    expect(first).toContain('AppLaunched=powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "AssiniLangSetup.ps1"');
+    expect(first).toContain(
+      'AppLaunched=powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "AssiniLangSetup.ps1"'
+    );
     expect(first.indexOf('FILE0="AssiniLang-win32-x64.zip"')).toBeLessThan(
       first.indexOf('FILE1="AssiniLangSetup.ps1"')
     );

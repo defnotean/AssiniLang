@@ -24,21 +24,11 @@ export function LearnerPracticeNextPanel({
   function renderEmptyActions(includeBuild: boolean) {
     return (
       <div className="practice-next-actions">
-        <button
-          type="button"
-          className="secondary"
-          disabled={isWorkflowBusy}
-          onClick={onAuthorExercise}
-        >
+        <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={onAuthorExercise}>
           {t("learner.authorExerciseCta")}
         </button>
         {includeBuild && onOpenBuild && (
-          <button
-            type="button"
-            className="secondary"
-            disabled={isWorkflowBusy}
-            onClick={onOpenBuild}
-          >
+          <button type="button" className="secondary" disabled={isWorkflowBusy} onClick={onOpenBuild}>
             {t("learner.openBuildCta")}
           </button>
         )}

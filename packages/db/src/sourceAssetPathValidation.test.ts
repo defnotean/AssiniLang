@@ -28,9 +28,9 @@ describe("sourceAssetFilePathIssue", () => {
 
 describe("resolveSourceAssetFilePath", () => {
   it("throws for NUL-bearing persisted paths instead of resolving them under dataDir", () => {
-    expect(() =>
-      resolveSourceAssetFilePath(join(tmpdir(), "data"), "assets/avenik/a\0.txt", "avenik")
-    ).toThrow(/Unsafe source asset file path/);
+    expect(() => resolveSourceAssetFilePath(join(tmpdir(), "data"), "assets/avenik/a\0.txt", "avenik")).toThrow(
+      /Unsafe source asset file path/
+    );
   });
 
   it("resolves a safe relative asset path under dataDir", () => {

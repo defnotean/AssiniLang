@@ -40,7 +40,7 @@ async function findAvailablePort(preferredPort) {
     server.listen(0, "127.0.0.1", resolve);
   });
   const port = server.address().port;
-  await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   return String(port);
 }
 
@@ -101,7 +101,10 @@ async function startApi(port) {
 function startWebServer(url, apiUrl) {
   const parsed = new URL(url);
   const viteBin = path.join(repoRoot, "node_modules", "vite", "bin", "vite.js");
-  assert(existsSync(path.join(repoRoot, "apps", "web", "dist", "index.html")), "Built web app was not found. Run npm run build first.");
+  assert(
+    existsSync(path.join(repoRoot, "apps", "web", "dist", "index.html")),
+    "Built web app was not found. Run npm run build first."
+  );
   assert(existsSync(viteBin), `Vite CLI was not found at ${viteBin}.`);
   const child = spawn(nodeExecutable, [viteBin, "preview", "--host", parsed.hostname, "--port", parsed.port], {
     cwd: path.join(repoRoot, "apps", "web"),
@@ -149,7 +152,8 @@ async function renderSmoke(url) {
 
   try {
     await webContents.loadURL(url);
-    const report = await webContents.executeJavaScript(`
+    const report = await webContents.executeJavaScript(
+      `
       new Promise((resolve) => {
         const deadline = Date.now() + ${RENDER_TIMEOUT_MS};
         const snapshot = () => ({
@@ -169,9 +173,12 @@ async function renderSmoke(url) {
         };
         poll();
       })
-    `, true);
+    `,
+      true
+    );
     const screenshotPath = process.env.ASSINI_WEB_SMOKE_SCREENSHOT;
-    if (screenshotPath) await webContents.capturePage().then((image) => require("node:fs").writeFileSync(screenshotPath, image.toPNG()));
+    if (screenshotPath)
+      await webContents.capturePage().then((image) => require("node:fs").writeFileSync(screenshotPath, image.toPNG()));
     const complete = parseSmokeReport({ ...report, consoleErrors, fatalEvents });
     return complete;
   } finally {
@@ -205,10 +212,14 @@ async function main() {
 // final result are guaranteed to finish before the process exits.
 app.on("window-all-closed", () => {});
 
-app.whenReady().then(main).then(() => app.quit()).catch((error) => {
-  console.error(`[web-smoke] failed: ${error instanceof Error ? error.stack : String(error)}`);
-  app.exit(1);
-});
+app
+  .whenReady()
+  .then(main)
+  .then(() => app.quit())
+  .catch((error) => {
+    console.error(`[web-smoke] failed: ${error instanceof Error ? error.stack : String(error)}`);
+    app.exit(1);
+  });
 
 app.on("will-quit", () => {
   if (smokeDbPath) rmSync(smokeDbPath, { force: true });

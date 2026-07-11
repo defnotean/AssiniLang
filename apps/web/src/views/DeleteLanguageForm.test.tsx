@@ -5,8 +5,22 @@ import { ApiError } from "../lib/apiClient";
 import { DeleteLanguageForm } from "./DeleteLanguageForm";
 
 const LANGUAGES = [
-  { id: "lang-1", name: "Avenik", description: "Test", orthography: "Latin", status: "draft" as const, typology: "unknown" as const },
-  { id: "lang-2", name: "Testlang", description: "Fixture", orthography: "Latin", status: "draft" as const, typology: "unknown" as const }
+  {
+    id: "lang-1",
+    name: "Avenik",
+    description: "Test",
+    orthography: "Latin",
+    status: "draft" as const,
+    typology: "unknown" as const
+  },
+  {
+    id: "lang-2",
+    name: "Testlang",
+    description: "Fixture",
+    orthography: "Latin",
+    status: "draft" as const,
+    typology: "unknown" as const
+  }
 ];
 
 describe("DeleteLanguageForm", () => {
@@ -76,7 +90,8 @@ describe("DeleteLanguageForm", () => {
   });
 
   it("localizes rate-limit and payload-too-large deletion failures", async () => {
-    const onDelete = vi.fn()
+    const onDelete = vi
+      .fn()
       .mockRejectedValueOnce(
         new ApiError("Request failed: /languages/lang-1 (429): Rate limit exceeded", {
           status: 429,
@@ -106,9 +121,7 @@ describe("DeleteLanguageForm", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Too many requests. Wait 8 seconds, then retry."
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests. Wait 8 seconds, then retry.");
 
     fireEvent.change(screen.getByLabelText("Type the language name to confirm"), {
       target: { value: "Avenik" }
